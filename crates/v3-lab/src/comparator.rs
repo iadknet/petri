@@ -13,7 +13,7 @@ pub const RING_REF: u16 = AUTHORED_REF + 1;
 /// The area-food controller (F01's comparator).
 #[must_use]
 pub fn area_food(founder: &CreatureGenome) -> CreatureGenome {
-    controller(founder, Family::Vector).0
+    controller(founder, Family::Vector)
 }
 
 /// `barrier-comparator`: the area-food controller plus the Ring controller

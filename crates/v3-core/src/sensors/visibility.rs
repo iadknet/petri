@@ -289,7 +289,28 @@ pub fn compute_visible_cells_into<'a>(
 mod tests {
     use super::*;
     use crate::config::WorldEdgeMode;
+    use crate::contracts::Direction;
     use crate::kernel::WorldState;
+
+    /// Barriers on the four diagonal ring cells never hide a cardinal ring cell.
+    #[test]
+    fn diagonal_barriers_leave_every_cardinal_ring_cell_visible() {
+        let mut world = WorldState::new(20, 20, WorldEdgeMode::Wrap);
+        let origin = Position::new(10, 10);
+        for diagonal in [Direction::NE, Direction::SE, Direction::SW, Direction::NW] {
+            let (dx, dy) = diagonal.delta();
+            let cell = |offset: i32| u16::try_from(10 + offset).expect("inside the world");
+            world.set_barrier(Position::new(cell(dx), cell(dy)), true);
+        }
+        let visible = compute_visible_cells(origin, &world, get_visibility_table(5));
+        for cardinal in [Direction::N, Direction::E, Direction::S, Direction::W] {
+            let (dx, dy) = cardinal.delta();
+            assert!(
+                visible.iter().any(|cell| (cell.dx, cell.dy) == (dx, dy)),
+                "{cardinal:?}"
+            );
+        }
+    }
 
     #[test]
     fn visibility_table_has_correct_ray_count() {

@@ -708,10 +708,9 @@ mod tests {
     fn the_comparator_builds_on_the_production_founder() {
         let setup = setup(1, 100.0);
         let founder = founder(&setup);
-        let (comparator, structure) =
+        let comparator =
             crate::controllers::controller(&founder, crate::controllers::Family::Vector);
         assert_ne!(comparator, founder);
-        assert!(structure.edges > 0);
     }
 
     #[test]

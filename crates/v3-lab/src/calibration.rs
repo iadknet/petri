@@ -357,7 +357,7 @@ mod tests {
             config.population.founder_profile,
             &config.energy.lifecycle,
         );
-        let comparator = controller(&founder, Family::Vector).0;
+        let comparator = controller(&founder, Family::Vector);
         (founder, comparator)
     }
 

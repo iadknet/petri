@@ -10,7 +10,7 @@
 use v3_core::config::OrdinaryFoodTypeId;
 use v3_core::contracts::food_idx;
 use v3_core::contracts::votes::DirectedVoteKind;
-use v3_core::contracts::votes::{ActionParamField, VoteSink};
+use v3_core::contracts::votes::VoteSink;
 use v3_core::contracts::{InputReference, WorldInputKey};
 use v3_core::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
@@ -45,24 +45,13 @@ pub const VECTOR_GATE_THRESHOLD: f32 = 0.5;
 /// `A_vector`: the weight of a gated nearest-food component into the move
 /// toward it (and its negation into the move away).
 pub const VECTOR_WEIGHT: f32 = 1.0;
-/// `A_scalar`: the fruit-only flag (fruit here, no primary food here) opens
-/// above this; its weight into `Eat` lies above the founder's largest move
-/// vote (0.9), and the fruit-here flag's weight into `EatFoodType` names
-/// type 1. With grass here the founder already eats once, so only the type
-/// changes.
-pub const SCALAR_ONLY_THRESHOLD: f32 = 0.5;
-pub const SCALAR_EAT_WEIGHT: f32 = 1.0;
-pub const SCALAR_TYPE_WEIGHT: f32 = 1.0;
-
-/// The three controller families, one per input shape.
+/// The two controller families, one per input shape.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Family {
     /// `NeighborBarrierRing`, cyclic 8.
     Ring,
     /// `AreaFoodSummary(0)`, heterogeneous 7.
     Vector,
-    /// `FoodHere(1)`, scalar.
-    Scalar,
 }
 
 impl Family {
@@ -72,16 +61,8 @@ impl Family {
         InputReference::World(match self {
             Self::Ring => WorldInputKey::NeighborBarrierRing,
             Self::Vector => WorldInputKey::area_food_summary(OrdinaryFoodTypeId::new(0)),
-            Self::Scalar => WorldInputKey::food_here(OrdinaryFoodTypeId::new(1)),
         })
     }
-}
-
-/// The count of authored structure a controller adds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct AuthoredStructure {
-    pub edges: u32,
-    pub compute_nodes: u32,
 }
 
 /// Appends authored structure to the vote graph, reading the family's
@@ -89,8 +70,6 @@ pub struct AuthoredStructure {
 struct Author<'a> {
     graph: &'a mut CgpGraphBackendDef,
     ref_idx: u16,
-    edges: u32,
-    nodes: u32,
 }
 
 impl Author<'_> {
@@ -101,24 +80,18 @@ impl Author<'_> {
         }
     }
 
-    fn edge(&mut self, source: GraphSource, weight: f32) -> GraphEdge {
-        self.edges += 1;
-        GraphEdge::new(source, weight)
-    }
-
     fn node(&mut self, kind: ComputeNodeKind, inputs: &[(GraphSource, f32)]) -> GraphSource {
         let inputs = inputs
             .iter()
-            .map(|&(source, weight)| self.edge(source, weight))
+            .map(|&(source, weight)| GraphEdge::new(source, weight))
             .collect();
-        self.nodes += 1;
         self.graph
             .append_compute_node(ComputeNode::new(kind, inputs));
         GraphSource::ComputeNode((self.graph.compute_nodes().len() - 1) as u16)
     }
 
     fn wire(&mut self, sink: OutputSinkKind, source: GraphSource, weight: f32) {
-        let edge = self.edge(source, weight);
+        let edge = GraphEdge::new(source, weight);
         let surface = self
             .graph
             .sink_surface(sink)
@@ -137,19 +110,14 @@ fn move_sink(direction: u8) -> OutputSinkKind {
 /// # Panics
 ///
 /// If `genome`'s vote node is not a Graph node.
-pub fn append_controller(genome: &mut CreatureGenome, family: Family) -> AuthoredStructure {
+pub fn append_controller(genome: &mut CreatureGenome, family: Family) {
     let node = &mut genome.nodes[VOTE_NODE];
     let ref_idx = u16::try_from(node.input_refs.len()).expect("a vote node's references fit u16");
     node.input_refs.push(family.reference());
     let BackendDef::Graph(graph) = &mut node.backend_def else {
         panic!("the founder's vote node is a Graph node");
     };
-    let mut author = Author {
-        graph,
-        ref_idx,
-        edges: 0,
-        nodes: 0,
-    };
+    let mut author = Author { graph, ref_idx };
     match family {
         Family::Ring => {
             for direction in RING_MOVES {
@@ -177,29 +145,6 @@ pub fn append_controller(genome: &mut CreatureGenome, family: Family) -> Authore
             author.wire(move_sink(4), dy, VECTOR_WEIGHT);
             author.wire(move_sink(0), dy, -VECTOR_WEIGHT);
         }
-        Family::Scalar => {
-            let fruit_here = author.leaf(0);
-            let fruit = author.node(ComputeNodeKind::Threshold(0.0), &[(fruit_here, 1.0)]);
-            // Fruit is the only food here: the founder does not already eat.
-            let fruit_only = author.node(
-                ComputeNodeKind::Threshold(SCALAR_ONLY_THRESHOLD),
-                &[(fruit, 1.0), (PRIMARY_FOOD_HERE, -1.0)],
-            );
-            author.wire(
-                OutputSinkKind::ActionVote(VoteSink::Eat),
-                fruit_only,
-                SCALAR_EAT_WEIGHT,
-            );
-            author.wire(
-                OutputSinkKind::ActionParam(ActionParamField::EatFoodType),
-                fruit,
-                SCALAR_TYPE_WEIGHT,
-            );
-        }
-    }
-    AuthoredStructure {
-        edges: author.edges,
-        compute_nodes: author.nodes,
     }
 }
 
@@ -210,13 +155,13 @@ pub fn append_controller(genome: &mut CreatureGenome, family: Family) -> Authore
 ///
 /// If `founder`'s vote node is not the founder's seven-reference Graph node.
 #[must_use]
-pub fn controller(founder: &CreatureGenome, family: Family) -> (CreatureGenome, AuthoredStructure) {
+pub fn controller(founder: &CreatureGenome, family: Family) -> CreatureGenome {
     let mut genome = founder.clone();
     assert_eq!(
         genome.nodes[VOTE_NODE].input_refs.len(),
         usize::from(AUTHORED_REF),
         "the founder's vote node holds seven references"
     );
-    let structure = append_controller(&mut genome, family);
-    (genome, structure)
+    append_controller(&mut genome, family);
+    genome
 }
