@@ -20,13 +20,18 @@ use crate::testing::{decode_metrics, MetricKind, PointValue, ReceivedSnapshot};
 
 const MS: Duration = Duration::from_millis(1);
 
-#[test]
-fn the_census_mean_capacity_is_the_living_population_mean_and_zero_at_extinction() {
+/// A 16x16 world seeded with three creatures.
+fn three_creatures() -> Simulation {
     let mut config = v3_core::config::SimulationConfig::default();
     config.world.width = 16;
     config.world.height = 16;
     config.population.initial_creatures = 3;
-    let mut sim = v3_core::simulation::seed_simulation(config, 5);
+    v3_core::simulation::seed_simulation(config, 5)
+}
+
+#[test]
+fn the_census_mean_capacity_is_the_living_population_mean_and_zero_at_extinction() {
+    let mut sim = three_creatures();
     for (creature, capacity) in sim.creatures.values_mut().zip([40.0, 60.0, 110.0]) {
         creature.body.capacity = capacity;
     }
@@ -45,11 +50,7 @@ fn the_census_mean_capacity_is_the_living_population_mean_and_zero_at_extinction
 /// equality: the census reads the one definition, it computes nothing.
 #[test]
 fn the_census_means_are_the_readers_definitions_uncast_and_zero_at_extinction() {
-    let mut config = v3_core::config::SimulationConfig::default();
-    config.world.width = 16;
-    config.world.height = 16;
-    config.population.initial_creatures = 3;
-    let mut sim = v3_core::simulation::seed_simulation(config, 5);
+    let mut sim = three_creatures();
     for ((creature, energy), capacity) in sim
         .creatures
         .values_mut()
