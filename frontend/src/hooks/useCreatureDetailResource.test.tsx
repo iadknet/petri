@@ -369,7 +369,10 @@ describe("useCreatureDetailResource", () => {
 		await act(async () => {
 			useConfigStore
 				.getState()
-				.commitServerConfig({ ...MOCK_CONFIG, runtime: { ...MOCK_CONFIG.runtime } }, "paused");
+				.commitServerConfig(
+					{ ...MOCK_CONFIG, runtime: { ...MOCK_CONFIG.runtime, max_vm_steps: 2048 } },
+					"paused",
+				);
 			await Promise.resolve();
 		});
 		await act(async () => {
