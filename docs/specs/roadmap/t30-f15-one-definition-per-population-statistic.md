@@ -166,8 +166,13 @@ pin table would show it wrong.
 - [ ] `make check` exits 0.
 - [ ] Overhead: `scripts/telemetry-overhead` (stack up, `run` workload) ->
       pass, its pair count, ratio interval and time used in the readings.
-- [ ] Gate: summary at `docs/progress/features/t30-f15.json`, raw hash and
+      INCONCLUSIVE, not a pass: spread attempt 1 0.2476, attempt 2 0.0708
+      -> 24 pairs at 5303 ms do not fit the 300 s cap (102.6 s used); 0
+      pairs, no ratio or interval.
+- [x] Gate: summary at `docs/progress/features/t30-f15.json`, raw hash and
       byte count checked, series entry points to it, no full report staged.
+      `make bench PROFILE=gate FEATURE=t30-f15` exit 0, `severe=false`;
+      raw 161168 bytes, sha256 `df9ed774...7a87`.
 
 ## Performance and Goal Impact
 
@@ -194,7 +199,14 @@ otherwise inconclusive, as is reaching the 300 s cap. Expected: pass, the
 sort being small beside the snapshot's per-genome censuses. An inconclusive
 result is reported to the user, never rounded to a pass or extended.
 
-**Measured verdict.** Not yet run.
+**Measured verdict.** Gate (`make bench PROFILE=gate FEATURE=t30-f15`, exit
+0, CLI exit 0): `severe=false` against `t25-f11.json`; deterministic block
+identical to the epoch's; all nine work counters at 0.000000%; no wall-clock
+reference in the epoch, so none compared. Overhead
+(`scripts/telemetry-overhead`, exit 0): inconclusive with 0 pairs (24 pairs
+at 5303 ms per run do not fit the 300 s cap; 102.6 s used; first spread
+0.2476 on a cold stack, second 0.0708); no ratio or interval. Details in the
+readings.
 
 - Summary of the declared profile: [gate](../../progress/features/t30-f15.json).
 - Full readings: [`docs/progress/readings/t30-f15.md`](../../progress/readings/t30-f15.md).
