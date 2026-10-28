@@ -90,16 +90,16 @@ today's for a valid genome would show it wrong.
 
 ## Implementation Tasks
 
-- [ ] Core: add invariant 2's bus-slot read API in `genome::mesh_annotations` with unit tests for each liveness case (a declared but unread `UpstreamSlot`, a dead VM `ReadInput`, an `InputLeaf` edge into a non-live compute node, an `UpstreamBus` field read, an `UpstreamSlot` read through any field, a VM payload write, a wired and an unwired `CustomOutput`), moving the server test `a_bus_field_read_is_the_slot_its_upstream_slot_twin_reads` here.
-- [ ] Core: `BirthCoordinate` carries the member location (invariant 4); update the container tests and extend the bundle proptest (`mutation/graph/tests/bundle.rs`) so every located member is a member of its bundle reading the coordinate's field on its site.
-- [ ] Server: diagnostics forward the API (invariant 3); bundle coordinates forward the location; `BrainContext` becomes the identity (invariant 5); `PROTOCOL_VERSION` `v3alpha17`; regenerate the wire types; update `tests/server.rs`' brain-context test to compare identities, and add a server test pinning `live_circuit`'s two slot lists for a genome with an unreachable node and a Graph `CustomOutput` write.
-- [ ] Frontend: `EdgeBundleList.tsx` reads members by location and presence from the location; `useCreatureDetailResource.ts` compares the identity whole and polls on any committed config change, with hook tests for a commit that changes the identity (brain refetched) and one that does not (brain not refetched); drop the "Custom Outputs" row; update the protocol pin and the affected tests and fixtures.
+- [x] Core: add invariant 2's bus-slot read API in `genome::mesh_annotations` with unit tests for each liveness case (a declared but unread `UpstreamSlot`, a dead VM `ReadInput`, an `InputLeaf` edge into a non-live compute node, an `UpstreamBus` field read, an `UpstreamSlot` read through any field, a VM payload write, a wired and an unwired `CustomOutput`), moving the server test `a_bus_field_read_is_the_slot_its_upstream_slot_twin_reads` here.
+- [x] Core: `BirthCoordinate` carries the member location (invariant 4); update the container tests and extend the bundle proptest (`mutation/graph/tests/bundle.rs`) so every located member is a member of its bundle reading the coordinate's field on its site.
+- [x] Server: diagnostics forward the API (invariant 3); bundle coordinates forward the location; `BrainContext` becomes the identity (invariant 5); `PROTOCOL_VERSION` `v3alpha17`; regenerate the wire types; update `tests/server.rs`' brain-context test to compare identities, and add a server test pinning `live_circuit`'s two slot lists for a genome with an unreachable node and a Graph `CustomOutput` write.
+- [x] Frontend: `EdgeBundleList.tsx` reads members by location and presence from the location; `useCreatureDetailResource.ts` compares the identity whole and polls on any committed config change, with hook tests for a commit that changes the identity (brain refetched) and one that does not (brain not refetched); drop the "Custom Outputs" row; update the protocol pin and the affected tests and fixtures.
 
 ## Verification
 
-- [ ] Core slot and coordinate tests: `cargo test -p v3-core mesh_annotations` and `cargo test -p v3-core bundle` -> result recorded in the readings.
-- [ ] Server: `cargo test -p v3-server` (wire-type test without `PETRI_WRITE_TS_TYPES`) -> pass.
-- [ ] Frontend: `npm test` and `npm run lint` in `frontend/` -> pass.
+- [x] Core slot and coordinate tests: `cargo test -p v3-core mesh_annotations` and `cargo test -p v3-core bundle` -> result recorded in the readings.
+- [x] Server: `cargo test -p v3-server` (wire-type test without `PETRI_WRITE_TS_TYPES`) -> pass.
+- [x] Frontend: `npm test` and `npm run lint` in `frontend/` -> pass.
 - [ ] `make check` -> exit 0, viability and baseline-world digests unchanged.
 - [ ] Benchmark profiles: `Not run: Verification Plan`.
 
@@ -112,8 +112,8 @@ compute cost, indicator or threshold applies; no profile runs.
 
 ## Success Criteria
 
-- [ ] `http/creature.rs` contains no walk over a node's program or edges; its slot lists come from the genome API.
-- [ ] `EdgeBundleList.tsx` contains no coordinate join and `useCreatureDetailResource.ts` no field of the brain context.
+- [x] `http/creature.rs` contains no walk over a node's program or edges; its slot lists come from the genome API.
+- [x] `EdgeBundleList.tsx` contains no coordinate join and `useCreatureDetailResource.ts` no field of the brain context.
 - [ ] Invariants 1–6 hold and the Verification items pass.
 
 ## Notes for AI Agents
