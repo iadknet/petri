@@ -184,12 +184,11 @@ impl BackendLearning {
         let mut slot_of: Vec<Option<usize>> = vec![None; bundles.len()];
         let mut scales = Vec::new();
         let mut scale_seeded = Vec::new();
-        for (index, bound) in bounds.iter().enumerate() {
+        for ((bundle, record), bound) in def.indexed_bundles().zip(&bounds) {
             if let Some(bound) = *bound {
-                slot_of[index] = Some(scales.len());
-                let bundle = BundleId::new(u16::try_from(index).expect("bundles below u16::MAX"));
-                let genomic = bundles[index].scale();
-                let inherit_scale = bundles[index].inherit_scale();
+                slot_of[bundle.index()] = Some(scales.len());
+                let genomic = record.scale();
+                let inherit_scale = record.inherit_scale();
                 // The birth value (invariant 2): the clamped seed, else the
                 // clamped genomic scale.
                 let seed = seeds
@@ -201,7 +200,7 @@ impl BackendLearning {
                     birth: seed.unwrap_or(genomic).clamp(-bound, bound),
                     bound,
                     inherit_scale,
-                    retention: bundles[index].retention(),
+                    retention: record.retention(),
                 });
                 scale_seeded.push(seed.is_some());
             }

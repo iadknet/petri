@@ -21,6 +21,7 @@
 
 pub mod battery;
 pub mod births;
+pub mod bundles;
 pub mod census;
 pub mod classify;
 pub mod drift;
@@ -51,6 +52,11 @@ use crate::contracts::SensorContext;
 /// `EVOLVED_SEED_MULTIPLIER * (genome_index + 1)`, `genome_index` running
 /// over the sampled genomes of one seed in rank order.
 pub const EVOLVED_SEED_MULTIPLIER: u64 = 100_000;
+
+/// The weight magnitude above which a census counts an edge as carrying a
+/// path, and a bundle scale or own correction as off zero (`> 1e-3`): the
+/// one floor the drive, ring-rule and bundle censuses share.
+pub const PATH_WEIGHT_FLOOR: f32 = 1e-3;
 
 /// Predeclared founder-half battery version and sizes (T11.F01 Battery,
 /// "Predeclared sizes and seeds"). Halved once, uniformly, if a compute limit

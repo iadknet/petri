@@ -649,6 +649,20 @@ impl CgpGraphBackendDef {
         &self.bundles
     }
 
+    /// Every edge-bundle record with its id, in `BundleId` order: a
+    /// record's id is its slice position, which the graph keeps below
+    /// `u16::MAX` (`add_bundle`), so callers never convert an index.
+    pub fn indexed_bundles(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (BundleId, &Bundle)> + ExactSizeIterator + Clone + '_ {
+        self.bundles.iter().enumerate().map(|(index, bundle)| {
+            (
+                BundleId(u16::try_from(index).expect("bundles below u16::MAX")),
+                bundle,
+            )
+        })
+    }
+
     /// The genomic weight of the edge at `occurrence`: its own weight when
     /// ungrouped, [`compose`]`(own_weight, scale, pattern)` for a member.
     #[must_use]

@@ -245,8 +245,10 @@ pub(crate) fn add_sensor_by_law(
     node.add_sensor(reference, &births, context)
         .map_err(|_| MutationSkipReason::NoApplicableTarget)?;
     let (def, _) = graph_node(node)?;
-    let ids: Vec<BundleId> = (first..def.bundles().len())
-        .map(|index| BundleId::new(u16::try_from(index).expect("bundles below u16::MAX")))
+    let ids: Vec<BundleId> = def
+        .indexed_bundles()
+        .skip(first)
+        .map(|(id, _)| id)
         .collect();
     let edits = draw_birth_learning(def, &ids, rng);
     let wirings: Vec<Wiring> = births.iter().map(|birth| birth.wiring).collect();
@@ -392,9 +394,7 @@ fn pick_where(
     rng: &mut impl Rng,
 ) -> Result<BundleId, MutationSkipReason> {
     let matching = || {
-        def.bundles()
-            .iter()
-            .enumerate()
+        def.indexed_bundles()
             .filter(|(_, bundle)| predicate(bundle))
     };
     let count = matching().count();
@@ -402,12 +402,10 @@ fn pick_where(
         return Err(MutationSkipReason::NoApplicableTarget);
     }
     let pick = rng.gen_range(0..count);
-    let (index, _) = matching()
+    let (id, _) = matching()
         .nth(pick)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    Ok(BundleId::new(
-        u16::try_from(index).expect("bundles below u16::MAX"),
-    ))
+    Ok(id)
 }
 
 /// `EnableBundleRetention` (T25.F09): one retaining bundle, then

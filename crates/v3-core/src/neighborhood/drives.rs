@@ -20,8 +20,7 @@ use crate::genome::{BackendDef, CreatureGenome, VmInstruction};
 /// The census version the goal summary records.
 pub const DRIVES_VERSION: &str = "drives-v2";
 
-/// The weight magnitude above which an edge carries a path.
-pub const PATH_WEIGHT_FLOOR: f32 = 1e-3;
+use crate::neighborhood::PATH_WEIGHT_FLOOR;
 
 const KINDS: usize = DirectedVoteKind::ALL.len();
 

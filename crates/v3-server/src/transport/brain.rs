@@ -512,11 +512,8 @@ fn graph_brain(
     }
     let mut scales = learned.scales(node_idx).peekable();
     let bundles = def
-        .bundles()
-        .iter()
-        .enumerate()
-        .map(|(index, record)| {
-            let id = core_cgp::BundleId::new(u16::try_from(index).expect("bundles below u16::MAX"));
+        .indexed_bundles()
+        .map(|(id, record)| {
             let learned_scale = scales
                 .next_if(|scale| scale.bundle == id)
                 .and_then(|scale| scale.learned);

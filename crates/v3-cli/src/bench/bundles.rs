@@ -8,17 +8,13 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use v3_core::genome::cgp::{BundleId, Wiring};
-use v3_core::genome::{BackendDef, CreatureGenome};
-use v3_core::mutation::types::{wiring_index, MutationOperator, FORM_KEYS, WIRING_KEYS};
+use v3_core::genome::CreatureGenome;
+use v3_core::mutation::types::{MutationOperator, FORM_KEYS, WIRING_KEYS};
+use v3_core::neighborhood::bundles::{BundleCensus, BundleTarget};
 use v3_core::runtime::plasticity::LearnedState;
 
 /// The block's definition version.
 pub const BUNDLES_VERSION: &str = "bundles-v1";
-
-/// A scale or own correction off zero: `|w| > 1e-3`, the census weight
-/// floor.
-const NONZERO_FLOOR: f32 = v3_core::neighborhood::drives::PATH_WEIGHT_FLOOR;
 
 /// One wiring's totals over the reachable bundles.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -64,90 +60,55 @@ pub struct Bundles {
     pub rows: Vec<BundleRow>,
 }
 
-/// The target key of a wiring's row.
-fn target(wiring: &Wiring) -> String {
-    match wiring {
-        Wiring::Plain { sink } => sink.as_key(),
-        Wiring::Ring { kind, .. } | Wiring::DirectionPair { kind, .. } => kind.as_key().to_owned(),
+/// The target key of a row.
+fn target(target: BundleTarget) -> String {
+    match target {
+        BundleTarget::Sink(sink) => sink.as_key(),
+        BundleTarget::Kind(kind) => kind.as_key().to_owned(),
     }
 }
 
 impl Bundles {
-    /// Census `creatures`, each a genome, its reachable node indices and,
-    /// when sampled, its runtime's learned state, with the run's creations.
+    /// The block of `creatures`, each a genome, its reachable node indices
+    /// and, when sampled, its runtime's learned state, with the run's
+    /// creations: the readers' bundle census, labelled.
     pub fn census<'a>(
         creatures: impl IntoIterator<Item = (&'a CreatureGenome, &'a [usize], Option<&'a LearnedState>)>,
         created_total: &std::collections::HashMap<MutationOperator, [[u64; 2]; 3]>,
     ) -> Self {
-        let mut totals: [WiringTotals; 3] = Default::default();
-        let mut learned_sampled = false;
-        let mut creature_count = 0;
-        let mut carriers = 0;
-        let mut rows: BTreeMap<(usize, String), BundleRow> = BTreeMap::new();
-        for (genome, reachable, learned) in creatures {
-            creature_count += 1;
-            learned_sampled |= learned.is_some();
-            let mut carried = false;
-            for (index, node) in genome.nodes.iter().enumerate() {
-                let BackendDef::Graph(def) = &node.backend_def else {
-                    continue;
-                };
-                let scales: BTreeMap<BundleId, Option<f32>> = learned
-                    .map(|learned| {
-                        learned
-                            .scales(index)
-                            .map(|scale| (scale.bundle, scale.learned))
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                for (id, bundle) in def.bundles().iter().enumerate() {
-                    let wiring = bundle.wiring();
-                    let row = wiring_index(&wiring);
-                    if !reachable.contains(&index) {
-                        totals[row].unreachable += 1;
-                        continue;
-                    }
-                    carried = true;
-                    let id = BundleId::new(u16::try_from(id).expect("bundles below u16::MAX"));
-                    let members = def.members(id).count() as u64;
-                    let own_nonzero = def
-                        .members(id)
-                        .filter(|&member| def.edge_at(member).own_weight().abs() > NONZERO_FLOOR)
-                        .count() as u64;
-                    let genomic = bundle.scale().abs() > NONZERO_FLOOR;
-                    let learned_nonzero = scales
-                        .get(&id)
-                        .copied()
-                        .flatten()
-                        .is_some_and(|value| value.abs() > NONZERO_FLOOR);
-                    let total = &mut totals[row];
-                    total.bundles += 1;
-                    total.genomic_nonzero += u64::from(genomic);
-                    *total.learned_nonzero.get_or_insert(0) += u64::from(learned_nonzero);
-                    total.members += members;
-                    total.own_nonzero += own_nonzero;
-                    let entry = rows
-                        .entry((row, target(&wiring)))
-                        .or_insert_with(|| BundleRow {
-                            wiring: WIRING_KEYS[row].to_string(),
-                            target: target(&wiring),
-                            count: 0,
-                            genomic_nonzero: 0,
-                            members: 0,
-                        });
-                    entry.count += 1;
-                    entry.genomic_nonzero += u64::from(genomic);
-                    entry.members += members;
-                }
-            }
-            carriers += u64::from(carried);
-        }
+        let census = BundleCensus::observe(creatures);
         let wirings = WIRING_KEYS
             .iter()
-            .zip(totals)
-            .map(|(key, mut total)| {
-                total.learned_nonzero = learned_sampled.then(|| total.learned_nonzero.unwrap_or(0));
-                (key.to_string(), total)
+            .zip(census.wirings)
+            .map(|(key, total)| {
+                (
+                    key.to_string(),
+                    WiringTotals {
+                        bundles: total.bundles,
+                        genomic_nonzero: total.genomic_nonzero,
+                        learned_nonzero: census.learned_sampled.then_some(total.learned_nonzero),
+                        members: total.members,
+                        own_nonzero: total.own_nonzero,
+                        unreachable: total.unreachable,
+                    },
+                )
+            })
+            .collect();
+        let rows: BTreeMap<(usize, String), BundleRow> = census
+            .rows
+            .iter()
+            .map(|row| {
+                let label = target(row.target);
+                (
+                    (row.wiring, label.clone()),
+                    BundleRow {
+                        wiring: WIRING_KEYS[row.wiring].to_string(),
+                        target: label,
+                        count: row.count,
+                        genomic_nonzero: row.genomic_nonzero,
+                        members: row.members,
+                    },
+                )
             })
             .collect();
         let created = created_total
@@ -170,8 +131,8 @@ impl Bundles {
             .collect();
         Self {
             version: BUNDLES_VERSION.to_string(),
-            creatures: creature_count,
-            carriers,
+            creatures: census.creatures,
+            carriers: census.carriers,
             wirings,
             created,
             rows: rows.into_values().collect(),
@@ -204,7 +165,8 @@ mod tests {
     use v3_core::contracts::votes::DirectedVoteKind;
     use v3_core::contracts::{InputReference, WorldInputKey};
     use v3_core::creature::founder::v3alpha1_founder_genome;
-    use v3_core::genome::cgp::{BundleBirth, BundleSource};
+    use v3_core::genome::cgp::{BundleBirth, BundleSource, Wiring};
+    use v3_core::genome::BackendDef;
     use v3_core::mutation::graph::GraphOperator;
 
     fn context() -> v3_core::contracts::SensorContext {

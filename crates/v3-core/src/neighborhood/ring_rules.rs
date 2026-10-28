@@ -27,14 +27,13 @@ use crate::genome::cgp::{
     ring_offset, BundleSource, CgpGraphBackendDef, GraphSource, OutputSinkKind, Wiring,
 };
 use crate::genome::{BackendDef, CreatureGenome};
+use crate::neighborhood::bundles::{CreatureBundles, RING};
 use crate::neighborhood::sensor_census::world_input_key_label;
 
 /// The census version the goal summary records.
 pub const RING_RULES_VERSION: &str = "ring-rules-v3";
 
-/// The weight magnitude above which an edge carries a path, and above which
-/// a bundle's scale counts as nonzero.
-pub const PATH_WEIGHT_FLOOR: f32 = 1e-3;
+use crate::neighborhood::PATH_WEIGHT_FLOOR;
 
 /// A rule covering this many directions or more is direction-general.
 pub const DIRECTION_GENERAL_COVERAGE: u32 = 6;
@@ -177,7 +176,6 @@ impl RingRuleCensus {
         self.creatures += 1;
         let bus = bus(genome, reachable);
         let mut coverage = Coverage::default();
-        let mut carried = 0u64;
         for (def, refs) in graphs(genome, reachable) {
             for sink in def.output_sinks() {
                 let OutputSinkKind::ActionVote(vote) = sink.kind else {
@@ -226,7 +224,7 @@ impl RingRuleCensus {
                     }
                 }
             }
-            for (index, bundle) in def.bundles().iter().enumerate() {
+            for (id, bundle) in def.indexed_bundles() {
                 let (
                     Wiring::Ring { kind, offset },
                     BundleSource::Sensor {
@@ -236,16 +234,8 @@ impl RingRuleCensus {
                 else {
                     continue;
                 };
-                let members = def
-                    .members(crate::genome::cgp::BundleId::new(
-                        u16::try_from(index).expect("bundles below u16::MAX"),
-                    ))
-                    .count() as u64;
-                carried += 1;
-                self.ring_bundles += 1;
-                self.ring_bundle_members += members;
+                let members = def.members(id).count() as u64;
                 let nonzero = carries(bundle.scale());
-                self.ring_bundles_nonzero += u64::from(nonzero);
                 let Some(family) = ring_of(refs.get(usize::from(ring_ref))) else {
                     continue;
                 };
@@ -259,22 +249,14 @@ impl RingRuleCensus {
                 counts.members += members;
             }
         }
-        self.ring_bundles_unreachable += genome
-            .nodes
-            .iter()
-            .enumerate()
-            .filter(|(idx, _)| !reachable.contains(idx))
-            .filter_map(|(_, node)| match &node.backend_def {
-                BackendDef::Graph(def) => Some(
-                    def.bundles()
-                        .iter()
-                        .filter(|bundle| matches!(bundle.wiring(), Wiring::Ring { .. }))
-                        .count() as u64,
-                ),
-                BackendDef::Vm(_) => None,
-            })
-            .sum::<u64>();
-        self.ring_bundle_carriers += u64::from(carried > 0);
+        // The `Ring` totals are the bundle census's: a `Ring` wiring always
+        // reads a sensor source (`bundles::tests`).
+        let ring = CreatureBundles::of(genome, reachable, None).wirings[RING];
+        self.ring_bundles += ring.bundles;
+        self.ring_bundles_nonzero += ring.genomic_nonzero;
+        self.ring_bundle_members += ring.members;
+        self.ring_bundles_unreachable += ring.unreachable;
+        self.ring_bundle_carriers += u64::from(ring.bundles > 0);
         let general = |mask: u8| mask.count_ones() >= DIRECTION_GENERAL_COVERAGE;
         self.direction_general += u64::from(coverage.0.values().any(|&(all, _)| general(all)));
         self.direction_general_edges_only +=
