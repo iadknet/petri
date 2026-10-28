@@ -142,7 +142,7 @@ that moves, or a lab test or slow-tier lab run failing, would show it wrong.
 - [x] Lab: add `crates/v3-lab/src/controllers.rs` with the controller
       construction moved from `neighborhood/opportunity/controllers.rs`
       (`Family` with `reference()`, the constants with `RING_MOVES`,
-      `AuthoredStructure`, `controller`), dropping the assay-only parts
+      `controller`), dropping the assay-only parts
       (`Family::ALL`, `index`, `as_key`, `authored_sub_indices`,
       `authored_channels`, the inert `Z_k` scale, the `Scalar` family, the
       `AuthoredStructure` counts and derives nothing in the lab uses). One
