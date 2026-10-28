@@ -6,12 +6,6 @@ import {
 	useCreatureInspectorStore,
 } from "../stores/creatureInspector.ts";
 import { useSimulationStore } from "../stores/simulation.ts";
-import type { BrainContext } from "../types/generated/BrainContext.ts";
-
-function sameBrainContext(a: BrainContext, b: BrainContext): boolean {
-	return a.food_type_count === b.food_type_count && a.action_queue_slots === b.action_queue_slots;
-}
-
 export function useCreatureDetailResource() {
 	// The request in flight, cleared when it settles. A tick never replaces
 	// it: with responses slower than ticks, every poll would abort its
@@ -21,9 +15,8 @@ export function useCreatureDetailResource() {
 	const lastFetchRef = useRef<number>(0);
 	const latestTickRef = useRef<number | null>(null);
 	const hasFullFetchRef = useRef(false);
-	// The held brain resolves under another context than the latest poll's
-	// or the committed config's: every fetch carries the brain until one
-	// lands.
+	// The held brain resolves under another context than the latest
+	// poll's: every fetch carries the brain until one lands.
 	const brainStaleRef = useRef(false);
 	const MIN_FETCH_INTERVAL = 100;
 
@@ -80,10 +73,10 @@ export function useCreatureDetailResource() {
 					hasFullFetchRef.current = true;
 				}
 
-				// The held brain resolves under another context (a changed
-				// `max_actions_per_turn`): refetch it under the current one.
+				// The held brain resolves under another context identity:
+				// refetch it under the current one.
 				const held = useCreatureInspectorStore.getState().staticDetail.brainContext;
-				brainStaleRef.current = held !== null && !sameBrainContext(held, detail.brain_context);
+				brainStaleRef.current = held !== null && held !== detail.brain_context;
 				if (brainStaleRef.current) fetchCreature(id, true);
 			} catch (err) {
 				if (controller.signal.aborted || currentIdRef.current !== id) return;
@@ -129,19 +122,16 @@ export function useCreatureDetailResource() {
 			}
 		});
 
-		// A committed queue change (`max_actions_per_turn`) moves the brain
-		// context with no tick while paused: refetch the brain under it,
-		// replacing a request sent under the old config.
+		// A committed config change may move the brain context with no tick
+		// while paused: poll, replacing a request sent under the old config,
+		// and let the poll's context identity decide the brain refetch.
 		const unsubConfig = useConfigStore.subscribe((state, prev) => {
-			const queue = state.serverConfig?.runtime.max_actions_per_turn;
-			const prevQueue = prev.serverConfig?.runtime.max_actions_per_turn;
 			if (
-				prevQueue !== undefined &&
-				queue !== prevQueue &&
+				prev.serverConfig !== null &&
+				state.serverConfig !== prev.serverConfig &&
 				currentIdRef.current !== null &&
 				!creatureInspectorSelectors.isDead(useCreatureInspectorStore.getState())
 			) {
-				brainStaleRef.current = true;
 				fetchCreature(currentIdRef.current, true);
 			}
 		});

@@ -6,12 +6,8 @@ import type { BrainEdge } from "../../types/generated/BrainEdge.ts";
 import type { BrainSink } from "../../types/generated/BrainSink.ts";
 import type { GraphBrain } from "../../types/generated/GraphBrain.ts";
 import type { Site } from "../../types/generated/Site.ts";
-import {
-	EdgeBundleList,
-	collectBundleMembers,
-	coordinateKey,
-	indexMembers,
-} from "./EdgeBundleList.tsx";
+import { EdgeBundleList, coordinateMember } from "./EdgeBundleList.tsx";
+import { joinLearning } from "./brainLearning.ts";
 
 /** A member of bundle 0 as the brain view resolves it: every number given,
  * none composed here. */
@@ -53,7 +49,7 @@ function grouped(): GraphBrain {
 	}
 	const bundle = ringBundle(1, { offset: 1, scale: 0.5 });
 	const missing = bundle.coordinates[3];
-	if (missing) missing.present = false;
+	if (missing) bundle.coordinates[3] = { field: missing.field, site: missing.site };
 	return graphBrain({ output_sinks: sinks, bundles: [bundle] });
 }
 
@@ -64,19 +60,16 @@ const refs = [
 
 /** The coordinates of a `DirectionPair` bundle on AreaFoodSummary pair 1
  * (x field 3, y field 4, facts 0, 5, 6) at `offset`, in birth order: the
- * twelve compass coordinates, then the facts on the drive; `absent` lists
- * the coordinates without a member. */
-function pairCoordinates(
-	offset: number,
-	absent: (field: number, site: Site) => boolean = () => false,
-): BrainBundle["coordinates"] {
+ * twelve compass coordinates, then the facts on the drive; each a hole
+ * until a member is placed on it. */
+function pairCoordinates(offset: number): BrainBundle["coordinates"] {
 	const compass = (field: number, relatives: number[]) =>
 		relatives.map((r) => ({ field, site: { Direction: (r + offset) % 8 } as Site }));
 	return [
 		...compass(3, [1, 2, 3, 5, 6, 7]),
 		...compass(4, [0, 1, 3, 4, 5, 7]),
 		...[0, 5, 6].map((field) => ({ field, site: "Drive" as Site })),
-	].map((c) => ({ ...c, present: !absent(c.field, c.site) }));
+	];
 }
 
 describe("EdgeBundleList", () => {
@@ -189,17 +182,19 @@ describe("EdgeBundleList", () => {
 		const absent = (field: number, site: Site) =>
 			(field === 3 && typeof site !== "string" && site.Direction === 4) ||
 			(field === 6 && site === "Drive");
-		const coordinates = pairCoordinates(2, absent);
+		const coordinates = pairCoordinates(2);
 		const sinks = directionSinks("StealEnergy");
 		const drive: BrainSink = { kind: { ActionVote: { Drive: "StealEnergy" } }, edges: [] };
-		for (const c of coordinates.filter((c) => c.present)) {
+		for (const c of coordinates.filter((c) => !absent(c.field, c.site))) {
 			if (c.site === "Drive") {
 				const own = c.field === 5 ? 0.25 : 0;
+				c.member = { surface: "sink", container: 8, edge: drive.edges.length };
 				drive.edges.push(member(c.field, "Drive", { own, genomic: 2 + own, pattern: 1, scale: 2 }));
 			} else if (typeof c.site !== "string") {
-				sinks[c.site.Direction]?.edges.push(
-					member(c.field, c.site, { own: 0, genomic: 1, pattern: 0.5, scale: 2 }),
-				);
+				const sink = sinks[c.site.Direction];
+				if (!sink) continue;
+				c.member = { surface: "sink", container: c.site.Direction, edge: sink.edges.length };
+				sink.edges.push(member(c.field, c.site, { own: 0, genomic: 1, pattern: 0.5, scale: 2 }));
 			}
 		}
 		const bundle: BrainBundle = {
@@ -242,7 +237,11 @@ describe("EdgeBundleList", () => {
 			source: { Memory: { previous: true } },
 			wiring: { Plain: { sink: "Eat" } },
 			scale: 0.5,
-			coordinates: [0, 1, 2].map((field) => ({ field, site: "Sink", present: field < 2 })),
+			coordinates: [0, 1, 2].map((field) => ({
+				field,
+				site: "Sink",
+				...(field < 2 ? { member: { surface: "sink", container: 0, edge: field } } : {}),
+			})),
 		};
 		render(
 			<EdgeBundleList
@@ -267,20 +266,36 @@ describe("EdgeBundleList", () => {
 	});
 });
 
-describe("indexMembers", () => {
-	it("finds every member of the widest queue bundle by coordinate", () => {
-		const width = 65_536;
-		const sink: BrainSink = { kind: { ActionVote: "Eat" }, edges: [] };
-		for (let field = 0; field < width; field++) {
-			sink.edges.push(member(field, "Sink", { own: 0, genomic: 0, pattern: 1, scale: 0 }));
-		}
+describe("coordinateMember", () => {
+	it("reads the edge at the coordinate's location, its weight in force by the same key", () => {
+		// Two members of bundle 0 read field 0 on the sink; the coordinate
+		// names the second, so the first is not shown.
+		const sink: BrainSink = {
+			kind: { ActionVote: "Eat" },
+			edges: [
+				member(0, "Sink", { own: 0.125, genomic: 0.625, pattern: 1, scale: 0.5 }),
+				member(0, "Sink", { own: 0.25, genomic: 0.75, pattern: 1, scale: 0.5 }),
+			],
+		};
 		const graph = graphBrain({ output_sinks: [sink], bundles: [ringBundle(0)] });
-		const index = indexMembers(collectBundleMembers(graph, null)[0] ?? []);
-		let found = 0;
-		for (let field = 0; field < width; field++) {
-			if (index.get(coordinateKey(field, "Sink"))?.field === field) found++;
-		}
-		expect(found).toBe(width);
-		expect(index.get(coordinateKey(0, { Direction: 0 }))).toBeUndefined();
+		const join = joinLearning({
+			node_id: 0,
+			scales: [],
+			edges: [{ surface: "sink", container: 0, edge: 1, applied: 1.5 }],
+		});
+		const located = coordinateMember(
+			graph,
+			{ field: 0, site: "Sink", member: { surface: "sink", container: 0, edge: 1 } },
+			join,
+		);
+		expect(located).toEqual({
+			own: 0.25,
+			genomic: 0.75,
+			scale: 0.5,
+			pattern: 1,
+			scope: "Edge",
+			applied: 1.5,
+		});
+		expect(coordinateMember(graph, { field: 0, site: "Sink" }, join)).toBeUndefined();
 	});
 });

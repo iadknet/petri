@@ -89,7 +89,8 @@ export function learner(overrides: Partial<EdgeLearner> = {}): EdgeLearner {
 }
 
 /** A ring bundle on `ringRef` into `kind` (default `Move`) at `offset`
- * (default 0) and scale 0, with all eight members present. */
+ * (default 0) and scale 0, with all eight members present, each the first
+ * edge of the direction sink its site names. */
 export function ringBundle(
 	ringRef: number,
 	{
@@ -107,7 +108,7 @@ export function ringBundle(
 		coordinates: Array.from({ length: 8 }, (_, c) => ({
 			field: c,
 			site: { Direction: (c + offset) % 8 },
-			present: true,
+			member: { surface: "sink", container: (c + offset) % 8, edge: 0 },
 		})),
 		...overrides,
 	};

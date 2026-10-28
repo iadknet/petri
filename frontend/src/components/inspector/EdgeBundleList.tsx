@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from "react";
 import type { BrainBundle } from "../../types/generated/BrainBundle.ts";
+import type { BundleCoordinate } from "../../types/generated/BundleCoordinate.ts";
 import type { BundleSource } from "../../types/generated/BundleSource.ts";
 import type { GraphBrain } from "../../types/generated/GraphBrain.ts";
 import type { InputRef } from "../../types/generated/InputRef.ts";
@@ -8,7 +9,7 @@ import type { Scope } from "../../types/generated/Scope.ts";
 import type { Site } from "../../types/generated/Site.ts";
 import type { Wiring } from "../../types/generated/Wiring.ts";
 import { Tip } from "../config-panel/shared/Tooltip.tsx";
-import { joinLearning } from "./brainLearning.ts";
+import { type LearningJoin, joinLearning } from "./brainLearning.ts";
 import { directionName } from "./directions.ts";
 import { composeTerms, scopeLabel } from "./edgeBundleWeights.ts";
 import { describeInputRef, formatInputRef } from "./inputRefUtils.ts";
@@ -21,13 +22,8 @@ interface EdgeBundleListProps {
 	learning: NodeLearning | null;
 }
 
+/** A bundle member's weights as the brain view resolves them. */
 export interface BundleMember {
-	/** The field the member reads: a sensor's sub-value or a memory slot. */
-	field: number | undefined;
-	/** Where the member sits under its bundle's wiring. */
-	site: Site | undefined;
-	sink: number;
-	edge: number;
 	own: number;
 	/** The member's genomic (composed) weight. */
 	genomic: number;
@@ -39,50 +35,27 @@ export interface BundleMember {
 	applied: number;
 }
 
-/** Each bundle's members in sink order, as the brain view lists them. */
-export function collectBundleMembers(
+/** The member a birth coordinate names: the edge at its location, the
+ * key the `learning` payload uses; `undefined` for a hole. */
+export function coordinateMember(
 	graphDef: GraphBrain,
-	learning: NodeLearning | null,
-): BundleMember[][] {
-	const join = joinLearning(learning);
-	const members: BundleMember[][] = graphDef.bundles.map(() => []);
-	graphDef.output_sinks.forEach((sink, sinkIndex) => {
-		sink.edges.forEach((edge, edgeIndex) => {
-			const member = edge.member;
-			const list = member ? members[member.bundle] : undefined;
-			if (!member || !list) return;
-			list.push({
-				field: member.field,
-				site: member.site,
-				sink: sinkIndex,
-				edge: edgeIndex,
-				own: edge.own,
-				genomic: edge.genomic,
-				scale: member.scale,
-				pattern: member.pattern,
-				scope: member.scope,
-				applied: join.edge("sink", sinkIndex, edgeIndex, edge).applied,
-			});
-		});
-	});
-	return members;
-}
-
-/** A birth coordinate `(field, site)` as a lookup key. */
-export function coordinateKey(field: number, site: Site): string {
-	return `${field}:${typeof site === "string" ? site : site.Direction}`;
-}
-
-/** A bundle's members by coordinate, the first at each (one lookup per
- * birth coordinate; a queue bundle carries up to 65,536). */
-export function indexMembers(members: readonly BundleMember[]): Map<string, BundleMember> {
-	const index = new Map<string, BundleMember>();
-	for (const member of members) {
-		if (member.field === undefined || member.site === undefined) continue;
-		const key = coordinateKey(member.field, member.site);
-		if (!index.has(key)) index.set(key, member);
-	}
-	return index;
+	coordinate: BundleCoordinate,
+	join: LearningJoin,
+): BundleMember | undefined {
+	const at = coordinate.member;
+	if (at === undefined) return undefined;
+	const containers = at.surface === "sink" ? graphDef.output_sinks : graphDef.compute_nodes;
+	const edge = containers[at.container]?.edges[at.edge];
+	const member = edge?.member;
+	if (edge === undefined || member === undefined) return undefined;
+	return {
+		own: edge.own,
+		genomic: edge.genomic,
+		scale: member.scale,
+		pattern: member.pattern,
+		scope: member.scope,
+		applied: join.edge(at.surface, at.container, at.edge, edge).applied,
+	};
 }
 
 /** A geometric wiring's kind and offset; `null` for `Plain`. */
@@ -118,10 +91,11 @@ function fieldLabel(source: BundleSource, field: number, inputRefs: InputRef[]):
 	return ref === undefined ? `field ${field}` : describeInputRef(ref, field).label;
 }
 
-/** A coordinate list's presence: `count/total ●○…`. */
-function presence(list: readonly { present: boolean }[]): string {
-	const marks = list.map(({ present }) => (present ? "●" : "○")).join("");
-	return `${list.filter(({ present }) => present).length}/${list.length} ${marks}`;
+/** A coordinate list's presence: `count/total ●○…`; a coordinate is
+ * present when it carries a member location. */
+function presence(list: readonly BundleCoordinate[]): string {
+	const marks = list.map(({ member }) => (member ? "●" : "○")).join("");
+	return `${list.filter(({ member }) => member).length}/${list.length} ${marks}`;
 }
 
 /** A member's weights, its composition from the bundle in a tooltip. */
@@ -209,18 +183,17 @@ function BundleFacts({
 function BundleRow({
 	bundle,
 	index,
-	members,
+	graphDef,
+	join,
 	inputRefs,
-	learnedScale,
 }: {
 	bundle: BrainBundle;
 	index: number;
-	members: BundleMember[];
+	graphDef: GraphBrain;
+	join: LearningJoin;
 	inputRefs: InputRef[];
-	learnedScale: number | undefined;
 }) {
 	const [open, setOpen] = useState(true);
-	const byCoordinate = indexMembers(members);
 	const wiringName =
 		"Plain" in bundle.wiring
 			? `Plain → ${formatVoteSink(bundle.wiring.Plain.sink)}`
@@ -242,7 +215,7 @@ function BundleRow({
 					<span aria-hidden="true">{open ? "▾" : "▸"}</span>
 					{name}
 				</button>
-				<BundleFacts bundle={bundle} learnedScale={learnedScale} />
+				<BundleFacts bundle={bundle} learnedScale={join.learnedScale(index, bundle)} />
 				<Tip
 					data-testid="edge-bundle-members"
 					content="Members present over the birth coordinates, in birth order (● present, ○ hole)."
@@ -253,18 +226,17 @@ function BundleRow({
 			{open ? (
 				<ul className="ml-4 space-y-0.5 text-slate-400">
 					{bundle.coordinates.map((coordinate) => {
-						const key = coordinateKey(coordinate.field, coordinate.site);
-						const member = byCoordinate.get(key);
+						const member = coordinateMember(graphDef, coordinate, join);
 						const at = `${fieldLabel(bundle.source, coordinate.field, inputRefs)} → ${siteLabel(
 							coordinate.site,
 							bundle.wiring,
 						)}`;
 						return member ? (
-							<li key={key} data-testid="edge-bundle-member">
+							<li key={at} data-testid="edge-bundle-member">
 								{at} <MemberWeights member={member} />
 							</li>
 						) : (
-							<li key={key} data-testid="edge-bundle-hole" className="text-slate-400">
+							<li key={at} data-testid="edge-bundle-hole" className="text-slate-400">
 								{at} (hole)
 							</li>
 						);
@@ -284,7 +256,6 @@ function BundleRow({
 export function EdgeBundleList({ graphDef, inputRefs, learning }: EdgeBundleListProps) {
 	const bundles = graphDef.bundles;
 	if (bundles.length === 0) return null;
-	const members = collectBundleMembers(graphDef, learning);
 	const join = joinLearning(learning);
 	return (
 		<section aria-label="Edge bundles" className="mt-2">
@@ -298,9 +269,9 @@ export function EdgeBundleList({ graphDef, inputRefs, learning }: EdgeBundleList
 						key={index}
 						bundle={bundle}
 						index={index}
-						members={members[index] ?? []}
+						graphDef={graphDef}
+						join={join}
 						inputRefs={inputRefs}
-						learnedScale={join.learnedScale(index, bundle)}
 					/>
 				))}
 			</ul>

@@ -58,7 +58,7 @@ function makeDetail(overrides: Partial<Detail> = {}): Detail {
 				},
 			],
 		},
-		brainContext: { food_type_count: 1, action_queue_slots: 10 },
+		brainContext: "food_type_count=1;action_queue_slots=10",
 		sharedMemory: [0, 1, 2],
 		actionLog: [makeEntry(1), makeEntry(2, "Eat")],
 		diagnostics: {
@@ -76,7 +76,6 @@ function makeDetail(overrides: Partial<Detail> = {}): Detail {
 				barrier_reader_without_decision_writer_reachable_node_count: 0,
 				distinct_upstream_slots_read: [0],
 				distinct_payload_slots_written: [1],
-				distinct_custom_output_slots_written: [2],
 				reachable_read_class_counts: { barrier: 1, food: 2 },
 				reachable_write_class_counts: { action: 1, route: 2 },
 			},
@@ -243,7 +242,7 @@ describe("creatureInspectorStore actionLog", () => {
 
 	it("replaces the brain and its context with every fetch that carries one", () => {
 		useCreatureInspectorStore.getState().setDetail(makeDetail());
-		const wider = { food_type_count: 1, action_queue_slots: 20 };
+		const wider = "food_type_count=1;action_queue_slots=20";
 		const refetched = { entry_node_id: 5, nodes: [] };
 		useCreatureInspectorStore
 			.getState()
@@ -259,14 +258,13 @@ describe("creatureInspectorStore actionLog", () => {
 		useCreatureInspectorStore.getState().setDetail(
 			makeDetail({
 				brain: undefined,
-				brainContext: { food_type_count: 1, action_queue_slots: 20 },
+				brainContext: "food_type_count=1;action_queue_slots=20",
 			}),
 		);
 
-		expect(useCreatureInspectorStore.getState().staticDetail.brainContext).toEqual({
-			food_type_count: 1,
-			action_queue_slots: 10,
-		});
+		expect(useCreatureInspectorStore.getState().staticDetail.brainContext).toBe(
+			"food_type_count=1;action_queue_slots=10",
+		);
 	});
 
 	it("keeps the brain across polls and replaces learning on every poll", () => {

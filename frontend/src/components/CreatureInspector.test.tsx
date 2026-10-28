@@ -136,7 +136,7 @@ function makeDetail(id: number) {
 			rgb: [255, 128, 64] as [number, number, number],
 		},
 		brain: withAnnotations(makeGenome(), MESH_ANNOTATIONS),
-		brainContext: { food_type_count: 1, action_queue_slots: 10 },
+		brainContext: "food_type_count=1;action_queue_slots=10",
 		sharedMemory: [0, 65, 255, 12, 0, 1],
 		actionLog: [makeActionEntry(10), makeActionEntry(11, "Eat")],
 	};

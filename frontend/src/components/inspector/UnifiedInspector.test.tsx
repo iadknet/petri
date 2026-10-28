@@ -110,7 +110,6 @@ const defaultProps: ComponentProps<typeof UnifiedInspector> = {
 			barrier_reader_without_decision_writer_reachable_node_count: 1,
 			distinct_upstream_slots_read: [0, 1],
 			distinct_payload_slots_written: [0],
-			distinct_custom_output_slots_written: [2],
 			reachable_read_class_counts: { barrier: 1, food: 2 },
 			reachable_write_class_counts: { action: 1, route: 2 },
 		},

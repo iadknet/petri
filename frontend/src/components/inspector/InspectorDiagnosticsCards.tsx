@@ -136,12 +136,6 @@ export function InspectorDiagnosticsCards({ diagnostics }: InspectorDiagnosticsC
 										{formatSlotList(diagnostics.live_circuit.distinct_payload_slots_written)}
 									</span>
 								</div>
-								<div className="flex justify-between">
-									<span>Custom Outputs</span>
-									<span className="font-mono text-slate-200">
-										{formatSlotList(diagnostics.live_circuit.distinct_custom_output_slots_written)}
-									</span>
-								</div>
 							</div>
 						</div>
 					</div>

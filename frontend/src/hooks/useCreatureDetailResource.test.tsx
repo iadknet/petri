@@ -58,7 +58,7 @@ function buildCreatureDetail(): CreatureDetailResponse {
 			entry_node_id: 2,
 			nodes: [],
 		},
-		brain_context: { food_type_count: 1, action_queue_slots: 10 },
+		brain_context: "food_type_count=1;action_queue_slots=10",
 		shared_memory: [0, 1],
 		action_log: [],
 		diagnostics: {
@@ -76,7 +76,6 @@ function buildCreatureDetail(): CreatureDetailResponse {
 				barrier_reader_without_decision_writer_reachable_node_count: 1,
 				distinct_upstream_slots_read: [0],
 				distinct_payload_slots_written: [0],
-				distinct_custom_output_slots_written: [],
 				reachable_read_class_counts: { barrier: 1 },
 				reachable_write_class_counts: { action: 1 },
 			},
@@ -271,7 +270,7 @@ describe("useCreatureDetailResource", () => {
 	});
 
 	it("refetches the brain when a poll's brain context differs from the held brain's", async () => {
-		const wider = { food_type_count: 1, action_queue_slots: 20 };
+		const wider = "food_type_count=1;action_queue_slots=20";
 		const { brain: _brain, ...polled } = {
 			...buildCreatureDetail(),
 			latest_tick: 2733,
@@ -311,11 +310,13 @@ describe("useCreatureDetailResource", () => {
 		expect(brainContext).toEqual(wider);
 	});
 
-	it("refetches the brain when a paused config commit changes the queue, without a tick", async () => {
-		const wider = { food_type_count: 1, action_queue_slots: 60 };
+	it("refetches the brain when a paused config commit changes the context identity", async () => {
+		const wider = "food_type_count=1;action_queue_slots=60";
 		const refetchedBrain = { entry_node_id: 9, nodes: [] };
+		const { brain: _brain, ...polled } = { ...buildCreatureDetail(), brain_context: wider };
 		vi.mocked(api.getCreature)
 			.mockResolvedValueOnce(buildCreatureDetail())
+			.mockResolvedValueOnce(polled)
 			.mockResolvedValueOnce({
 				...buildCreatureDetail(),
 				brain: refetchedBrain,
@@ -337,16 +338,56 @@ describe("useCreatureDetailResource", () => {
 				);
 			await Promise.resolve();
 		});
+		await act(async () => {
+			await Promise.resolve();
+		});
 
-		expect(api.getCreature).toHaveBeenCalledTimes(2);
-		expect(vi.mocked(api.getCreature).mock.calls[1]?.[2]).toEqual({ since_tick: 2732 });
+		// The commit polls without the brain; the poll's identity differs from
+		// the held brain's, so the brain is refetched.
+		expect(api.getCreature).toHaveBeenCalledTimes(3);
+		expect(vi.mocked(api.getCreature).mock.calls[1]?.[2]).toEqual({
+			since_tick: 2732,
+			exclude: "brain",
+		});
+		expect(vi.mocked(api.getCreature).mock.calls[2]?.[2]).toEqual({ since_tick: 2732 });
 		const { brain, brainContext } = useCreatureInspectorStore.getState().staticDetail;
 		expect(brain).toEqual(refetchedBrain);
-		expect(brainContext).toEqual(wider);
+		expect(brainContext).toBe(wider);
+	});
+
+	it("keeps the brain when a paused config commit leaves the context identity", async () => {
+		const held = buildCreatureDetail();
+		const { brain: _brain, ...polled } = held;
+		vi.mocked(api.getCreature).mockResolvedValueOnce(held).mockResolvedValueOnce(polled);
+		useConfigStore.getState().setServerConfig(MOCK_CONFIG, "paused");
+
+		useCreatureInspectorStore.getState().selectCreature(7);
+		await act(async () => {
+			render(<Harness />);
+			await Promise.resolve();
+		});
+		await act(async () => {
+			useConfigStore
+				.getState()
+				.commitServerConfig({ ...MOCK_CONFIG, runtime: { ...MOCK_CONFIG.runtime } }, "paused");
+			await Promise.resolve();
+		});
+		await act(async () => {
+			await Promise.resolve();
+		});
+
+		expect(api.getCreature).toHaveBeenCalledTimes(2);
+		expect(vi.mocked(api.getCreature).mock.calls[1]?.[2]).toEqual({
+			since_tick: 2732,
+			exclude: "brain",
+		});
+		const { brain, brainContext } = useCreatureInspectorStore.getState().staticDetail;
+		expect(brain).toEqual(held.brain);
+		expect(brainContext).toBe(held.brain_context);
 	});
 
 	it("lands a brain refresh while ticks keep arriving faster than every response", async () => {
-		const wider = { food_type_count: 1, action_queue_slots: 20 };
+		const wider = "food_type_count=1;action_queue_slots=20";
 		const refetchedBrain = { entry_node_id: 9, nodes: [] };
 		// Every poll after the first resolves 150 ms later under the wider
 		// context, and honours its abort signal.
