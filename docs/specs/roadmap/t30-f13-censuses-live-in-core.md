@@ -1,6 +1,6 @@
 # T30.F13 — Censuses Live in Core, Summaries Follow Their Types
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-28
 **Feature**: T30.F13
 **Track**: [T30 — Core Boundaries](../../roadmaps/t30-core-boundaries.md)
@@ -212,7 +212,7 @@ a different summary from the same full report would show it wrong.
       `metrics::tests::the_tick_census_keeps_its_pre_move_values` (telemetry),
       `state::census_pins` (server status and health); every literal is
       unchanged after the move.
-- [ ] Workspace: `make check` exit 0.
+- [x] Workspace: `make check` exit 0 at `efe1ae918`.
 - [x] No outer-crate census remains: a `grep` for folds over
       `sim.creatures` in `v3-cli/src`, `v3-telemetry/src`,
       `v3-server/src`, its hits each a per-creature record or a reader
@@ -274,12 +274,12 @@ observation cost within run-to-run noise. A counter off
 
 ## Success Criteria
 
-- [ ] Every inventory census is computed once, in readers; outer crates
+- [x] Every inventory census is computed once, in readers; outer crates
       format only (invariants 1–3).
-- [ ] A persistence sample is one composed record whose retention
+- [x] A persistence sample is one composed record whose retention
       declarations derive the summary keep-lists, and the summary for any
       full report is unchanged (invariants 4–6).
-- [ ] Gate deterministic blocks identical to the epoch; every existing pin
+- [x] Gate deterministic blocks identical to the epoch; every existing pin
       unchanged.
 
 ## Notes for AI Agents
