@@ -1,7 +1,7 @@
 # T30 — Core Boundaries
 
 **Status**: In Progress
-**Last updated**: 2026-10-27
+**Last updated**: 2026-10-28
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -280,8 +280,9 @@ behavior.
   `insert_member`'s `expect`, `can_add_edge` and `RetargetBundle`'s two skip
   orders all handle partial catalogs production never builds. Validation
   requires the full catalog, sinks are found by index, and that hosting
-  layer is deleted. F12 follows F09, which deletes the only non-test
-  builder of a partial catalog (`recruitment_paths/fixtures.rs:535`).
+  layer is deleted. F12 follows F09 (ordering; corrected 2026-10-28 at
+  F09's Plan: `recruitment_paths/fixtures.rs:535` rebuilds the full catalog
+  with moved edges, so no non-test builder of a partial catalog exists).
 - F13 and F14 were added on 2026-10-27 at the user's direction from a second
   refactor audit (the T25.F11 areas in `v3-cli/src/bench/`, the server
   transport, the frontend inspector and telemetry): "Run the fix pass
