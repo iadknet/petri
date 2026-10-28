@@ -187,8 +187,9 @@ pub(super) fn run_one_seed(
             population,
             sim.stats.reproduction_actions_spawned_total,
             || {
-                let total: f64 = sim.creatures.values().map(|c| f64::from(c.energy)).sum();
-                total / population as f64
+                v3_core::neighborhood::population::PopulationCensus::of(&sim)
+                    .mean_energy()
+                    .expect("read only while the population lives")
             },
             || PopulationReadings::observe(&sim),
             || WorldTracking::observe(&sim),

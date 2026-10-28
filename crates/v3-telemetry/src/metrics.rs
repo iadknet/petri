@@ -28,6 +28,7 @@ use v3_core::ledger::DeathCause;
 use v3_core::mutation::{FORM_KEYS, WIRING_KEYS};
 use v3_core::neighborhood::drives::DriveCensus;
 use v3_core::neighborhood::plasticity_census::{LearnedScales, PlasticityCensus};
+use v3_core::neighborhood::population::PopulationCensus;
 use v3_core::neighborhood::sensor_census::{
     sensor_use_census, world_input_key_label, SensorUseRow,
 };
@@ -147,7 +148,8 @@ pub struct Census {
 impl Census {
     /// All means are `0.0` for an empty population.
     pub fn of(sim: &Simulation) -> Self {
-        let population = sim.creatures.len();
+        let census = PopulationCensus::of(sim);
+        let population = census.population();
         let catalog = WorldInputKey::universe(
             sim.world
                 .food()
@@ -171,7 +173,7 @@ impl Census {
                 ..Self::default()
             };
         }
-        let mean = |total: u64| total as f64 / population as f64;
+        let means = census.structure_means();
         let drives = DriveCensus::observe(
             sim.creatures
                 .values()
@@ -188,26 +190,11 @@ impl Census {
             drive_carriers: drives.kinds.map(|kind| kind.drive_carriers),
             drive_fanout_creatures: drives.kinds.map(|kind| kind.fanout_creatures),
             population,
-            mean_energy: sim.mean_energy(),
-            mean_capacity: sim
-                .creatures
-                .values()
-                .map(|c| f64::from(c.body.capacity))
-                .sum::<f64>()
-                / population as f64,
-            mean_genome_size: mean(
-                sim.creatures
-                    .values()
-                    .map(|c| u64::from(c.genome_size()))
-                    .sum(),
-            ),
-            mean_mesh_nodes: mean(
-                sim.creatures
-                    .values()
-                    .map(|c| c.genome().nodes.len() as u64)
-                    .sum(),
-            ),
-            mean_generation: mean(sim.creatures.values().map(|c| c.generation).sum()),
+            mean_energy: census.mean_energy_live(),
+            mean_capacity: census.mean_capacity_live(),
+            mean_genome_size: means.genome_size,
+            mean_mesh_nodes: means.mesh_nodes,
+            mean_generation: means.generation,
         }
     }
 }

@@ -25,14 +25,15 @@ use std::collections::BTreeMap;
 use std::time::Instant;
 use v3_core::config::{MutationConfig, SimulationConfig};
 use v3_core::creature::founder::founder_genome;
-use v3_core::genome::analysis::mesh_reachable_nodes;
 use v3_core::genome::{structural_companions, StructuralCompanions};
+use v3_core::neighborhood::clades::CladeCensus;
+use v3_core::neighborhood::final_census::{CompanionCounts, DifferingCounts};
 use v3_core::neighborhood::steering::{self, SteeringBattery};
 use v3_core::neighborhood::{
-    self, evaluate_genome, evolved_sample_ranks, read_sample_ranks, Battery, BirthResult,
-    EvalContext, GenomeEvaluation, OperatorRow, Tally, BATTERY_VERSION, READ_GENOME_MULTIPLIER,
-    READ_SEED_BASE,
+    self, evaluate_genome, Battery, BirthResult, EvalContext, GenomeEvaluation, OperatorRow, Tally,
+    BATTERY_VERSION, READ_GENOME_MULTIPLIER, READ_SEED_BASE,
 };
+use v3_core::neighborhood::{distributions, population_sample};
 use v3_core::simulation::FinalActionObservation;
 
 fn domain_keys(counts: &BTreeMap<v3_core::mutation::MutationDomain, u64>) -> BTreeMap<String, u64> {
@@ -352,33 +353,34 @@ fn compute_drift_depth(
     (depth, cohort)
 }
 
-pub(super) fn generation_distribution(
-    mut generations: Vec<u64>,
-) -> Indicator<GenerationDistribution> {
-    if generations.is_empty() {
-        return undefined_generation_distribution();
+pub(super) fn generation_distribution(generations: Vec<u64>) -> Indicator<GenerationDistribution> {
+    match distributions::generation_distribution(generations) {
+        Some(distribution) => Indicator::Defined(GenerationDistribution {
+            median: distribution.median,
+            max: distribution.max,
+        }),
+        None => undefined_generation_distribution(),
     }
-    generations.sort_unstable();
-    Indicator::Defined(GenerationDistribution {
-        median: generations[generations.len() / 2],
-        max: generations[generations.len() - 1],
-    })
 }
 
-/// One genome's `mesh_execution` block and its `steering-v1` reading from a
-/// single observed battery pass: the T11.F14 executed set feeds the
-/// steering `move_voted` flag, so the knockout pass runs once.
+/// One genome's `mesh_execution` block and its `steering-v1` block from the
+/// readers' single observed battery pass.
 pub(super) fn mesh_execution_and_steering(
     battery: &Battery,
     steering_battery: &SteeringBattery,
     genome: &v3_core::genome::CreatureGenome,
     context: &EvalContext,
 ) -> (MeshExecution, Steering) {
+    let (reading, steering) =
+        population_sample::mesh_execution_and_steering(battery, steering_battery, genome, context);
+    (mesh_execution_block(reading), steering_block(steering))
+}
+
+fn mesh_execution_block(
+    reading: v3_core::neighborhood::mesh_execution::MeshExecutionReading,
+) -> MeshExecution {
     use v3_core::neighborhood::mesh_execution::{KNOCKOUT_METHOD, MESH_EXECUTION_VERSION};
-    let sets =
-        battery.mesh_execution_sets(genome, context.runtime, context.shared_memory_decay_rate);
-    let reading = sets.reading;
-    let mesh = MeshExecution {
+    MeshExecution {
         backends: Some(reading.backends),
         version: MESH_EXECUTION_VERSION.to_string(),
         executions_per_genome: neighborhood_battery_execution_count(),
@@ -399,14 +401,16 @@ pub(super) fn mesh_execution_and_steering(
         cycle_carrying: reading.cycle_carrying,
         revisiting: reading.revisiting,
         productive_cycle: reading.productive_cycle,
-    };
-    let steering = Steering {
+    }
+}
+
+fn steering_block(reading: steering::SteeringReading) -> Steering {
+    Steering {
         version: steering::STEERING_VERSION.to_string(),
         seed: steering::STEERING_SEED,
         base_count: steering::STEERING_BASE_COUNT as u32,
-        reading: steering_battery.read(genome, context.runtime, &sets.executed),
-    };
-    (mesh, steering)
+        reading,
+    }
 }
 
 /// The pooled `steering-v1` block for one seed's sample.
@@ -426,26 +430,14 @@ pub(super) fn steering_pooled(pooled: steering::SteeringPooled) -> Indicator<Ste
 }
 
 /// Surviving founder clade count and the Shannon entropy of their size
-/// distribution, in nats. Counting is keyed in a `BTreeMap`, so neither the
-/// count nor the fixed summation order of the entropy depends on how the
-/// caller's population was iterated.
+/// distribution in nats, from the readers' clade census; the entropy is
+/// `UNDEFINED` for an empty population.
 pub(super) fn clade_diversity(lineage_ids: impl IntoIterator<Item = u32>) -> (u64, String) {
-    let mut counts = BTreeMap::<u32, u64>::new();
-    for lineage_id in lineage_ids {
-        *counts.entry(lineage_id).or_default() += 1;
-    }
-    let total: u64 = counts.values().sum();
-    let shannon_entropy_nats = if total == 0 {
-        UNDEFINED.to_string()
-    } else {
-        let total = total as f64;
-        let entropy = counts.values().fold(0.0, |acc, &count| {
-            let probability = count as f64 / total;
-            acc - probability * probability.ln()
-        });
-        six(entropy)
-    };
-    (counts.len() as u64, shannon_entropy_nats)
+    let census = CladeCensus::of(lineage_ids);
+    let entropy = census
+        .entropy_nats()
+        .map_or_else(|| UNDEFINED.to_string(), six);
+    (census.surviving(), entropy)
 }
 
 pub(super) fn lineage_diversity(
@@ -464,55 +456,38 @@ pub(super) fn structural_companions_census<'a>(
     seed: u64,
     genomes: impl Iterator<Item = &'a v3_core::genome::CreatureGenome>,
 ) -> StructuralCompanionsSeed {
-    let mut census = StructuralCompanionsSeed {
+    let counts = CompanionCounts::of(genomes);
+    StructuralCompanionsSeed {
         seed,
-        ..Default::default()
-    };
-    for genome in genomes {
-        let companions = structural_companions(genome);
-        census.final_creature_count += 1;
-        census.reads_shared_memory += u64::from(companions.reads_shared_memory);
-        census.writes_shared_memory += u64::from(companions.writes_shared_memory);
-        census.has_stateful_compute_node += u64::from(companions.has_stateful_compute_node);
-        census.has_plasticity += u64::from(companions.has_plasticity);
+        final_creature_count: counts.creatures,
+        reads_shared_memory: counts.reads_shared_memory,
+        writes_shared_memory: counts.writes_shared_memory,
+        has_stateful_compute_node: counts.has_stateful_compute_node,
+        has_plasticity: counts.has_plasticity,
     }
-    census
+}
+
+fn memory_sensitivity_seed(seed: u64, counts: DifferingCounts) -> MemorySensitivitySeed {
+    MemorySensitivitySeed {
+        seed,
+        final_creature_count: counts.creatures,
+        different_from_zeroed_count: counts.from_zeroed,
+        different_from_scrambled_count: counts.from_scrambled,
+        different_from_either_count: counts.from_either,
+        different_from_zeroed_fraction: fraction_or_undefined(counts.from_zeroed, counts.creatures),
+        different_from_scrambled_fraction: fraction_or_undefined(
+            counts.from_scrambled,
+            counts.creatures,
+        ),
+        different_from_either_fraction: fraction_or_undefined(counts.from_either, counts.creatures),
+    }
 }
 
 pub(super) fn memory_sensitivity(
     seed: u64,
     observations: &[FinalActionObservation],
 ) -> MemorySensitivitySeed {
-    let final_creature_count = observations.len() as u64;
-    let (different_from_zeroed_count, different_from_scrambled_count, different_from_either_count) =
-        observations.iter().fold((0, 0, 0), |counts, observation| {
-            let different_from_zeroed = observation.intact != observation.zeroed;
-            let different_from_scrambled = observation.intact != observation.scrambled;
-            (
-                counts.0 + u64::from(different_from_zeroed),
-                counts.1 + u64::from(different_from_scrambled),
-                counts.2 + u64::from(different_from_zeroed || different_from_scrambled),
-            )
-        });
-    MemorySensitivitySeed {
-        seed,
-        final_creature_count,
-        different_from_zeroed_count,
-        different_from_scrambled_count,
-        different_from_either_count,
-        different_from_zeroed_fraction: fraction_or_undefined(
-            different_from_zeroed_count,
-            final_creature_count,
-        ),
-        different_from_scrambled_fraction: fraction_or_undefined(
-            different_from_scrambled_count,
-            final_creature_count,
-        ),
-        different_from_either_fraction: fraction_or_undefined(
-            different_from_either_count,
-            final_creature_count,
-        ),
-    }
+    memory_sensitivity_seed(seed, DifferingCounts::of(observations))
 }
 
 pub(super) fn temporal_memory_sensitivity(
@@ -522,12 +497,10 @@ pub(super) fn temporal_memory_sensitivity(
     use v3_core::simulation::{observe_temporal_actions, TemporalMemorySubstrate};
     let observations = observe_temporal_actions(sim);
     let component = |substrate| {
-        let actions: Vec<_> = observations
-            .iter()
-            .filter(|observation| observation.substrate == substrate)
-            .map(|observation| observation.actions.clone())
-            .collect();
-        memory_sensitivity(seed, &actions)
+        memory_sensitivity_seed(
+            seed,
+            DifferingCounts::of_substrate(&observations, substrate),
+        )
     };
     TemporalMemorySensitivitySeed {
         seed,
@@ -649,20 +622,10 @@ pub(super) fn compute_founder_neighborhood(
     }
 }
 
-/// The living population's ids in ascending order: the rank space every
-/// final-population sample is drawn from.
-pub(super) fn sorted_creature_ids(
-    sim: &v3_core::simulation::Simulation,
-) -> Vec<v3_core::contracts::CreatureId> {
-    let mut creature_ids: Vec<_> = sim.creatures.keys().collect();
-    creature_ids.sort();
-    creature_ids
-}
-
-/// The evolved half for one seed's final living population: the predeclared
-/// rank sample, each sampled genome's full reading and structural
-/// companions, and the pooled per-operator and per-birth tallies across the
-/// sample.
+/// The evolved half for one seed's final living population, from the
+/// readers' evolved observation: each sampled genome's full reading and
+/// structural companions, and the pooled per-operator and per-birth tallies
+/// across the sample.
 pub(super) fn evolved_neighborhood_for_seed(
     seed: u64,
     sim: &v3_core::simulation::Simulation,
@@ -671,59 +634,33 @@ pub(super) fn evolved_neighborhood_for_seed(
     context: &EvalContext,
     sizes: NeighborhoodSizes,
 ) -> NeighborhoodEvolvedSeed {
-    let creature_ids = sorted_creature_ids(sim);
-    let population_size = creature_ids.len();
-    let ranks = evolved_sample_ranks(population_size);
-    let catalog = v3_core::neighborhood::operator_catalog();
-
-    let mut sampled_genomes = Vec::with_capacity(ranks.len());
-    let mut pooled_operator_tallies: Vec<Tally> = vec![Tally::default(); catalog.len()];
-    let mut pooled_births = BirthResult::default();
-    let steering_battery = SteeringBattery::generate(context.sensors.food_type_count);
-    let mut pooled_steering = steering::SteeringPooled::default();
-
-    for (genome_index, &rank) in ranks.iter().enumerate() {
-        let creature_id = creature_ids[rank];
-        let creature = &sim.creatures[creature_id];
-        let seed_offset =
-            v3_core::neighborhood::EVOLVED_SEED_MULTIPLIER * (genome_index as u64 + 1);
-        let evaluation = evaluate_genome(
-            creature.genome(),
-            battery,
-            mutation_config,
-            context,
-            sizes.evolved_operator_trials,
-            sizes.evolved_births,
-            seed_offset,
-        );
-        let companions = structural_companions(creature.genome());
-
-        for (pooled, row) in pooled_operator_tallies
-            .iter_mut()
-            .zip(&evaluation.operator_rows)
-        {
-            *pooled = pooled.merge(row.tally);
-        }
-        pooled_births = pooled_births.merge(&evaluation.births);
-        let (mesh_execution, steering) =
-            mesh_execution_and_steering(battery, &steering_battery, creature.genome(), context);
-        pooled_steering = pooled_steering.merge(steering.reading);
-
-        sampled_genomes.push(NeighborhoodSampledGenome {
-            generation: Some(creature.generation),
-            mesh_execution: Indicator::Defined(mesh_execution),
-            steering: Indicator::Defined(steering),
-            rank: rank as u64,
-            creature_id: format!("{creature_id:?}"),
-            operator_rows: to_neighborhood_operator_rows(&evaluation.operator_rows),
-            births: to_neighborhood_births(&evaluation.births),
-            companions: to_neighborhood_companions(&companions),
-        });
-    }
-
-    let pooled_operator_rows = catalog
+    let observation = population_sample::evolved_observation(
+        sim,
+        battery,
+        mutation_config,
+        context,
+        population_sample::EvaluationSizes {
+            operator_trials: sizes.evolved_operator_trials,
+            births: sizes.evolved_births,
+        },
+    );
+    let sampled_genomes = observation
+        .genomes
+        .into_iter()
+        .map(|genome| NeighborhoodSampledGenome {
+            generation: Some(genome.generation),
+            mesh_execution: Indicator::Defined(mesh_execution_block(genome.mesh_execution)),
+            steering: Indicator::Defined(steering_block(genome.steering)),
+            rank: genome.rank as u64,
+            creature_id: format!("{:?}", genome.creature_id),
+            operator_rows: to_neighborhood_operator_rows(&genome.evaluation.operator_rows),
+            births: to_neighborhood_births(&genome.evaluation.births),
+            companions: to_neighborhood_companions(&genome.companions),
+        })
+        .collect();
+    let pooled_operator_rows = v3_core::neighborhood::operator_catalog()
         .iter()
-        .zip(pooled_operator_tallies.iter())
+        .zip(observation.pooled_operator_tallies.iter())
         .map(|((family, name), tally)| NeighborhoodOperatorRow {
             family: (*family).to_string(),
             operator: name.clone(),
@@ -732,27 +669,19 @@ pub(super) fn evolved_neighborhood_for_seed(
         .collect();
 
     NeighborhoodEvolvedSeed {
-        generation_distribution: generation_distribution(
-            sim.creatures
-                .values()
-                .map(|creature| creature.generation)
-                .collect(),
-        ),
+        generation_distribution: generation_distribution(observation.generations),
         seed,
-        final_population_size: population_size as u64,
+        final_population_size: observation.population_size as u64,
         sampled_genomes,
         pooled_operator_rows,
-        pooled_births: to_neighborhood_births(&pooled_births),
-        steering_pooled: steering_pooled(pooled_steering),
+        pooled_births: to_neighborhood_births(&observation.pooled_births),
+        steering_pooled: steering_pooled(observation.pooled_steering),
     }
 }
 
-/// The neighborhood read (T14.F12) for one world's final living population:
-/// a seeded uniform sample of the id-sorted population, each genome's
-/// production births through the unchanged `per_birth_result`, pooled by
-/// integer merge in sample order. Reads the terminal population only; the
-/// evolved half's reading is untouched. Beside it, the exposure strata of the
-/// same births (T11.F26), pooled in sample order.
+/// The neighborhood read (T14.F12) for one world's final living population,
+/// from the readers' read observation, and beside it the exposure strata of
+/// the same births (T11.F26).
 pub(super) fn neighborhood_read_for_seed(
     seed: u64,
     sim: &v3_core::simulation::Simulation,
@@ -761,67 +690,17 @@ pub(super) fn neighborhood_read_for_seed(
     context: &EvalContext,
     sizes: NeighborhoodSizes,
 ) -> (NeighborhoodRead, neighborhood::BirthExposure) {
-    let creature_ids = sorted_creature_ids(sim);
-    let population_size = creature_ids.len();
-    let ranks = read_sample_ranks(population_size, sizes.read_sample as usize, seed);
-
-    let mut genomes = Vec::with_capacity(ranks.len());
-    let mut pooled = BirthResult::default();
-    let mut exposure = neighborhood::BirthExposure::default();
-    let mut generation_sum = 0u64;
-    let mut genome_size_sum = 0u64;
-    let mut total_nodes = 0u64;
-    let mut reachable_nodes = 0u64;
-    let mut executed_nodes = 0u64;
-
-    for (genome_index, &rank) in ranks.iter().enumerate() {
-        let creature_id = creature_ids[rank];
-        let creature = &sim.creatures[creature_id];
-        let genome = creature.genome();
-        let seed_offset = READ_SEED_BASE + READ_GENOME_MULTIPLIER * (genome_index as u64 + 1);
-        let base = battery.signature(genome, context.runtime, context.shared_memory_decay_rate);
-        let (births, genome_exposure) = neighborhood::births::per_birth_reading(
-            genome,
-            &base,
-            battery,
-            mutation_config,
-            context,
-            sizes.read_births,
-            seed_offset,
-        );
-        exposure = exposure.merge(&genome_exposure);
-        let executed = battery
-            .executed_indices(genome, context.runtime, context.shared_memory_decay_rate)
-            .len() as u64;
-        let reachable = mesh_reachable_nodes(genome).len() as u64;
-        let nodes = genome.nodes.len() as u64;
-        let genome_size = genome.genome_size();
-
-        generation_sum += creature.generation;
-        genome_size_sum += u64::from(genome_size);
-        total_nodes += nodes;
-        reachable_nodes += reachable;
-        executed_nodes += executed;
-        pooled = pooled.merge(&births);
-
-        genomes.push(NeighborhoodReadGenome {
-            rank: rank as u64,
-            creature_id: format!("{creature_id:?}"),
-            lineage_id: creature.body.identity.lineage_id,
-            generation: creature.generation,
-            genome_size,
-            total_nodes: nodes,
-            reachable_nodes: reachable,
-            executed_nodes: executed,
-            births_total: births.births_total,
-            zero_event_births: births.zero_event_births,
-            silent: births.any_events.silent,
-            changed: births.any_events.changed,
-            dead: births.any_events.dead,
-        });
-    }
-
-    let sample_size = ranks.len() as u64;
+    let observation = population_sample::read_observation(
+        seed,
+        sim,
+        battery,
+        mutation_config,
+        context,
+        sizes.read_sample as usize,
+        sizes.read_births,
+    );
+    let pooled = &observation.pooled;
+    let sample_size = observation.genomes.len() as u64;
     let births_total = u64::from(pooled.births_total);
     let read = NeighborhoodRead {
         version: NEIGHBORHOOD_READ_VERSION.to_string(),
@@ -831,7 +710,7 @@ pub(super) fn neighborhood_read_for_seed(
             "{READ_SEED_BASE} + {READ_GENOME_MULTIPLIER} * (sample_index + 1) + {} + birth_index",
             neighborhood::births::BIRTH_SEED_BASE
         ),
-        population_size: population_size as u64,
+        population_size: observation.population_size as u64,
         sample_size_requested: sizes.read_sample,
         sample_size: sample_size as u32,
         birth_trials: sizes.read_births,
@@ -844,54 +723,50 @@ pub(super) fn neighborhood_read_for_seed(
             births_total,
         ),
         dead_per_all_births: fraction_or_undefined(u64::from(pooled.any_events.dead), births_total),
-        births: to_neighborhood_births(&pooled),
-        generation_sum,
-        mean_generation: fraction_or_undefined(generation_sum, sample_size),
-        genome_size_sum,
-        mean_genome_size: fraction_or_undefined(genome_size_sum, sample_size),
-        total_nodes,
-        mean_total_nodes: fraction_or_undefined(total_nodes, sample_size),
-        reachable_nodes,
-        mean_reachable_nodes: fraction_or_undefined(reachable_nodes, sample_size),
-        executed_nodes,
-        mean_executed_nodes: fraction_or_undefined(executed_nodes, sample_size),
-        genomes,
+        births: to_neighborhood_births(pooled),
+        generation_sum: observation.generation_sum,
+        mean_generation: fraction_or_undefined(observation.generation_sum, sample_size),
+        genome_size_sum: observation.genome_size_sum,
+        mean_genome_size: fraction_or_undefined(observation.genome_size_sum, sample_size),
+        total_nodes: observation.total_nodes,
+        mean_total_nodes: fraction_or_undefined(observation.total_nodes, sample_size),
+        reachable_nodes: observation.reachable_nodes,
+        mean_reachable_nodes: fraction_or_undefined(observation.reachable_nodes, sample_size),
+        executed_nodes: observation.executed_nodes,
+        mean_executed_nodes: fraction_or_undefined(observation.executed_nodes, sample_size),
+        genomes: observation
+            .genomes
+            .iter()
+            .map(|genome| NeighborhoodReadGenome {
+                rank: genome.rank as u64,
+                creature_id: format!("{:?}", genome.creature_id),
+                lineage_id: genome.lineage_id,
+                generation: genome.generation,
+                genome_size: genome.genome_size,
+                total_nodes: genome.total_nodes,
+                reachable_nodes: genome.reachable_nodes,
+                executed_nodes: genome.executed_nodes,
+                births_total: genome.births.births_total,
+                zero_event_births: genome.births.zero_event_births,
+                silent: genome.births.any_events.silent,
+                changed: genome.births.any_events.changed,
+                dead: genome.births.any_events.dead,
+            })
+            .collect(),
     };
-    (read, exposure)
+    (read, observation.exposure)
 }
 
-fn percentile(sorted: &[u32], p: f64) -> u32 {
-    if sorted.is_empty() {
-        return 0;
-    }
-    let idx = (p / 100.0 * (sorted.len() - 1) as f64).round();
-    let idx = idx.clamp(0.0, (sorted.len() - 1) as f64) as usize;
-    sorted[idx]
-}
-
-pub(super) fn structure_size_distribution(mut pooled: Vec<u32>) -> StructureSizeDistribution {
-    if pooled.is_empty() {
-        return StructureSizeDistribution {
-            version: Some(REACHABLE_STRUCTURE_VERSION.to_string()),
-            min: 0,
-            p25: 0,
-            median: 0,
-            p75: 0,
-            max: 0,
-            mean: six(0.0),
-        };
-    }
-    pooled.sort_unstable();
-    let sum: u64 = pooled.iter().map(|&v| u64::from(v)).sum();
-    let mean = sum as f64 / pooled.len() as f64;
+pub(super) fn structure_size_distribution(pooled: Vec<u32>) -> StructureSizeDistribution {
+    let sizes = distributions::structure_sizes(pooled);
     StructureSizeDistribution {
         version: Some(REACHABLE_STRUCTURE_VERSION.to_string()),
-        min: pooled[0],
-        p25: percentile(&pooled, 25.0),
-        median: percentile(&pooled, 50.0),
-        p75: percentile(&pooled, 75.0),
-        max: pooled[pooled.len() - 1],
-        mean: six(mean),
+        min: sizes.min,
+        p25: sizes.p25,
+        median: sizes.median,
+        p75: sizes.p75,
+        max: sizes.max,
+        mean: six(sizes.mean),
     }
 }
 

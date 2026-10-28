@@ -115,7 +115,11 @@ impl CreatureBundles {
     /// Read `genome`'s Graph nodes against its `reachable` node indices and,
     /// when sampled, its runtime's `learned` scales.
     #[must_use]
-    pub fn of(genome: &CreatureGenome, reachable: &[usize], learned: Option<&LearnedState>) -> Self {
+    pub fn of(
+        genome: &CreatureGenome,
+        reachable: &[usize],
+        learned: Option<&LearnedState>,
+    ) -> Self {
         let mut reading = Self::default();
         for (index, node) in genome.nodes.iter().enumerate() {
             let BackendDef::Graph(def) = &node.backend_def else {
@@ -142,11 +146,7 @@ impl CreatureBundles {
                     .filter(|&member| off_zero(def.edge_at(member).own_weight()))
                     .count() as u64;
                 let genomic = off_zero(bundle.scale());
-                let learned_nonzero = scales
-                    .get(&id)
-                    .copied()
-                    .flatten()
-                    .is_some_and(off_zero);
+                let learned_nonzero = scales.get(&id).copied().flatten().is_some_and(off_zero);
                 let total = &mut reading.wirings[row];
                 total.bundles += 1;
                 total.genomic_nonzero += u64::from(genomic);

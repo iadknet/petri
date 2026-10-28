@@ -6,8 +6,9 @@ use slotmap::Key;
 use tokio::sync::{broadcast, Mutex};
 use v3_core::config::SimulationConfig;
 use v3_core::creature::colour::channels_to_rgb;
-use v3_core::creature::state::CreatureState;
 use v3_core::ledger::DeathCause;
+use v3_core::neighborhood::clades::CladeCensus;
+use v3_core::neighborhood::population::PopulationCensus;
 use v3_core::simulation::{seed_simulation, Simulation};
 
 use crate::query::projection::ProjectionStore;
@@ -265,57 +266,6 @@ pub struct HealthPayload {
     pub creature_ticks_total: u64,
 }
 
-/// Per-frame population census gathered in one pass over living creatures.
-#[derive(Default)]
-struct PopulationCensus {
-    count: u64,
-    generation_sum: u64,
-    generation_max: u64,
-    genome_size_sum: u64,
-    world_inputs_read_sum: u64,
-    lineage_counts: HashMap<u32, u64>,
-}
-
-impl PopulationCensus {
-    fn observe(&mut self, creature: &CreatureState) {
-        self.count += 1;
-        self.generation_sum += creature.generation;
-        self.generation_max = self.generation_max.max(creature.generation);
-        self.genome_size_sum += u64::from(creature.genome_size());
-        self.world_inputs_read_sum += creature.last_mesh_world_reads.len() as u64;
-        *self
-            .lineage_counts
-            .entry(creature.body.identity.lineage_id)
-            .or_insert(0) += 1;
-    }
-
-    fn mean(&self, sum: u64) -> f32 {
-        if self.count == 0 {
-            0.0
-        } else {
-            (sum as f64 / self.count as f64) as f32
-        }
-    }
-
-    fn lineages_effective(&self) -> f32 {
-        if self.count == 0 {
-            return 0.0;
-        }
-        // Sorted so the float sum, and the wire value, never depend on hash order.
-        let mut counts: Vec<u64> = self.lineage_counts.values().copied().collect();
-        counts.sort_unstable();
-        let total = self.count as f64;
-        let entropy: f64 = counts
-            .iter()
-            .map(|&n| {
-                let share = n as f64 / total;
-                -share * share.ln()
-            })
-            .sum();
-        entropy.exp() as f32
-    }
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct MutationTargetReachabilityTotalPayload {
@@ -397,11 +347,15 @@ pub struct TransportPerfSnapshot {
 pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
     let sim = &handle.sim;
     let stats = &sim.stats;
+    let census = PopulationCensus::of(sim);
+    let means = census.structure_means();
+    let complexity = census.complexity();
+    let clades = CladeCensus::of(census.lineage_ids());
 
     let status = StatusPayload {
         state: handle.status,
         population: sim.creatures.len(),
-        mean_energy: sim.mean_energy(),
+        mean_energy: census.mean_energy_live(),
         last_tick_actions: LastTickActions {
             move_count: stats.last_tick_move,
             eat: stats.last_tick_eat,
@@ -437,20 +391,7 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
     };
 
     let mut creatures = Vec::with_capacity(sim.creatures.len());
-    let mut complexity_sum: u64 = 0;
-    let mut complexity_min: u32 = u32::MAX;
-    let mut complexity_max: u32 = 0;
-    let mut vm_live_read_world_inputs_current = std::collections::HashMap::new();
-    let mut census = PopulationCensus::default();
     for (id, creature) in &sim.creatures {
-        census.observe(creature);
-        let c = creature.complexity();
-        complexity_sum += c as u64;
-        complexity_min = complexity_min.min(c);
-        complexity_max = complexity_max.max(c);
-        for (key, count) in creature.live_vm_world_inputs().iter().copied() {
-            *vm_live_read_world_inputs_current.entry(key).or_insert(0u64) += u64::from(count);
-        }
         creatures.push(CreatureSnapshot {
             id: id.data().as_ffi(),
             x: creature.position.x,
@@ -459,15 +400,6 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             generation: creature.generation,
             phenotype_rgb: channels_to_rgb(creature.body.phenotype.channels),
         });
-    }
-    let creature_count = creatures.len();
-    let complexity_mean = if creature_count > 0 {
-        complexity_sum as f32 / creature_count as f32
-    } else {
-        0.0
-    };
-    if creature_count == 0 {
-        complexity_min = 0;
     }
 
     let food_types = sim
@@ -544,7 +476,7 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
 
     let health = HealthPayload {
         population: sim.creatures.len(),
-        mean_energy: sim.mean_energy(),
+        mean_energy: census.mean_energy_live(),
         last_tick_food_occupancy_depletion_mean: stats.last_tick_food_occupancy_depletion_mean,
         last_tick_food_occupancy_depletion_occupied_cells: stats
             .last_tick_food_occupancy_depletion_occupied_cells,
@@ -636,7 +568,8 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
                 )
             })
             .collect(),
-        vm_live_read_world_inputs_current: vm_live_read_world_inputs_current
+        vm_live_read_world_inputs_current: census
+            .live_vm_world_inputs()
             .into_iter()
             .map(|(key, count)| (key.as_key().to_string(), count))
             .collect(),
@@ -727,9 +660,9 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             .iter()
             .map(|(result, count)| (result.as_key().to_string(), *count))
             .collect(),
-        genome_complexity_mean: complexity_mean,
-        genome_complexity_min: complexity_min,
-        genome_complexity_max: complexity_max,
+        genome_complexity_mean: complexity.mean,
+        genome_complexity_min: complexity.min,
+        genome_complexity_max: complexity.max,
         deaths_total: stats.mortality.deaths_total,
         deaths_total_by_cause: DeathCause::ALL
             .iter()
@@ -737,12 +670,12 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             .map(|&cause| (cause.as_key().to_string(), stats.mortality.count(cause)))
             .collect(),
         food_total_density_by_type: stats.last_tick_food_total_density_by_type.clone(),
-        generation_mean: census.mean(census.generation_sum),
-        generation_max: census.generation_max,
-        genome_size_mean: census.mean(census.genome_size_sum),
-        lineages_alive: u32::try_from(census.lineage_counts.len()).unwrap_or(u32::MAX),
-        lineages_effective: census.lineages_effective(),
-        world_inputs_read_mean: census.mean(census.world_inputs_read_sum),
+        generation_mean: means.generation as f32,
+        generation_max: census.generation_max(),
+        genome_size_mean: means.genome_size as f32,
+        lineages_alive: u32::try_from(clades.surviving()).unwrap_or(u32::MAX),
+        lineages_effective: clades.effective_lineages_live(),
+        world_inputs_read_mean: census.mean_world_inputs_read() as f32,
         plasticity_changes_total: stats.plasticity_changes_total,
         shared_memory_writes_changed_total: stats.shared_memory_writes_changed_total,
         creature_ticks_total: stats.creature_ticks_total,

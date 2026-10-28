@@ -6,11 +6,11 @@ use crate::bench::tests::small_profile;
 use crate::UNDEFINED;
 use proptest::prelude::*;
 use v3_core::config::SimulationConfig;
-use v3_core::contracts::Position;
+use v3_core::contracts::{Position, WorldInputKey};
 use v3_core::creature::action_log::ActionType;
-use v3_core::kernel::occupancy_grid::OCCUPANCY_CELL_COUNT;
 use v3_core::mutation::graph::GraphOperator;
 use v3_core::mutation::topology::TopologyOperator;
+use v3_core::neighborhood::occupancy::OCCUPANCY_CELL_COUNT;
 use v3_core::simulation::seed_simulation;
 use v3_core::simulation::seeding::seed_simulation_with_founder_genomes;
 

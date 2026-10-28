@@ -426,19 +426,7 @@ pub(super) fn selected_cohort(
     read_sample: u32,
     sizes: effects::Sizes,
 ) -> Vec<effects::CohortParent> {
-    let ids = super::indicators::sorted_creature_ids(sim);
-    let ranks = v3_core::neighborhood::read_sample_ranks(ids.len(), read_sample as usize, seed);
-    effects::selected_positions(ranks.len(), sizes.parents as usize, seed)
-        .into_iter()
-        .map(|position| {
-            let creature = &sim.creatures[ids[ranks[position]]];
-            effects::CohortParent {
-                index: position as u64,
-                depth_or_generation: creature.generation,
-                genome: creature.genome().clone(),
-            }
-        })
-        .collect()
+    v3_core::neighborhood::population_sample::selected_cohort(seed, sim, read_sample, sizes)
 }
 
 /// The selected cohort as a world input: undefined when the world is extinct.

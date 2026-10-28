@@ -4,6 +4,7 @@ use proptest::prelude::*;
 use v3_core::contracts::{Direction, WorldAction};
 use v3_core::mutation::graph::GraphOperator;
 use v3_core::mutation::topology::TopologyOperator;
+use v3_core::neighborhood::{evolved_sample_ranks, read_sample_ranks};
 use v3_core::simulation::seed_simulation;
 
 fn companion_population() -> [v3_core::genome::CreatureGenome; 3] {

@@ -5,6 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use v3_core::neighborhood::distributions::{self, TraitDistribution};
+
 use crate::six;
 
 /// The living population's capacity distribution at one sampled tick.
@@ -29,44 +31,29 @@ impl CapacityDistribution {
     /// The distribution of the living population's capacities, `None` at
     /// extinction.
     pub(super) fn observe(sim: &v3_core::simulation::Simulation) -> Option<Self> {
-        Self::of(
-            sim.creatures
-                .values()
-                .map(|creature| creature.body.capacity),
-            sim.config.energy.capacity.min,
-            sim.config.energy.lifecycle.max_energy,
-        )
+        distributions::capacity_distribution(sim).map(Self::from)
     }
 
-    /// The distribution of `capacities` in a `[lower, upper]` range; the
-    /// boundary fractions count exact equality, which the inheritance clamp
-    /// produces.
+    /// The readers' distribution of `capacities` in a `[lower, upper]` range,
+    /// formatted.
+    #[cfg(test)]
     fn of(capacities: impl Iterator<Item = f32>, lower: f32, upper: f32) -> Option<Self> {
-        let mut sorted: Vec<f32> = capacities.collect();
-        if sorted.is_empty() {
-            return None;
+        TraitDistribution::of(capacities, lower, upper).map(Self::from)
+    }
+}
+
+impl From<TraitDistribution> for CapacityDistribution {
+    fn from(distribution: TraitDistribution) -> Self {
+        Self {
+            min: six(distribution.min),
+            p10: six(distribution.p10),
+            median: six(distribution.median),
+            p90: six(distribution.p90),
+            max: six(distribution.max),
+            mean: six(distribution.mean),
+            at_min_fraction: six(distribution.at_min_fraction),
+            at_max_fraction: six(distribution.at_max_fraction),
         }
-        sorted.sort_by(f32::total_cmp);
-        let count = sorted.len();
-        let rank = |q: f64| {
-            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-            let rank = (q * count as f64).ceil() as usize;
-            f64::from(sorted[rank.clamp(1, count) - 1])
-        };
-        let share = |bound: f32| {
-            sorted.iter().filter(|&&capacity| capacity == bound).count() as f64 / count as f64
-        };
-        let mean = sorted.iter().copied().map(f64::from).sum::<f64>() / count as f64;
-        Some(Self {
-            min: six(f64::from(sorted[0])),
-            p10: six(rank(0.1)),
-            median: six(rank(0.5)),
-            p90: six(rank(0.9)),
-            max: six(f64::from(sorted[count - 1])),
-            mean: six(mean),
-            at_min_fraction: six(share(lower)),
-            at_max_fraction: six(share(upper)),
-        })
     }
 }
 
@@ -82,17 +69,9 @@ pub struct ShareDistributions {
 impl ShareDistributions {
     /// The two share distributions, `None` at extinction.
     pub(super) fn observe(sim: &v3_core::simulation::Simulation) -> Option<Self> {
-        let share_min = sim.config.exchange.share_min;
-        let of = |share: fn(&v3_core::creature::body::HeritableBody) -> f32| {
-            CapacityDistribution::of(
-                sim.creatures.values().map(|creature| share(&creature.body)),
-                share_min,
-                1.0,
-            )
-        };
-        Some(Self {
-            steal_share: of(|body| body.steal_share)?,
-            give_share: of(|body| body.give_share)?,
+        distributions::share_distributions(sim).map(|shares| Self {
+            steal_share: shares.steal_share.into(),
+            give_share: shares.give_share.into(),
         })
     }
 }

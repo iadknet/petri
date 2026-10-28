@@ -3,10 +3,13 @@
 //! computes (`genome::sensor_analysis`) and each creature's most
 //! recent mesh reads; and the report label of a world input key.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::contracts::WorldInputKey;
+use crate::genome::sensor_analysis::{sensor_census, DecisionInputKey};
+use crate::genome::CreatureGenome;
 use crate::sensors::reads::WorldKeySet;
+use crate::simulation::Simulation;
 
 /// Per world input key of a world's catalog, how many creatures carry it,
 /// wire it and read it (the live sensor census telemetry exports).
@@ -60,6 +63,74 @@ pub fn world_input_key_label(key: WorldInputKey) -> String {
     match key.food_type_idx() {
         Some(type_idx) => format!("{}:{}", key.as_key(), type_idx.get()),
         None => key.as_key().to_string(),
+    }
+}
+
+/// The structural sensor census of one population (T14.F08, T19.F05): per
+/// world input key of the run's universe and per decision-state input, the
+/// creatures holding a live reference to it, and the three stateful-reach
+/// counts, from each creature's `genome::sensor_analysis::sensor_census`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReferenceCensus {
+    /// Every universe key, in key order, with its creature count.
+    pub world_inputs: BTreeMap<WorldInputKey, u64>,
+    /// Indexed like `DecisionInputKey::ALL`.
+    pub decision_inputs: [u64; DecisionInputKey::ALL.len()],
+    pub reading_shared_memory: u64,
+    pub with_stateful_node: u64,
+    pub with_any_stateful_read: u64,
+}
+
+impl ReferenceCensus {
+    /// Census `creatures`, each a genome and its reachable node indices,
+    /// over the keys of `universe`. Pure structure: no brain executes.
+    pub fn observe<'a>(
+        universe: impl IntoIterator<Item = WorldInputKey>,
+        creatures: impl IntoIterator<Item = (&'a CreatureGenome, &'a [usize])>,
+    ) -> Self {
+        let mut census = Self {
+            world_inputs: universe.into_iter().map(|key| (key, 0)).collect(),
+            decision_inputs: [0; DecisionInputKey::ALL.len()],
+            reading_shared_memory: 0,
+            with_stateful_node: 0,
+            with_any_stateful_read: 0,
+        };
+        for (genome, reachable) in creatures {
+            let reading = sensor_census(genome, reachable);
+            census.reading_shared_memory += u64::from(reading.reads_shared_memory);
+            census.with_stateful_node += u64::from(reading.holds_stateful_node);
+            census.with_any_stateful_read += u64::from(reading.reads_any_stateful());
+            for key in reading.decision_inputs {
+                census.decision_inputs[key as usize] += 1;
+            }
+            for key in reading.world_inputs {
+                // The row set is the same at every checkpoint: mutation draws
+                // food type ids from `config.world.food.types.len()`, clamped
+                // to at least one (`mutation::sampling::sample_food_type_id`),
+                // and the universe is the runtime catalog — that same list, or
+                // the one synthesized default when the config carries none. So
+                // no key can land outside the declared universe.
+                *census.world_inputs.entry(key).or_insert(0) += 1;
+            }
+        }
+        census
+    }
+
+    /// The census of `sim`'s living population over its world's catalog.
+    #[must_use]
+    pub fn of(sim: &Simulation) -> Self {
+        Self::observe(
+            WorldInputKey::universe(
+                sim.world
+                    .food()
+                    .food_types()
+                    .iter()
+                    .map(|food_type| food_type.id),
+            ),
+            sim.creatures
+                .values()
+                .map(|creature| (creature.genome(), creature.reachable_nodes())),
+        )
     }
 }
 

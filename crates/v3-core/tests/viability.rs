@@ -32,6 +32,7 @@ use v3_core::creature::identity::CreatureIdentityState;
 use v3_core::creature::phenotype::Phenotype;
 use v3_core::mutation::reachability::ParentExecuted;
 use v3_core::mutation::MutationEngine;
+use v3_core::neighborhood::population::PopulationCensus;
 use v3_core::simulation::actions::ReproductionActionResult;
 use v3_core::simulation::{run_tick, seed_simulation, Simulation};
 
@@ -1021,9 +1022,9 @@ fn mean_energy_is_positive_in_viable_sim() {
         run_tick(&mut sim, &mut None);
     }
     assert!(
-        sim.mean_energy() > 0.0,
+        PopulationCensus::of(&sim).mean_energy_live() > 0.0,
         "mean_energy should be positive in a viable simulation, got {}",
-        sim.mean_energy()
+        PopulationCensus::of(&sim).mean_energy_live()
     );
 }
 

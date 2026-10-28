@@ -166,15 +166,6 @@ impl Simulation {
         }
         self.action_logs.remove(id);
     }
-
-    /// Mean energy across all living creatures. Returns `0.0` for an empty population.
-    pub fn mean_energy(&self) -> f32 {
-        if self.creatures.is_empty() {
-            0.0
-        } else {
-            self.creatures.values().map(|c| c.energy).sum::<f32>() / self.creatures.len() as f32
-        }
-    }
 }
 
 fn build_mutation_outcome_observation(
@@ -218,34 +209,5 @@ fn build_mutation_outcome_observation(
         survived_short_horizon,
         survived_long_horizon,
         reproduced_once,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::simulation::seeding::seed_simulation;
-
-    fn small_config() -> SimulationConfig {
-        let mut cfg = SimulationConfig::default();
-        cfg.world.width = 20;
-        cfg.world.height = 20;
-        cfg.population.initial_creatures = 5;
-        cfg
-    }
-
-    #[test]
-    fn mean_energy_returns_zero_for_empty_simulation() {
-        let mut sim = seed_simulation(small_config(), 42);
-        sim.creatures.clear();
-        assert_eq!(sim.mean_energy(), 0.0);
-    }
-
-    #[test]
-    fn mean_energy_returns_correct_mean_for_multiple_creatures() {
-        let sim = seed_simulation(small_config(), 42);
-        let expected =
-            sim.creatures.values().map(|c| c.energy).sum::<f32>() / sim.creatures.len() as f32;
-        assert!((sim.mean_energy() - expected).abs() < f32::EPSILON);
     }
 }

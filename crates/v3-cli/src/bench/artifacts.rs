@@ -7,6 +7,7 @@ use std::process::Command;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
+use v3_core::neighborhood::mesh_summary::{MeshRowReading, MeshSummary};
 
 use super::{ComparisonInputs, Report};
 
@@ -186,7 +187,12 @@ fn aggregate_fields(source: &Value, aggregate: &impl Serialize) -> Result<Value,
     Ok(pick(source, &keys))
 }
 
+/// The readers' mesh summary of a stored sample's `mesh_execution` rows:
+/// each row's scalars extracted as the report carries them (a non-integer
+/// count or a non-boolean flag reads as absent, a route flag as `false`
+/// unless `true`), labelled; no row gives `null`.
 fn mesh_summary(source: &Value) -> Value {
+    let count = |row: &Value, key: &str| row[key].as_u64();
     let rows = source
         .as_array()
         .into_iter()
@@ -195,46 +201,54 @@ fn mesh_summary(source: &Value) -> Value {
             genome
                 .get("mesh_execution")
                 .filter(|value| value.is_object())
+        })
+        .map(|row| MeshRowReading {
+            total_node_count: count(row, "total_node_count"),
+            reachable_node_count: count(row, "reachable_node_count"),
+            executed_node_count: count(row, "executed_node_count"),
+            knockout_count: count(row, "knockout_count"),
+            pass_cap_hits: count(row, "pass_cap_hits"),
+            passes: count(row, "passes"),
+            executions_per_genome: count(row, "executions_per_genome"),
+            route_varies_with_input: row["route_varies_with_input"] == true,
+            route_destination_varies: row["route_destination_varies"] == true,
+            route_varies_within_snapshot: row
+                .get("route_varies_within_snapshot")
+                .and_then(Value::as_bool),
+            route_destination_varies_within_snapshot: row
+                .get("route_destination_varies_within_snapshot")
+                .and_then(Value::as_bool),
         });
-    let mut out: BTreeMap<&str, u64> = BTreeMap::new();
-    for row in rows {
-        *out.entry("genomes").or_default() += 1;
-        for (target, key) in [
-            ("total", "total_node_count"),
-            ("reachable", "reachable_node_count"),
-            ("executed", "executed_node_count"),
-            ("knockout", "knockout_count"),
-            ("capHits", "pass_cap_hits"),
-            ("passes", "passes"),
-            ("execs", "executions_per_genome"),
-        ] {
-            if let Some(count) = row[key].as_u64() {
-                *out.entry(target).or_default() += count;
-            }
-        }
-        *out.entry("routeVaries").or_default() += u64::from(row["route_varies_with_input"] == true);
-        *out.entry("routeDestinationVaries").or_default() +=
-            u64::from(row["route_destination_varies"] == true);
-        // State-driven flags (T19.F06): a row measured before them carries no
-        // key, so the count is kept only over rows that do and is absent,
-        // never zero, when none does.
-        for (target, key) in [
-            ("routeVariesWithinSnapshot", "route_varies_within_snapshot"),
-            (
-                "routeDestinationVariesWithinSnapshot",
-                "route_destination_varies_within_snapshot",
-            ),
-        ] {
-            if let Some(varies) = row.get(key).and_then(Value::as_bool) {
-                *out.entry(target).or_default() += u64::from(varies);
-            }
-        }
-    }
-    if out.is_empty() {
-        Value::Null
-    } else {
-        json!(out)
-    }
+    let Some(summary) = MeshSummary::of(rows) else {
+        return Value::Null;
+    };
+    let out: BTreeMap<&str, u64> = [
+        ("genomes", Some(summary.genomes)),
+        ("total", summary.total),
+        ("reachable", summary.reachable),
+        ("executed", summary.executed),
+        ("knockout", summary.knockout),
+        ("capHits", summary.cap_hits),
+        ("passes", summary.passes),
+        ("execs", summary.execs),
+        ("routeVaries", Some(summary.route_varies)),
+        (
+            "routeDestinationVaries",
+            Some(summary.route_destination_varies),
+        ),
+        (
+            "routeVariesWithinSnapshot",
+            summary.route_varies_within_snapshot,
+        ),
+        (
+            "routeDestinationVariesWithinSnapshot",
+            summary.route_destination_varies_within_snapshot,
+        ),
+    ]
+    .into_iter()
+    .filter_map(|(key, value)| Some((key, value?)))
+    .collect();
+    json!(out)
 }
 
 fn neighborhood(source: &Value) -> Value {

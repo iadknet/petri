@@ -9,11 +9,14 @@ use super::schema::{
 use crate::{fraction_or_undefined, six};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use v3_core::contracts::WorldInputKey;
-use v3_core::creature::action_log::{ActionType, ACTION_TYPE_COUNT};
-use v3_core::genome::sensor_analysis::{sensor_census, DecisionInputKey};
-use v3_core::kernel::occupancy_grid::{occupancy_grid, OCCUPANCY_CELLS_PER_AXIS};
+use v3_core::creature::action_log::ActionType;
+use v3_core::genome::sensor_analysis::DecisionInputKey;
+use v3_core::neighborhood::clades::surviving_clade_profiles;
+pub(super) use v3_core::neighborhood::clades::CladeMemberReading;
+use v3_core::neighborhood::occupancy::{occupancy_grid, OCCUPANCY_CELLS_PER_AXIS};
+use v3_core::neighborhood::population::PopulationCensus;
 use v3_core::neighborhood::sensor_census::world_input_key_label;
+use v3_core::neighborhood::sensor_census::ReferenceCensus;
 
 /// The applied-behavior integer sums of
 /// `v3_core::simulation::stats::MutationValueTotals`: what the carriers of an
@@ -108,13 +111,7 @@ pub struct GestationTracking {
 impl GestationTracking {
     fn observe(sim: &v3_core::simulation::Simulation) -> Self {
         let stats = &sim.stats;
-        let (pending_births, pending_litter_energy) = sim
-            .creatures
-            .values()
-            .filter_map(|creature| creature.pending_birth)
-            .fold((0, 0.0), |(count, energy), pending| {
-                (count + 1, energy + f64::from(pending.litter_energy))
-            });
+        let pending = PopulationCensus::of(sim).pending_births();
         Self {
             gestations_started_total: stats.gestations_started_total,
             gestations_delivered_total: stats.gestations_delivered_total,
@@ -122,8 +119,8 @@ impl GestationTracking {
             gestations_lost_no_cell_total: stats.gestations_lost_no_cell_total,
             gestations_lost_population_cap_total: stats.gestations_lost_population_cap_total,
             gestation_creature_ticks_total: stats.gestation_creature_ticks_total,
-            pending_births,
-            pending_litter_energy: six(pending_litter_energy),
+            pending_births: pending.count,
+            pending_litter_energy: six(pending.litter_energy),
         }
     }
 }
@@ -433,103 +430,29 @@ pub struct SurvivingCladeProfileRow {
     pub predation_hits_taken: u64,
 }
 
-/// One living creature's contribution to its clade's row: its lineage and
-/// the lifetime counters `CreatureState` carries.
-#[derive(Debug, Clone, PartialEq)]
-pub(super) struct CladeMemberReading {
-    pub(super) lineage_id: u32,
-    pub(super) energy: f32,
-    pub(super) age: u64,
-    pub(super) generation: u64,
-    pub(super) genome_size: u32,
-    pub(super) eats_by_type: Vec<u64>,
-    pub(super) actions_by_type: [u64; ACTION_TYPE_COUNT as usize],
-    pub(super) predation_kills: u64,
-    pub(super) predation_hits_taken: u64,
-}
-
-impl CladeMemberReading {
-    fn observe(creature: &v3_core::creature::state::CreatureState) -> Self {
-        Self {
-            lineage_id: creature.body.identity.lineage_id,
-            energy: creature.energy,
-            age: creature.age,
-            generation: creature.generation,
-            genome_size: creature.genome_size(),
-            eats_by_type: creature.lifetime_eats_applied_by_type.clone(),
-            actions_by_type: creature.lifetime_actions_attempted_by_type,
-            predation_kills: creature.lifetime_predation_kills_count,
-            predation_hits_taken: creature.lifetime_predation_hits_taken_count,
-        }
-    }
-}
-
-#[derive(Default)]
-struct CladeAccumulator {
-    size: u64,
-    energy_sum: f64,
-    age_sum: u64,
-    generation_sum: u64,
-    genome_size_sum: u64,
-    eats_by_type: Vec<u64>,
-    actions_by_type: [u64; ACTION_TYPE_COUNT as usize],
-    predation_kills: u64,
-    predation_hits_taken: u64,
-}
-
-/// Bucket living creatures by `lineage_id` into rows ascending by lineage.
-/// Pure over its input: sizes sum to the member count, every integer column
-/// is the sum over the row's members, and `eats_by_type` is exactly
-/// `food_type_count` long (a member's lazily grown vector may be shorter, and
-/// a type index past the configured types is not a food type of this run).
-/// Energy is summed in `f64` in input order, so feeding `creatures.values()`
-/// keeps the order the checkpoint `mean_energy` uses.
+/// The readers' per-clade profiles of the living members, as report rows
+/// ascending by lineage.
 pub(super) fn bucket_surviving_clades(
     food_type_count: usize,
     members: impl IntoIterator<Item = CladeMemberReading>,
 ) -> Vec<SurvivingCladeProfileRow> {
-    let mut clades: BTreeMap<u32, CladeAccumulator> = BTreeMap::new();
-    for member in members {
-        let clade = clades
-            .entry(member.lineage_id)
-            .or_insert_with(|| CladeAccumulator {
-                eats_by_type: vec![0; food_type_count],
-                ..CladeAccumulator::default()
-            });
-        clade.size += 1;
-        clade.energy_sum += f64::from(member.energy);
-        clade.age_sum += member.age;
-        clade.generation_sum += member.generation;
-        clade.genome_size_sum += u64::from(member.genome_size);
-        for (total, eaten) in clade.eats_by_type.iter_mut().zip(&member.eats_by_type) {
-            *total += eaten;
-        }
-        for (total, attempted) in clade.actions_by_type.iter_mut().zip(member.actions_by_type) {
-            *total += attempted;
-        }
-        clade.predation_kills += member.predation_kills;
-        clade.predation_hits_taken += member.predation_hits_taken;
-    }
-    clades
+    surviving_clade_profiles(food_type_count, members)
         .into_iter()
-        .map(|(lineage_id, clade)| {
-            let size = clade.size as f64;
-            SurvivingCladeProfileRow {
-                lineage_id,
-                size: clade.size,
-                mean_energy: six(clade.energy_sum / size),
-                mean_age: six(clade.age_sum as f64 / size),
-                mean_generation: six(clade.generation_sum as f64 / size),
-                mean_genome_size: six(clade.genome_size_sum as f64 / size),
-                eats_by_type: clade.eats_by_type,
-                actions_by_type: ActionType::ALL
-                    .into_iter()
-                    .zip(clade.actions_by_type)
-                    .map(|(action, count)| (action.as_key().to_string(), count))
-                    .collect(),
-                predation_kills: clade.predation_kills,
-                predation_hits_taken: clade.predation_hits_taken,
-            }
+        .map(|clade| SurvivingCladeProfileRow {
+            lineage_id: clade.lineage_id,
+            size: clade.size,
+            mean_energy: six(clade.mean_energy),
+            mean_age: six(clade.mean_age),
+            mean_generation: six(clade.mean_generation),
+            mean_genome_size: six(clade.mean_genome_size),
+            eats_by_type: clade.eats_by_type,
+            actions_by_type: ActionType::ALL
+                .into_iter()
+                .zip(clade.actions_by_type)
+                .map(|(action, count)| (action.as_key().to_string(), count))
+                .collect(),
+            predation_kills: clade.predation_kills,
+            predation_hits_taken: clade.predation_hits_taken,
         })
         .collect()
 }
@@ -1089,42 +1012,10 @@ impl SensorCensus {
     /// Census the living population from post-tick state. Pure structure: it
     /// reads genomes and cached reachability and executes no brain.
     pub(super) fn observe(sim: &v3_core::simulation::Simulation) -> Self {
-        let mut world_inputs: BTreeMap<WorldInputKey, u64> = WorldInputKey::universe(
-            sim.world
-                .food()
-                .food_types()
-                .iter()
-                .map(|food_type| food_type.id),
-        )
-        .into_iter()
-        .map(|key| (key, 0))
-        .collect();
-        let mut decision_inputs = [0u64; DecisionInputKey::ALL.len()];
-        let mut creatures_reading_shared_memory = 0;
-        let mut creatures_with_stateful_node = 0;
-        let mut creatures_with_any_stateful_read = 0;
-
-        for creature in sim.creatures.values() {
-            let census = sensor_census(creature.genome(), creature.reachable_nodes());
-            creatures_reading_shared_memory += u64::from(census.reads_shared_memory);
-            creatures_with_stateful_node += u64::from(census.holds_stateful_node);
-            creatures_with_any_stateful_read += u64::from(census.reads_any_stateful());
-            for key in census.decision_inputs {
-                decision_inputs[key as usize] += 1;
-            }
-            for key in census.world_inputs {
-                // The row set is the same at every checkpoint: mutation draws
-                // food type ids from `config.world.food.types.len()`, clamped
-                // to at least one (`mutation::sampling::sample_food_type_id`),
-                // and the universe above is the runtime catalog — that same
-                // list, or the one synthesized default when the config carries
-                // none. So no key can land outside the declared universe.
-                *world_inputs.entry(key).or_insert(0) += 1;
-            }
-        }
-
+        let census = ReferenceCensus::of(sim);
         Self {
-            world_inputs: world_inputs
+            world_inputs: census
+                .world_inputs
                 .into_iter()
                 .map(|(key, creatures)| WorldInputCensusRow {
                     key: world_input_key_label(key),
@@ -1133,15 +1024,15 @@ impl SensorCensus {
                 .collect(),
             decision_inputs: DecisionInputKey::ALL
                 .into_iter()
-                .zip(decision_inputs)
+                .zip(census.decision_inputs)
                 .map(|(key, creatures)| DecisionInputCensusRow {
                     key: key.as_key().to_string(),
                     creatures,
                 })
                 .collect(),
-            creatures_reading_shared_memory,
-            creatures_with_stateful_node,
-            creatures_with_any_stateful_read,
+            creatures_reading_shared_memory: census.reading_shared_memory,
+            creatures_with_stateful_node: census.with_stateful_node,
+            creatures_with_any_stateful_read: census.with_any_stateful_read,
         }
     }
 }
@@ -1166,9 +1057,10 @@ pub(super) struct PopulationReadings {
 
 impl PopulationReadings {
     pub(super) fn observe(sim: &v3_core::simulation::Simulation) -> Self {
-        let means = crate::structure_means(sim);
+        let census = PopulationCensus::of(sim);
+        let means = census.structure_means();
         let (surviving_founder_clade_count, shannon_entropy_nats) =
-            clade_diversity(sim.creatures.values().map(|c| c.body.identity.lineage_id));
+            clade_diversity(census.lineage_ids());
         Self {
             mean_genome_size: means.genome_size,
             mean_mesh_nodes: means.mesh_nodes,
