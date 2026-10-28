@@ -1,9 +1,11 @@
 use std::collections::BTreeSet;
 
-use crate::contracts::{InputReference, NodeId, WorldInputKey};
+use crate::contracts::{InputReference, NodeId, WorldInputKey, OUTPUT_SLOT_COUNT};
 
 use super::analysis::{mesh_reachable_nodes, vm_backward_slice, vm_is_output_instruction};
-use super::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef};
+use super::cgp::{GraphSource, OutputSinkKind};
+use super::cgp_analysis::wired_surface_edges;
+use super::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
@@ -170,6 +172,73 @@ pub(crate) fn collect_live_vm_instruction_indices(vm: &VmBackendDef) -> Vec<usiz
         }
     }
     live.into_iter().collect()
+}
+
+/// The bus slots one node's live circuit touches: the upstream bus slots
+/// its live reads reach and the payload (output bus) slots its live writes
+/// reach.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NodeBusSlots {
+    pub upstream_read: BTreeSet<usize>,
+    pub payload_written: BTreeSet<usize>,
+}
+
+/// The bus slots `node` reads and writes under `annotation`'s liveness, its
+/// own [`MeshNodeAnnotation`], which this reads and never re-derives.
+///
+/// A live read is a `ReadInput` at a live instruction index (VM) or an
+/// `InputLeaf` edge on the wired surface of the live compute nodes (Graph);
+/// its slot is [`InputReference::bus_slot`] of the reference it names. A
+/// live write is a `WriteInternalPayload` at a live instruction index (VM)
+/// or a wired `CustomOutput` sink (Graph), counted below
+/// [`OUTPUT_SLOT_COUNT`], the bound the runtime applies.
+#[must_use]
+pub fn node_bus_slots(node: &NodeGenome, annotation: &MeshNodeAnnotation) -> NodeBusSlots {
+    debug_assert_eq!(node.node_id, annotation.node_id);
+    let read = |ref_idx: usize, sub_idx: u16| node.input_refs.get(ref_idx)?.bus_slot(sub_idx);
+    let on_bus = |slot: usize| (slot < OUTPUT_SLOT_COUNT).then_some(slot);
+    let mut slots = NodeBusSlots::default();
+    match &node.backend_def {
+        BackendDef::Vm(vm) => {
+            let live = annotation
+                .live_instruction_indices
+                .iter()
+                .filter_map(|&index| vm.program.get(index));
+            for instruction in live {
+                match *instruction {
+                    VmInstruction::ReadInput {
+                        ref_idx, sub_idx, ..
+                    } => slots
+                        .upstream_read
+                        .extend(read(usize::from(ref_idx), sub_idx)),
+                    VmInstruction::WriteInternalPayload { slot_idx, .. } => {
+                        slots.payload_written.extend(on_bus(usize::from(slot_idx)))
+                    }
+                    _ => {}
+                }
+            }
+        }
+        BackendDef::Graph(def) => {
+            let live = &annotation.live_internal_node_indices;
+            for edge in wired_surface_edges(def, live) {
+                if let GraphSource::InputLeaf { ref_idx, sub_idx } = edge.source() {
+                    slots
+                        .upstream_read
+                        .extend(read(usize::from(ref_idx), sub_idx));
+                }
+            }
+            let wired = def
+                .output_sinks()
+                .iter()
+                .filter(|sink| !sink.inputs.is_empty());
+            for sink in wired {
+                if let OutputSinkKind::CustomOutput(slot) = sink.kind {
+                    slots.payload_written.extend(on_bus(usize::from(slot)));
+                }
+            }
+        }
+    }
+    slots
 }
 
 pub(crate) fn classify_input_ref(input_ref: &InputReference) -> MeshReadClass {
@@ -546,5 +615,220 @@ mod tests {
 
         assert_eq!(reachable_indices, vec![0, 1]);
         assert_eq!(via_cached, via_wrapper);
+    }
+}
+
+#[cfg(test)]
+mod bus_slot_tests {
+    use super::*;
+    use crate::contracts::OUTPUT_SLOT_COUNT;
+    use crate::genome::cgp::{
+        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
+        OutputSinkKind,
+    };
+    use crate::genome::VmInstruction;
+
+    /// `node`'s bus slots under its own annotation, as a reachable node.
+    fn slots_of(node: &NodeGenome) -> NodeBusSlots {
+        node_bus_slots(node, &derive_node_annotation(node, true))
+    }
+
+    fn vm_node(input_refs: Vec<InputReference>, program: Vec<VmInstruction>) -> NodeGenome {
+        NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs,
+            targets: Vec::new(),
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 2,
+                constants: vec![1.0],
+                program,
+            }),
+        }
+    }
+
+    fn graph_node(input_refs: Vec<InputReference>, def: CgpGraphBackendDef) -> NodeGenome {
+        NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs,
+            targets: Vec::new(),
+            backend_def: BackendDef::Graph(def),
+        }
+    }
+
+    fn leaf(sub_idx: u16) -> GraphEdge {
+        GraphEdge::new(
+            GraphSource::InputLeaf {
+                ref_idx: 0,
+                sub_idx,
+            },
+            1.0,
+        )
+    }
+
+    fn sink(slot: u8, inputs: Vec<GraphEdge>) -> OutputSink {
+        OutputSink::new(OutputSinkKind::CustomOutput(slot), inputs)
+    }
+
+    /// A Graph node whose input leaf `sub_idx` of `reference` feeds a
+    /// `CustomOutput(0)` sink directly.
+    fn graph_reading(reference: InputReference, sub_idx: u16) -> NodeGenome {
+        let def = CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_compute_nodes(Vec::new())
+            .with_output_sinks(vec![sink(0, vec![leaf(sub_idx)])]);
+        graph_node(vec![reference], def)
+    }
+
+    /// A VM node whose live `ReadInput` of `reference` at `sub_idx` feeds a
+    /// payload write.
+    fn vm_reading(reference: InputReference, sub_idx: u16) -> NodeGenome {
+        vm_node(
+            vec![reference],
+            vec![
+                VmInstruction::ReadInput {
+                    dst: 0,
+                    ref_idx: 0,
+                    sub_idx,
+                },
+                VmInstruction::WriteInternalPayload {
+                    slot_idx: 0,
+                    src: 0,
+                },
+            ],
+        )
+    }
+
+    /// A VM node writing a constant to payload slot `slot_idx`.
+    fn vm_payload_write(input_refs: Vec<InputReference>, slot_idx: u8) -> NodeGenome {
+        vm_node(
+            input_refs,
+            vec![
+                VmInstruction::LoadConst {
+                    dst: 1,
+                    const_idx: 0,
+                },
+                VmInstruction::WriteInternalPayload { slot_idx, src: 1 },
+            ],
+        )
+    }
+
+    #[test]
+    fn a_declared_but_unread_upstream_slot_reads_no_slot() {
+        // Arrange
+        let node = vm_payload_write(vec![InputReference::UpstreamSlot(3)], 0);
+
+        // Act
+        let slots = slots_of(&node);
+
+        // Assert
+        assert!(slots.upstream_read.is_empty(), "{slots:?}");
+    }
+
+    #[test]
+    fn a_dead_vm_read_input_reads_no_slot() {
+        // Arrange: the read's register reaches no output instruction.
+        let mut node = vm_payload_write(vec![InputReference::UpstreamSlot(3)], 0);
+        let BackendDef::Vm(vm) = &mut node.backend_def else {
+            unreachable!("a VM node")
+        };
+        vm.program.insert(
+            0,
+            VmInstruction::ReadInput {
+                dst: 0,
+                ref_idx: 0,
+                sub_idx: 0,
+            },
+        );
+
+        // Act
+        let slots = slots_of(&node);
+
+        // Assert
+        assert!(slots.upstream_read.is_empty(), "{slots:?}");
+        assert_eq!(slots.payload_written, BTreeSet::from([0]));
+    }
+
+    #[test]
+    fn an_input_leaf_into_a_non_live_compute_node_reads_no_slot() {
+        // Arrange: compute node 0 reads slot 2; only `live` wires it to a sink.
+        let dead = CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_compute_nodes(vec![ComputeNode::new(ComputeNodeKind::Add, vec![leaf(0)])])
+            .with_output_sinks(Vec::new());
+        let live = dead.clone().with_output_sinks(vec![sink(
+            1,
+            vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+        )]);
+        let refs = vec![InputReference::UpstreamSlot(2)];
+
+        // Act
+        let dead_slots = slots_of(&graph_node(refs.clone(), dead));
+        let live_slots = slots_of(&graph_node(refs, live));
+
+        // Assert
+        assert!(dead_slots.upstream_read.is_empty(), "{dead_slots:?}");
+        assert_eq!(live_slots.upstream_read, BTreeSet::from([2]));
+    }
+
+    /// A bus field read through `UpstreamBus[j]` is slot `j` read, as
+    /// `UpstreamSlot(j)` reads it, on either backend; a read past the bus
+    /// reads no slot.
+    #[test]
+    fn a_bus_field_read_is_the_slot_its_upstream_slot_twin_reads() {
+        let past = u16::try_from(OUTPUT_SLOT_COUNT).expect("a small bus");
+        for build in [graph_reading, vm_reading] {
+            // Act
+            let via_slot = slots_of(&build(InputReference::UpstreamSlot(3), 0)).upstream_read;
+            let via_bus = slots_of(&build(InputReference::UpstreamBus, 3)).upstream_read;
+            let off_bus = slots_of(&build(InputReference::UpstreamBus, past)).upstream_read;
+
+            // Assert
+            assert_eq!(via_slot, BTreeSet::from([3]));
+            assert_eq!(via_bus, via_slot);
+            assert!(off_bus.is_empty(), "{off_bus:?}");
+        }
+    }
+
+    #[test]
+    fn an_upstream_slot_read_through_any_field_reads_its_slot() {
+        for build in [graph_reading, vm_reading] {
+            // Act
+            let slots = slots_of(&build(InputReference::UpstreamSlot(5), 7));
+
+            // Assert
+            assert_eq!(slots.upstream_read, BTreeSet::from([5]));
+        }
+    }
+
+    #[test]
+    fn a_vm_payload_write_writes_its_slot_below_the_bus_bound() {
+        // Arrange
+        let past = u8::try_from(OUTPUT_SLOT_COUNT).expect("a small bus");
+
+        // Act
+        let within = slots_of(&vm_payload_write(Vec::new(), 4));
+        let beyond = slots_of(&vm_payload_write(Vec::new(), past));
+
+        // Assert
+        assert_eq!(within.payload_written, BTreeSet::from([4]));
+        assert!(beyond.payload_written.is_empty(), "{beyond:?}");
+    }
+
+    #[test]
+    fn a_wired_custom_output_writes_its_slot_and_an_unwired_one_does_not() {
+        // Arrange
+        let past = u8::try_from(OUTPUT_SLOT_COUNT).expect("a small bus");
+        let def = CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_compute_nodes(Vec::new())
+            .with_output_sinks(vec![
+                sink(6, vec![leaf(0)]),
+                sink(7, Vec::new()),
+                sink(past, vec![leaf(0)]),
+            ]);
+        let node = graph_node(vec![InputReference::UpstreamSlot(0)], def);
+
+        // Act
+        let slots = slots_of(&node);
+
+        // Assert
+        assert_eq!(slots.payload_written, BTreeSet::from([6]));
     }
 }

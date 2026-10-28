@@ -7,7 +7,7 @@
 //! goes through a primitive below, which applies the seed rule of the write
 //! it replaces. The container draws no random numbers.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::ops::Deref;
 
@@ -1159,11 +1159,12 @@ impl CgpGraphBackendDef {
             })
     }
 
-    /// The birth coordinates of `bundle` with presence (T30.F01): every
-    /// coordinate its wiring materializes on its field set
+    /// The birth coordinates of `bundle` with their members (T30.F01,
+    /// T30.F14): every coordinate its wiring materializes on its field set
     /// ([`Wiring::coordinates`]) under the reader's `context`, none when the
-    /// source no longer resolves. A coordinate is present when a member of
-    /// `bundle` reads its field on its site.
+    /// source no longer resolves. Each carries the location of the first
+    /// member of `bundle`, in [`Self::members`] order, that reads its field
+    /// on its site; none for a hole.
     #[must_use]
     pub fn birth_coordinates(
         &self,
@@ -1177,22 +1178,23 @@ impl CgpGraphBackendDef {
             .resolve_in(input_refs, context)
             .map(|set| record.wiring.coordinates(&set))
             .unwrap_or_default();
-        let members: HashSet<(u16, Site)> = self
-            .members(bundle)
-            .filter_map(|member| {
-                let edge = self.edge_at(member);
-                reads_source(edge.source, record)
-                    .then(|| member_field(edge.source))
-                    .flatten()
-                    .zip(self.site_of(member))
-            })
-            .collect();
+        let mut members: HashMap<(u16, Site), EdgeOccurrence> = HashMap::new();
+        for member in self.members(bundle) {
+            let edge = self.edge_at(member);
+            let coordinate = reads_source(edge.source, record)
+                .then(|| member_field(edge.source))
+                .flatten()
+                .zip(self.site_of(member));
+            if let Some(coordinate) = coordinate {
+                members.entry(coordinate).or_insert(member);
+            }
+        }
         births
             .into_iter()
             .map(|(field, site)| BirthCoordinate {
                 field,
                 site,
-                present: members.contains(&(field, site)),
+                member: members.get(&(field, site)).copied(),
             })
             .collect()
     }

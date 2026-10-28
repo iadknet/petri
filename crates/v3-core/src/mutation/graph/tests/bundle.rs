@@ -12,7 +12,8 @@ use crate::creature::founder::v3alpha1_founder_genome;
 use crate::genome::cgp::test_support::{add_bundle_on, edit_sinks};
 use crate::genome::cgp::{
     compose, detach, validate_graph, BirthSeeds, BundleBirth, BundleId, BundleSource,
-    CgpGraphBackendDef, EdgeOccurrence, EdgeSurface, OutputSinkKind, Scope, Wiring,
+    CgpGraphBackendDef, EdgeOccurrence, EdgeSurface, GraphSource, OutputSinkKind, Scope, Site,
+    Wiring,
 };
 use crate::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
@@ -404,6 +405,30 @@ fn replay_creation(op: GraphOperator, rng: &mut SmallRng) -> (CgpGraphBackendDef
     (want, randomized)
 }
 
+/// Whether the edge at `member` is a member of `bundle` reading `field` of
+/// its source on `site`: the fact a birth coordinate's location claims.
+fn located_member_reads(
+    def: &CgpGraphBackendDef,
+    bundle: BundleId,
+    member: EdgeOccurrence,
+    field: u16,
+    site: Site,
+) -> bool {
+    let edge = def.edge_at(member);
+    let reads_field = match (edge.source(), def.bundles()[bundle.index()].source()) {
+        (GraphSource::InputLeaf { ref_idx, sub_idx }, BundleSource::Sensor { ref_idx: at, .. }) => {
+            ref_idx == at && sub_idx == field
+        }
+        (GraphSource::SharedMemory { slot, previous }, BundleSource::Memory { previous: bank }) => {
+            previous == bank && u16::from(slot) == field
+        }
+        _ => false,
+    };
+    edge.membership().is_some_and(|m| m.bundle == bundle)
+        && reads_field
+        && def.site_of(member) == Some(site)
+}
+
 proptest::proptest! {
     /// Both creation operators draw the source, the plan, the live scale,
     /// the form coin and that form's learning draws, and nothing else; the
@@ -423,7 +448,13 @@ proptest::proptest! {
         proptest::prop_assert!(validate_graph(&node).is_ok());
         let def = graph(&node);
         let coordinates = def.birth_coordinates(id(0), &node.input_refs, &crate::contracts::SensorContext::WIDEST);
-        proptest::prop_assert!(coordinates.iter().all(|c| c.present), "the whole set");
+        for c in &coordinates {
+            let member = c.member.expect("the whole set");
+            proptest::prop_assert!(
+                located_member_reads(def, id(0), member, c.field, c.site),
+                "{c:?}"
+            );
+        }
         proptest::prop_assert!(def.edges().all(|edge| edge.own_weight() == 0.0));
         if !live {
             proptest::prop_assert_eq!(def.bundles()[0].scale(), 0.0, "born silent");

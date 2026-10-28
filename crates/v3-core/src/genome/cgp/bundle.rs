@@ -391,13 +391,16 @@ pub const fn pair_relative(d: u8, offset: u8) -> u8 {
 }
 
 /// One birth coordinate of a bundle (T30.F01): the field a member born with
-/// the bundle reads, the site it is born on, and whether a member of the
-/// bundle reading that field sits there now.
+/// the bundle reads, the site it is born on, and the location of the member
+/// of the bundle reading that field that sits there now (T30.F14).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BirthCoordinate {
     pub field: u16,
     pub site: Site,
-    pub present: bool,
+    /// The first such member in `members` order (sink order, then edge
+    /// order); `None` for a hole. A coordinate is present exactly when it
+    /// carries a member.
+    pub member: Option<EdgeOccurrence>,
 }
 
 /// The only composition formula: a member's genomic weight from its own

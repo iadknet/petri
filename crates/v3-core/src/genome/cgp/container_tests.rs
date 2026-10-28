@@ -2372,15 +2372,18 @@ fn a_fact_member_detaches_by_the_one_member_law() {
 
 // ── Birth coordinates (T30.F01) ─────────────────────────────────────────────
 
+/// The `(field, site)` of the leaf-reading member at `member`.
+fn member_site(def: &CgpGraphBackendDef, member: EdgeOccurrence) -> (u16, Site) {
+    let GraphSource::InputLeaf { sub_idx, .. } = def.edge_at(member).source() else {
+        unreachable!("members read leaves")
+    };
+    (sub_idx, def.site_of(member).expect("a member on its kind"))
+}
+
 /// The `(field, site)` of every member of `id`.
 fn site_ofs(def: &CgpGraphBackendDef, id: BundleId) -> Vec<(u16, Site)> {
     def.members(id)
-        .map(|member| {
-            let GraphSource::InputLeaf { sub_idx, .. } = def.edge_at(member).source() else {
-                unreachable!("members read leaves")
-            };
-            (sub_idx, def.site_of(member).expect("a member on its kind"))
-        })
+        .map(|member| member_site(def, member))
         .collect()
 }
 
@@ -2391,7 +2394,7 @@ fn coordinate_sites(coordinates: &[BirthCoordinate]) -> Vec<(u16, Site)> {
 
 proptest! {
     /// A new bundle's birth coordinates are exactly its members, each
-    /// present: a ring's eight channels on `(channel + offset) mod 8`, a
+    /// carrying the member at its `(field, site)`: a ring's eight channels on `(channel + offset) mod 8`, a
     /// pair's twelve direction members, then its declared facts on the
     /// drive.
     #[test]
@@ -2409,7 +2412,10 @@ proptest! {
             (def, id, ring_refs())
         };
         let coordinates = def.birth_coordinates(id, &refs, &crate::contracts::SensorContext::WIDEST);
-        prop_assert!(coordinates.iter().all(|c| c.present));
+        for c in &coordinates {
+            let member = c.member.expect("every coordinate present");
+            prop_assert_eq!(member_site(&def, member), (c.field, c.site));
+        }
         let mut sites = coordinate_sites(&coordinates);
         let expected = if pair { 12 + facts().len() } else { 8 };
         prop_assert_eq!(sites.len(), expected);
@@ -2425,7 +2431,7 @@ proptest! {
         prop_assert_eq!(sites, members);
     }
 
-    /// Removing one member marks exactly its coordinate absent.
+    /// Removing one member makes exactly its coordinate a hole.
     #[test]
     fn a_removed_member_is_its_coordinate_absent(offset in 0u8..8, pick in 0usize..15) {
         let (mut def, id) = fact_gene(DirectedVoteKind::Move, offset);
@@ -2437,7 +2443,7 @@ proptest! {
         let absent: Vec<_> = def
             .birth_coordinates(id, &refs, &crate::contracts::SensorContext::WIDEST)
             .into_iter()
-            .filter(|c| !c.present)
+            .filter(|c| c.member.is_none())
             .map(|c| (c.field, c.site))
             .collect();
         prop_assert_eq!(absent, vec![site]);
@@ -2457,7 +2463,7 @@ fn an_unresolvable_pair_has_no_coordinates() {
     assert_eq!(directions.len(), 12);
     let fields: Vec<u16> = drives.iter().map(|c| c.field).collect();
     assert_eq!(fields, facts());
-    assert!(coordinates.iter().all(|c| c.present));
+    assert!(coordinates.iter().all(|c| c.member.is_some()));
     assert!(def
         .birth_coordinates(id, &ring_refs(), &crate::contracts::SensorContext::WIDEST)
         .is_empty());
@@ -2499,5 +2505,31 @@ fn the_widest_queue_bundle_lists_every_coordinate_present() {
 
     // Assert
     assert_eq!(births.len(), 65_536);
-    assert!(births.iter().all(|c| c.present));
+    assert!(births.iter().all(|c| c.member.is_some()));
+}
+
+/// A coordinate two members of its bundle sit on carries the first in
+/// member order (sink order, then edge order).
+#[test]
+fn a_doubly_held_coordinate_carries_its_first_member() {
+    // Arrange: a ring bundle, then a second member on its first coordinate,
+    // appended after the original on the same sink.
+    let (mut def, id) = grouped(DirectedVoteKind::Move, 3);
+    let refs = ring_refs();
+    let context = crate::contracts::SensorContext::WIDEST;
+    let first = def.birth_coordinates(id, &refs, &context)[0];
+    let original = first.member.expect("a new bundle's coordinate is present");
+    let EdgeSurface::SinkInput(sink) = original.surface else {
+        unreachable!("members sit on sinks")
+    };
+    let duplicate = CgpGraphBackendDef::new_member(id, RING_SOURCE, first.field);
+    def.output_sinks.0[sink].inputs.0.push(duplicate);
+    let appended = EdgeOccurrence::new(original.surface, def.output_sinks[sink].inputs.len() - 1);
+    assert_eq!(member_site(&def, appended), (first.field, first.site));
+
+    // Act
+    let after = def.birth_coordinates(id, &refs, &context)[0];
+
+    // Assert
+    assert_eq!(after.member, Some(original));
 }
