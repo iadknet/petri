@@ -99,7 +99,8 @@ today's for a valid genome would show it wrong.
 
 - [x] Core slot and coordinate tests: `cargo test -p v3-core mesh_annotations` and `cargo test -p v3-core bundle` -> result recorded in the readings.
 - [x] Server: `cargo test -p v3-server` (wire-type test without `PETRI_WRITE_TS_TYPES`) -> pass.
-- [x] Frontend: `npm test` and `npm run lint` in `frontend/` -> pass.
+- [x] Frontend: `npm test`, `npm run lint` and `npx tsc -b` in `frontend/` -> pass (lint warnings only in files F14 does not touch).
+- [x] `cargo fmt --all -- --check` and `make rust-clippy` -> pass.
 - [ ] `make check` -> exit 0, viability and baseline-world digests unchanged.
 - [ ] Benchmark profiles: `Not run: Verification Plan`.
 
