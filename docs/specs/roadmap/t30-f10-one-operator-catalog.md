@@ -27,8 +27,7 @@ is identical to main's; any that moves is a defect.
   applicability predicate, draws or dispatch target; to the domain draw
   (`mesh_layer_probability`, then three node-internal domains at equal
   probability); or to the reachable-bias values.
-- New report fields (T25.F12 adds them to the one report this feature
-  leaves).
+- New report fields (T25.F12).
 - Any wire type, benchmark schema or frontend change.
 
 ## Inputs and Invariants
@@ -80,13 +79,14 @@ Invariants:
    entry, and every entry serializes to its `as_key()` string and
    deserializes back to itself (invariant 3).
 3. **One serde form.** `MutationOperator` serializes as its `as_key()`
-   string and deserializes from it (serde's `into`/`try_from` attributes
-   or a hand impl, the implementer's choice); the derived variant-name form
+   string and deserializes from it (serde `into`/`try_from` or a hand
+   impl); the derived variant-name form
    (`GraphAddGraphEdge`) ends. Its only exporters follow: the lab's
-   `key_of` (`v3-lab/src/ladder/track.rs:117`, its tests and
-   `tests/fixtures/summary-v2-wall.json`) and the recruitment-paths records
-   (`recruitment_paths/records.rs`; the `v3-cli/tests/bench_artifacts.rs:1517`
-   literal). Every benchmark summary key, server payload and frontend
+   `key_of` (`v3-lab/src/ladder/track.rs:117` and its tests) and the
+   recruitment-paths records (`recruitment_paths/records.rs`; the
+   `v3-cli/tests/bench_artifacts.rs:1517` literal). Stored output such as
+   the historical `v3-lab/tests/fixtures/summary-v2-wall.json` is not an
+   exporter and stays as committed. Every benchmark summary key, server payload and frontend
    label already reads `as_key()` and is unchanged.
 4. **One report and one dispatch.** `mutation/types` defines
    `EventReport { class: Option<BirthEdgeClass>, attribute_scope: Option<Scope>, bundle_edits: BundleEdits }`
@@ -170,8 +170,8 @@ its marker: the node an operator added is F11's to report.
 
 ## Telemetry
 
-Not applicable: a type and control-flow refactor adding no signal, config
-value or mechanism switch; nothing a run does changes.
+Not applicable: a refactor adding no signal, config value or mechanism
+switch; nothing a run does changes.
 
 | Signal | Kind | Source | Context carried |
 | --- | --- | --- | --- |
@@ -208,8 +208,8 @@ regression past its threshold would show it wrong.
       in `neighborhood/operators.rs` drops `OperatorKind` for the dispatch.
 - [ ] 4. Callers of invariant 6 (compiler-driven): readers,
       `recruitment_paths` with the `WORKAROUND(T30.F09)` comment on
-      `ProductionEvent`, `v3-cli`, `v3-lab` (`key_of`, tests, fixture),
-      and every test file naming a flat variant.
+      `ProductionEvent`, `v3-cli`, `v3-lab` (`key_of` and its tests; the
+      v2 fixture stays), and every test file naming a flat variant.
 - [ ] 5. `make check` (the draw-stream pin and `tests/reproducibility.rs`
       run inside it).
 - [ ] 6. At close: run the declared gate profile and the slow tier.
@@ -237,8 +237,8 @@ regression past its threshold would show it wrong.
 
 **Predeclaration — written before the run.** No cost-bearing change: the
 one selection function does the same list build, weighted draws and gated
-apply the four blocks do, with one extra `match` on the nested variant per
-attempt and no new allocation or clone. Expected compute cost: none
+apply the four blocks do, with one extra `match` per attempt and no new
+allocation. Expected compute cost: none
 measurable. The gate is compared against the current epoch with the
 standard thresholds and no re-pin; every deterministic block is expected
 identical, a differing block is a defect, and a compute regression past
