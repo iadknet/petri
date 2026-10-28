@@ -233,7 +233,9 @@ Commands run on the feature head (2026-10-28), each exit 0: `cargo check
 `--test viability` ran first); `node
 scripts/architecture-check.mjs`. `v3-cli bench-summarize` parity on both
 stored reports ran on the build at `aa3cc6402` (readings); the later commits
-change no converter code. Every pin literal is unchanged. `make check` and the gate are not yet run.
+change converter code only by moving the keep-list derivation into
+`bench/artifacts/sample_retention.rs`, whose pinned retention-table test is
+unchanged and passes. Every pin literal is unchanged. `make check` and the gate are not yet run.
 
 ## Performance and Goal Impact
 
@@ -283,3 +285,5 @@ observation cost within run-to-run noise. A counter off
   user at closure, with the same keying in
   `mutation_added_node_world_inputs_total_by_operator` (readings R11).
 - Exception: a fourth Codex job (spec-round3 template, priors rounds 1–2, round 3 via readings) confirmed 3.F3's C22 fix and upheld no blocking finding; its not-ready verdict rested only on the superseded 2.F3 rebuttal, withdrawn as round 4 directed; orchestrator decision 2026-10-28.
+- Decision: final review lens 1 P1-A (server food-key collision) was rebutted by the spec owner and accepted by the orchestrator: main's value came from a process-seeded HashMap, so no deterministic output existed to preserve; payer stays the R11 Deferred note (readings, final review triage).
+- Decision: final review lens 2 P1 (v3-cli retention ↔ tracking import cycle) and lens 3 P3 (duplicate wiring constants) were remediated in the post-review pass.
