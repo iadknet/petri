@@ -2394,9 +2394,9 @@ fn coordinate_sites(coordinates: &[BirthCoordinate]) -> Vec<(u16, Site)> {
 
 proptest! {
     /// A new bundle's birth coordinates are exactly its members, each
-    /// carrying the member at its `(field, site)`: a ring's eight channels on `(channel + offset) mod 8`, a
-    /// pair's twelve direction members, then its declared facts on the
-    /// drive.
+    /// carrying the member at its `(field, site)`: a ring's eight channels
+    /// on `(channel + offset) mod 8`, a pair's twelve direction members,
+    /// then its declared facts on the drive.
     #[test]
     fn a_new_bundles_coordinates_are_its_members_all_present(
         kind in 0usize..4,

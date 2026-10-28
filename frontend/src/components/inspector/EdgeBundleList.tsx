@@ -226,17 +226,17 @@ function BundleRow({
 			{open ? (
 				<ul className="ml-4 space-y-0.5 text-slate-400">
 					{bundle.coordinates.map((coordinate) => {
+						const { field, site } = coordinate;
+						// A coordinate's identity is its `(field, site)`, not its label.
+						const key = `${field}:${typeof site === "string" ? site : site.Direction}`;
 						const member = coordinateMember(graphDef, coordinate, join);
-						const at = `${fieldLabel(bundle.source, coordinate.field, inputRefs)} → ${siteLabel(
-							coordinate.site,
-							bundle.wiring,
-						)}`;
+						const at = `${fieldLabel(bundle.source, field, inputRefs)} → ${siteLabel(site, bundle.wiring)}`;
 						return member ? (
-							<li key={at} data-testid="edge-bundle-member">
+							<li key={key} data-testid="edge-bundle-member">
 								{at} <MemberWeights member={member} />
 							</li>
 						) : (
-							<li key={at} data-testid="edge-bundle-hole" className="text-slate-400">
+							<li key={key} data-testid="edge-bundle-hole" className="text-slate-400">
 								{at} (hole)
 							</li>
 						);

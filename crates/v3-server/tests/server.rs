@@ -3351,16 +3351,16 @@ async fn get_creature_brain_resolves_pair_coordinates_and_fact_members() {
     );
     let coordinates = gene["coordinates"].as_array().unwrap();
     assert_eq!(coordinates.len(), 12 + 3, "twelve compass and three facts");
-    let present = coordinates
+    let present: Vec<_> = coordinates
         .iter()
         .filter(|c| c.get("member").is_some())
-        .count();
-    assert_eq!(present, 14, "one member removed");
-    assert!(coordinates
-        .iter()
-        .filter(|c| c.get("member").is_some())
-        .all(|c| located_edge(graph, c)["member"]["field"] == c["field"]
-            && located_edge(graph, c)["member"]["site"] == c["site"]));
+        .collect();
+    assert_eq!(present.len(), 14, "one member removed");
+    for coordinate in present {
+        let member = &located_edge(graph, coordinate)["member"];
+        assert_eq!(member["field"], coordinate["field"], "{coordinate}");
+        assert_eq!(member["site"], coordinate["site"], "{coordinate}");
+    }
     let drives: Vec<_> = coordinates
         .iter()
         .filter(|c| c["site"] == "Drive")
