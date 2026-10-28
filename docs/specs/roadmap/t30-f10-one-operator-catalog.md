@@ -206,7 +206,7 @@ regression past its threshold would show it wrong.
       5); delete the three key functions, the four wrappers,
       `ClassifiedResult` and the `too_many_lines` allowance; the battery
       in `neighborhood/operators.rs` drops `OperatorKind` for the dispatch.
-- [x] 4. Callers of invariant 6 (compiler-driven): readers,
+- [ ] 4. Callers of invariant 6 (compiler-driven): readers,
       `recruitment_paths` with the `WORKAROUND(T30.F09)` comment on
       `ProductionEvent`, `v3-cli`, `v3-lab` (`key_of`, tests, fixture),
       and every test file naming a flat variant.
