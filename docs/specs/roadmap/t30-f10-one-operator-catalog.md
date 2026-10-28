@@ -1,6 +1,6 @@
 # T30.F10 — One Operator Catalog
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-28
 **Feature**: T30.F10
 **Track**: [T30 — Core Boundaries](../../roadmaps/t30-core-boundaries.md)
@@ -219,9 +219,9 @@ regression past its threshold would show it wrong.
       `recruitment_paths` with the `WORKAROUND(T30.F09)` comment on
       `ProductionEvent`, `v3-cli`, `v3-lab` (`key_of` and its tests; the
       v2 fixture stays), and every test file naming a flat variant.
-- [ ] 5. `make check` (the draw-stream pin and `tests/reproducibility.rs`
+- [x] 5. `make check` (the draw-stream pin and `tests/reproducibility.rs`
       run inside it).
-- [ ] 6. At close: run the declared gate profile and the slow tier.
+- [x] 6. At close: run the declared gate profile and the slow tier.
 - [x] 7. Review remediation: the leaf `mutation/event` module with
       `types` re-exporting it (invariant 4), `COUNT` in place of the
       literal 69 (invariant 2), and the domain-mapping test collapsed to
@@ -240,11 +240,11 @@ regression past its threshold would show it wrong.
 - [x] Invariant 5: `grep -n too_many_lines crates/v3-core/src/mutation/engine/mod.rs`
       is empty; `cargo test -p v3-core draw_stream` passes with hash
       `14_628_003_425_138_151_748` unchanged.
-- [ ] Invariants 6 and 7: `make check` exits 0, no test deleted or ignored.
+- [x] Invariants 6 and 7: `make check` exits 0, no test deleted or ignored.
 - [x] Gate profile: summary at `docs/progress/features/t30-f10.json`, blocks
       equal to the epoch, raw hash and size in the readings, series entry
       added, no full report staged.
-- [ ] Slow tier: `make rust-test-slow` -> exit 0 on the final code.
+- [x] Slow tier: `make rust-test-slow` -> exit 0 on the final code.
 
 | Self-review check (2026-10-28, after `simplify`) | Result |
 | --- | --- |
@@ -252,6 +252,7 @@ regression past its threshold would show it wrong.
 | `cargo test -p v3-core` | pass; draw-stream hash unchanged, `reproducibility` 4 passed |
 | `cargo test -p v3-cli` | pass |
 | Task 7 (2026-10-28): check, fmt, clippy; `cargo test -p v3-core`; `cargo test -p v3-cli -p v3-lab -p v3-telemetry -p v3-server`; upward-import grep | clean; pass, hash unchanged; 742 passed; empty (readings) |
+| Closure at tested commit `786668ec2`: `make check`; `make rust-test-slow` | exit 0 (frontend 680/680; first run timed out `ConfigPanel` "clamps the slider", 4.7 s of 5 s alone, untouched frontend); exit 0, 9 slow tests passed |
 
 ## Performance and Goal Impact
 
@@ -283,20 +284,19 @@ move; the goal profile is not run (Verification Plan).
 
 ## Success Criteria
 
-- [ ] Every operator is defined in one place: its domain enum; the nested
+- [x] Every operator is defined in one place: its domain enum; the nested
       `MutationOperator` derives domain, key, weight and complexity effect,
       and no mapping function or parallel list remains.
-- [ ] One engine function selects and dispatches every domain's events,
+- [x] One engine function selects and dispatches every domain's events,
       returning one report shape, and the `too_many_lines` allowance is gone.
-- [ ] The draw-stream hash, `tests/reproducibility.rs` and the gate's
+- [x] The draw-stream hash, `tests/reproducibility.rs` and the gate's
       deterministic blocks are identical to main's; `make check` and the
       slow tier pass.
 
 ## Notes for AI Agents
 
-- Decision: `MutationOperator`'s serde form is its `as_key()` string; the
-  derived variant-name spelling in the lab summary and the recruitment-paths
-  block is gone, and no stored benchmark key changes.
+- Decision: `MutationOperator` serializes as its `as_key()` string; no
+  stored benchmark key changes.
 - Deferred: `tracked_before` and the added-node diff stay under
   `WORKAROUND(T30.F11)` in the one path; T30.F11 pays it.
 - Deferred: the test-only `TopologyOperator::random` and `VmOperator::random`
@@ -305,3 +305,5 @@ move; the goal profile is not run (Verification Plan).
 - Deferred: `ProductionEvent` in `recruitment_paths/qualification.rs` stays
   as a second nested operator enum under `WORKAROUND(T30.F09)`; T30.F09
   deletes the module.
+- Cost: 3 implementer passes, 6 advisor consults, 3 spec-owner resumes,
+  2 Codex rounds, `ready`; lens P1 0/1/0, P2 0/0/2.
