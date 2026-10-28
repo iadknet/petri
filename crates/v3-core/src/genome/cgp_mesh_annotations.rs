@@ -12,6 +12,7 @@ use crate::contracts::InputReference;
 use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNodeKind, EdgeSurface, GraphSource, OutputSinkKind,
 };
+use crate::genome::learning::LearningLayout;
 use crate::genome::mesh_annotations::{classify_input_ref, MeshReadClass, MeshWriteClass};
 
 use super::cgp_analysis::{cgp_live_compute_indices, wired_surface_edges};
@@ -28,12 +29,17 @@ pub(crate) fn derive_cgp_annotations(
 
     let live_indices = cgp_live_compute_indices(def);
 
-    // Learning (T25.F06): a plastic edge into a live compute node or a
-    // sink (a sink with an edge is wired).
-    let mut has_stateful_behavior = def.plastic_edges().any(|(site, _)| match site.surface {
-        EdgeSurface::ComputeInput(i) => live_indices.contains(&i),
-        EdgeSurface::SinkInput(_) => true,
-    });
+    // Learning (T25.F06, T25.F12): an edge learner into a live compute node
+    // or a sink (a sink with an edge is wired), or any scale learner.
+    let layout = LearningLayout::of(def, input_refs);
+    let mut has_stateful_behavior = !layout.scales.is_empty()
+        || layout
+            .edges
+            .iter()
+            .any(|learner| match learner.occurrence.surface {
+                EdgeSurface::ComputeInput(i) => live_indices.contains(&i),
+                EdgeSurface::SinkInput(_) => true,
+            });
 
     // Stateful flags from live compute nodes
     for &idx in &live_indices {

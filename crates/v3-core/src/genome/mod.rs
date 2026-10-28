@@ -3,14 +3,17 @@ pub mod cgp;
 pub(crate) mod cgp_analysis;
 pub(crate) mod cgp_mesh_annotations;
 pub mod companions;
+pub mod learning;
 pub mod mesh_annotations;
 mod node_edit;
 pub mod sensor_analysis;
 
 pub use companions::{structural_companions, StructuralCompanions};
+pub(crate) use learning::retention_decays;
+pub use learning::{HebbianRule, PlasticityConfig, RewardModulationConfig};
 pub use node_edit::{input_ref_kind, InputRefKind, NodeEditError};
 
-use crate::contracts::{InputReference, NodeId, OutcomeChannel, RouteTarget};
+use crate::contracts::{InputReference, NodeId, RouteTarget};
 
 /// A single VM instruction. 39 opcodes per v3-vm-isa-spec.md.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -133,85 +136,6 @@ pub struct VmBackendDef {
     pub program: Vec<VmInstruction>,
 }
 
-// ── Graph backend types ───────────────────────────────────────────────────────
-
-/// Hebbian learning rule variant controlling how edge weights adapt at runtime.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum HebbianRule {
-    /// dw = eta * pre * post
-    Classic,
-    /// dw = eta * post * (pre - w * post)  (normalizing)
-    Oja,
-    /// dw = -eta * pre * post
-    AntiHebb,
-    /// dw = eta * (pre - 0.5) * (post - 0.5)
-    Covariance,
-}
-
-impl HebbianRule {
-    /// Every rule, in declaration order.
-    pub const ALL: [Self; 4] = [Self::Classic, Self::Oja, Self::AntiHebb, Self::Covariance];
-}
-
-/// Reward modulation config for three-factor plasticity.
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct RewardModulationConfig {
-    pub reward_source: OutcomeChannel,
-    /// Eligibility retention per world tick, in [0.0, 1.0] (I1).
-    pub trace_decay: f32,
-}
-
-/// One edge's learning attributes (T25.F06), stored on the `GraphEdge`.
-///
-/// Governs both pure Hebbian and reward-modulated (three-factor) learning.
-/// When `modulation` is `None`, this is pure Hebbian learning. When `Some`,
-/// activity without the learning-rate factor replaces the tick contribution to an eligibility trace; weight
-/// updates are deferred to the reward-modulated learning pass.
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct PlasticityConfig {
-    pub rule: HebbianRule,
-    /// Learning rate, applied once per weight update, in [0.0, 1.0] (I1).
-    pub learning_rate: f32,
-    /// Symmetric weight clamp magnitude, in [0.01, 10.0] (I1).
-    pub weight_clamp: f32,
-    /// If true, offspring inherit learned weights (Lamarckian); otherwise
-    /// offspring start from genome birth weights (Darwinian).
-    pub lamarckian: bool,
-    /// Reward modulation config. `None` = pure Hebbian (default).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub modulation: Option<RewardModulationConfig>,
-    /// Learned-weight retention per world tick, in [0.0, 1.0] (T25.F09): the
-    /// learned own quantity relaxes `b + ρ·(x − b)` toward its birth value;
-    /// 1 is an exact no-op.
-    pub retention: f32,
-}
-
-impl PlasticityConfig {
-    /// I1 for plasticity (T25.F06, T25.F09): every value finite, the learning
-    /// rate, trace decay and retention in `[0, 1]` and the weight clamp in
-    /// `[0.01, 10]`. The
-    /// enable draws and perturbation laws keep it by construction; the load
-    /// boundary checks it ([`cgp::validate_graph`]).
-    #[must_use]
-    pub fn in_range(&self) -> bool {
-        (0.0..=1.0).contains(&self.learning_rate)
-            && (0.01..=10.0).contains(&self.weight_clamp)
-            && (0.0..=1.0).contains(&self.retention)
-            && self
-                .modulation
-                .is_none_or(|modulation| (0.0..=1.0).contains(&modulation.trace_decay))
-    }
-}
-
-/// Whether a learned-weight retention (a [`PlasticityConfig`]'s or a
-/// bundle's) decays: below 1, compared exactly so that 1 is an exact no-op
-/// (T25.F09 invariant 3).
-#[inline]
-#[must_use]
-pub(crate) fn retention_decays(retention: f32) -> bool {
-    retention < 1.0
-}
-
 // ── Top-level genome types ────────────────────────────────────────────────────
 
 /// Backend definition: either VM or Graph (CGP three-layer model).
@@ -273,6 +197,16 @@ impl CreatureGenome {
     /// Look up a node by its ID. O(n) — genomes are small.
     pub fn find_node(&self, id: NodeId) -> Option<&NodeGenome> {
         self.nodes.iter().find(|n| n.node_id == id)
+    }
+
+    /// Mask lifetime learning (T25.F12 invariant 4): nothing in any graph
+    /// node learns afterwards.
+    pub fn clear_learning(&mut self) {
+        for node in &mut self.nodes {
+            if let BackendDef::Graph(graph) = &mut node.backend_def {
+                graph.clear_learning();
+            }
+        }
     }
 
     /// Total structural size: sum of all discrete genome components.
@@ -348,7 +282,9 @@ mod node_edit_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::contracts::{DynamicIntrospectionKey, StaticIntrospectionKey, WorldInputKey};
+    use crate::contracts::{
+        DynamicIntrospectionKey, OutcomeChannel, StaticIntrospectionKey, WorldInputKey,
+    };
     use proptest::prelude::*;
     use proptest::strategy::Union;
 

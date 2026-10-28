@@ -3,6 +3,7 @@
 
 use crate::genome::analysis::{functional_complexity, mesh_reachable_nodes};
 use crate::genome::cgp::{GraphSource, NodeClass, OutputSinkKind};
+use crate::genome::learning::LearningLayout;
 use crate::genome::{BackendDef, CreatureGenome, VmInstruction};
 
 /// Structural facts about a genome's reachable mesh, independent of any
@@ -20,7 +21,7 @@ pub struct StructuralCompanions {
     /// Any reachable graph compute node's kind is one of the stateful kinds
     /// (`DecayIntegrator`, `Momentum`, `Oscillator`, `AdaptiveGain`).
     pub has_stateful_compute_node: bool,
-    /// Any reachable graph compute node carries a plasticity rule.
+    /// Any reachable graph node's learning layout is non-empty (T25.F12).
     pub has_plasticity: bool,
 }
 
@@ -54,7 +55,7 @@ pub fn structural_companions(genome: &CreatureGenome) -> StructuralCompanions {
                 }
             }
             BackendDef::Graph(graph) => {
-                if graph.plastic_edges().next().is_some() {
+                if !LearningLayout::of(graph, &node.input_refs).is_empty() {
                     has_plasticity = true;
                 }
                 for compute_node in graph.compute_nodes() {

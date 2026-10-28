@@ -829,3 +829,131 @@ fn a_fact_member_weighs_and_learns_with_the_scale() {
         "a passive fact member"
     );
 }
+
+/// FNV-1a over `text`: a stable digest of a `Debug` rendering, whose `f32`
+/// formatting round-trips exactly.
+fn fnv1a(text: &str) -> u64 {
+    text.bytes().fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
+    })
+}
+
+/// Every reading of `state` on `def`: the edge and scale views, the applied
+/// weights and the captured seeds.
+fn reading(state: &LearnedState, def: &CgpGraphBackendDef) -> String {
+    format!(
+        "{:?}|{:?}|{:?}|{:?}",
+        state.edges(0).collect::<Vec<_>>(),
+        state.scales(0).collect::<Vec<_>>(),
+        state.applied_weights(0).collect::<Vec<_>>(),
+        state.capture(0, def),
+    )
+}
+
+/// T25.F12 commit 1 preservation (invariant 12): a bundle whose group
+/// contributors differ in rule, rate, reward source and trace decay, with
+/// an edge-scope learner, a group-scope member with a nonzero correction,
+/// a static member, a decaying scale and a seeded parent, read through
+/// every visit, tick and reward step. The digest pins today's semantics.
+#[test]
+fn commit_one_preserves_contributor_semantics() {
+    let (mut def, id) = ring_def(0.375);
+    let all = members(&def, id);
+    def.bundle_mut(id).set_inherit_scale(true);
+    def.bundle_mut(id).set_retention(0.875);
+    let lamarckian = |config: PlasticityConfig| PlasticityConfig {
+        lamarckian: true,
+        ..config
+    };
+    let source = |config: PlasticityConfig, channel: OutcomeChannel, decay: f32| PlasticityConfig {
+        modulation: Some(RewardModulationConfig {
+            reward_source: channel,
+            trace_decay: decay,
+        }),
+        ..config
+    };
+    def.edge_mut(all[0]).set_weight(0.25);
+    learn(
+        &mut def,
+        all[0],
+        hebbian(HebbianRule::Classic, 0.125, 3.0),
+        Scope::Group,
+    );
+    learn(
+        &mut def,
+        all[1],
+        hebbian(HebbianRule::Oja, 0.5, 2.0),
+        Scope::Group,
+    );
+    learn(
+        &mut def,
+        all[2],
+        source(
+            hebbian(HebbianRule::Covariance, 0.25, 4.0),
+            OutcomeChannel::EnergyDelta,
+            0.75,
+        ),
+        Scope::Group,
+    );
+    def.edge_mut(all[3]).set_weight(-0.5);
+    learn(
+        &mut def,
+        all[3],
+        source(
+            hebbian(HebbianRule::AntiHebb, 0.0625, 5.0),
+            OutcomeChannel::ActionSuccess,
+            0.5,
+        ),
+        Scope::Group,
+    );
+    def.edge_mut(all[4]).set_weight(0.125);
+    learn(
+        &mut def,
+        all[4],
+        lamarckian(PlasticityConfig {
+            retention: 0.9,
+            ..hebbian(HebbianRule::Classic, 0.25, 1.5)
+        }),
+        Scope::Edge,
+    );
+    learn(
+        &mut def,
+        all[5],
+        lamarckian(source(
+            hebbian(HebbianRule::Classic, 0.5, 2.5),
+            OutcomeChannel::DamageDelta,
+            0.875,
+        )),
+        Scope::Edge,
+    );
+    def.edge_mut(all[6]).set_weight(0.75);
+    let parent_seeds = seeds(&def, |seeds| {
+        seed_bundle(seeds, id, 1.125);
+        seed_edge(seeds, all[0], 2.0);
+        seed_edge(seeds, all[4], -0.625);
+    });
+
+    let mut log = String::new();
+    for seeded in [None, Some(parent_seeds)] {
+        let mut learned = state(&def, seeded);
+        log.push_str(&reading(&learned, &def));
+        for step in 0..4u8 {
+            learned.begin_tick();
+            let value = f32::from(step) * 0.25 - 0.375;
+            let counts = drive(
+                &mut learned,
+                &def,
+                |at| value + 0.0625 * at.index as f32,
+                0.5 + value,
+            );
+            let mut bank = OutcomeSignalBank::default();
+            bank.signals[OutcomeChannel::EnergyDelta as usize] = 0.5 - value;
+            bank.signals[OutcomeChannel::ActionSuccess as usize] = value;
+            bank.signals[OutcomeChannel::DamageDelta as usize] = -0.25;
+            let rewarded = learned.apply_reward(&bank);
+            log.push_str(&format!("{counts:?}{rewarded:?}"));
+            log.push_str(&reading(&learned, &def));
+        }
+    }
+    assert_eq!(fnv1a(&log), 15_357_053_464_873_532_514, "{log}");
+}

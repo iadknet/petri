@@ -131,15 +131,17 @@ impl OutputSink {
 
 // ── Edge occurrences ────────────────────────────────────────────────────────
 
-/// Which edge-bearing surface an edge belongs to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// Which edge-bearing surface an edge belongs to. The derived order is the
+/// canonical one: every compute surface, then every sink.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EdgeSurface {
     ComputeInput(usize),
     SinkInput(usize),
 }
 
-/// One edge: its surface and its index within that surface's inputs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// One edge: its surface and its index within that surface's inputs. The
+/// derived order is canonical (`CgpGraphBackendDef::edge_sites`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EdgeOccurrence {
     pub surface: EdgeSurface,
     pub index: usize,
@@ -1363,6 +1365,12 @@ impl CgpGraphBackendDef {
             EdgeOccurrence::new(EdgeSurface::SinkInput(sink), at),
             removed,
         )
+    }
+
+    /// Make nothing learn (T25.F12 invariant 4): every edge static; no
+    /// seed change.
+    pub fn clear_learning(&mut self) {
+        self.for_each_edge_mut(|edge| edge.plasticity = None);
     }
 
     /// A handle for changing `bundle`'s record.

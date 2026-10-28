@@ -23,7 +23,7 @@ use v3_core::config::{OrdinaryFoodTypeId, SimulationConfig};
 use v3_core::contracts::{ActionOutcome, CreatureId, Direction, Position, SHARED_MEMORY_SLOTS};
 use v3_core::creature::body::HeritableBody;
 use v3_core::creature::state::CreatureState;
-use v3_core::genome::{BackendDef, CreatureGenome};
+use v3_core::genome::CreatureGenome;
 use v3_core::kernel::WorldState;
 use v3_core::ledger::EnergyFlows;
 use v3_core::runtime::state::DispatchRecord;
@@ -213,19 +213,12 @@ fn blocked_fraction(blocked: u64, attempted: u64) -> f64 {
     }
 }
 
-/// `genome` with lifetime learning masked: every plastic edge on either
-/// surface made static (T25.F06; the only lifetime-learning mechanism).
+/// `genome` with lifetime learning masked through the genome owner
+/// operation `CreatureGenome::clear_learning` (T25.F12).
 #[must_use]
 pub fn expressed(genome: &CreatureGenome) -> CreatureGenome {
     let mut masked = genome.clone();
-    for node in &mut masked.nodes {
-        if let BackendDef::Graph(graph) = &mut node.backend_def {
-            let plastic: Vec<_> = graph.plastic_edges().map(|(site, _)| site).collect();
-            for site in plastic {
-                graph.edge_mut(site).set_plasticity(None);
-            }
-        }
-    }
+    masked.clear_learning();
     masked
 }
 
@@ -685,6 +678,7 @@ mod tests {
     use crate::arena::arena_config;
     use crate::scene::{centre, SceneSpec};
     use v3_core::creature::founder::founder_genome_with_age_gate;
+    use v3_core::genome::BackendDef;
     use v3_core::simulation::actions::move_effort;
 
     fn setup(lifetime: u32, start_energy: f32) -> Setup {

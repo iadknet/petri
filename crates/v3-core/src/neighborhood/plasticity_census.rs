@@ -268,7 +268,10 @@ impl PlasticityCensus {
                 add_drift(&mut cell.drift_sum, weight, edge.birth);
                 cell.at_clamp += u64::from(weight.abs() >= edge.bound);
             }
+            // A carrier has a learner, an edge's or a scale's, on a
+            // reachable node (T25.F12 invariant 11).
             for scale in learned.scales(node_idx) {
+                carries = true;
                 self.scales_by_retention[retention_index(scale.retention)].add(
                     scale.learned,
                     scale.birth,
