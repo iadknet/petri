@@ -208,8 +208,8 @@ impl RingRuleCensus {
                             };
                             coverage.add(rule, d, independent);
                         }
-                    } else if let Some(InputReference::UpstreamSlot(slot)) = reference {
-                        let Some(sources) = u8::try_from(*slot).ok().and_then(|j| bus.get(&j))
+                    } else if let Some(slot) = reference.and_then(|r| r.bus_slot(sub_idx)) {
+                        let Some(sources) = u8::try_from(slot).ok().and_then(|j| bus.get(&j))
                         else {
                             continue;
                         };

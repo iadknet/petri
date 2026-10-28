@@ -451,6 +451,22 @@ pub enum InputReference {
     PreviousOutcome,
 }
 
+impl InputReference {
+    /// The upstream bus slot a read of this reference at `sub_idx` takes,
+    /// as `resolve_input` reads it: `UpstreamSlot(k)` slot `k`, an
+    /// `UpstreamBus` field slot `sub_idx`; none past the bus or for any
+    /// other reference. The one answer every bus-slot reader shares.
+    #[must_use]
+    pub fn bus_slot(&self, sub_idx: u16) -> Option<usize> {
+        let slot = match self {
+            Self::UpstreamSlot(slot) => *slot,
+            Self::UpstreamBus => usize::from(sub_idx),
+            _ => return None,
+        };
+        (slot < crate::contracts::OUTPUT_SLOT_COUNT).then_some(slot)
+    }
+}
+
 // ── Sensor descriptor (T25.F11) ─────────────────────────────────────────────
 
 /// What a sensor's descriptor reads beyond the reference itself: the run's

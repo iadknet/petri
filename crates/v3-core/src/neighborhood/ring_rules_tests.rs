@@ -99,8 +99,14 @@ fn direct_edges_cover_a_rule_per_direction_and_ignore_tiny_weights() {
 }
 
 /// A food-ring sender writing `sender_channel` into `CustomOutput(4)` at
-/// weight −2, and a receiver voting `StealEnergy(5)` from that slot at 0.5.
+/// weight −2, and a receiver voting `StealEnergy(5)` from that slot at 0.5
+/// through `UpstreamSlot(4)`.
 fn bus_hop(sender_channel: u16) -> CreatureGenome {
+    bus_hop_read(sender_channel, InputReference::UpstreamSlot(4), 0)
+}
+
+/// [`bus_hop`] with the receiver reading `reader` at `sub_idx`.
+fn bus_hop_read(sender_channel: u16, reader: InputReference, sub_idx: u16) -> CreatureGenome {
     let food = InputReference::World(WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(
         1,
     )));
@@ -114,7 +120,7 @@ fn bus_hop(sender_channel: u16) -> CreatureGenome {
     wire(
         &mut receiver,
         OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::StealEnergy, 5)),
-        leaf(0, 0, 0.5),
+        leaf(0, sub_idx, 0.5),
     );
     let mut entry = node(0, vec![food], sender);
     entry.targets.push(RouteTarget {
@@ -124,10 +130,7 @@ fn bus_hop(sender_channel: u16) -> CreatureGenome {
     });
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![
-            entry,
-            node(1, vec![InputReference::UpstreamSlot(4)], receiver),
-        ],
+        nodes: vec![entry, node(1, vec![reader], receiver)],
     }
 }
 
@@ -138,6 +141,25 @@ fn one_bus_hop_carries_the_ring_channel_with_the_product_sign() {
         census.rule_rows(),
         vec!["NeighborFoodRing:1 StealEnergy 2 - 1 0 0 0 0 0 0 0".to_string()]
     );
+}
+
+#[test]
+fn a_bus_field_read_carries_the_rule_its_slot_read_carries() {
+    // Arrange: the same hop read through `UpstreamBus[4]` and `UpstreamSlot(4)`.
+    let via_bus = bus_hop_read(3, InputReference::UpstreamBus, 4);
+
+    // Act
+    let census = census_of(&[via_bus]);
+
+    // Assert
+    assert_eq!(census.rule_rows(), census_of(&[bus_hop(3)]).rule_rows());
+    assert!(!census.rule_rows().is_empty());
+}
+
+#[test]
+fn a_bus_field_read_of_another_slot_carries_no_rule() {
+    let census = census_of(&[bus_hop_read(3, InputReference::UpstreamBus, 5)]);
+    assert!(census.rule_rows().is_empty());
 }
 
 #[test]

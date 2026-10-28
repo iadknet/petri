@@ -8,12 +8,12 @@ use v3_core::contracts::OUTPUT_SLOT_COUNT;
 use v3_core::contracts::{CreatureId, InputReference};
 use v3_core::creature::action_log::{ActionLogEntry, ActionType};
 use v3_core::creature::colour::channels_to_rgb;
-use v3_core::genome::cgp::OutputSinkKind;
+use v3_core::genome::cgp::{GraphSource, OutputSinkKind};
 use v3_core::genome::mesh_annotations::{
     derive_mesh_annotations_with_reachable_indices, MeshNodeAnnotation, MeshReadClass,
     MeshWriteClass,
 };
-use v3_core::genome::{BackendDef, VmInstruction};
+use v3_core::genome::{BackendDef, NodeGenome, VmInstruction};
 use v3_core::sensors::static_inputs::assemble_static_inputs;
 use v3_core::simulation::recording::ActiveTrace;
 
@@ -196,6 +196,40 @@ fn serialized_key<T: serde::Serialize>(value: T) -> String {
         .expect("fieldless enum serializes to its variant name")
 }
 
+/// The upstream bus slots `node` reads: each `UpstreamSlot` it declares,
+/// and the slot of every `UpstreamBus` field one of its input leaves or
+/// `ReadInput`s reads ([`InputReference::bus_slot`]).
+fn upstream_slots_read(node: &NodeGenome) -> BTreeSet<usize> {
+    let refs = &node.input_refs;
+    let read = |ref_idx: usize, sub_idx: u16| refs.get(ref_idx)?.bus_slot(sub_idx);
+    let declared = refs
+        .iter()
+        .filter(|reference| matches!(reference, InputReference::UpstreamSlot(_)))
+        .filter_map(|reference| reference.bus_slot(0));
+    let mut slots: BTreeSet<usize> = declared.collect();
+    match &node.backend_def {
+        BackendDef::Graph(def) => {
+            slots.extend(def.edges().filter_map(|edge| match edge.source() {
+                GraphSource::InputLeaf { ref_idx, sub_idx } => read(usize::from(ref_idx), sub_idx),
+                _ => None,
+            }))
+        }
+        BackendDef::Vm(vm) => {
+            slots.extend(
+                vm.program
+                    .iter()
+                    .filter_map(|instruction| match instruction {
+                        VmInstruction::ReadInput {
+                            ref_idx, sub_idx, ..
+                        } => read(usize::from(*ref_idx), *sub_idx),
+                        _ => None,
+                    }),
+            )
+        }
+    }
+    slots
+}
+
 fn build_creature_diagnostics(
     sim: &v3_core::simulation::Simulation,
     creature: &v3_core::creature::state::CreatureState,
@@ -265,13 +299,7 @@ fn build_creature_diagnostics(
         if !reachable_node_ids.contains(&node.node_id) {
             continue;
         }
-        for input_ref in &node.input_refs {
-            if let InputReference::UpstreamSlot(slot) = input_ref {
-                if *slot < OUTPUT_SLOT_COUNT {
-                    upstream_slots.insert(*slot);
-                }
-            }
-        }
+        upstream_slots.extend(upstream_slots_read(node));
         match &node.backend_def {
             BackendDef::Vm(vm) => {
                 for instruction in &vm.program {
@@ -566,6 +594,9 @@ pub async fn get_sample(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use v3_core::contracts::NodeId;
+    use v3_core::genome::cgp::{CgpGraphBackendDef, GraphEdge};
+    use v3_core::genome::VmBackendDef;
 
     #[test]
     fn reachable_class_counts_serialize_in_sorted_key_order() {
@@ -624,6 +655,61 @@ mod tests {
         );
         assert!(json.contains(expected_read), "{json}");
         assert!(json.contains(expected_write), "{json}");
+    }
+
+    fn graph_reading(reference: InputReference, sub_idx: u16) -> NodeGenome {
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+        let surface = def
+            .sink_surface(OutputSinkKind::CustomOutput(0))
+            .expect("fixed catalog");
+        def.push_edge(
+            surface,
+            GraphEdge::new(
+                GraphSource::InputLeaf {
+                    ref_idx: 0,
+                    sub_idx,
+                },
+                1.0,
+            ),
+        );
+        NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![reference],
+            backend_def: BackendDef::Graph(def),
+            targets: Vec::new(),
+        }
+    }
+
+    fn vm_reading(reference: InputReference, sub_idx: u16) -> NodeGenome {
+        NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![reference],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                constants: Vec::new(),
+                program: vec![VmInstruction::ReadInput {
+                    dst: 0,
+                    ref_idx: 0,
+                    sub_idx,
+                }],
+            }),
+            targets: Vec::new(),
+        }
+    }
+
+    /// A bus field read through `UpstreamBus[j]` is slot `j` read, as
+    /// `UpstreamSlot(j)` reads it, on either backend; a read past the bus
+    /// reads no slot.
+    #[test]
+    fn a_bus_field_read_is_the_slot_its_upstream_slot_twin_reads() {
+        for build in [graph_reading, vm_reading] {
+            let via_slot = upstream_slots_read(&build(InputReference::UpstreamSlot(3), 0));
+            let via_bus = upstream_slots_read(&build(InputReference::UpstreamBus, 3));
+            assert_eq!(via_slot, BTreeSet::from([3]));
+            assert_eq!(via_bus, via_slot);
+            let past = u16::try_from(OUTPUT_SLOT_COUNT).expect("a small bus");
+            assert!(upstream_slots_read(&build(InputReference::UpstreamBus, past)).is_empty());
+        }
     }
 
     #[test]

@@ -251,6 +251,29 @@ mod tests {
         assert_eq!(resolve_input(&InputReference::UpstreamBus, past, &ctx), 0.0);
     }
 
+    proptest::proptest! {
+        /// `InputReference::bus_slot` names the slot `resolve_input` reads
+        /// for both bus references, and no slot where it reads none.
+        #[test]
+        fn bus_slot_names_the_slot_resolve_input_reads(
+            slot in 0usize..OUTPUT_SLOT_COUNT + 4,
+            sub_idx in 0u16..(OUTPUT_SLOT_COUNT as u16 + 4),
+        ) {
+            let ss = make_sensor_snapshot(0.0);
+            let upstream: [f32; OUTPUT_SLOT_COUNT] = std::array::from_fn(|s| s as f32 + 1.0);
+            let ctx = make_ctx(&ss, &upstream, 20.0, 0.0);
+            for (reference, sub_idx) in [
+                (InputReference::UpstreamSlot(slot), sub_idx),
+                (InputReference::UpstreamBus, sub_idx),
+            ] {
+                let read = resolve_input(&reference, sub_idx, &ctx);
+                let named = reference.bus_slot(sub_idx).map_or(0.0, |s| upstream[s]);
+                proptest::prop_assert_eq!(read, named);
+            }
+            proptest::prop_assert_eq!(InputReference::ActionVotes.bus_slot(sub_idx), None);
+        }
+    }
+
     #[test]
     fn upstream_slot_in_range() {
         let ss = make_sensor_snapshot(0.0);
