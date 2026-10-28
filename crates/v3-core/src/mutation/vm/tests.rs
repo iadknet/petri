@@ -9,7 +9,7 @@ use crate::creature::founder::vm_decision_founder_genome as v3alpha1_founder_gen
 use crate::creature::parseability::ParseabilityGate;
 use crate::genome::analysis::vm_forward_slice;
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
-use crate::mutation::types::MutationSkipReason;
+use crate::mutation::event::MutationSkipReason;
 use proptest::prelude::*;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -1478,7 +1478,7 @@ fn vm_operator_weights_are_positive() {
 
 #[test]
 fn complexity_effect_consistent_with_types() {
-    use crate::mutation::types::ComplexityEffect;
+    use crate::mutation::event::ComplexityEffect;
     for &op in &VmOperator::ALL {
         let effect = op.complexity_effect();
         assert!(
@@ -1496,7 +1496,7 @@ fn complexity_effect_consistent_with_types() {
 
 #[test]
 fn vm_has_at_least_one_decreasing_operator() {
-    use crate::mutation::types::ComplexityEffect;
+    use crate::mutation::event::ComplexityEffect;
     let saw_decreasing = VmOperator::ALL
         .iter()
         .any(|op| op.complexity_effect() == ComplexityEffect::Decreasing);

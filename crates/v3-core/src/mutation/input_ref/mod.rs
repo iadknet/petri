@@ -4,10 +4,10 @@ use rand::Rng;
 use crate::config::{MutationConfig, OrdinaryFoodTypeId};
 use crate::contracts::{InputReference, SensorContext, WorldInputKey, OUTPUT_SLOT_COUNT};
 use crate::genome::{input_ref_kind, CreatureGenome, NodeGenome};
+use crate::mutation::event::{EventReport, MutationSkipReason, TargetReachability};
 use crate::mutation::graph::bundle::{add_sensor_by_law, BirthLaw};
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::sampling;
-use crate::mutation::types::{EventReport, MutationSkipReason, TargetReachability};
 
 /// Every `InputReference` a genome can carry in a world with
 /// `context.food_type_count` ordinary food types: `sampling::INPUT_BUCKETS`
@@ -130,8 +130,8 @@ impl InputRefOperator {
 
     /// Whether this operator increases, decreases, or preserves genome complexity.
     #[must_use]
-    pub const fn complexity_effect(self) -> crate::mutation::types::ComplexityEffect {
-        use crate::mutation::types::ComplexityEffect;
+    pub const fn complexity_effect(self) -> crate::mutation::event::ComplexityEffect {
+        use crate::mutation::event::ComplexityEffect;
         match self {
             Self::AddSensorLive | Self::AddSensorSilent => ComplexityEffect::Increasing,
             Self::Prune => ComplexityEffect::Decreasing,

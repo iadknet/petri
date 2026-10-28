@@ -222,7 +222,7 @@ regression past its threshold would show it wrong.
 - [ ] 5. `make check` (the draw-stream pin and `tests/reproducibility.rs`
       run inside it).
 - [ ] 6. At close: run the declared gate profile and the slow tier.
-- [ ] 7. Review remediation: the leaf `mutation/event` module with
+- [x] 7. Review remediation: the leaf `mutation/event` module with
       `types` re-exporting it (invariant 4), `COUNT` in place of the
       literal 69 (invariant 2), and the domain-mapping test collapsed to
       four outer-variant arms.
@@ -251,6 +251,7 @@ regression past its threshold would show it wrong.
 | `cargo check --workspace --all-targets`, `cargo fmt --all --check`, `make rust-clippy` | clean, exit 0 |
 | `cargo test -p v3-core` | pass; draw-stream hash unchanged, `reproducibility` 4 passed |
 | `cargo test -p v3-cli` | pass |
+| Task 7 (2026-10-28): check, fmt, clippy; `cargo test -p v3-core`; `cargo test -p v3-cli -p v3-lab -p v3-telemetry -p v3-server`; upward-import grep | clean; pass, hash unchanged; 742 passed; empty (readings) |
 
 ## Performance and Goal Impact
 

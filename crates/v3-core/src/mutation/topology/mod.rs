@@ -3,8 +3,8 @@ use rand::Rng;
 use crate::config::MutationConfig;
 use crate::contracts::SensorContext;
 use crate::genome::CreatureGenome;
+use crate::mutation::event::{EventReport, MutationSkipReason, TargetReachability};
 use crate::mutation::reachability::TargetSelector;
-use crate::mutation::types::{EventReport, MutationSkipReason, TargetReachability};
 
 // Re-exported for use via `use super::*` in tests.
 #[cfg(test)]
@@ -133,8 +133,8 @@ impl TopologyOperator {
 
     /// Whether this operator increases, decreases, or preserves genome complexity.
     #[must_use]
-    pub const fn complexity_effect(self) -> crate::mutation::types::ComplexityEffect {
-        use crate::mutation::types::ComplexityEffect;
+    pub const fn complexity_effect(self) -> crate::mutation::event::ComplexityEffect {
+        use crate::mutation::event::ComplexityEffect;
         match self {
             Self::AddNode
             | Self::CopyNode

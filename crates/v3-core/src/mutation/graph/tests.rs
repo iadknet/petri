@@ -10,7 +10,7 @@ mod retention;
 
 #[test]
 fn complexity_effect_consistent_with_types() {
-    use crate::mutation::types::ComplexityEffect;
+    use crate::mutation::event::ComplexityEffect;
     for &op in &GraphOperator::ALL {
         let effect = op.complexity_effect();
         assert!(

@@ -22,10 +22,10 @@ use crate::genome::cgp::{
     GraphSource, OutputSink, OutputSinkKind,
 };
 use crate::genome::PlasticityConfig;
+use crate::mutation::event::MutationSkipReason;
 use crate::mutation::graph::operators::{
     copy_cgp_subgraph, copy_compute_node, split_existing_edge,
 };
-use crate::mutation::types::MutationSkipReason;
 use crate::runtime::cgp::execute_graph_node;
 use crate::runtime::types::{MeshSideOutputs, NodeResult};
 
@@ -489,7 +489,7 @@ fn split_preserves_a_live_introspection_sink_edge_under_plasticity() {
                 crate::mutation::graph::operators::test_inputs(&[]),
                 &mut SmallRng::seed_from_u64(seed)
             ),
-            Ok(crate::mutation::types::BundleEdits::default()),
+            Ok(crate::mutation::event::BundleEdits::default()),
             "seed {seed}"
         );
         assert_eq!(child.compute_nodes().len(), 2, "seed {seed}");
@@ -568,7 +568,7 @@ fn split_applies_to_every_introspection_edge_shape() {
                 crate::mutation::graph::operators::test_inputs(&[]),
                 &mut SmallRng::seed_from_u64(3)
             ),
-            Ok(crate::mutation::types::BundleEdits::default()),
+            Ok(crate::mutation::event::BundleEdits::default()),
             "{label}: the split applies"
         );
         assert_eq!(child.compute_nodes().len(), def.compute_nodes().len() + 1);

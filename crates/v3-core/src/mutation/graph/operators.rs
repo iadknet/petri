@@ -12,7 +12,7 @@ use crate::genome::cgp::{
     GraphEdge, GraphSource, OutputSinkKind,
 };
 use crate::genome::{BackendDef, CreatureGenome};
-use crate::mutation::types::{BirthEdgeClass, BundleEdits, MutationSkipReason};
+use crate::mutation::event::{BirthEdgeClass, BundleEdits, MutationSkipReason};
 
 #[inline]
 pub(super) fn graph_def_mut(

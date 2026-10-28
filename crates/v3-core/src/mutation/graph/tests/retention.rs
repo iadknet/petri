@@ -12,12 +12,12 @@ use crate::genome::cgp::{
     validate_graph, BundleId, CgpGraphBackendDef, EdgeOccurrence, GraphEdge, GraphSource, Scope,
 };
 use crate::genome::{BackendDef, HebbianRule, NodeGenome, PlasticityConfig};
+use crate::mutation::event::{ComplexityEffect, MutationSkipReason};
 use crate::mutation::graph::hebbian::{
     disable_retention_in_def, draw_retention, enable_retention_in_def, mutate_retention_in_def,
     step_retention, RETENTION_DEFICIT_MIN,
 };
 use crate::mutation::graph::{bundle, GraphMutator, GraphOperator};
-use crate::mutation::types::{ComplexityEffect, MutationSkipReason};
 use crate::mutation::MutationOperator;
 
 const RETENTION_OPERATORS: [GraphOperator; 6] = [

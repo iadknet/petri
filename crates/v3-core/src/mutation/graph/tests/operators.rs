@@ -19,11 +19,11 @@ use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
     OutputSinkKind,
 };
+use crate::mutation::event::MutationSkipReason;
 use crate::mutation::graph::operators::{
     add_bootstrap_node, add_disconnected_node, copy_cgp_subgraph, copy_compute_node,
     raw_field_mutation, split_existing_edge,
 };
-use crate::mutation::types::MutationSkipReason;
 use crate::runtime::cgp::execute::execute_graph_impl;
 use crate::runtime::cgp::execute_graph_node;
 use crate::runtime::cgp::tracer::GraphTracer;

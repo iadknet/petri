@@ -32,7 +32,7 @@ use rand::{Rng, RngCore};
 use crate::contracts::OutcomeChannel;
 use crate::genome::cgp::{CgpGraphBackendDef, EdgeOccurrence, Scope};
 use crate::genome::{retention_decays, HebbianRule, PlasticityConfig, RewardModulationConfig};
-use crate::mutation::types::MutationSkipReason;
+use crate::mutation::event::MutationSkipReason;
 
 // ─── Applicability predicates ───────────────────────────────────────────────
 //

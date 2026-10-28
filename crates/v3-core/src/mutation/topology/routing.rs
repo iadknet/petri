@@ -5,9 +5,9 @@ use crate::contracts::{InputReference, NodeId, RouteTarget, SensorContext, MAX_G
 use crate::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge, OutputSinkKind};
 use crate::genome::CreatureGenome;
 use crate::genome::{BackendDef, NodeGenome, VmInstruction};
+use crate::mutation::event::{MutationSkipReason, TargetReachability};
 use crate::mutation::graph::operators::{random_graph_source, NodeInputs};
 use crate::mutation::reachability::TargetSelector;
-use crate::mutation::types::{MutationSkipReason, TargetReachability};
 use crate::mutation::vm::operators::insert_new_instruction_with_reference_repair;
 use crate::runtime::routing::{resolve_gated_route, RouteGateMap};
 

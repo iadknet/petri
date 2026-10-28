@@ -11,7 +11,7 @@ use crate::genome::cgp::{
     self, BundleBirth, BundleId, BundleSource, CgpGraphBackendDef, Scope, Wiring,
 };
 use crate::genome::{retention_decays, BackendDef, NodeGenome, PlasticityConfig};
-use crate::mutation::types::{wiring_index, BirthEdgeClass, BundleEdits, MutationSkipReason};
+use crate::mutation::event::{wiring_index, BirthEdgeClass, BundleEdits, MutationSkipReason};
 
 use super::hebbian::{
     draw_hebbian_config, draw_modulation, draw_retention, is_member, select_eligible,

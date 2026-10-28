@@ -1,4 +1,5 @@
 pub mod engine;
+pub mod event;
 pub mod graph;
 pub mod input_ref;
 pub mod phenotype;

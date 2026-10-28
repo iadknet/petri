@@ -5,8 +5,8 @@ use rand::Rng;
 use crate::contracts::{NodeId, RouteTarget};
 use crate::genome::analysis::{mesh_backward_slice, mesh_forward_slice};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
+use crate::mutation::event::{MutationSkipReason, TargetReachability};
 use crate::mutation::reachability::TargetSelector;
-use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
 use super::birth;
 use super::routing::{free_gate_slot, lowest_unused_slot, static_incumbent, writes_gate};

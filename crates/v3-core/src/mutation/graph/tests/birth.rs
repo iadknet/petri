@@ -10,9 +10,9 @@ use crate::genome::cgp::{
     Wiring,
 };
 use crate::genome::{BackendDef, NodeGenome};
+use crate::mutation::event::{BundleEdits, MutationSkipReason};
 use crate::mutation::graph::bundle::{draw_birth_learning, draw_births, BirthLaw};
 use crate::mutation::graph::operators::{remove_edge, retarget_edge, test_inputs};
-use crate::mutation::types::{BundleEdits, MutationSkipReason};
 
 fn area_sets() -> Vec<(u8, FieldSet)> {
     let area = InputReference::World(WorldInputKey::AreaBarrierSummary);

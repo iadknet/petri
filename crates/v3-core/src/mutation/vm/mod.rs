@@ -4,8 +4,8 @@ use crate::config::MutationConfig;
 use crate::contracts::InputReference;
 use crate::genome::analysis::{vm_is_output_instruction, vm_register_write};
 use crate::genome::{BackendDef, CreatureGenome, VmBackendDef};
+use crate::mutation::event::{EventReport, MutationSkipReason, TargetReachability};
 use crate::mutation::reachability::TargetSelector;
-use crate::mutation::types::{EventReport, MutationSkipReason, TargetReachability};
 
 pub(crate) mod operators;
 use operators::*;
@@ -116,8 +116,8 @@ impl VmOperator {
 
     /// Whether this operator increases, decreases, or preserves genome complexity.
     #[must_use]
-    pub const fn complexity_effect(self) -> crate::mutation::types::ComplexityEffect {
-        use crate::mutation::types::ComplexityEffect;
+    pub const fn complexity_effect(self) -> crate::mutation::event::ComplexityEffect {
+        use crate::mutation::event::ComplexityEffect;
         match self {
             Self::VmCopyInstructionBlock
             | Self::VmCopyInstructionBlockRemapped

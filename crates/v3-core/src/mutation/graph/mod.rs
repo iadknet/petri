@@ -8,10 +8,10 @@ use crate::config::MutationConfig;
 use crate::contracts::SensorContext;
 use crate::genome::cgp::{CgpGraphBackendDef, Scope};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
-use crate::mutation::reachability::TargetSelector;
-use crate::mutation::types::{
+use crate::mutation::event::{
     BirthEdgeClass, BundleEdits, EventReport, MutationSkipReason, TargetReachability,
 };
+use crate::mutation::reachability::TargetSelector;
 
 /// Graph mutation operator variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -184,8 +184,8 @@ impl GraphOperator {
 
     /// Whether this operator increases, decreases, or preserves genome complexity.
     #[must_use]
-    pub const fn complexity_effect(self) -> crate::mutation::types::ComplexityEffect {
-        use crate::mutation::types::ComplexityEffect;
+    pub const fn complexity_effect(self) -> crate::mutation::event::ComplexityEffect {
+        use crate::mutation::event::ComplexityEffect;
         match self {
             Self::AddInternalGraphNode
             | Self::AddGraphEdge

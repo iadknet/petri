@@ -73,7 +73,7 @@ fn apply(
     genome: &mut CreatureGenome,
     op: VmOperator,
     seed: u64,
-) -> Result<(), crate::mutation::types::MutationSkipReason> {
+) -> Result<(), crate::mutation::event::MutationSkipReason> {
     VmMutator::apply(
         genome,
         op,

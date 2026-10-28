@@ -18,9 +18,9 @@ use crate::genome::{
     BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
     VmBackendDef,
 };
+use crate::mutation::event::{ComplexityEffect, MutationSkipReason};
 use crate::mutation::graph::{bundle, GraphMutator, GraphOperator};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
-use crate::mutation::types::{ComplexityEffect, MutationSkipReason};
 use crate::mutation::MutationOperator;
 
 const BUNDLE_OPERATORS: [GraphOperator; 6] = [

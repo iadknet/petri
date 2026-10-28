@@ -723,7 +723,7 @@ fn input_ref_operator_weights_are_positive() {
 
 #[test]
 fn complexity_effect_consistent_with_types() {
-    use crate::mutation::types::ComplexityEffect;
+    use crate::mutation::event::ComplexityEffect;
     for &op in &InputRefOperator::ALL {
         let effect = op.complexity_effect();
         assert!(
@@ -798,7 +798,7 @@ fn apply_add_to_node(
     node_idx: usize,
     rng: &mut SmallRng,
     food_type_count: usize,
-) -> Result<crate::mutation::types::EventReport, MutationSkipReason> {
+) -> Result<crate::mutation::event::EventReport, MutationSkipReason> {
     InputRefMutator::apply_to_node(
         genome,
         op,

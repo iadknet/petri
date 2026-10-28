@@ -15,7 +15,7 @@ use std::cmp::Ordering;
 
 use rand::Rng;
 
-use super::types::TargetReachability;
+use super::event::TargetReachability;
 use crate::contracts::NodeId;
 use crate::genome::NodeGenome;
 
