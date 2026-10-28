@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { ActionLogEntry } from "../types/generated/ActionLogEntry.ts";
+import type { BrainContext } from "../types/generated/BrainContext.ts";
 import type { BrainView } from "../types/generated/BrainView.ts";
 import type { CreatureDiagnosticsResponse } from "../types/generated/CreatureDiagnosticsResponse.ts";
 import type { CreaturePhenotypeResponse } from "../types/generated/CreaturePhenotypeResponse.ts";
@@ -24,8 +25,11 @@ export interface CreatureSelectionState {
 }
 
 export interface CreatureStaticDetailState {
-	/** The brain view from the full fetch (T30.F01). */
+	/** The brain view from the latest fetch that carried one (T30.F01). */
 	brain: BrainView | null;
+	/** The sensor context `brain` resolves under (T25.F11): a poll under
+	 * another context makes the resource hook refetch the brain. */
+	brainContext: BrainContext | null;
 	/** The weights in force of the dynamic edges and the learned scales,
 	 * replaced on every poll; `null` with no dynamic edge. */
 	learning: NodeLearning[] | null;
@@ -68,6 +72,7 @@ interface CreatureInspectorState {
 		genomeSize: number;
 		phenotype: CreaturePhenotypeResponse;
 		brain?: BrainView;
+		brainContext: BrainContext;
 		learning?: NodeLearning[];
 		sharedMemory?: number[];
 		actionLog?: ActionLogEntry[];
@@ -98,7 +103,7 @@ function makeEmptyState(
 > {
 	return {
 		selection: { selectedCreatureId },
-		staticDetail: { brain: null, learning: null },
+		staticDetail: { brain: null, brainContext: null, learning: null },
 		runtimeSnapshot: { sharedMemory: null },
 		liveDetail: { stats: null, actionLog: null, diagnostics: null },
 		resourceMeta: { isLoading, error: null, isDead: false },
@@ -146,10 +151,11 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 			phenotype: detail.phenotype,
 		};
 
-		let brain = state.staticDetail.brain;
-		if (detail.brain && !brain) {
-			brain = detail.brain;
-		}
+		// Polls exclude the brain; a fetch that carries one carries it under
+		// its current context, so it replaces the held brain.
+		const { brain, brainContext } = detail.brain
+			? { brain: detail.brain, brainContext: detail.brainContext }
+			: state.staticDetail;
 
 		// Every fetch carries `learning` (absent: no dynamic edge), and the
 		// weights in force move between polls, so each response replaces it.
@@ -176,7 +182,7 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 		const diagnostics = detail.diagnostics ?? state.liveDetail.diagnostics;
 
 		set({
-			staticDetail: { brain, learning },
+			staticDetail: { brain, brainContext, learning },
 			runtimeSnapshot: { sharedMemory },
 			liveDetail: { stats, actionLog, diagnostics },
 			resourceMeta: {

@@ -3130,6 +3130,52 @@ async fn get_creature_brain_lists_an_action_queue_bundle_at_the_configured_width
     );
 }
 
+/// Every creature fetch, a poll excluding the brain included, carries the
+/// sensor context the brain resolves under, so a client holding a brain
+/// sees a queue-width change and refetches it (T25.F11 invariant 11).
+#[tokio::test]
+async fn a_brainless_poll_carries_the_brain_context_in_force() {
+    let state = test_state();
+    let creature_id = {
+        let handle = state.sim.lock().await;
+        handle.sim.creatures.keys().next().expect("a creature")
+    };
+    let uri = format!("/v3/simulation/creature/{}", creature_id.data().as_ffi());
+    let poll = format!("{uri}?exclude=brain");
+    let (food_types, slots) = {
+        let handle = state.sim.lock().await;
+        let config = &handle.sim.config;
+        (
+            config.world.food.types.len(),
+            config.runtime.max_actions_per_turn,
+        )
+    };
+
+    let (status, full) = do_request(router(state.clone()), get_req(&uri)).await;
+    assert_eq!(status, StatusCode::OK, "body: {full}");
+    let (_, before) = do_request(router(state.clone()), get_req(&poll)).await;
+    assert!(before.get("brain").is_none());
+    assert_eq!(before["brain_context"], full["brain_context"]);
+    assert_eq!(
+        before["brain_context"],
+        serde_json::json!({"food_type_count": food_types, "action_queue_slots": slots})
+    );
+
+    state
+        .sim
+        .lock()
+        .await
+        .sim
+        .config
+        .runtime
+        .max_actions_per_turn = slots + 7;
+    let (_, after) = do_request(router(state), get_req(&poll)).await;
+    assert_eq!(
+        after["brain_context"]["action_queue_slots"],
+        serde_json::json!(slots + 7)
+    );
+}
+
 /// `brain` for a `DirectionPair` bundle (T25.F11 invariants 3, 4 and 11):
 /// its source and wiring, its twelve compass coordinates and its facts on
 /// the drive with presence; every member, a fact included, at its pattern

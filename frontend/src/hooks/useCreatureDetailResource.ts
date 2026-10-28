@@ -5,6 +5,11 @@ import {
 	useCreatureInspectorStore,
 } from "../stores/creatureInspector.ts";
 import { useSimulationStore } from "../stores/simulation.ts";
+import type { BrainContext } from "../types/generated/BrainContext.ts";
+
+function sameBrainContext(a: BrainContext, b: BrainContext): boolean {
+	return a.food_type_count === b.food_type_count && a.action_queue_slots === b.action_queue_slots;
+}
 
 export function useCreatureDetailResource() {
 	const abortRef = useRef<AbortController | null>(null);
@@ -24,7 +29,7 @@ export function useCreatureDetailResource() {
 	}, []);
 
 	useEffect(() => {
-		const fetchCreature = async (id: number, incremental: boolean) => {
+		const fetchCreature = async (id: number, incremental: boolean, withBrain = false) => {
 			abortRef.current?.abort();
 			const controller = new AbortController();
 			abortRef.current = controller;
@@ -34,7 +39,7 @@ export function useCreatureDetailResource() {
 				query.since_tick = latestTickRef.current;
 				// `learning` carries the weights in force, which move every
 				// tick, so polls exclude the brain only.
-				query.exclude = "brain";
+				if (!withBrain) query.exclude = "brain";
 			}
 
 			try {
@@ -55,6 +60,7 @@ export function useCreatureDetailResource() {
 					genomeSize: detail.genome_size,
 					phenotype: detail.phenotype,
 					brain: detail.brain,
+					brainContext: detail.brain_context,
 					learning: detail.learning,
 					sharedMemory: detail.shared_memory,
 					actionLog: detail.action_log,
@@ -64,6 +70,13 @@ export function useCreatureDetailResource() {
 
 				if (!hasFullFetchRef.current) {
 					hasFullFetchRef.current = true;
+				}
+
+				// The held brain resolves under another context (a changed
+				// `max_actions_per_turn`): refetch it under the current one.
+				const held = useCreatureInspectorStore.getState().staticDetail.brainContext;
+				if (!detail.brain && held && !sameBrainContext(held, detail.brain_context)) {
+					fetchCreature(id, true, true);
 				}
 			} catch (err) {
 				if (controller.signal.aborted || currentIdRef.current !== id) return;

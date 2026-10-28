@@ -20,7 +20,7 @@ use v3_core::simulation::recording::ActiveTrace;
 use crate::error::{AppError, FieldError};
 use crate::state::{AppState, SimulationStatus};
 use crate::transport::action_log::ActionLogEntry as WireActionLogEntry;
-use crate::transport::brain::{brain_view, learning_view, BrainView, NodeLearning};
+use crate::transport::brain::{brain_view, learning_view, BrainContext, BrainView, NodeLearning};
 use crate::transport::sample_assembler::assemble_execution_sample;
 use crate::transport::sample_protocol::ExecutionSamplePayload;
 use crate::types::PROTOCOL_VERSION;
@@ -76,6 +76,9 @@ pub(crate) struct CreatureDetailResponse<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     brain: Option<BrainView>,
+    /// The context `brain` resolves under, on every fetch: a client
+    /// refetches its brain when this moves.
+    brain_context: BrainContext,
     /// The weights in force of every dynamic edge and the learned scales,
     /// refreshed on every poll; excluded by the `learning` token and omitted
     /// when no node carries a dynamic edge.
@@ -425,6 +428,7 @@ pub async fn get_creature(
         build_creature_diagnostics(sim, creature, &mesh_annotations, &all_action_log_entries)
     });
 
+    let sensor_context = sim.config.sensor_context(sim.config.world.food.types.len());
     let response = CreatureDetailResponse {
         protocol_version: PROTOCOL_VERSION,
         id,
@@ -453,9 +457,10 @@ pub async fn get_creature(
                 creature.genome(),
                 creature.graph_runtime().learned(),
                 &mesh_annotations,
-                &sim.config.sensor_context(sim.config.world.food.types.len()),
+                &sensor_context,
             )
         }),
+        brain_context: BrainContext::from(&sensor_context),
         learning: if exclude.contains("learning") {
             None
         } else {

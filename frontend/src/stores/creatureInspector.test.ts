@@ -58,6 +58,7 @@ function makeDetail(overrides: Partial<Detail> = {}): Detail {
 				},
 			],
 		},
+		brainContext: { food_type_count: 1, action_queue_slots: 10 },
 		sharedMemory: [0, 1, 2],
 		actionLog: [makeEntry(1), makeEntry(2, "Eat")],
 		diagnostics: {
@@ -238,6 +239,34 @@ describe("creatureInspectorStore actionLog", () => {
 		useCreatureInspectorStore.getState().setDetail(makeDetail({ brain: undefined }));
 		const genome = useCreatureInspectorStore.getState().staticDetail.brain;
 		expect(genome).toBe(originalBrain);
+	});
+
+	it("replaces the brain and its context with every fetch that carries one", () => {
+		useCreatureInspectorStore.getState().setDetail(makeDetail());
+		const wider = { food_type_count: 1, action_queue_slots: 20 };
+		const refetched = { entry_node_id: 5, nodes: [] };
+		useCreatureInspectorStore
+			.getState()
+			.setDetail(makeDetail({ brain: refetched, brainContext: wider }));
+
+		const { brain, brainContext } = useCreatureInspectorStore.getState().staticDetail;
+		expect(brain).toBe(refetched);
+		expect(brainContext).toEqual(wider);
+	});
+
+	it("keeps the brain's context through a brainless poll under another context", () => {
+		useCreatureInspectorStore.getState().setDetail(makeDetail());
+		useCreatureInspectorStore.getState().setDetail(
+			makeDetail({
+				brain: undefined,
+				brainContext: { food_type_count: 1, action_queue_slots: 20 },
+			}),
+		);
+
+		expect(useCreatureInspectorStore.getState().staticDetail.brainContext).toEqual({
+			food_type_count: 1,
+			action_queue_slots: 10,
+		});
 	});
 
 	it("keeps the brain across polls and replaces learning on every poll", () => {

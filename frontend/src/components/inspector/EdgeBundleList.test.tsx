@@ -7,9 +7,9 @@ import type { BrainSink } from "../../types/generated/BrainSink.ts";
 import type { GraphBrain } from "../../types/generated/GraphBrain.ts";
 import type { Site } from "../../types/generated/Site.ts";
 import {
+	EdgeBundleList,
 	collectBundleMembers,
 	coordinateKey,
-	EdgeBundleList,
 	indexMembers,
 } from "./EdgeBundleList.tsx";
 

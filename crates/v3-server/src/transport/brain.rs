@@ -28,6 +28,27 @@ pub struct BrainView {
     pub nodes: Vec<BrainNode>,
 }
 
+/// The sensor context a brain view's bundle coordinates resolve under
+/// (T25.F11 invariant 11). Every creature fetch carries it, a poll that
+/// excludes the brain included, so a client holding a brain refetches the
+/// brain when the context moves (a `max_actions_per_turn` change widens the
+/// queue's coordinates).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct BrainContext {
+    pub food_type_count: u32,
+    pub action_queue_slots: u32,
+}
+
+impl From<&SensorContext> for BrainContext {
+    fn from(context: &SensorContext) -> Self {
+        Self {
+            food_type_count: u32::try_from(context.food_type_count).unwrap_or(u32::MAX),
+            action_queue_slots: context.action_queue_slots,
+        }
+    }
+}
+
 /// One mesh node: its annotation facts, input references, backend and route
 /// targets.
 #[derive(Debug, Clone, PartialEq, Serialize)]
