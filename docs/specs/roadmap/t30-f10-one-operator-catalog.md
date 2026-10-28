@@ -241,7 +241,7 @@ regression past its threshold would show it wrong.
       is empty; `cargo test -p v3-core draw_stream` passes with hash
       `14_628_003_425_138_151_748` unchanged.
 - [ ] Invariants 6 and 7: `make check` exits 0, no test deleted or ignored.
-- [ ] Gate profile: summary at `docs/progress/features/t30-f10.json`, blocks
+- [x] Gate profile: summary at `docs/progress/features/t30-f10.json`, blocks
       equal to the epoch, raw hash and size in the readings, series entry
       added, no full report staged.
 - [ ] Slow tier: `make rust-test-slow` -> exit 0 on the final code.
@@ -265,9 +265,20 @@ identical, a differing block is a defect, and a compute regression past
 the threshold goes to the spec owner, not to acceptance. No indicator can
 move; the goal profile is not run (Verification Plan).
 
-**Measured verdict.** Not run yet.
+**Measured verdict.** Predeclaration holds.
 
-- Summary of the declared profile: [gate](../../progress/features/t30-f10.json).
+| Item | Value |
+| --- | --- |
+| Command | `make bench PROFILE=gate FEATURE=t30-f10` at `8ac851d1e`, `dirty=false` |
+| Outer `make` exit | 0 (shell exit status) |
+| CLI exit | 0 (`measurement_evidence.cli_exit`) |
+| `severe` | false |
+| Threshold verdict | all 9 work counters `ok` at standard thresholds (flag 10%, severe 50%), 0.000000% against `t25-f11.json` |
+| Deterministic block vs epoch | identical (parsed `deterministic` objects equal) |
+| Raw report | `<main-checkout>/.bench-artifacts/t30-f10/gate.json`, 159,411 bytes, SHA-256 `0cf20d9227461b12a1fcbe06fcc6947f0ca47d538e381a85618570148203d8a8` |
+| Summary | `docs/progress/features/t30-f10.json`, 36,306 bytes; series entry appended; no full report staged |
+
+- Summary: [gate](../../progress/features/t30-f10.json).
 - Full readings: [`docs/progress/readings/t30-f10.md`](../../progress/readings/t30-f10.md).
 
 ## Success Criteria
