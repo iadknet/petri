@@ -78,7 +78,7 @@ Standing rules. Execution policy stays in [`docs/workflow.md`](workflow.md).
 
 Priority order for new starts: T30.F03, T26.F01, T25.F10, T27.F01, T26.F02,
 T27.F03, T30.F01, T30.F07, T30.F08, T25.F11, T30.F10, T25.F12, T29.F01, T29.F02, T29.F03,
-T30.F02, T30.F04, T30.F05, T30.F06, T30.F09, T30.F11, T30.F12, T27.F02, T28.F01, T28.F02.
+T30.F02, T30.F04, T30.F05, T30.F06, T30.F09, T30.F11, T30.F12, T30.F13, T30.F14, T27.F02, T28.F01, T28.F02.
 
 - T27.F02 was moved after T29.F03 and T30.F05 on 2026-10-27 at the user's
   direction: "Move T27.F02 after T29.F03 and T30.F05 so all architecture

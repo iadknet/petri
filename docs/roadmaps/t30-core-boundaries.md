@@ -44,6 +44,10 @@ behavior.
   - Goal: Offspring mutate exactly as before, with every Graph edit reporting what it changed and keeping its own container rules, so the engine never infers an edit by comparing genome copies, with no behavior change.
 - [ ] **T30.F12 — The Sink Catalog Is Whole** — Depends on: T30.F09
   - Goal: Every Graph node carries the full vote and parameter sink catalog by validation, not by convention, so no edit or reader handles a partial catalog, with no behavior change.
+- [ ] **T30.F13 — Censuses Live in Core, Summaries Follow Their Types** — Depends on: None
+  - Goal: Every population census is computed once in core's readers and each benchmark sample block is declared once with its retention policy, so a new block is not wired by hand in five places and the summary keeps the same minimum, with no simulation behavior change.
+- [ ] **T30.F14 — The Inspector Reads Resolved Views** — Depends on: None
+  - Goal: The creature inspector shows what the genome resolves, with the server forwarding core's facts and the frontend matching nothing the core already matched, with no behavior change.
 
 ## Notes for AI Agents
 
@@ -262,7 +266,13 @@ behavior.
   owner-complete split that detaches and returns its effects, with split's
   weight, seed and draw behavior unchanged; and `insert_member`'s per-member
   position scan, which makes building a wide bundle quadratic, becomes
-  linear.
+  linear, so the widest-queue fixture in `container_tests.rs` builds
+  through `add_bundle` (its `WORKAROUND(T30.F11)` marker). The bundle
+  creations F11's reports carry become one `BundleCreations` type instead
+  of the positional `[[u64; 2]; 3]` summed by hand in
+  `simulation/actions/reproduction.rs` and `v3-telemetry` metrics, with the
+  wiring keys (`wiring_index`, `WIRING_KEYS`, today in `mutation/types`)
+  owned by the genome.
 - F12: the sink catalog is validated. `with_output_sinks`
   (`genome/cgp/container.rs:534-541`) accepts any list and neither
   `validate_graph` nor parseability checks it, so `hosts`/`hosts_kind`, the
@@ -272,6 +282,64 @@ behavior.
   requires the full catalog, sinks are found by index, and that hosting
   layer is deleted. F12 follows F09, which deletes the only non-test
   builder of a partial catalog (`recruitment_paths/fixtures.rs:535`).
+- F13 and F14 were added on 2026-10-27 at the user's direction from a second
+  refactor audit (the T25.F11 areas in `v3-cli/src/bench/`, the server
+  transport, the frontend inspector and telemetry): "Run the fix pass
+  (items 1-7) through the implementer with make check and merge, then
+  draft the roadmap rows and notes and run their track-design review".
+  Both are behavior-preserving in the T25.F01 shape; F13 may change the
+  benchmark summary's shape and records that under
+  `counter_definition_changes`
+  ([F13–F14 design review](../progress/readings/t30-f13-f14-design-review.md)).
+- F13: the bundle census moves to core. `v3-cli/src/bench/bundles.rs:79-200`
+  counts bundles in the CLI, against `docs/architecture.md`'s readers
+  owner, and its ring row repeats counts `neighborhood/ring_rules.rs:228-277`
+  makes; the carry threshold is defined twice (`neighborhood/drives.rs:24`,
+  `ring_rules.rs:37`) and the bundle-index conversion three times
+  (`bench/bundles.rs`, `ring_rules.rs`, `v3-server/src/transport/brain.rs`).
+  It becomes `neighborhood/bundles.rs` with one threshold and a Graph
+  iterator over `(BundleId, &Bundle)`, which `ring_rules` reads. The rule
+  is that every population calculation in an outer crate (`v3-cli`,
+  `v3-telemetry`, `v3-server`) moves to readers with its current numerical
+  definition, so those crates only format core results for export or the
+  wire; F13's spec inventories them at Plan time. Known today, besides
+  telemetry's `Census::of` (`v3-telemetry/src/metrics.rs`) and the server's
+  `PopulationCensus` (`v3-server/src/state.rs`):
+  `SensorCensus::observe`, `bucket_surviving_clades` and
+  `GestationTracking::observe`'s pending-birth fold (`bench/tracking.rs`);
+  `CapacityDistribution::of` (`bench/capacity.rs`, also serving exchange
+  shares); `clade_diversity`, `structural_companions_census`,
+  `generation_distribution` and `structure_size_distribution`
+  (`bench/indicators.rs`); `structure_means` (`v3-cli/src/lib.rs`); and the
+  population and clade census `OccupancyGrid::observe` delegates to
+  `v3-core/src/kernel/occupancy_grid.rs`, outside the readers owner. Also in F13: a per-sample block is today added in five places by
+  hand (the `PersistenceSample` field, `PopulationReadings` and the
+  transfer in `PersistenceAccumulator::observe` in `bench/tracking.rs`, the
+  list in `persistence()` and `KEPT_SAMPLE_FIELDS` in `bench/artifacts.rs`),
+  and `KEPT_BUNDLE_FIELDS` repeats part of the `Bundles` struct. The sample
+  blocks become one composed record carried through observation and
+  accumulation, each block declaring its retention policy, and the
+  keep-lists derive from that policy: the deliberate exclusions (`rows`
+  kept only at the last checkpoint by `keep_sample`, fields of
+  `PersistenceSample` the summary omits, `81ab1cf7d`) and the telemetry
+  commit rule's minimum summary are unchanged.
+- F14: `http/creature.rs` (`upstream_slots_read` and the payload and
+  custom-output slot walks) walks programs the genome's `mesh_annotations`
+  already walk, and counts a declared `UpstreamSlot` as read where
+  `UpstreamBus` counts only fields read; it also scans every Graph edge
+  and VM instruction, where `mesh_annotations` uses live VM slices and
+  `cgp_mesh_annotations` the wired Graph surface. The slot sets become
+  genome annotations under the annotations' liveness rule, for both bus
+  references: a slot counts when a live read reaches it, so an unused
+  declaration or a dead read no longer adds a diagnostic slot. That is a
+  correction to the inspector's diagnostics, recorded in F14's spec; it
+  changes no simulation behavior. `birth_coordinates`
+  (`genome/cgp/container.rs`) matches members to coordinates but sends only
+  `present`, so `EdgeBundleList.tsx` matches them again by coordinate;
+  each coordinate carries its member's location. `BrainContext`
+  (`transport/brain.rs`) is mirrored and compared field by field in
+  `useCreatureDetailResource.ts`, so a new field would be ignored; the
+  server sends a context identity the client compares whole.
 - The master order puts F03 first (user, 2026-10-25), F01 and F07 before
   T25.F11, F08 after F07 (assistant proposal), F02 and F06 before T28, and
   F09 after F06 (assistant proposal), as preferences, not prerequisites.
