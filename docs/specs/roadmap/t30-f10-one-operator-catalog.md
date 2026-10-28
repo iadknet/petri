@@ -21,7 +21,7 @@ is identical to main's; any that moves is a defect.
 - The `tracked_before` clone (T30.F11); the sink catalog (T30.F12); the
   gate and route resolution moving into the genome and the test-only
   `TopologyOperator::random` and `VmOperator::random` samplers (T30.F05,
-  user 2026-10-27); retiring `neighborhood/recruitment_paths` (T30.F09).
+  user 2026-10-27).
 - Any change to an operator's weight, key string, complexity effect,
   applicability predicate, draws or dispatch target; to the domain draw
   (`mesh_layer_probability`, then three node-internal domains at equal
@@ -80,10 +80,10 @@ Invariants:
 3. **One serde form.** `MutationOperator` serializes as its `as_key()`
    string and deserializes from it (serde `into`/`try_from` or a hand
    impl); the derived variant-name form
-   (`GraphAddGraphEdge`) ends. Its only exporters follow: the lab's
-   `key_of` (`v3-lab/src/ladder/track.rs:117` and its tests) and the
-   recruitment-paths records (`recruitment_paths/records.rs`; the
-   `v3-cli/tests/bench_artifacts.rs:1517` literal). Stored output such as
+   (`GraphAddGraphEdge`) ends. Its only exporter follows: the lab's
+   `key_of` (`v3-lab/src/ladder/track.rs:117` and its tests); the
+   recruitment-paths records that also exported it left with T30.F09,
+   closed before this feature. Stored output such as
    the historical `v3-lab/tests/fixtures/summary-v2-wall.json` is not an
    exporter and stays as committed. Every benchmark summary key, server payload and frontend
    label already reads `as_key()` and is unchanged.
@@ -146,7 +146,6 @@ Invariants:
    | Site | Change |
    | --- | --- |
    | `EditSurface::of`, `neighborhood/recruitment.rs:117` | matches `Topology(op)` on `TopologyOperator` and the other three variants by domain; today's classification for every operator, no wildcard |
-   | `ProductionEvent::operator`, `recruitment_paths/qualification.rs:49`; `recruitment_paths/fixtures.rs:242` | use `From`; `ProductionEvent` carries `WORKAROUND(T30.F09): a second nested operator enum; MutationOperator is the one catalog and T30.F09 deletes this module` |
    | `birth_edge_class`, the three added-node functions in `engine/mod.rs`, `v3-cli/src/bench/bundles.rs:258` | name the nested variants |
    | every test naming a flat variant (17 files, readings) | names the nested one or `XOperator::V.into()`; assertions and expected values kept; no test deleted or ignored |
 7. **No behavior change.** `engine/draw_stream_tests.rs` keeps its pinned
@@ -161,7 +160,7 @@ Invariants:
 
 Owners touched: `mutation` (owner of supply, dispatch and every birth
 draw), whose catalog type, engine path and report shape change; readers
-(`neighborhood/{recruitment,operators}.rs`, `recruitment_paths/`),
+(`neighborhood/{recruitment,operators}.rs`),
 `v3-cli`, `v3-lab` and tests across crates, which rename variants, follow
 the one key or call the one dispatch. No debt in section 5 is paid or
 extended; `scripts/architecture-debts.txt` is untouched. Shared rule
@@ -197,7 +196,7 @@ regression past its threshold would show it wrong.
 | Check | Declared | Reason |
 | --- | --- | --- |
 | Benchmark profiles | `gate` | The track's verification note declares each row gate with pins unchanged; the gate's deterministic blocks against the epoch are the byte-identity reading and its compute threshold the cost reading for a hot path that now goes through one generic function, in seconds; no population reading is in question. |
-| Slow tests (`make rust-test-slow`) | `run` | The workflow's trigger names a change to mutation operators or their draws and to recruitment code; this feature rewrites the engine path those draws come through and edits `recruitment_paths/qualification.rs`, and the tier's recruitment-paths pins read that path end to end. |
+| Slow tests (`make rust-test-slow`) | `run` | The workflow's trigger names a change to `crates/v3-lab`, whose `ladder/track.rs` and tests follow the one key here, and the tier holds the lab's end-to-end runs; the tier's recruitment-paths half, the plan's first reason, left with T30.F09 before closure, which leaves the declaration unchanged. |
 
 ## Implementation Tasks
 
@@ -215,10 +214,9 @@ regression past its threshold would show it wrong.
       5); delete the three key functions, the four wrappers,
       `ClassifiedResult` and the `too_many_lines` allowance; the battery
       in `neighborhood/operators.rs` drops `OperatorKind` for the dispatch.
-- [x] 4. Callers of invariant 6 (compiler-driven): readers,
-      `recruitment_paths` with the `WORKAROUND(T30.F09)` comment on
-      `ProductionEvent`, `v3-cli`, `v3-lab` (`key_of` and its tests; the
-      v2 fixture stays), and every test file naming a flat variant.
+- [x] 4. Callers of invariant 6 (compiler-driven): readers, `v3-cli`,
+      `v3-lab` (`key_of` and its tests; the v2 fixture stays), and every
+      test file naming a flat variant.
 - [x] 5. `make check` (the draw-stream pin and `tests/reproducibility.rs`
       run inside it).
 - [x] 6. At close: run the declared gate profile and the slow tier.
@@ -231,8 +229,7 @@ regression past its threshold would show it wrong.
 
 - [x] Invariant 1: `grep -rnE "topology_operator_key|vm_operator_key|input_ref_operator_key|MutationOperator::all\(\)|GraphEventReport|InputRefEventReport|OperatorKind" crates`
       is empty, and `grep -n "fn operator" crates/v3-core/src/mutation/graph/mod.rs`
-      is empty (`ProductionEvent::operator` in `recruitment_paths` stays
-      until T30.F09).
+      is empty.
 - [x] Invariant 2: `cargo test -p v3-core mutation::types` passes with the
       catalog test; the `as_key` strings of every operator equal the list
       on `ac3747005` (`types/mod.rs:319-387`), by a diff recorded in the
@@ -302,8 +299,5 @@ move; the goal profile is not run (Verification Plan).
 - Deferred: the test-only `TopologyOperator::random` and `VmOperator::random`
   samplers stay under `WORKAROUND(T25.F08)`; T30.F05 pays it (user,
   2026-10-27).
-- Deferred: `ProductionEvent` in `recruitment_paths/qualification.rs` stays
-  as a second nested operator enum under `WORKAROUND(T30.F09)`; T30.F09
-  deletes the module.
 - Cost: 3 implementer passes, 6 advisor consults, 3 spec-owner resumes,
   2 Codex rounds, `ready`; lens P1 0/1/0, P2 0/0/2.
