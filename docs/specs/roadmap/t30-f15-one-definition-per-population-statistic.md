@@ -164,7 +164,7 @@ pin table would show it wrong.
       `--all-features`), `cargo fmt --all --check` and `make rust-clippy`
       pass.
 - [ ] `make check` exits 0.
-- [ ] Overhead: `scripts/telemetry-overhead` (stack up, `run` workload) ->
+- [x] Overhead: `scripts/telemetry-overhead` (stack up, `run` workload) ->
       pass, its pair count, ratio interval and time used in the readings.
       INCONCLUSIVE, not a pass: spread attempt 1 0.2476, attempt 2 0.0708
       -> 24 pairs at 5303 ms do not fit the 300 s cap (102.6 s used); 0
@@ -203,10 +203,12 @@ result is reported to the user, never rounded to a pass or extended.
 0, CLI exit 0): `severe=false` against `t25-f11.json`; deterministic block
 identical to the epoch's; all nine work counters at 0.000000%; no wall-clock
 reference in the epoch, so none compared. Overhead
-(`scripts/telemetry-overhead`, exit 0): inconclusive with 0 pairs (24 pairs
-at 5303 ms per run do not fit the 300 s cap; 102.6 s used; first spread
-0.2476 on a cold stack, second 0.0708); no ratio or interval. Details in the
-readings.
+(`scripts/telemetry-overhead`, exit 0): first attempt inconclusive with 0
+pairs (24 pairs at 5303 ms per run did not fit the 300 s cap; 102.6 s used;
+first spread 0.2476 on a cold stack, second 0.0708). The user authorized one
+fresh check on 2026-10-28 ("Fresh check authorized", new 300 s cap): pass,
+spread 0.0801, 24/24 pairs, median ratio 1.0036, 90% interval [0.9934,
+1.0131] against ceiling 1.10, 218.6 s used. Details in the readings.
 
 - Summary of the declared profile: [gate](../../progress/features/t30-f15.json).
 - Full readings: [`docs/progress/readings/t30-f15.md`](../../progress/readings/t30-f15.md).
