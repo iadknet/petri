@@ -271,6 +271,6 @@ the `deterministic` diff lists only `recruitment_paths`; bytes in readings.
   `Scalar` family, the `AuthoredStructure` counts) are deleted, not moved.
 - Decision: `GraphMutator::apply` is deleted outright; test callers pass an
   explicit `SensorContext`, never a hidden default.
-- Deferred: Codex round 1 F4: `recruitment_paths/fixtures.rs:535` builds a
-  full sink catalog, so the T30 F12 note is corrected; F12's dependency edge
-  on F09 is left as the user set it.
+- Cost: $37.11 (Opus 5.5 8.8M cache read); 3 implementer passes (advisor
+  2/1/2); 3 spec-owner resumes; 2 Codex rounds, `ready`; review: P1 1,
+  design 0, health P3 2.
