@@ -3,7 +3,7 @@
 **State**: desired. This file describes where the system is going, not what
 the code does today. [Known debts](#5-known-debts) lists where the code
 differs and the row that pays each debt.
-**Last updated**: 2026-10-26
+**Last updated**: 2026-10-28
 
 ## Use this file
 
@@ -113,7 +113,7 @@ behavior depending on readers. Two prohibitions it does not say:
 | brain execution, its state, learned values and the learning update law | `runtime` |
 | the creature record, body rules, and one birth constructor for founders and children (finalization, inherited payload, per-life initialization, energy provisioning) | `creature` |
 | tick order; action resolution, each action one transaction with one applied result; removal settled through one path; records derived from applied results | `simulation` (a scheduler and mechanics) |
-| censuses and indicators | readers (`neighborhood/`) |
+| censuses and indicators: every population calculation, computed once with one definition; outer crates only format the results | readers (`neighborhood/`) |
 | transport, the inspector view, telemetry export | outer crates (section 2) |
 
 ## 4 Composition and flow
