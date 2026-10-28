@@ -215,3 +215,5 @@ result is reported to the user, never rounded to a pass or extended.
 - Decision: the live definitions and their markers are deleted rather than
   kept beside the one definition, and telemetry's census carries mean energy
   as `f64` so its `f64` gauge is not rounded through `f32` (audit A1–A4).
+- Decision: final review lens1 P2 (order-insensitive capacity fixture)
+  remediated with an order-sensitive fixture; lens2 and lens3 clear.

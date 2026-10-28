@@ -46,8 +46,11 @@ fn the_census_mean_capacity_is_the_living_population_mean_and_zero_at_extinction
 }
 
 /// The census carries the readers' mean energy and mean capacity uncast:
-/// energies whose `f32` sum would round keep their `f64` mean. Exact
-/// equality: the census reads the one definition, it computes nothing.
+/// energies whose `f32` sum would round keep their `f64` mean, and
+/// capacities whose `f64` sum depends on order (2^53 + 1 rounds to 2^53, so
+/// creature order `[2^53, 1, 1]` sums to 2^53 while sorted order sums to
+/// 2^53 + 2) keep the sorted distribution's mean. Exact equality: the
+/// census reads the one definition, it computes nothing.
 #[test]
 fn the_census_means_are_the_readers_definitions_uncast_and_zero_at_extinction() {
     let mut sim = three_creatures();
@@ -55,7 +58,7 @@ fn the_census_means_are_the_readers_definitions_uncast_and_zero_at_extinction() 
         .creatures
         .values_mut()
         .zip([16_777_216.0_f32, 1.0, 1.0])
-        .zip([110.0_f32, 40.0, 60.0])
+        .zip([9_007_199_254_740_992.0_f32, 1.0, 1.0])
     {
         creature.energy = energy;
         creature.body.capacity = capacity;
@@ -66,11 +69,18 @@ fn the_census_means_are_the_readers_definitions_uncast_and_zero_at_extinction() 
         .mean_energy()
         .expect("a living population");
     let capacity = capacity_distribution(&sim).expect("a living population");
+    let creature_order = sim
+        .creatures
+        .values()
+        .map(|creature| f64::from(creature.body.capacity))
+        .sum::<f64>()
+        / 3.0;
     sim.creatures.clear();
     let extinct = Census::of(&sim);
 
     assert_eq!(census.mean_energy.to_bits(), mean_energy.to_bits());
     assert_eq!(census.mean_capacity.to_bits(), capacity.mean.to_bits());
+    assert_ne!(census.mean_capacity.to_bits(), creature_order.to_bits());
     assert_eq!(extinct.mean_energy.to_bits(), 0.0_f64.to_bits());
     assert_eq!(extinct.mean_capacity.to_bits(), 0.0_f64.to_bits());
 }
