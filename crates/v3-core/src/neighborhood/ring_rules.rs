@@ -6,7 +6,8 @@
 //! A rule is `(family, kind, offset, sign)`. A path for direction `d` on a
 //! reachable Graph node is (i) an `ActionVote` edge into `K(d)` whose genomic
 //! weight `w` has `|w| > 1e-3`, from the ring's channel `(d − offset) mod 8`,
-//! sign of `w`; or (ii) such an edge from `UpstreamSlot(j)` while some
+//! sign of `w`; or (ii) such an edge reading bus slot `j` (`UpstreamSlot(j)`
+//! or `UpstreamBus` field `j`) while some
 //! reachable Graph node has an edge with `|w'| > 1e-3` into `CustomOutput(j)`
 //! from that ring channel, sign of `w · w'` (execution order and overwrites
 //! ignored, so an upper bound). Bundle members are sink edges and take part

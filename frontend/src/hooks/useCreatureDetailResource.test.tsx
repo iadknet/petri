@@ -309,6 +309,52 @@ describe("useCreatureDetailResource", () => {
 		expect(brainContext).toEqual(wider);
 	});
 
+	it("carries the brain on the next poll when a tick aborts the brain refetch", async () => {
+		const wider = { food_type_count: 1, action_queue_slots: 20 };
+		const { brain: _brain, ...polled } = {
+			...buildCreatureDetail(),
+			latest_tick: 2733,
+			brain_context: wider,
+		};
+		const refetchedBrain = { entry_node_id: 9, nodes: [] };
+		vi.mocked(api.getCreature)
+			.mockResolvedValueOnce(buildCreatureDetail())
+			.mockResolvedValueOnce(polled)
+			.mockImplementationOnce(() => new Promise(() => {}))
+			.mockResolvedValueOnce({
+				...buildCreatureDetail(),
+				latest_tick: 2734,
+				brain: refetchedBrain,
+				brain_context: wider,
+			});
+
+		useCreatureInspectorStore.getState().selectCreature(7);
+		await act(async () => {
+			render(<Harness />);
+			await Promise.resolve();
+		});
+		act(() => {
+			vi.advanceTimersByTime(200);
+			useSimulationStore.getState().setTick(2733);
+		});
+		await act(async () => {
+			await Promise.resolve();
+		});
+		act(() => {
+			vi.advanceTimersByTime(200);
+			useSimulationStore.getState().setTick(2734);
+		});
+		await act(async () => {
+			await Promise.resolve();
+		});
+
+		expect(api.getCreature).toHaveBeenCalledTimes(4);
+		expect(vi.mocked(api.getCreature).mock.calls[3]?.[2]).toEqual({ since_tick: 2733 });
+		const { brain, brainContext } = useCreatureInspectorStore.getState().staticDetail;
+		expect(brain).toEqual(refetchedBrain);
+		expect(brainContext).toEqual(wider);
+	});
+
 	it("stops incremental polling after the selected creature is marked dead", async () => {
 		vi.mocked(api.getCreature)
 			.mockResolvedValueOnce(buildCreatureDetail())

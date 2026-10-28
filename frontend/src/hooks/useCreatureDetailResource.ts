@@ -17,6 +17,10 @@ export function useCreatureDetailResource() {
 	const lastFetchRef = useRef<number>(0);
 	const latestTickRef = useRef<number | null>(null);
 	const hasFullFetchRef = useRef(false);
+	// The held brain resolves under another context than the latest poll's:
+	// every fetch carries the brain until one lands, so a poll that aborts
+	// the refetch carries it instead.
+	const brainStaleRef = useRef(false);
 	const MIN_FETCH_INTERVAL = 100;
 
 	useEffect(() => {
@@ -29,7 +33,7 @@ export function useCreatureDetailResource() {
 	}, []);
 
 	useEffect(() => {
-		const fetchCreature = async (id: number, incremental: boolean, withBrain = false) => {
+		const fetchCreature = async (id: number, incremental: boolean) => {
 			abortRef.current?.abort();
 			const controller = new AbortController();
 			abortRef.current = controller;
@@ -39,7 +43,7 @@ export function useCreatureDetailResource() {
 				query.since_tick = latestTickRef.current;
 				// `learning` carries the weights in force, which move every
 				// tick, so polls exclude the brain only.
-				if (!withBrain) query.exclude = "brain";
+				if (!brainStaleRef.current) query.exclude = "brain";
 			}
 
 			try {
@@ -75,9 +79,8 @@ export function useCreatureDetailResource() {
 				// The held brain resolves under another context (a changed
 				// `max_actions_per_turn`): refetch it under the current one.
 				const held = useCreatureInspectorStore.getState().staticDetail.brainContext;
-				if (!detail.brain && held && !sameBrainContext(held, detail.brain_context)) {
-					fetchCreature(id, true, true);
-				}
+				brainStaleRef.current = held !== null && !sameBrainContext(held, detail.brain_context);
+				if (brainStaleRef.current) fetchCreature(id, true);
 			} catch (err) {
 				if (controller.signal.aborted || currentIdRef.current !== id) return;
 				if (err instanceof ApiRequestError && err.status === 404) {
@@ -93,6 +96,7 @@ export function useCreatureDetailResource() {
 		const resetIncrementalState = () => {
 			latestTickRef.current = null;
 			hasFullFetchRef.current = false;
+			brainStaleRef.current = false;
 		};
 
 		const unsubInspector = useCreatureInspectorStore.subscribe((state, prev) => {
