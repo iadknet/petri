@@ -10,6 +10,7 @@ pub mod calibration;
 pub mod campaign;
 pub mod cli;
 pub mod comparator;
+pub mod controllers;
 pub mod eval;
 pub mod geodesic;
 pub mod ladder;

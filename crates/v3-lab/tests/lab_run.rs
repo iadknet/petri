@@ -697,11 +697,8 @@ fn hot_arm_files(scratch: &Scratch) -> (PathBuf, PathBuf, CreatureGenome) {
         reference.population.founder_profile,
         &reference.energy.lifecycle,
     );
-    let (genome, _) = v3_core::neighborhood::opportunity::controllers::controller(
-        &founder,
-        v3_core::neighborhood::opportunity::Family::Vector,
-        false,
-    );
+    let (genome, _) =
+        v3_lab::controllers::controller(&founder, v3_lab::controllers::Family::Vector);
     let genome_path = scratch.lab.join("hot-genome.json");
     std::fs::write(
         &genome_path,

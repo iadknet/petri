@@ -349,16 +349,15 @@ mod tests {
     }
 
     use crate::arena::arena_config;
+    use crate::controllers::{controller, Family};
     use v3_core::creature::founder::founder_genome_with_age_gate;
-    use v3_core::neighborhood::opportunity::controllers::controller;
-    use v3_core::neighborhood::opportunity::Family;
 
     fn actors(config: &SimulationConfig) -> (CreatureGenome, CreatureGenome) {
         let founder = founder_genome_with_age_gate(
             config.population.founder_profile,
             &config.energy.lifecycle,
         );
-        let comparator = controller(&founder, Family::Vector, false).0;
+        let comparator = controller(&founder, Family::Vector).0;
         (founder, comparator)
     }
 

@@ -1,34 +1,24 @@
-//! Built-in comparators: competence witnesses composed from the existing
-//! `input-opportunity-v1` controllers, never tuned on assay outcomes.
+//! Built-in comparators: competence witnesses composed from the authored
+//! controllers, never tuned on assay outcomes.
 
-use v3_core::contracts::votes::DirectedVoteKind;
-use v3_core::contracts::votes::VoteSink;
-use v3_core::genome::cgp::{GraphEdge, GraphSource, OutputSinkKind};
-use v3_core::genome::{BackendDef, CreatureGenome};
-use v3_core::neighborhood::opportunity::controllers::{
-    controller, AUTHORED_REF, RING_INHIBITION, VOTE_NODE,
-};
-use v3_core::neighborhood::opportunity::Family;
+use v3_core::genome::CreatureGenome;
 
+use crate::controllers::{append_controller, controller, Family, AUTHORED_REF, VOTE_NODE};
 use crate::scene::Assay;
 
 /// The Ring reference's index on the vote node, after the Vector
 /// controller's `AreaFoodSummary` at [`AUTHORED_REF`].
 pub const RING_REF: u16 = AUTHORED_REF + 1;
-/// The cardinal moves the Ring controller inhibits: N, E, S, W.
-pub const RING_MOVES: [u8; 4] = [0, 2, 4, 6];
 
 /// The area-food controller (F01's comparator).
 #[must_use]
 pub fn area_food(founder: &CreatureGenome) -> CreatureGenome {
-    controller(founder, Family::Vector, false).0
+    controller(founder, Family::Vector).0
 }
 
-/// `barrier-comparator`: the area-food controller plus the Ring
-/// controller's structure appended by the lab — `NeighborBarrierRing` at
-/// index 8 and `barrier[d] → Move(d)` at `RING_INHIBITION` for the four
-/// cardinal moves (`controller()` asserts seven references, so it cannot be
-/// called twice).
+/// `barrier-comparator`: the area-food controller plus the Ring controller
+/// — `NeighborBarrierRing` at [`RING_REF`] and `barrier[d] → Move(d)` at
+/// `RING_INHIBITION` for the four cardinal moves.
 ///
 /// # Panics
 ///
@@ -36,34 +26,12 @@ pub fn area_food(founder: &CreatureGenome) -> CreatureGenome {
 #[must_use]
 pub fn barrier_comparator(founder: &CreatureGenome) -> CreatureGenome {
     let mut genome = area_food(founder);
-    let node = &mut genome.nodes[VOTE_NODE];
     assert_eq!(
-        node.input_refs.len(),
+        genome.nodes[VOTE_NODE].input_refs.len(),
         usize::from(RING_REF),
         "the area-food controller's vote node holds eight references"
     );
-    node.input_refs.push(Family::Ring.reference());
-    let BackendDef::Graph(graph) = &mut node.backend_def else {
-        panic!("the founder's vote node is a Graph node");
-    };
-    for direction in RING_MOVES {
-        let surface = graph
-            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Directed(
-                DirectedVoteKind::Move,
-                direction,
-            )))
-            .expect("the fixed catalog holds every move sink");
-        graph.push_edge(
-            surface,
-            GraphEdge::new(
-                GraphSource::InputLeaf {
-                    ref_idx: RING_REF,
-                    sub_idx: u16::from(direction),
-                },
-                RING_INHIBITION,
-            ),
-        );
-    }
+    append_controller(&mut genome, Family::Ring);
     genome
 }
 
@@ -80,11 +48,15 @@ pub fn built_in(assay: Assay, founder: &CreatureGenome) -> CreatureGenome {
 mod tests {
     use super::*;
     use crate::arena::arena_config;
+    use crate::controllers::{RING_INHIBITION, RING_MOVES};
     use crate::eval::{evaluate_genome, Setup};
     use crate::scene::{Geometry, SceneSpec};
     use rand::SeedableRng;
+    use v3_core::contracts::votes::{DirectedVoteKind, VoteSink};
     use v3_core::contracts::InputReference;
     use v3_core::creature::founder::founder_genome_with_age_gate;
+    use v3_core::genome::cgp::{GraphEdge, GraphSource, OutputSinkKind};
+    use v3_core::genome::BackendDef;
 
     /// The reference the comparator reads at `index` on the vote node.
     fn vote_reference(genome: &CreatureGenome, index: usize) -> Option<&InputReference> {
