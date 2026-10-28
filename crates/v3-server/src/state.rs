@@ -769,3 +769,7 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
         predation_events,
     }
 }
+
+#[cfg(test)]
+#[path = "state_census_pins.rs"]
+mod census_pins;

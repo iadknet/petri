@@ -211,7 +211,10 @@ pub(crate) fn structure_means(sim: &v3_core::simulation::Simulation) -> Structur
     }
 }
 
-fn build_tick_sample(sim: &v3_core::simulation::Simulation, tick: u64) -> TickSampleEvent {
+pub(crate) fn build_tick_sample(
+    sim: &v3_core::simulation::Simulation,
+    tick: u64,
+) -> TickSampleEvent {
     let means = structure_means(sim);
     TickSampleEvent {
         protocol_version: PROTOCOL_VERSION,

@@ -8,6 +8,8 @@
 pub mod artifacts;
 pub mod bundles;
 pub mod capacity;
+#[cfg(test)]
+mod census_pins;
 mod comparison;
 pub mod drives;
 mod indicators;

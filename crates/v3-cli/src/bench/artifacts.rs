@@ -1459,6 +1459,38 @@ mod tests {
             .is_none());
     }
 
+    /// Census pin (T30.F13): a row lacking a key adds nothing to it, a
+    /// non-integer count and a non-boolean flag read as absent, a missing
+    /// route flag counts as false, and no row gives `null`.
+    #[test]
+    fn mesh_summary_keeps_its_pre_move_reading_of_partial_rows() {
+        let summary = mesh_summary(&json!([
+            {"mesh_execution": {"total_node_count": 4, "passes": -1}},
+            {"mesh_execution": {
+                "total_node_count": 2.5,
+                "knockout_count": 3,
+                "route_varies_with_input": "yes",
+                "route_destination_varies": true,
+                "route_varies_within_snapshot": 1,
+                "route_destination_varies_within_snapshot": false
+            }},
+            {"mesh_execution": 7}
+        ]));
+        assert_eq!(
+            summary,
+            json!({
+                "genomes": 2,
+                "total": 4,
+                "knockout": 3,
+                "routeVaries": 0,
+                "routeDestinationVaries": 1,
+                "routeDestinationVariesWithinSnapshot": 0
+            })
+        );
+        assert_eq!(mesh_summary(&json!([])), Value::Null);
+        assert_eq!(mesh_summary(&json!({"not": "rows"})), Value::Null);
+    }
+
     #[test]
     fn neighborhood_projects_evolved_rows_and_drops_raw_payloads() {
         let source = json!({

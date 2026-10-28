@@ -1065,3 +1065,43 @@ fn parent_age_at_birth_is_one_cumulative_histogram_per_birth_order() {
     assert_eq!(empty.histograms.len(), BirthOrder::ALL.len());
     assert!(empty.histograms.iter().all(|h| h.count == 0));
 }
+
+/// Census pins (T30.F13): the `petri.tick.*` census values `Census::of`
+/// feeds, pinned on a living and an empty population against the code
+/// before the censuses moved into core's readers. Only the call expressions
+/// may change, never the literals.
+fn census_pin(census: &Census) -> String {
+    format!(
+        "population={} mean_energy={:#x} mean_capacity={:#x} mean_genome_size={:#x} \
+         mean_mesh_nodes={:#x} mean_generation={:#x}",
+        census.population,
+        census.mean_energy.to_bits(),
+        census.mean_capacity.to_bits(),
+        census.mean_genome_size.to_bits(),
+        census.mean_mesh_nodes.to_bits(),
+        census.mean_generation.to_bits(),
+    )
+}
+
+#[test]
+fn the_tick_census_keeps_its_pre_move_values() {
+    let mut config = v3_core::config::SimulationConfig::default();
+    config.world.width = 40;
+    config.world.height = 40;
+    config.population.initial_creatures = 48;
+    let mut sim = v3_core::simulation::seed_simulation(config.clone(), 29);
+    for _ in 0..40 {
+        v3_core::simulation::run_tick(&mut sim, &mut None);
+    }
+    let living = census_pin(&Census::of(&sim));
+    config.population.initial_creatures = 0;
+    let empty = census_pin(&Census::of(&v3_core::simulation::seed_simulation(
+        config, 29,
+    )));
+    println!("PIN {living}\nPIN {empty}");
+    assert_eq!(living, LIVING_CENSUS_PIN);
+    assert_eq!(empty, EMPTY_CENSUS_PIN);
+}
+
+const LIVING_CENSUS_PIN: &str = "population=93 mean_energy=0x41f60aa1 mean_capacity=0x40690d09791e4792 mean_genome_size=0x405404d1344d1345 mean_mesh_nodes=0x4000160581605816 mean_generation=0x3fe44d1344d1344d";
+const EMPTY_CENSUS_PIN: &str = "population=0 mean_energy=0x0 mean_capacity=0x0 mean_genome_size=0x0 mean_mesh_nodes=0x0 mean_generation=0x0";
