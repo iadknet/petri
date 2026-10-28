@@ -185,22 +185,6 @@ pub(crate) fn static_successor_bypass(genome: &CreatureGenome, removed: NodeId) 
     bypass
 }
 
-/// Replace only the chosen node's payload: id, input references, targets and
-/// position stay, `backend_def` becomes `payload` (T13.F07's ancestral
-/// counterfactual, read against [`static_successor_bypass`]).
-#[must_use]
-pub fn ancestral_payload_replacement(
-    genome: &CreatureGenome,
-    node: NodeId,
-    payload: &BackendDef,
-) -> CreatureGenome {
-    let mut replaced = genome.clone();
-    if let Some(slot) = replaced.nodes.iter_mut().find(|slot| slot.node_id == node) {
-        slot.backend_def = payload.clone();
-    }
-    replaced
-}
-
 /// Everything one observed battery pass yields about a genome's execution.
 struct BatteryObservation {
     executed: BTreeSet<NodeId>,
@@ -1001,27 +985,6 @@ mod tests {
         }
     }
 
-    /// The ancestral counterfactual touches one node's payload and nothing
-    /// else; replacing a payload with itself is the identity, and a missing
-    /// node leaves the genome unchanged.
-    #[test]
-    fn ancestral_payload_replacement_swaps_only_the_named_payload() {
-        let g = genome(vec![node(0, &[1], false), node(1, &[], true)]);
-        let halt = node(7, &[], false).backend_def;
-        let replaced = ancestral_payload_replacement(&g, NodeId::new(1), &halt);
-        assert_eq!(replaced.entry_node_id, g.entry_node_id);
-        assert_eq!(replaced.nodes[0], g.nodes[0]);
-        assert_eq!(replaced.nodes[1].node_id, g.nodes[1].node_id);
-        assert_eq!(replaced.nodes[1].targets, g.nodes[1].targets);
-        assert_eq!(replaced.nodes[1].input_refs, g.nodes[1].input_refs);
-        assert_eq!(replaced.nodes[1].backend_def, halt);
-        assert_eq!(
-            ancestral_payload_replacement(&g, NodeId::new(1), &g.nodes[1].backend_def),
-            g
-        );
-        assert_eq!(ancestral_payload_replacement(&g, NodeId::new(9), &halt), g);
-    }
-
     #[test]
     fn repeated_route_sets_and_visit_absence_do_not_establish_input_variation() {
         let id = NodeId::new(0);
@@ -1224,9 +1187,6 @@ mod tests {
             prop_assert!(executed.is_subset(&reachable));
             prop_assert_eq!(executed.len(), r.executed_node_count);
 
-            for original in &g.nodes {
-                prop_assert_eq!(ancestral_payload_replacement(&g, original.node_id, &original.backend_def), g.clone());
-            }
             let bypass = static_successor_bypass(&g, NodeId::new(removed));
             prop_assert!(!bypass.nodes.iter().any(|n| n.node_id == NodeId::new(removed)));
             for original in &g.nodes {

@@ -207,7 +207,8 @@ that moves, or a lab test or slow-tier lab run failing, would show it wrong.
 - [x] Invariant 4: the grep -> empty (command and output in the readings).
 - [x] Invariant 5: `grep -rn "GraphMutator::apply(" crates` -> empty.
 - [x] Invariant 2: the two comparator digests on `ac3747005` and on the
-      final code, equal (commands and digests in the readings);
+      final code after self-review, equal (commands and digests in the
+      readings);
       `cargo test -p v3-lab` -> pass with the existing comparator tests'
       assertions unchanged.
 - [x] Invariant 6: `cargo test -p v3-cli` -> pass, the artifact reader's

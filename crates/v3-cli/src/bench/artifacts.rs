@@ -14,7 +14,7 @@ pub const SUMMARY_KIND: &str = "petri-benchmark-summary";
 pub const SUMMARY_VERSION: u32 = 2;
 /// The retired detailed summary, read only by `--from-summary-v1`.
 pub const SUMMARY_V1_VERSION: u32 = 1;
-pub const MAX_CLAIMS: usize = 16;
+pub const MAX_CLAIMS: usize = 8;
 pub const MAX_PERSISTENCE_CHECKPOINTS: usize = 21;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -522,9 +522,7 @@ pub fn summarize_v1(
         claims: claims(&source),
         omitted_details: [
             "full genomes and genome deltas",
-            "per-proposal rows",
             "scene, signature, route and state traces",
-            "replay paths",
             "per-genome neighborhood rows (pooled readings retained)",
             "persistence checkpoints beyond 21 evenly spaced source indices",
         ]
@@ -1128,24 +1126,12 @@ pub fn output_paths(
     raw: Option<&Path>,
     summary: Option<&Path>,
 ) -> Result<OutputPaths, String> {
+    // The raw file is `<profile>.json`, the summary `<feature><suffix>.json`.
     let suffix = if profile == "gate" {
         String::new()
     } else {
         format!("-{profile}")
     };
-    output_paths_with_suffix(cwd, profile, &suffix, feature, raw, summary)
-}
-
-/// [`output_paths`] with the summary file's suffix chosen by the caller:
-/// the raw file is `<profile>.json`, the summary `<feature><suffix>.json`.
-pub fn output_paths_with_suffix(
-    cwd: &Path,
-    profile: &str,
-    suffix: &str,
-    feature: Option<&str>,
-    raw: Option<&Path>,
-    summary: Option<&Path>,
-) -> Result<OutputPaths, String> {
     if let Some(feature) = feature {
         if feature.is_empty()
             || !feature
