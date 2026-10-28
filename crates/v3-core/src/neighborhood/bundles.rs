@@ -14,16 +14,19 @@ use std::collections::BTreeMap;
 use crate::contracts::votes::{DirectedVoteKind, VoteSink};
 use crate::genome::cgp::{BundleId, Wiring};
 use crate::genome::{BackendDef, CreatureGenome};
-use crate::mutation::types::wiring_index;
+use crate::mutation::types::{wiring_index, WIRING_KEYS};
 use crate::neighborhood::PATH_WEIGHT_FLOOR;
 use crate::runtime::plasticity::LearnedState;
 
 /// The wirings, indexed by [`wiring_index`]: `Plain`, `Ring`,
 /// `DirectionPair`.
-pub const WIRING_COUNT: usize = 3;
+pub const WIRING_COUNT: usize = WIRING_KEYS.len();
 
 /// [`wiring_index`] of a `Ring` wiring.
-pub const RING: usize = 1;
+pub const RING: usize = wiring_index(&Wiring::Ring {
+    kind: DirectedVoteKind::Move,
+    offset: 0,
+});
 
 /// One wiring's totals.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
