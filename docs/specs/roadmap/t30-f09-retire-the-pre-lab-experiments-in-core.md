@@ -25,11 +25,9 @@ changes.
   Benefit and Retention rungs) already routes the questions the two
   experiments asked.
 - `neighborhood/recruitment.rs` and `neighborhood/recruitment/` (T13.F01's
-  module-recruitment census, read by the drift walk into `drift-depth-v3`'s
-  `recruitment` and `opportunities` blocks, with `RECRUITMENT_VERSION`,
-  `MODULE_IDENTITY` and `PROVENANCE_RULE`), `neighborhood/input_use/`
-  (T20.F01's input-use census, read by `bench/input_use.rs` and the lab's
-  readings) and `neighborhood/drift.rs` stay as they are.
+  module-recruitment census, the drift walk's `recruitment` and
+  `opportunities` blocks), `neighborhood/input_use/` (T20.F01's input-use
+  census) and `neighborhood/drift.rs` stay as they are.
 - The Graph's tolerance of partial sink catalogs (`insert_member`'s
   `expect`, `can_add_edge`, `RetargetBundle`'s skip orders): T30.F12.
 - The VM and Topology test-only samplers (`WORKAROUND(T25.F08)`): T30.F05.
@@ -52,11 +50,9 @@ Inputs:
   library.
 - The T25.F11 accept this row pays: `WORKAROUND(T25.F11)` at
   `neighborhood/recruitment_paths/mod.rs:1`.
-- `docs/workflow.md`'s slow-tests row and the `rust-test-slow` and
-  `rust-test-temporal-fixtures` Makefile targets.
+- `docs/workflow.md`'s slow-tests row and the Makefile's test targets.
 - The code inventory on `ac3747005` in the
-  [readings](../../progress/readings/t30-f09.md) ("Code sites read at
-  planning").
+  [readings](../../progress/readings/t30-f09.md).
 
 Invariants:
 
@@ -92,8 +88,7 @@ Invariants:
 7. The slow tier's lab half is unchanged: the six `lab_run` tests the
    Makefile names run under `make rust-test-slow`, and nothing else does.
 8. No test is deleted other than tests of deleted code; a test whose subject
-   survives (the shim's test callers, the artifact reader's other paths)
-   is kept and retargeted.
+   survives is kept and retargeted.
 
 ## Architecture
 
@@ -150,9 +145,11 @@ that moves, or a lab test or slow-tier lab run failing, would show it wrong.
       working tree); the same step on the final code must print the same.
 - [x] Lab: add `crates/v3-lab/src/controllers.rs` with the controller
       construction moved from `neighborhood/opportunity/controllers.rs`
-      (`Family` with `reference()`, the constants, `AuthoredStructure`,
-      `controller`), dropping the assay-only helpers (`Family::ALL`,
-      `index`, `as_key`, `authored_sub_indices`, `authored_channels`). One
+      (`Family` with `reference()`, the constants with `RING_MOVES`,
+      `AuthoredStructure`, `controller`), dropping the assay-only parts
+      (`Family::ALL`, `index`, `as_key`, `authored_sub_indices`,
+      `authored_channels`, the inert `Z_k` scale and derives nothing in
+      the lab uses). One
       operation appends a family's reference at the vote node's next index
       and wires its structure reading that index; `controller()` (asserting
       the founder's seven references) and `comparator::barrier_comparator`
@@ -170,16 +167,19 @@ that moves, or a lab test or slow-tier lab run failing, would show it wrong.
       `pub mod` lines, the `Recruitment` and `InputOpportunity` arms, args
       and runners in `main.rs`, and the `measure` module's `AssayReadings`,
       `assay_end`, `read_summary`, `recruitment*` and `opportunity*`
-      functions with `measure/tests.rs`; the command doc comment lists the
-      surviving commands.
+      functions with `measure/tests.rs`, and the two commands' tests in
+      `tests/cli.rs` and `tests/telemetry/measurement.rs`; the command doc
+      comment lists the surviving commands.
 - [x] Bench: delete `ProfileParams.recruitment` and every `Sizes` use,
       `GoalIndicators.recruitment_paths`, `undefined_recruitment_paths`,
       `timed_recruitment_paths`, the `recruitment_paths_wall_clock_ms`
       fields of `RunTimings` and the environment block, the artifact
       projection (`constructed_stage`, `recruitment_summary`, the
-      `recruitment_paths` branch, its eight `claims` pointers, its
-      omitted-paths entry and the `wall_caps.recruitment_seconds_per_report`
-      field of `measurement_evidence`) and the tests of those paths in
+      `recruitment_paths` branch, its eight `claims` pointers with
+      `MAX_CLAIMS` set to the eight that remain, the static
+      `omitted_details` notes "per-proposal rows" and "replay paths", and
+      the `wall_caps.recruitment_seconds_per_report` field of
+      `measurement_evidence`) and the tests of those paths in
       `run/tests.rs` and `tests/bench_artifacts.rs`.
 - [x] Telemetry: `MeasurementStart.command`'s doc lists the surviving
       commands; `MeasurementStart.pilot`, `MeasurementEnd.stop_reason`,
@@ -197,7 +197,8 @@ that moves, or a lab test or slow-tier lab run failing, would show it wrong.
       gains a T30.F09 `counter_definition_changes` entry for
       `recruitment_paths` and `recruitment_paths_wall_clock_ms` (before: the
       `recruitment-paths-v3` goal-only block; after: absent; comparison: no
-      like-for-like, past goal summaries keep the block as history).
+      like-for-like; past full reports keep the block and past summaries
+      its wall clock, claims and omitted-path entry, as history).
 - [ ] Gate profile, `make rust-test-slow` and `make check` on the final
       code; readings and summary recorded.
 
