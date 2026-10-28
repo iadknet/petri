@@ -224,7 +224,7 @@
       "counter": "ring_rules (ring-rules-v2 -> ring-rules-v3)",
       "before": "ring-rules-v2: ring_group_* fields (carriers, groups, nonzero, unreachable, members, row format and rows); path (ii) took a bus hop only through an UpstreamSlot(j) read",
       "after": "ring-rules-v3: the same fields renamed ring_bundle_* over Ring bundles; path (ii) also takes the hop through an UpstreamBus read of field j as bus slot j",
-      "comparison": "ring_bundle_* counts are like-for-like with ring_group_* under the rename; direction_general and the rule rows gain UpstreamBus bus-hop paths, so they are not like-for-like where a population routes ring channels through the bus"
+      "comparison": "ring_bundle_* counts are like-for-like with ring_group_* under the rename; direction_general and the rule rows gain UpstreamBus bus-hop paths, so they are not like-for-like where a population routes ring channels through the bus; T25.F11's committed goal summary carries the renamed ring_bundle_* fields under ring-rules-v2 and reads as v3 without the UpstreamBus hop"
     },
     {
       "feature": "T25.F11",
