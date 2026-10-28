@@ -36,7 +36,7 @@ behavior.
   - Goal: Offspring inherit and brains run exactly as before, with the genome a domain of its own beside the creature record rather than inside it, with no behavior change.
 - [x] **T30.F08 — A Creature's Genome and Its Derived State Agree** — Depends on: None
   - Goal: A creature's genome and everything computed from it at birth are set together by construction and cannot drift apart, so tests build the creature they need instead of swapping genomes and resyncing caches by hand, with no behavior change.
-- [ ] **T30.F09 — Retire the Pre-Lab Experiments in Core** — Depends on: None
+- [x] **T30.F09 — Retire the Pre-Lab Experiments in Core** — Depends on: None
   - Goal: The two capability experiments placed in `v3-core` before the T22 lab rule, recruitment paths (2026-09-12) and T20.F01's discovery and ecological-opportunity assay (2026-09-25), leave core together with their goal indicator, CLI commands and the recruitment half of the slow tier, and the lab's reachability assays answer their supply, discovery and retention questions, with no simulation behavior change.
 - [ ] **T30.F10 — One Operator Catalog** — Depends on: None
   - Goal: Offspring mutate exactly as before, with each mutation operator defined once and selected and dispatched by one engine path for every domain, so adding an operator edits one catalog, with no behavior change.

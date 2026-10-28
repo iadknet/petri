@@ -1,6 +1,6 @@
 # T30.F09 — Retire the Pre-Lab Experiments in Core
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-28
 **Feature**: T30.F09
 **Track**: [T30 — Core Boundaries](../../roadmaps/t30-core-boundaries.md)
@@ -198,7 +198,7 @@ that moves, or a lab test or slow-tier lab run failing, would show it wrong.
       `recruitment-paths-v3` goal-only block; after: absent; comparison: no
       like-for-like; past full reports keep the block and past summaries
       its wall clock, claims and omitted-path entry, as history).
-- [ ] Gate profile, `make rust-test-slow` and `make check` on the final
+- [x] Gate profile, `make rust-test-slow` and `make check` on the final
       code; readings and summary recorded.
 
 ## Verification
@@ -212,9 +212,9 @@ that moves, or a lab test or slow-tier lab run failing, would show it wrong.
       assertions unchanged.
 - [x] Invariant 6: `cargo test -p v3-cli` -> pass, the artifact reader's
       historical-report tests among them.
-- [ ] Invariant 7: `make rust-test-slow` -> exit 0 on the final code, lab
+- [x] Invariant 7: `make rust-test-slow` -> exit 0 on the final code, lab
       tests only.
-- [ ] Invariants 1, 3 and 8: `make check` -> exit 0; `make check-docs` ->
+- [x] Invariants 1, 3 and 8: `make check` -> exit 0; `make check-docs` ->
       exit 0.
 - [x] Gate profile and invariant 1: summary at
       `docs/progress/features/t30-f09.json`; a structural diff of the gate
@@ -247,15 +247,15 @@ the `deterministic` diff lists only `recruitment_paths`; bytes in readings.
 
 ## Success Criteria
 
-- [ ] Invariant 4's grep is empty: both experiments, their indicator, both
+- [x] Invariant 4's grep is empty: both experiments, their indicator, both
       commands and the recruitment slow-tier line are gone.
-- [ ] The lab builds its comparators from its own `controllers.rs` through
+- [x] The lab builds its comparators from its own `controllers.rs` through
       one Ring-wiring operation, and their genomes are unchanged
       (invariant 2's digests equal).
-- [ ] The gate's `deterministic` block equals the epoch's apart from the
+- [x] The gate's `deterministic` block equals the epoch's apart from the
       deleted `recruitment_paths` key; `make check`, `make rust-test-slow`
       and `make check-docs` exit 0 on the final code.
-- [ ] `docs/workflow.md`, `docs/benchmark-artifacts.md`, the four
+- [x] `docs/workflow.md`, `docs/benchmark-artifacts.md`, the four
       `docs/reference/` passages and `benchmark-series.json` describe the
       state after the change.
 
