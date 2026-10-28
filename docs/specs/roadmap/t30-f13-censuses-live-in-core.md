@@ -223,10 +223,10 @@ a different summary from the same full report would show it wrong.
       and the feature's build; `deterministic` and `omitted_details`
       equal; hashes in the readings (a report main's build cannot load is
       replaced by the newest stored one it can, and the readings say so).
-- [ ] Gate: summary at `docs/progress/features/t30-f13.json`, raw hash and
+- [x] Gate: summary at `docs/progress/features/t30-f13.json`, raw hash and
       bytes in the readings, series entry, no full report staged.
 
-Commands run on the feature head (2026-10-28), each exit 0: `cargo check
+Run on the feature head (2026-10-28), each exit 0: `cargo check
 --workspace --all-targets`; `cargo fmt --all --check`; `make rust-clippy`;
 `cargo test -p v3-core -p v3-cli -p v3-server -p v3-telemetry` (viability
 30 passed within it; no default or tick-loop change since the build, where
@@ -235,7 +235,7 @@ scripts/architecture-check.mjs`. `v3-cli bench-summarize` parity on both
 stored reports ran on the build at `aa3cc6402` (readings); the later commits
 change converter code only by moving the keep-list derivation into
 `bench/artifacts/sample_retention.rs`, whose pinned retention-table test is
-unchanged and passes. Every pin literal is unchanged. `make check` and the gate are not yet run.
+unchanged and passes. Every pin literal is unchanged. `make check` is not yet run.
 
 ## Performance and Goal Impact
 
@@ -256,7 +256,18 @@ severe; expected inside the flag threshold, a change there being
 observation cost within run-to-run noise. A counter off
 0%, or a deterministic block that differs, is a defect, not a cost.
 
-**Measured verdict.** Pending.
+**Measured verdict.** Predeclaration holds.
+
+| Item | Value |
+| --- | --- |
+| Command | `make bench PROFILE=gate FEATURE=t30-f13` at `8495a79ae`, `dirty=false` |
+| Outer `make` exit | 0 (shell exit status) |
+| CLI exit | 0 (`measurement_evidence.cli_exit`) |
+| `severe` | false |
+| Threshold verdict | all 9 work counters `ok` at standard thresholds (flag 10%, severe 50%), 0.000000% against `t25-f11.json`; wall clock per creature tick `ok` (-51.2%, same-host label, never severe) |
+| Deterministic block vs epoch | identical (parsed `deterministic` objects equal) |
+| Raw report | `<main-checkout>/.bench-artifacts/t30-f13/gate.json`, 161,619 bytes, SHA-256 `3e899bb26a84ee4d786fe78f7b49c8f7f2fc67dd23158a695123f699f17dc91b` |
+| Summary | `docs/progress/features/t30-f13.json`, 37,510 bytes; series entry appended; no full report staged |
 
 - Summary of the declared profile: [gate](../../progress/features/t30-f13.json).
 - Full readings: [`docs/progress/readings/t30-f13.md`](../../progress/readings/t30-f13.md).
