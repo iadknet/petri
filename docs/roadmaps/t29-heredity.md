@@ -68,14 +68,25 @@ user decisions and review:
   (surface and position) is valid for one graph revision, a learnable
   identity while structural correspondence holds, a runtime slot only
   inside one compiled layout; inspectors read resolved views.
+  F01 also makes `NodeGenome`'s `input_refs` and `backend_def` private
+  (`genome/mod.rs:255-261`), so every write goes through the node's edit
+  operations: seeding's bench-only `inject_extended_perception_input`
+  (`simulation/seeding.rs:140-158`), which overwrites `input_refs[0]`
+  (`FoodHere`, width 1) with `AreaFoodSummary` (width 7), builds its node
+  with those declarations and the existing backend through the node's
+  construction API instead (mutation's `swap` keeps its same-kind,
+  same-width rule), and the whole-backend replacements in
+  `mutation::topology::structural` become the edit operations above (user,
+  2026-10-27, from a post-closure refactor audit of T25.F11's areas).
   The preservation cases are today's seed behavior: a source change or a
   weight or scale write invalidates a seed; detach falls back to genomic
   values when a seed is absent; topology copies clone whole backends; and
   `apply_gated` rolls back genome and seeds together, so mappings compose
-  across committed edits and vanish with a rejected one. Edits returning
-  their effects retire the `WORKAROUND(T25.F08)` group-edit tallies in
-  `mutation/engine/mod.rs` (the operator-kind list and the before/after
-  scans go; required, 2026-10-25 architecture review);
+  across committed edits and vanish with a rejected one. Graph edits
+  already report their bundle effects (`BundleEdits`, `9b6d452e6` deleted
+  the T25.F08 group-edit tallies), and T30.F11 removes the remaining
+  added-node scans; F01's edits return their inheritance mappings beside
+  those reports;
   finalization builds the child's derived state through the one creature
   constructor T30.F08 left (`7fc60133f` removed the unchanged-genome cache
   reuse; no birth reintroduces it), and owns resets of per-life state,

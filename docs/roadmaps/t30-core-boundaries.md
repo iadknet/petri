@@ -38,6 +38,12 @@ behavior.
   - Goal: A creature's genome and everything computed from it at birth are set together by construction and cannot drift apart, so tests build the creature they need instead of swapping genomes and resyncing caches by hand, with no behavior change.
 - [ ] **T30.F09 — Retire the Pre-Lab Experiments in Core** — Depends on: None
   - Goal: The two capability experiments placed in `v3-core` before the T22 lab rule, recruitment paths (2026-09-12) and T20.F01's discovery and ecological-opportunity assay (2026-09-25), leave core together with their goal indicator, CLI commands and the recruitment half of the slow tier, and the lab's reachability assays answer their supply, discovery and retention questions, with no simulation behavior change.
+- [ ] **T30.F10 — One Operator Catalog** — Depends on: None
+  - Goal: Offspring mutate exactly as before, with each mutation operator defined once and selected and dispatched by one engine path for every domain, so adding an operator edits one catalog, with no behavior change.
+- [ ] **T30.F11 — Operators Report Their Own Edits** — Depends on: None
+  - Goal: Offspring mutate exactly as before, with every Graph edit reporting what it changed and keeping its own container rules, so the engine never infers an edit by comparing genome copies, with no behavior change.
+- [ ] **T30.F12 — The Sink Catalog Is Whole** — Depends on: T30.F09
+  - Goal: Every Graph node carries the full vote and parameter sink catalog by validation, not by convention, so no edit or reader handles a partial catalog, with no behavior change.
 
 ## Notes for AI Agents
 
@@ -118,7 +124,15 @@ behavior.
   (`WORKAROUND(T25.F08)`, T25.F11's unpaid accept), so their distribution
   tests draw through the engine's sampler over the enabled catalog (user,
   2026-10-27: "Add the VM/Topology test-only sampler cleanup to T30.F05's
-  scope").
+  scope"). When the gate moves into the genome, it carries
+  `apply_gated`'s graph-validation and rollback contract
+  (`mutation/engine/mod.rs:581-607`; the T25 design note requires the check
+  after every event in every domain), and F05 removes only the checks shown
+  redundant because an owner edit in `genome/node_edit.rs` already enforces
+  them before writing; operators that rely on the restore
+  (`add_bundle`/`add_sensor` errors and `RetargetBundle`'s skip mapped
+  after their draws) keep their draws in order (user, 2026-10-27, from the
+  same audit).
 - F06 moves the per-action executors, action energy flooring and the
   removals actions cause from `simulation/tick.rs` into mechanics with
   narrow inputs (no whole `Simulation`), composes action costs there with
@@ -208,10 +222,62 @@ behavior.
   `counter_definition_changes`. Past readings stay as history. The goal
   summary's shape changes; simulation trajectories do not
   ([F09 design review](../progress/readings/t30-f09-design-review.md)).
+  F09 also deletes `GraphMutator::apply`'s default-`SensorContext` shim
+  (`mutation/graph/mod.rs:290-310`), whose only non-test caller is
+  `recruitment_paths/qualification.rs:81`.
+- F10, F11 and F12 were added on 2026-10-27 at the user's direction from a
+  post-closure refactor audit of the areas T25.F11 rebuilt: "Draft rows A,
+  B and C in T30, the T30.F05/T29.F01 note lines and the F09 shim note".
+  Each is behavior-preserving in the T25.F01 shape: any pin that moves is a
+  defect, and a finding that a skip path fires on production genomes (so
+  removing it would move draws) is a blocker for the user.
+- F10: each operator is defined once. Today every operator is defined in
+  its domain enum and again in the flat `MutationOperator`
+  (`mutation/types/mod.rs:239-620`), mapped by three free functions
+  (`topology_operator_key`, `vm_operator_key`, `input_ref_operator_key` in
+  `mutation/engine/mod.rs:688-750`) and a Graph method, and the engine's
+  `apply_mutations_on_units` (`mutation/engine/mod.rs:120-370`, carrying
+  the area's only `too_many_lines` allowance) repeats selection and
+  dispatch once per domain. `MutationOperator` becomes a nested enum
+  (`Graph(GraphOperator)`, …) from which domain and key derive, and one
+  generic selection and dispatch serves every domain with its draws in
+  today's order. T25.F12 adds report fields to this path, so F10 is ordered
+  before it.
+- F11: every Graph edit reports what it changed. The engine infers the node
+  an operator added by diffing whole genome clones (`tracked_before`,
+  `operator_requires_added_node_input_tracking`,
+  `collect_added_node_input_classes`, `collect_added_node_world_inputs_for_operator`
+  in `mutation/engine/mod.rs:198-575`) for TopologyAddNode,
+  TopologySpliceNode and GraphAddInternalGraphNode, on top of
+  `apply_gated`'s own snapshot; T25.F11 removed the same pattern for
+  bundles. Each operator returns the node it added. Also in F11: the five
+  wrappers built on `graph_def_mut_with_input_refs`
+  (`mutation/graph/operators.rs:36-47`), which clone `input_refs` per event
+  to avoid a borrow, use the split borrow `mutation/graph/bundle.rs` already
+  has; `EdgeMut::set_source` (`genome/cgp/container.rs:292-303`), which
+  relies on three callers detaching a member first, gains one container
+  retarget operation that detaches itself, and `split_edge`
+  (`genome/cgp/container.rs:1031`), whose caller `split_existing_edge`
+  detaches first and which writes the source directly, becomes an
+  owner-complete split that detaches and returns its effects, with split's
+  weight, seed and draw behavior unchanged; and `insert_member`'s per-member
+  position scan, which makes building a wide bundle quadratic, becomes
+  linear.
+- F12: the sink catalog is validated. `with_output_sinks`
+  (`genome/cgp/container.rs:534-541`) accepts any list and neither
+  `validate_graph` nor parseability checks it, so `hosts`/`hosts_kind`, the
+  present-sink filter in `plans`, `Option`-returning `sink`/`site_sink`,
+  `insert_member`'s `expect`, `can_add_edge` and `RetargetBundle`'s two skip
+  orders all handle partial catalogs production never builds. Validation
+  requires the full catalog, sinks are found by index, and that hosting
+  layer is deleted. F12 follows F09, which deletes the only non-test
+  builder of a partial catalog (`recruitment_paths/fixtures.rs:535`).
 - The master order puts F03 first (user, 2026-10-25), F01 and F07 before
   T25.F11, F08 after F07 (assistant proposal), F02 and F06 before T28, and
   F09 after F06 (assistant proposal), as preferences, not prerequisites.
   F09 is also a dependency of T27.F02 and T28.F01, like T29.F03 and
-  T30.F05 (user, 2026-10-27).
+  T30.F05 (user, 2026-10-27). F10 precedes T25.F12 as a dependency
+  (assistant proposal the user accepted with the row); F11 and F12 follow
+  F09 (assistant proposal).
 - Verification (assistant proposal): each row gate with pins unchanged; F01
   adds the frontend's own tests and the type-parity test.
