@@ -1442,6 +1442,23 @@ fn output_defaults_resolve_main_and_linked_checkouts_with_spaces() {
     .is_ok());
 }
 
+/// Integer-keyed maps serialize with string keys; the goal reader must parse
+/// them back inside `Indicator::Defined`, which the buffered
+/// `#[serde(untagged)]` derive could not.
+#[test]
+fn goal_reader_reads_back_integer_keyed_maps_inside_a_defined_indicator() {
+    #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+    struct Reading {
+        retained_at: std::collections::BTreeMap<u32, u64>,
+    }
+    let written = bench::Indicator::Defined(Reading {
+        retained_at: [(16, 2), (64, 1)].into(),
+    });
+    let text = serde_json::to_string(&written).unwrap();
+    let read: bench::Indicator<Reading> = serde_json::from_str(&text).unwrap();
+    assert_eq!(read, written);
+}
+
 #[test]
 fn goal_reader_keeps_bare_strings_undefined() {
     let indicator: bench::Indicator<bench::DriftDepth> =
