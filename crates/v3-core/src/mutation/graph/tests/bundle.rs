@@ -21,6 +21,7 @@ use crate::genome::{
 use crate::mutation::graph::{bundle, GraphMutator, GraphOperator};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
 use crate::mutation::types::{ComplexityEffect, MutationSkipReason};
+use crate::mutation::MutationOperator;
 
 const BUNDLE_OPERATORS: [GraphOperator; 6] = [
     GraphOperator::AddBundleLive,
@@ -205,7 +206,7 @@ fn the_catalog_places_the_bundle_operators_at_their_tiers() {
         "the Graph catalog's weight (T25.F11 invariant 7)"
     );
     assert_eq!(
-        BUNDLE_OPERATORS.map(|op| op.operator().as_key()),
+        BUNDLE_OPERATORS.map(|op| MutationOperator::from(op).as_key()),
         [
             "Graph.AddBundleLive",
             "Graph.AddBundleSilent",
@@ -235,7 +236,7 @@ fn the_catalog_places_the_bundle_operators_at_their_tiers() {
     for op in BUNDLE_OPERATORS {
         assert_eq!(
             op.complexity_effect(),
-            op.operator().complexity_effect(),
+            MutationOperator::from(op).complexity_effect(),
             "{op:?}"
         );
     }

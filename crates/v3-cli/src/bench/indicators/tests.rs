@@ -2,6 +2,8 @@ use super::*;
 use crate::bench::tests::small_profile;
 use proptest::prelude::*;
 use v3_core::contracts::{Direction, WorldAction};
+use v3_core::mutation::graph::GraphOperator;
+use v3_core::mutation::topology::TopologyOperator;
 use v3_core::simulation::seed_simulation;
 
 fn companion_population() -> [v3_core::genome::CreatureGenome; 3] {
@@ -165,16 +167,22 @@ fn drift_checkpoint_reports_recruitment_and_opportunities_and_still_loads_older_
     // splits therefore differ: two operators were discarded, one event
     // exhausted its domain.
     let mut summary = MutationSummary::zero();
-    summary.record_attempt(MutationDomain::Topology, MutationOperator::TopologyAddNode);
-    summary.record_applied(MutationDomain::Topology, MutationOperator::TopologyAddNode);
+    summary.record_attempt(
+        MutationDomain::Topology,
+        MutationOperator::Topology(TopologyOperator::AddNode),
+    );
+    summary.record_applied(
+        MutationDomain::Topology,
+        MutationOperator::Topology(TopologyOperator::AddNode),
+    );
     summary.record_reachability(TargetReachability::Reachable);
     summary.record_event(MutationEventRecord {
         domain: MutationDomain::Topology,
-        operator: Some(MutationOperator::TopologyAddNode),
+        operator: Some(MutationOperator::Topology(TopologyOperator::AddNode)),
         target: Some(founder.nodes[0].node_id),
         outcome: MutationEventOutcome::Applied(TargetReachability::Reachable),
         discarded: vec![(
-            MutationOperator::TopologyRemoveRouteTarget,
+            MutationOperator::Topology(TopologyOperator::RemoveRouteTarget),
             Some(founder.nodes[0].node_id),
         )],
     });
@@ -188,7 +196,7 @@ fn drift_checkpoint_reports_recruitment_and_opportunities_and_still_loads_older_
         target: Some(founder.nodes[0].node_id),
         outcome: MutationEventOutcome::Skipped(MutationSkipReason::NoApplicableTarget),
         discarded: vec![(
-            MutationOperator::GraphAddGraphEdge,
+            MutationOperator::Graph(GraphOperator::AddGraphEdge),
             Some(founder.nodes[0].node_id),
         )],
     });

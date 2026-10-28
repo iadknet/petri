@@ -5,18 +5,18 @@ use rand::Rng;
 use crate::config::MutationConfig;
 use crate::contracts::{NodeId, SensorContext};
 use crate::creature::parseability::ParseabilityGate;
-use crate::genome::cgp::{validate_graph, Scope};
+use crate::genome::cgp::validate_graph;
 use crate::genome::{BackendDef, CreatureGenome};
 use crate::mutation::graph::{GraphMutator, GraphOperator};
-use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
+use crate::mutation::input_ref::InputRefMutator;
 use crate::mutation::pressure;
-use crate::mutation::reachability::{BirthMembership, ParentExecuted, TargetSelector};
+use crate::mutation::reachability::{BirthMembership, ParentExecuted, TargetSelector, TargetSets};
 use crate::mutation::topology::{TopologyMutator, TopologyOperator};
 use crate::mutation::types::{
-    BirthEdgeClass, BundleEdits, MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
+    EventReport, MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
     MutationEventRecord, MutationOperator, MutationSkipReason, MutationSummary, TargetReachability,
 };
-use crate::mutation::vm::{VmMutator, VmOperator};
+use crate::mutation::vm::VmMutator;
 
 /// Draw requested supply from normalized config, independently of operator success.
 ///
@@ -29,10 +29,6 @@ fn requested_event_count(config: &MutationConfig, units: u32, rng: &mut impl Rng
         .sum()
 }
 
-/// An event's reachability and, for `AddGraphEdge` and `InputRef.Add`, the
-/// class of the vote-sink edge it pushed (T11.F30).
-type ClassifiedResult = Result<(TargetReachability, Option<BirthEdgeClass>), MutationSkipReason>;
-
 /// What one attempted mutation event produced, once an operator of the drawn
 /// domain accepted the attempt.
 struct SelectedEvent {
@@ -41,19 +37,75 @@ struct SelectedEvent {
     // whole-genome clone taken before the event (at each domain's draw) and
     // diffed after it.
     tracked_before: Option<CreatureGenome>,
-    /// The reachability and, for `AddGraphEdge` and `InputRef.Add`, the class
-    /// of the vote-sink edge the event pushed (T11.F30).
-    result: ClassifiedResult,
-    /// What the event did to bundles, reported by the operator and counted when it
-    /// commits (T25.F03); zero outside the Graph domain.
-    bundle_edits: BundleEdits,
-    /// The scope an attribute operator's change landed on, when it commits
-    /// (T25.F08).
-    attribute_scope: Option<Scope>,
+    /// The reachability and what the event reported (vote-sink class, bundle
+    /// edits, attribute scope), counted only when it commits (T25.F03).
+    result: Result<(TargetReachability, EventReport), MutationSkipReason>,
     executed_hits: u32,
     /// The index this event's kept selector first returned, into the genome as
     /// it stood before the event (T13.F01).
     first_pick: Option<usize>,
+}
+
+/// What every event of one birth selects and applies under: the run's
+/// configuration and sensor context and the birth's size-pressure state.
+struct BirthDraw<'a> {
+    config: &'a MutationConfig,
+    context: &'a SensorContext,
+    restricted: bool,
+    executed_bias: f64,
+}
+
+impl BirthDraw<'_> {
+    /// Select an operator of `domain` by weight and apply it through the
+    /// gate, discarding each operator that reports no applicable site (with
+    /// the node its selector first picked, T13.F01) and drawing again among
+    /// the rest. `None` when every operator of the domain was discarded.
+    fn select_and_apply(
+        &self,
+        domain: MutationDomain,
+        genome: &mut CreatureGenome,
+        sets: &TargetSets<'_>,
+        node_ids: &[NodeId],
+        discarded: &mut Vec<(MutationOperator, Option<NodeId>)>,
+        rng: &mut impl Rng,
+    ) -> Option<SelectedEvent> {
+        let config = self.config;
+        let mut available: Vec<MutationOperator> = domain
+            .catalog()
+            .iter()
+            .copied()
+            .filter(|op| !self.restricted || op.complexity_effect().is_decreasing())
+            .filter(|op| op.weight(config) > 0)
+            .collect();
+        let bias = pressure_adjusted_bias(
+            domain.reachable_bias(&config.reachable_bias),
+            self.restricted,
+        );
+        while !available.is_empty() {
+            let idx = select_weighted_index(&available, |op| op.weight(config), rng);
+            let operator = available[idx];
+            let tracked_before =
+                operator_requires_added_node_input_tracking(operator).then(|| genome.clone());
+            let mut targets = sets.selector(bias, self.executed_bias);
+            let result = apply_event(genome, operator, &mut targets, rng, config, self.context);
+            if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
+                discarded.push((
+                    operator,
+                    targets.first_pick().and_then(|i| node_ids.get(i).copied()),
+                ));
+                available.swap_remove(idx);
+                continue;
+            }
+            return Some(SelectedEvent {
+                operator,
+                tracked_before,
+                result,
+                executed_hits: targets.executed_hits(),
+                first_pick: targets.first_pick(),
+            });
+        }
+        None
+    }
 }
 
 /// Orchestrates genome mutation events for offspring.
@@ -120,11 +172,6 @@ impl MutationEngine {
     /// indices. Every target draw sees them through [`BirthMembership`]: a
     /// child node counts as a member only when the parent carried it, however
     /// earlier events of this birth removed or added nodes (T11.F24).
-    #[allow(
-        clippy::too_many_lines,
-        reason = "one match arm per mutation event kind; splitting it would spread \
-                  the operator dispatch table across several functions"
-    )]
     pub fn apply_mutations_on_units(
         genome: &mut CreatureGenome,
         units: u32,
@@ -148,10 +195,15 @@ impl MutationEngine {
         // off, so the inverted reachable bias prunes unreachable structure
         // first and the executed core is never targeted for removal.
         let executed = parent_executed.resolve(config.executed_window_ticks);
-        let executed_bias = if restricted {
-            0.0
-        } else {
-            config.executed_bias
+        let draw = BirthDraw {
+            config,
+            context,
+            restricted,
+            executed_bias: if restricted {
+                0.0
+            } else {
+                config.executed_bias
+            },
         };
         // The parent's sets are the targeting policy (T11.F17); which current
         // child nodes are their members follows the birth's removals and
@@ -170,211 +222,32 @@ impl MutationEngine {
         for _ in 0..event_count {
             node_ids.clear();
             node_ids.extend(genome.nodes.iter().map(|node| node.node_id));
-            let sets = membership.sets();
-            let selector = |domain_bias: f64| {
-                sets.selector(
-                    pressure_adjusted_bias(domain_bias, restricted),
-                    executed_bias,
-                )
-            };
             // Every operator this event tried and threw away for reporting no
             // applicable site, with the node it first selected (T13.F01).
             let mut discarded: Vec<(MutationOperator, Option<NodeId>)> = Vec::new();
-            // Two-layer dispatch: mesh (Topology) vs node-internal (VM/Graph/InputRef).
-            let rb = &config.reachable_bias;
-            let (domain, selected) = if rng.gen_bool(config.mesh_layer_probability) {
-                // Layer 1: Mesh (Topology)
-                let mut available: Vec<TopologyOperator> = TopologyOperator::ALL
-                    .iter()
-                    .copied()
-                    .filter(|op| !restricted || op.complexity_effect().is_decreasing())
-                    .filter(|op| op.tuned_weight(config.large_copy_weight_percent) > 0)
-                    .collect();
-                let selected = loop {
-                    if available.is_empty() {
-                        break None;
-                    }
-                    let idx = select_weighted_index(
-                        &available,
-                        |op| op.tuned_weight(config.large_copy_weight_percent),
-                        rng,
-                    );
-                    let op = available[idx];
-                    let operator = topology_operator_key(op);
-                    let tracked_before = if operator_requires_added_node_input_tracking(operator) {
-                        Some(genome.clone())
-                    } else {
-                        None
-                    };
-                    let mut targets = selector(rb.topology);
-                    let result =
-                        apply_topology_event(genome, op, &mut targets, rng, config, context)
-                            .map(|reachability| (reachability, None));
-                    if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
-                        discarded.push((
-                            operator,
-                            targets.first_pick().and_then(|i| node_ids.get(i).copied()),
-                        ));
-                        available.swap_remove(idx);
-                        continue;
-                    }
-                    break Some(SelectedEvent {
-                        operator,
-                        tracked_before,
-                        result,
-                        bundle_edits: BundleEdits::default(),
-                        attribute_scope: None,
-                        executed_hits: targets.executed_hits(),
-                        first_pick: targets.first_pick(),
-                    });
-                };
-                (MutationDomain::Topology, selected)
+            // Two-layer dispatch: mesh (Topology) vs node-internal (VM, Graph,
+            // InputRef at equal probability).
+            let domain = if rng.gen_bool(config.mesh_layer_probability) {
+                MutationDomain::Topology
             } else {
-                // Layer 2: Node-internal (VM, Graph, InputRef — equal probability)
                 match rng.gen_range(0u8..3) {
-                    0 => {
-                        let mut available: Vec<VmOperator> = VmOperator::ALL
-                            .iter()
-                            .copied()
-                            .filter(|op| !restricted || op.complexity_effect().is_decreasing())
-                            .collect();
-                        let selected = loop {
-                            if available.is_empty() {
-                                break None;
-                            }
-                            let idx =
-                                select_weighted_index(&available, |op| op.weight() as u16, rng);
-                            let op = available[idx];
-                            let operator = vm_operator_key(op);
-                            let tracked_before =
-                                if operator_requires_added_node_input_tracking(operator) {
-                                    Some(genome.clone())
-                                } else {
-                                    None
-                                };
-                            let mut targets = selector(rb.vm);
-                            let result = apply_vm_event(genome, op, &mut targets, rng, config)
-                                .map(|reachability| (reachability, None));
-                            if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
-                                discarded.push((
-                                    operator,
-                                    targets.first_pick().and_then(|i| node_ids.get(i).copied()),
-                                ));
-                                available.swap_remove(idx);
-                                continue;
-                            }
-                            break Some(SelectedEvent {
-                                operator,
-                                tracked_before,
-                                result,
-                                bundle_edits: BundleEdits::default(),
-                                attribute_scope: None,
-                                executed_hits: targets.executed_hits(),
-                                first_pick: targets.first_pick(),
-                            });
-                        };
-                        (MutationDomain::Vm, selected)
-                    }
-                    1 => {
-                        let mut available: Vec<GraphOperator> = GraphOperator::ALL
-                            .iter()
-                            .copied()
-                            .filter(|op| !restricted || op.complexity_effect().is_decreasing())
-                            .collect();
-                        let selected = loop {
-                            if available.is_empty() {
-                                break None;
-                            }
-                            let idx =
-                                select_weighted_index(&available, |op| op.weight() as u16, rng);
-                            let op = available[idx];
-                            let operator = op.operator();
-                            let tracked_before =
-                                if operator_requires_added_node_input_tracking(operator) {
-                                    Some(genome.clone())
-                                } else {
-                                    None
-                                };
-                            let mut targets = selector(rb.graph);
-                            let (result, bundle_edits, attribute_scope) =
-                                apply_graph_event(genome, op, &mut targets, rng, config, context);
-                            if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
-                                discarded.push((
-                                    operator,
-                                    targets.first_pick().and_then(|i| node_ids.get(i).copied()),
-                                ));
-                                available.swap_remove(idx);
-                                continue;
-                            }
-                            break Some(SelectedEvent {
-                                operator,
-                                tracked_before,
-                                result,
-                                bundle_edits,
-                                attribute_scope,
-                                executed_hits: targets.executed_hits(),
-                                first_pick: targets.first_pick(),
-                            });
-                        };
-                        (MutationDomain::Graph, selected)
-                    }
-                    _ => {
-                        let mut available: Vec<InputRefOperator> = InputRefOperator::ALL
-                            .iter()
-                            .copied()
-                            .filter(|op| !restricted || op.complexity_effect().is_decreasing())
-                            .collect();
-                        let selected = loop {
-                            if available.is_empty() {
-                                break None;
-                            }
-                            let idx =
-                                select_weighted_index(&available, |op| op.weight() as u16, rng);
-                            let op = available[idx];
-                            let operator = input_ref_operator_key(op);
-                            let tracked_before =
-                                if operator_requires_added_node_input_tracking(operator) {
-                                    Some(genome.clone())
-                                } else {
-                                    None
-                                };
-                            let mut targets = selector(rb.input_ref);
-                            let (result, bundle_edits) = apply_input_ref_event(
-                                genome,
-                                op,
-                                &mut targets,
-                                rng,
-                                config,
-                                context,
-                            );
-                            if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
-                                discarded.push((
-                                    operator,
-                                    targets.first_pick().and_then(|i| node_ids.get(i).copied()),
-                                ));
-                                available.swap_remove(idx);
-                                continue;
-                            }
-                            break Some(SelectedEvent {
-                                operator,
-                                tracked_before,
-                                result,
-                                bundle_edits,
-                                attribute_scope: None,
-                                executed_hits: targets.executed_hits(),
-                                first_pick: targets.first_pick(),
-                            });
-                        };
-                        (MutationDomain::InputRef, selected)
-                    }
+                    0 => MutationDomain::Vm,
+                    1 => MutationDomain::Graph,
+                    _ => MutationDomain::InputRef,
                 }
             };
+            let selected = draw.select_and_apply(
+                domain,
+                genome,
+                &membership.sets(),
+                &node_ids,
+                &mut discarded,
+                rng,
+            );
             let Some(SelectedEvent {
                 operator,
                 tracked_before,
                 result,
-                bundle_edits,
-                attribute_scope,
                 executed_hits,
                 first_pick,
             }) = selected
@@ -407,13 +280,13 @@ impl MutationEngine {
             });
 
             match result {
-                Ok((reachability, edge_class)) => {
+                Ok((reachability, report)) => {
                     summary.record_applied(domain, operator);
-                    summary.record_bundle_edits(operator, bundle_edits);
-                    if let Some(scope) = attribute_scope {
+                    summary.record_bundle_edits(operator, report.bundle_edits);
+                    if let Some(scope) = report.attribute_scope {
                         summary.record_attribute_scope(scope);
                     }
-                    if let Some(class) = edge_class {
+                    if let Some(class) = report.class {
                         summary.record_vote_edge_class(class);
                     }
                     if let Some(before) = tracked_before.as_ref() {
@@ -454,9 +327,9 @@ fn pressure_adjusted_bias(base_bias: f64, restricted: bool) -> f64 {
 fn operator_requires_added_node_input_tracking(operator: MutationOperator) -> bool {
     matches!(
         operator,
-        MutationOperator::TopologyAddNode
-            | MutationOperator::TopologySpliceNode
-            | MutationOperator::GraphAddInternalGraphNode
+        MutationOperator::Topology(TopologyOperator::AddNode)
+            | MutationOperator::Topology(TopologyOperator::SpliceNode)
+            | MutationOperator::Graph(GraphOperator::AddInternalGraphNode)
     )
 }
 
@@ -494,7 +367,8 @@ fn collect_added_node_input_classes(
     operator: MutationOperator,
 ) -> Option<Vec<MutationAddedNodeInputClass>> {
     match operator {
-        MutationOperator::TopologyAddNode | MutationOperator::TopologySpliceNode => {
+        MutationOperator::Topology(TopologyOperator::AddNode)
+        | MutationOperator::Topology(TopologyOperator::SpliceNode) => {
             let before_ids: BTreeSet<_> = before.nodes.iter().map(|node| node.node_id).collect();
             let newborn = after
                 .nodes
@@ -502,7 +376,7 @@ fn collect_added_node_input_classes(
                 .find(|node| !before_ids.contains(&node.node_id))?;
             Some(classify_added_node_input_classes(&newborn.input_refs))
         }
-        MutationOperator::GraphAddInternalGraphNode => {
+        MutationOperator::Graph(GraphOperator::AddInternalGraphNode) => {
             let target = before.nodes.iter().zip(after.nodes.iter()).find_map(
                 |(before_node, after_node)| match (
                     &before_node.backend_def,
@@ -529,7 +403,8 @@ fn collect_added_node_world_inputs_for_operator(
     operator: MutationOperator,
 ) -> Option<Vec<crate::contracts::WorldInputKey>> {
     match operator {
-        MutationOperator::TopologyAddNode | MutationOperator::TopologySpliceNode => {
+        MutationOperator::Topology(TopologyOperator::AddNode)
+        | MutationOperator::Topology(TopologyOperator::SpliceNode) => {
             let before_ids: BTreeSet<_> = before.nodes.iter().map(|node| node.node_id).collect();
             let newborn = after
                 .nodes
@@ -537,7 +412,7 @@ fn collect_added_node_world_inputs_for_operator(
                 .find(|node| !before_ids.contains(&node.node_id))?;
             Some(collect_added_node_world_inputs(&newborn.input_refs))
         }
-        MutationOperator::GraphAddInternalGraphNode => {
+        MutationOperator::Graph(GraphOperator::AddInternalGraphNode) => {
             let target = before.nodes.iter().zip(after.nodes.iter()).find_map(
                 |(before_node, after_node)| match (
                     &before_node.backend_def,
@@ -611,134 +486,45 @@ fn apply_gated<T>(
     result
 }
 
-/// Apply one topology mutation event with parseability gate.
-fn apply_topology_event(
+/// Apply `operator` through its domain's production entry, ungated: the one
+/// dispatch from the catalog to the four domain mutators. The engine gates
+/// it ([`apply_event`]); the per-operator battery calls it directly.
+pub(crate) fn dispatch(
     genome: &mut CreatureGenome,
-    op: TopologyOperator,
+    operator: MutationOperator,
     targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     config: &MutationConfig,
     context: &SensorContext,
-) -> Result<TargetReachability, MutationSkipReason> {
-    apply_gated(genome, |genome| {
-        TopologyMutator::apply_in(genome, op, targets, rng, config, context)
-    })
-}
-
-/// Apply one VM mutation event with parseability gate.
-fn apply_vm_event(
-    genome: &mut CreatureGenome,
-    op: VmOperator,
-    targets: &mut TargetSelector<'_>,
-    rng: &mut impl Rng,
-    config: &MutationConfig,
-) -> Result<TargetReachability, MutationSkipReason> {
-    apply_gated(genome, |genome| {
-        VmMutator::apply(genome, op, targets, rng, config)
-    })
-}
-
-/// Apply one graph mutation event with the gate, and the detaches and bundle
-/// removals it made, counted only when it commits: a rolled-back event
-/// reports none (T25.F03), nor an attribute scope (T25.F08).
-fn apply_graph_event(
-    genome: &mut CreatureGenome,
-    op: GraphOperator,
-    targets: &mut TargetSelector<'_>,
-    rng: &mut impl Rng,
-    config: &MutationConfig,
-    context: &SensorContext,
-) -> (ClassifiedResult, BundleEdits, Option<Scope>) {
-    let result = apply_gated(genome, |genome| {
-        GraphMutator::apply_classified(genome, op, targets, rng, config, context)
-    });
-    let edits = result
-        .as_ref()
-        .map_or(BundleEdits::default(), |(_, report)| report.bundle_edits);
-    let attribute_scope = result
-        .as_ref()
-        .ok()
-        .and_then(|(_, report)| report.attribute_scope);
-    (
-        result.map(|(reachability, report)| (reachability, report.class)),
-        edits,
-        attribute_scope,
-    )
-}
-
-/// Apply one input ref mutation event with parseability gate, and the bundle edits
-/// it made, counted only when it commits.
-fn apply_input_ref_event(
-    genome: &mut CreatureGenome,
-    op: InputRefOperator,
-    targets: &mut TargetSelector<'_>,
-    rng: &mut impl Rng,
-    config: &MutationConfig,
-    context: &SensorContext,
-) -> (ClassifiedResult, BundleEdits) {
-    let result = apply_gated(genome, |genome| {
-        InputRefMutator::apply_classified(genome, op, targets, rng, config, context)
-    });
-    let edits = result
-        .as_ref()
-        .map_or(BundleEdits::default(), |(_, (_, edits))| *edits);
-    (
-        result.map(|(reachability, (class, _))| (reachability, class)),
-        edits,
-    )
-}
-
-pub(crate) fn topology_operator_key(op: TopologyOperator) -> MutationOperator {
-    match op {
-        TopologyOperator::AddNode => MutationOperator::TopologyAddNode,
-        TopologyOperator::RemoveNode => MutationOperator::TopologyRemoveNode,
-        TopologyOperator::RetargetNodeTarget => MutationOperator::TopologyRetargetNodeTarget,
-        TopologyOperator::AddRouteTarget => MutationOperator::TopologyAddRouteTarget,
-        TopologyOperator::AddFeedbackRoute => MutationOperator::TopologyAddFeedbackRoute,
-        TopologyOperator::RemoveRouteTarget => MutationOperator::TopologyRemoveRouteTarget,
-        TopologyOperator::ChangeEntryNode => MutationOperator::TopologyChangeEntryNode,
-        TopologyOperator::SwapNodeBackend => MutationOperator::TopologySwapNodeBackend,
-        TopologyOperator::CopyNode => MutationOperator::TopologyCopyNode,
-        TopologyOperator::CopyMeshBackwardSlice => MutationOperator::TopologyCopyMeshBackwardSlice,
-        TopologyOperator::CopyMeshForwardSlice => MutationOperator::TopologyCopyMeshForwardSlice,
-        TopologyOperator::SpliceNode => MutationOperator::TopologySpliceNode,
-        TopologyOperator::SwapRouteTargets => MutationOperator::TopologySwapRouteTargets,
-        TopologyOperator::MutateGateBias => MutationOperator::TopologyMutateGateBias,
-    }
-}
-
-pub(crate) fn vm_operator_key(op: VmOperator) -> MutationOperator {
-    match op {
-        VmOperator::VmConstantMutation => MutationOperator::VmConstantMutation,
-        VmOperator::VmInstructionMutation => MutationOperator::VmInstructionMutation,
-        VmOperator::VmDeleteInstruction => MutationOperator::VmDeleteInstruction,
-        VmOperator::VmRegisterCountMutation => MutationOperator::VmRegisterCountMutation,
-        VmOperator::VmInstructionRawFieldMutation => {
-            MutationOperator::VmInstructionRawFieldMutation
+) -> Result<(TargetReachability, EventReport), MutationSkipReason> {
+    match operator {
+        MutationOperator::Topology(op) => {
+            TopologyMutator::apply_in(genome, op, targets, rng, config, context)
         }
-        VmOperator::VmCopyInstructionBlock => MutationOperator::VmCopyInstructionBlock,
-        VmOperator::VmCopyInstructionBlockRemapped => {
-            MutationOperator::VmCopyInstructionBlockRemapped
+        MutationOperator::Vm(op) => VmMutator::apply(genome, op, targets, rng, config),
+        MutationOperator::Graph(op) => {
+            GraphMutator::apply_classified(genome, op, targets, rng, config, context)
         }
-        VmOperator::VmCopyConstantBlock => MutationOperator::VmCopyConstantBlock,
-        VmOperator::VmCopyGeneBackwardSlice => MutationOperator::VmCopyGeneBackwardSlice,
-        VmOperator::VmCopyGeneForwardSlice => MutationOperator::VmCopyGeneForwardSlice,
-        VmOperator::VmInsertReadStoreMotif => MutationOperator::VmInsertReadStoreMotif,
-        VmOperator::VmInsertReadBidMotif => MutationOperator::VmInsertReadBidMotif,
-        VmOperator::VmInsertLoadCompareMotif => MutationOperator::VmInsertLoadCompareMotif,
-        VmOperator::VmMutateSlotAddress => MutationOperator::VmMutateSlotAddress,
-        VmOperator::VmMutatePairedSlotAddress => MutationOperator::VmMutatePairedSlotAddress,
+        MutationOperator::InputRef(op) => {
+            InputRefMutator::apply_classified(genome, op, targets, rng, config, context)
+        }
     }
 }
 
-pub(crate) fn input_ref_operator_key(op: InputRefOperator) -> MutationOperator {
-    match op {
-        InputRefOperator::AddSensorLive => MutationOperator::InputRefAddSensorLive,
-        InputRefOperator::AddSensorSilent => MutationOperator::InputRefAddSensorSilent,
-        InputRefOperator::Prune => MutationOperator::InputRefPrune,
-        InputRefOperator::Swap => MutationOperator::InputRefSwap,
-        InputRefOperator::RawFieldMutation => MutationOperator::InputRefRawFieldMutation,
-    }
+/// Apply one mutation event through the gate: what it reports counts only
+/// when it commits, so a rolled-back event reports no bundle edits, scope or
+/// class (T25.F03, T25.F08).
+fn apply_event(
+    genome: &mut CreatureGenome,
+    operator: MutationOperator,
+    targets: &mut TargetSelector<'_>,
+    rng: &mut impl Rng,
+    config: &MutationConfig,
+    context: &SensorContext,
+) -> Result<(TargetReachability, EventReport), MutationSkipReason> {
+    apply_gated(genome, |genome| {
+        dispatch(genome, operator, targets, rng, config, context)
+    })
 }
 
 #[cfg(test)]

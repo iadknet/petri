@@ -18,6 +18,7 @@ use crate::mutation::graph::hebbian::{
 };
 use crate::mutation::graph::{bundle, GraphMutator, GraphOperator};
 use crate::mutation::types::{ComplexityEffect, MutationSkipReason};
+use crate::mutation::MutationOperator;
 
 const RETENTION_OPERATORS: [GraphOperator; 6] = [
     GraphOperator::EnableRetention,
@@ -117,7 +118,7 @@ fn replay_pick(
 #[test]
 fn the_six_retention_operators_keep_their_slots_keys_and_tiers() {
     assert_eq!(&GraphOperator::ALL[29..35], &RETENTION_OPERATORS);
-    let keys = RETENTION_OPERATORS.map(|op| op.operator().as_key());
+    let keys = RETENTION_OPERATORS.map(|op| MutationOperator::from(op).as_key());
     assert_eq!(
         keys,
         [
@@ -135,7 +136,10 @@ fn the_six_retention_operators_keep_their_slots_keys_and_tiers() {
     );
     for op in RETENTION_OPERATORS {
         assert_eq!(op.complexity_effect(), ComplexityEffect::Neutral, "{op:?}");
-        assert_eq!(op.operator().complexity_effect(), ComplexityEffect::Neutral);
+        assert_eq!(
+            MutationOperator::from(op).complexity_effect(),
+            ComplexityEffect::Neutral
+        );
         // Restricted size pressure admits only decreasing operators.
         assert!(!op.complexity_effect().is_decreasing(), "{op:?}");
     }

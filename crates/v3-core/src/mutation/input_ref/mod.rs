@@ -7,7 +7,7 @@ use crate::genome::{input_ref_kind, CreatureGenome, NodeGenome};
 use crate::mutation::graph::bundle::{add_sensor_by_law, BirthLaw};
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::sampling;
-use crate::mutation::types::{BirthEdgeClass, BundleEdits, MutationSkipReason, TargetReachability};
+use crate::mutation::types::{EventReport, MutationSkipReason, TargetReachability};
 
 /// Every `InputReference` a genome can carry in a world with
 /// `context.food_type_count` ordinary food types: `sampling::INPUT_BUCKETS`
@@ -65,7 +65,7 @@ pub fn prunable_indices(node: &NodeGenome) -> Vec<usize> {
 }
 
 /// Input reference mutation operator variants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum InputRefOperator {
     /// Declare a sampled sensor and wire it whole, every bundle live
     /// (T25.F11).
@@ -102,6 +102,19 @@ impl InputRefOperator {
         }
     }
 
+    /// The operator's stable key, `<Domain>.<Name>`: benchmark summary
+    /// keys, server payloads and the serde form of `MutationOperator`.
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::AddSensorLive => "InputRef.AddSensorLive",
+            Self::AddSensorSilent => "InputRef.AddSensorSilent",
+            Self::Prune => "InputRef.Prune",
+            Self::Swap => "InputRef.Swap",
+            Self::RawFieldMutation => "InputRef.RawFieldMutation",
+        }
+    }
+
     /// Per-operator weight reflecting impact tier.
     /// 4 = refinement, 2 = moderate, 1 = structural.
     #[must_use]
@@ -126,11 +139,6 @@ impl InputRefOperator {
         }
     }
 }
-
-/// What an applied InputRef event reports beside its reachability: the
-/// vote-sink class of an `AddSensor*` that made exactly one `Plain` bundle
-/// (T11.F30, T25.F11 invariant 8) and its bundle edits.
-pub(crate) type InputRefEventReport = (Option<BirthEdgeClass>, BundleEdits);
 
 /// Input reference domain mutator.
 pub struct InputRefMutator;
@@ -169,7 +177,9 @@ impl InputRefMutator {
     }
 
     /// [`Self::apply_in`] with what the event reports
-    /// ([`InputRefEventReport`]); the same draws.
+    /// ([`EventReport`]: the vote-sink class of an `AddSensor*` that made
+    /// exactly one `Plain` bundle, T11.F30 and T25.F11 invariant 8, and its
+    /// bundle edits); the same draws.
     pub(crate) fn apply_classified(
         genome: &mut CreatureGenome,
         op: InputRefOperator,
@@ -177,14 +187,14 @@ impl InputRefMutator {
         rng: &mut impl Rng,
         _config: &MutationConfig,
         context: &SensorContext,
-    ) -> Result<(TargetReachability, InputRefEventReport), MutationSkipReason> {
+    ) -> Result<(TargetReachability, EventReport), MutationSkipReason> {
         if genome.nodes.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
 
         if op == InputRefOperator::RawFieldMutation {
             return apply_raw_field_mutation(genome, rng, context)
-                .map(|reachability| (reachability, (None, BundleEdits::default())));
+                .map(|reachability| (reachability, EventReport::default()));
         }
         let eligible = Self::applicable_indices(genome, op, context);
         if eligible.is_empty() {
@@ -222,11 +232,10 @@ impl InputRefMutator {
         node_idx: usize,
         rng: &mut impl Rng,
         context: &SensorContext,
-    ) -> Result<InputRefEventReport, MutationSkipReason> {
+    ) -> Result<EventReport, MutationSkipReason> {
         let node = &mut genome.nodes[node_idx];
-        let unreported = |result: Result<(), MutationSkipReason>| {
-            result.map(|()| (None, BundleEdits::default()))
-        };
+        let unreported =
+            |result: Result<(), MutationSkipReason>| result.map(|()| EventReport::default());
         match op {
             InputRefOperator::AddSensorLive => apply_add_sensor(node, BirthLaw::Live, rng, context),
             InputRefOperator::AddSensorSilent => {
@@ -251,10 +260,14 @@ fn apply_add_sensor(
     law: BirthLaw,
     rng: &mut impl Rng,
     context: &SensorContext,
-) -> Result<InputRefEventReport, MutationSkipReason> {
+) -> Result<EventReport, MutationSkipReason> {
     let reference = sampling::random_input_reference(rng, context);
-    let (edits, class) = add_sensor_by_law(node, reference, law, context, rng)?;
-    Ok((class, edits))
+    let (bundle_edits, class) = add_sensor_by_law(node, reference, law, context, rng)?;
+    Ok(EventReport {
+        class,
+        bundle_edits,
+        ..EventReport::default()
+    })
 }
 
 /// Delete one entry drawn uniformly among those no consumer addresses

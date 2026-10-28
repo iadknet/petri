@@ -16,6 +16,7 @@ use std::hash::Hash;
 
 use crate::contracts::NodeId;
 use crate::genome::{BackendDef, NodeGenome};
+use crate::mutation::topology::TopologyOperator;
 use crate::mutation::{
     MutationDomain, MutationEventOutcome, MutationEventRecord, MutationOperator,
     MutationSkipReason, MutationSummary,
@@ -116,29 +117,24 @@ impl EditSurface {
     #[must_use]
     pub const fn of(operator: MutationOperator) -> Self {
         match operator {
-            MutationOperator::TopologyRetargetNodeTarget
-            | MutationOperator::TopologyAddRouteTarget
-            | MutationOperator::TopologyAddFeedbackRoute
-            | MutationOperator::TopologyRemoveRouteTarget
-            | MutationOperator::TopologySwapRouteTargets
-            | MutationOperator::TopologyMutateGateBias
-            | MutationOperator::TopologySpliceNode
-            | MutationOperator::TopologyChangeEntryNode => Self::Split,
-            MutationOperator::TopologySwapNodeBackend => Self::Payload,
-            MutationOperator::TopologyAddNode
-            | MutationOperator::TopologyRemoveNode
-            | MutationOperator::TopologyCopyNode
-            | MutationOperator::TopologyCopyMeshBackwardSlice
-            | MutationOperator::TopologyCopyMeshForwardSlice
-            | MutationOperator::InputRefAddSensorLive
-            | MutationOperator::InputRefAddSensorSilent
-            | MutationOperator::InputRefPrune
-            | MutationOperator::InputRefSwap
-            | MutationOperator::InputRefRawFieldMutation => Self::Other,
-            _ => match operator.domain() {
-                MutationDomain::Vm | MutationDomain::Graph => Self::Payload,
-                MutationDomain::Topology | MutationDomain::InputRef => Self::Other,
+            MutationOperator::Topology(op) => match op {
+                TopologyOperator::RetargetNodeTarget
+                | TopologyOperator::AddRouteTarget
+                | TopologyOperator::AddFeedbackRoute
+                | TopologyOperator::RemoveRouteTarget
+                | TopologyOperator::SwapRouteTargets
+                | TopologyOperator::MutateGateBias
+                | TopologyOperator::SpliceNode
+                | TopologyOperator::ChangeEntryNode => Self::Split,
+                TopologyOperator::SwapNodeBackend => Self::Payload,
+                TopologyOperator::AddNode
+                | TopologyOperator::RemoveNode
+                | TopologyOperator::CopyNode
+                | TopologyOperator::CopyMeshBackwardSlice
+                | TopologyOperator::CopyMeshForwardSlice => Self::Other,
             },
+            MutationOperator::Vm(_) | MutationOperator::Graph(_) => Self::Payload,
+            MutationOperator::InputRef(_) => Self::Other,
         }
     }
 }
@@ -746,7 +742,8 @@ impl RecruitmentTracker {
             summary,
         } = observation;
         let copy_applied = summary.events.iter().any(|event| {
-            event.outcome.is_applied() && event.operator == Some(MutationOperator::TopologyCopyNode)
+            event.outcome.is_applied()
+                && event.operator == Some(MutationOperator::Topology(TopologyOperator::CopyNode))
         });
 
         let state = &mut self.lineages[lineage as usize];

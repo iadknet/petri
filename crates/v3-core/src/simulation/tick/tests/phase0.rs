@@ -2,6 +2,8 @@ use super::super::{run_phase_0, Phase0Charge};
 use super::support::*;
 use crate::config::SimulationConfig;
 use crate::contracts::Position;
+use crate::mutation::graph::GraphOperator;
+use crate::mutation::vm::VmOperator;
 use crate::mutation::MutationOperator;
 use crate::simulation::seeding::seed_simulation;
 use proptest::prelude::*;
@@ -123,16 +125,16 @@ fn phase_0_records_mutation_value_totals_on_creature_death() {
     creature.age = 9;
     creature.offspring_spawned_count = 3;
     creature.birth_mutation_operators = vec![
-        MutationOperator::VmInstructionMutation,
-        MutationOperator::GraphMutateHebbianRule,
+        MutationOperator::Vm(VmOperator::VmInstructionMutation),
+        MutationOperator::Graph(GraphOperator::MutateHebbianRule),
     ]
     .into_boxed_slice();
 
     run_phase_0(&mut sim);
 
     for operator in [
-        MutationOperator::VmInstructionMutation,
-        MutationOperator::GraphMutateHebbianRule,
+        MutationOperator::Vm(VmOperator::VmInstructionMutation),
+        MutationOperator::Graph(GraphOperator::MutateHebbianRule),
     ] {
         let totals = sim
             .stats
@@ -181,13 +183,13 @@ fn phase_0_records_the_carrier_outcome_under_its_birth_edge_class() {
         creature.age = 9;
         creature.offspring_spawned_count = 3;
         creature.birth_mutation_operators =
-            vec![MutationOperator::GraphAddGraphEdge].into_boxed_slice();
+            vec![MutationOperator::Graph(GraphOperator::AddGraphEdge)].into_boxed_slice();
         creature.birth_edge_class = class;
 
         run_phase_0(&mut sim);
 
-        let by_operator =
-            &sim.stats.mutation_value_totals_by_operator[&MutationOperator::GraphAddGraphEdge];
+        let by_operator = &sim.stats.mutation_value_totals_by_operator
+            [&MutationOperator::Graph(GraphOperator::AddGraphEdge)];
         let by_class = &sim.stats.mutation_value_totals_by_birth_edge_class;
         match class {
             Some(class) => {

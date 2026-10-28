@@ -74,7 +74,7 @@ fn world_input_key_keys_are_stable() {
 fn record_skipped_tracks_skip_reason_and_operator() {
     let mut s = MutationSummary::zero();
     s.record_skipped(
-        MutationOperator::VmInstructionMutation,
+        MutationOperator::Vm(VmOperator::VmInstructionMutation),
         MutationSkipReason::NoApplicableTarget,
     );
     assert_eq!(s.skipped_events, 1);
@@ -84,7 +84,7 @@ fn record_skipped_tracks_skip_reason_and_operator() {
     );
     assert_eq!(
         s.skipped_by_operator
-            .get(&MutationOperator::VmInstructionMutation),
+            .get(&MutationOperator::Vm(VmOperator::VmInstructionMutation)),
         Some(&1)
     );
 }
@@ -104,7 +104,7 @@ fn is_decreasing_returns_true_only_for_decreasing() {
 
 #[test]
 fn complexity_effect_covers_all_operators() {
-    for op in MutationOperator::all() {
+    for op in MutationOperator::ALL {
         let effect = op.complexity_effect();
         assert!(
             matches!(
@@ -124,7 +124,7 @@ fn complexity_effect_has_at_least_one_of_each_kind() {
     let mut has_increasing = false;
     let mut has_decreasing = false;
     let mut has_neutral = false;
-    for op in MutationOperator::all() {
+    for op in MutationOperator::ALL {
         match op.complexity_effect() {
             ComplexityEffect::Increasing => has_increasing = true,
             ComplexityEffect::Decreasing => has_decreasing = true,
@@ -140,23 +140,23 @@ fn complexity_effect_has_at_least_one_of_each_kind() {
 fn complexity_effect_known_classifications() {
     // Spot-check known classifications
     assert_eq!(
-        MutationOperator::TopologyAddNode.complexity_effect(),
+        MutationOperator::Topology(TopologyOperator::AddNode).complexity_effect(),
         ComplexityEffect::Increasing
     );
     assert_eq!(
-        MutationOperator::TopologyRemoveNode.complexity_effect(),
+        MutationOperator::Topology(TopologyOperator::RemoveNode).complexity_effect(),
         ComplexityEffect::Decreasing
     );
     assert_eq!(
-        MutationOperator::TopologyRetargetNodeTarget.complexity_effect(),
+        MutationOperator::Topology(TopologyOperator::RetargetNodeTarget).complexity_effect(),
         ComplexityEffect::Neutral
     );
     // The four creation operators are increasing (T25.F11 invariant 7).
     for creation in [
-        MutationOperator::InputRefAddSensorLive,
-        MutationOperator::InputRefAddSensorSilent,
-        MutationOperator::GraphAddBundleLive,
-        MutationOperator::GraphAddBundleSilent,
+        MutationOperator::InputRef(InputRefOperator::AddSensorLive),
+        MutationOperator::InputRef(InputRefOperator::AddSensorSilent),
+        MutationOperator::Graph(GraphOperator::AddBundleLive),
+        MutationOperator::Graph(GraphOperator::AddBundleSilent),
     ] {
         assert_eq!(
             creation.complexity_effect(),
@@ -165,120 +165,120 @@ fn complexity_effect_known_classifications() {
         );
     }
     assert_eq!(
-        MutationOperator::InputRefPrune.complexity_effect(),
+        MutationOperator::InputRef(InputRefOperator::Prune).complexity_effect(),
         ComplexityEffect::Decreasing
     );
     // Copy operators are increasing
     assert_eq!(
-        MutationOperator::TopologyCopyNode.complexity_effect(),
+        MutationOperator::Topology(TopologyOperator::CopyNode).complexity_effect(),
         ComplexityEffect::Increasing
     );
     assert_eq!(
-        MutationOperator::VmCopyInstructionBlock.complexity_effect(),
+        MutationOperator::Vm(VmOperator::VmCopyInstructionBlock).complexity_effect(),
         ComplexityEffect::Increasing
     );
     assert_eq!(
-        MutationOperator::VmDeleteInstruction.complexity_effect(),
+        MutationOperator::Vm(VmOperator::VmDeleteInstruction).complexity_effect(),
         ComplexityEffect::Decreasing
     );
     assert_eq!(
-        MutationOperator::GraphCopySubgraph.complexity_effect(),
+        MutationOperator::Graph(GraphOperator::CopySubgraph).complexity_effect(),
         ComplexityEffect::Increasing
     );
     // Hebbian rule/rate mutations are neutral
     assert_eq!(
-        MutationOperator::GraphMutateHebbianRule.complexity_effect(),
+        MutationOperator::Graph(GraphOperator::MutateHebbianRule).complexity_effect(),
         ComplexityEffect::Neutral
     );
     assert_eq!(
-        MutationOperator::GraphEnableHebbian.complexity_effect(),
+        MutationOperator::Graph(GraphOperator::EnableHebbian).complexity_effect(),
         ComplexityEffect::Increasing
     );
     assert_eq!(
-        MutationOperator::GraphDisableHebbian.complexity_effect(),
+        MutationOperator::Graph(GraphOperator::DisableHebbian).complexity_effect(),
         ComplexityEffect::Decreasing
     );
 }
 
 #[test]
 fn operator_domain_mapping_is_consistent() {
-    for operator in MutationOperator::all() {
+    for operator in MutationOperator::ALL {
         match operator {
-            MutationOperator::TopologyAddNode
-            | MutationOperator::TopologyRemoveNode
-            | MutationOperator::TopologyRetargetNodeTarget
-            | MutationOperator::TopologyAddRouteTarget
-            | MutationOperator::TopologyAddFeedbackRoute
-            | MutationOperator::TopologyRemoveRouteTarget
-            | MutationOperator::TopologyChangeEntryNode
-            | MutationOperator::TopologySwapNodeBackend
-            | MutationOperator::TopologyCopyNode
-            | MutationOperator::TopologyCopyMeshBackwardSlice
-            | MutationOperator::TopologyCopyMeshForwardSlice
-            | MutationOperator::TopologySpliceNode
-            | MutationOperator::TopologySwapRouteTargets
-            | MutationOperator::TopologyMutateGateBias => {
+            MutationOperator::Topology(TopologyOperator::AddNode)
+            | MutationOperator::Topology(TopologyOperator::RemoveNode)
+            | MutationOperator::Topology(TopologyOperator::RetargetNodeTarget)
+            | MutationOperator::Topology(TopologyOperator::AddRouteTarget)
+            | MutationOperator::Topology(TopologyOperator::AddFeedbackRoute)
+            | MutationOperator::Topology(TopologyOperator::RemoveRouteTarget)
+            | MutationOperator::Topology(TopologyOperator::ChangeEntryNode)
+            | MutationOperator::Topology(TopologyOperator::SwapNodeBackend)
+            | MutationOperator::Topology(TopologyOperator::CopyNode)
+            | MutationOperator::Topology(TopologyOperator::CopyMeshBackwardSlice)
+            | MutationOperator::Topology(TopologyOperator::CopyMeshForwardSlice)
+            | MutationOperator::Topology(TopologyOperator::SpliceNode)
+            | MutationOperator::Topology(TopologyOperator::SwapRouteTargets)
+            | MutationOperator::Topology(TopologyOperator::MutateGateBias) => {
                 assert_eq!(operator.domain(), MutationDomain::Topology)
             }
-            MutationOperator::VmConstantMutation
-            | MutationOperator::VmInstructionMutation
-            | MutationOperator::VmDeleteInstruction
-            | MutationOperator::VmRegisterCountMutation
-            | MutationOperator::VmInstructionRawFieldMutation
-            | MutationOperator::VmCopyInstructionBlock
-            | MutationOperator::VmCopyInstructionBlockRemapped
-            | MutationOperator::VmCopyConstantBlock
-            | MutationOperator::VmCopyGeneBackwardSlice
-            | MutationOperator::VmCopyGeneForwardSlice
-            | MutationOperator::VmInsertReadStoreMotif
-            | MutationOperator::VmInsertReadBidMotif
-            | MutationOperator::VmInsertLoadCompareMotif
-            | MutationOperator::VmMutateSlotAddress
-            | MutationOperator::VmMutatePairedSlotAddress => {
+            MutationOperator::Vm(VmOperator::VmConstantMutation)
+            | MutationOperator::Vm(VmOperator::VmInstructionMutation)
+            | MutationOperator::Vm(VmOperator::VmDeleteInstruction)
+            | MutationOperator::Vm(VmOperator::VmRegisterCountMutation)
+            | MutationOperator::Vm(VmOperator::VmInstructionRawFieldMutation)
+            | MutationOperator::Vm(VmOperator::VmCopyInstructionBlock)
+            | MutationOperator::Vm(VmOperator::VmCopyInstructionBlockRemapped)
+            | MutationOperator::Vm(VmOperator::VmCopyConstantBlock)
+            | MutationOperator::Vm(VmOperator::VmCopyGeneBackwardSlice)
+            | MutationOperator::Vm(VmOperator::VmCopyGeneForwardSlice)
+            | MutationOperator::Vm(VmOperator::VmInsertReadStoreMotif)
+            | MutationOperator::Vm(VmOperator::VmInsertReadBidMotif)
+            | MutationOperator::Vm(VmOperator::VmInsertLoadCompareMotif)
+            | MutationOperator::Vm(VmOperator::VmMutateSlotAddress)
+            | MutationOperator::Vm(VmOperator::VmMutatePairedSlotAddress) => {
                 assert_eq!(operator.domain(), MutationDomain::Vm)
             }
-            MutationOperator::GraphAlterGraphEdgeWeight
-            | MutationOperator::GraphSwapGraphOperator
-            | MutationOperator::GraphMutateGraphOperatorParam
-            | MutationOperator::GraphAddInternalGraphNode
-            | MutationOperator::GraphRemoveInternalGraphNode
-            | MutationOperator::GraphAddGraphEdge
-            | MutationOperator::GraphRetargetGraphEdge
-            | MutationOperator::GraphRemoveGraphEdge
-            | MutationOperator::GraphRawFieldMutation
-            | MutationOperator::GraphCopyInternalNode
-            | MutationOperator::GraphCopySubgraph
-            | MutationOperator::GraphCopyNodeInputs
-            | MutationOperator::GraphEnableHebbian
-            | MutationOperator::GraphDisableHebbian
-            | MutationOperator::GraphMutateHebbianRule
-            | MutationOperator::GraphMutateHebbianRate
-            | MutationOperator::GraphToggleHebbianLamarckian
-            | MutationOperator::GraphEnableRewardModulation
-            | MutationOperator::GraphDisableRewardModulation
-            | MutationOperator::GraphMutateRewardSource
-            | MutationOperator::GraphMutateTraceDecay
-            | MutationOperator::GraphAddBundleLive
-            | MutationOperator::GraphAddBundleSilent
-            | MutationOperator::GraphAlterBundleScale
-            | MutationOperator::GraphShiftBundleOffset
-            | MutationOperator::GraphRetargetBundle
-            | MutationOperator::GraphRemoveBundle
-            | MutationOperator::GraphSetScope
-            | MutationOperator::GraphDetachGraphEdge
-            | MutationOperator::GraphEnableRetention
-            | MutationOperator::GraphDisableRetention
-            | MutationOperator::GraphMutateRetention
-            | MutationOperator::GraphEnableBundleRetention
-            | MutationOperator::GraphDisableBundleRetention
-            | MutationOperator::GraphMutateBundleRetention => {
+            MutationOperator::Graph(GraphOperator::AlterGraphEdgeWeight)
+            | MutationOperator::Graph(GraphOperator::SwapGraphOperator)
+            | MutationOperator::Graph(GraphOperator::MutateGraphOperatorParam)
+            | MutationOperator::Graph(GraphOperator::AddInternalGraphNode)
+            | MutationOperator::Graph(GraphOperator::RemoveInternalGraphNode)
+            | MutationOperator::Graph(GraphOperator::AddGraphEdge)
+            | MutationOperator::Graph(GraphOperator::RetargetGraphEdge)
+            | MutationOperator::Graph(GraphOperator::RemoveGraphEdge)
+            | MutationOperator::Graph(GraphOperator::GraphRawFieldMutation)
+            | MutationOperator::Graph(GraphOperator::CopyInternalNode)
+            | MutationOperator::Graph(GraphOperator::CopySubgraph)
+            | MutationOperator::Graph(GraphOperator::CopyNodeInputs)
+            | MutationOperator::Graph(GraphOperator::EnableHebbian)
+            | MutationOperator::Graph(GraphOperator::DisableHebbian)
+            | MutationOperator::Graph(GraphOperator::MutateHebbianRule)
+            | MutationOperator::Graph(GraphOperator::MutateHebbianRate)
+            | MutationOperator::Graph(GraphOperator::ToggleHebbianLamarckian)
+            | MutationOperator::Graph(GraphOperator::EnableRewardModulation)
+            | MutationOperator::Graph(GraphOperator::DisableRewardModulation)
+            | MutationOperator::Graph(GraphOperator::MutateRewardSource)
+            | MutationOperator::Graph(GraphOperator::MutateTraceDecay)
+            | MutationOperator::Graph(GraphOperator::AddBundleLive)
+            | MutationOperator::Graph(GraphOperator::AddBundleSilent)
+            | MutationOperator::Graph(GraphOperator::AlterBundleScale)
+            | MutationOperator::Graph(GraphOperator::ShiftBundleOffset)
+            | MutationOperator::Graph(GraphOperator::RetargetBundle)
+            | MutationOperator::Graph(GraphOperator::RemoveBundle)
+            | MutationOperator::Graph(GraphOperator::SetScope)
+            | MutationOperator::Graph(GraphOperator::DetachGraphEdge)
+            | MutationOperator::Graph(GraphOperator::EnableRetention)
+            | MutationOperator::Graph(GraphOperator::DisableRetention)
+            | MutationOperator::Graph(GraphOperator::MutateRetention)
+            | MutationOperator::Graph(GraphOperator::EnableBundleRetention)
+            | MutationOperator::Graph(GraphOperator::DisableBundleRetention)
+            | MutationOperator::Graph(GraphOperator::MutateBundleRetention) => {
                 assert_eq!(operator.domain(), MutationDomain::Graph)
             }
-            MutationOperator::InputRefAddSensorLive
-            | MutationOperator::InputRefAddSensorSilent
-            | MutationOperator::InputRefPrune
-            | MutationOperator::InputRefSwap
-            | MutationOperator::InputRefRawFieldMutation => {
+            MutationOperator::InputRef(InputRefOperator::AddSensorLive)
+            | MutationOperator::InputRef(InputRefOperator::AddSensorSilent)
+            | MutationOperator::InputRef(InputRefOperator::Prune)
+            | MutationOperator::InputRef(InputRefOperator::Swap)
+            | MutationOperator::InputRef(InputRefOperator::RawFieldMutation) => {
                 assert_eq!(operator.domain(), MutationDomain::InputRef)
             }
         }
@@ -287,31 +287,28 @@ fn operator_domain_mapping_is_consistent() {
 
 #[test]
 fn complexity_effect_cross_consistency_with_domain_operators() {
-    use crate::mutation::graph::GraphOperator;
-    use crate::mutation::input_ref::InputRefOperator;
-    use crate::mutation::topology::TopologyOperator;
-    use crate::mutation::vm::VmOperator;
+    use crate::mutation::graph::GraphOperator as G;
+    use crate::mutation::input_ref::InputRefOperator as I;
+    use crate::mutation::topology::TopologyOperator as T;
+    use crate::mutation::vm::VmOperator as V;
+    use MutationOperator as M;
 
-    for &top in &TopologyOperator::ALL {
+    for &top in &T::ALL {
         let mo = match top {
-            TopologyOperator::AddNode => MutationOperator::TopologyAddNode,
-            TopologyOperator::RemoveNode => MutationOperator::TopologyRemoveNode,
-            TopologyOperator::RetargetNodeTarget => MutationOperator::TopologyRetargetNodeTarget,
-            TopologyOperator::AddRouteTarget => MutationOperator::TopologyAddRouteTarget,
-            TopologyOperator::AddFeedbackRoute => MutationOperator::TopologyAddFeedbackRoute,
-            TopologyOperator::RemoveRouteTarget => MutationOperator::TopologyRemoveRouteTarget,
-            TopologyOperator::ChangeEntryNode => MutationOperator::TopologyChangeEntryNode,
-            TopologyOperator::SwapNodeBackend => MutationOperator::TopologySwapNodeBackend,
-            TopologyOperator::CopyNode => MutationOperator::TopologyCopyNode,
-            TopologyOperator::CopyMeshBackwardSlice => {
-                MutationOperator::TopologyCopyMeshBackwardSlice
-            }
-            TopologyOperator::CopyMeshForwardSlice => {
-                MutationOperator::TopologyCopyMeshForwardSlice
-            }
-            TopologyOperator::SpliceNode => MutationOperator::TopologySpliceNode,
-            TopologyOperator::SwapRouteTargets => MutationOperator::TopologySwapRouteTargets,
-            TopologyOperator::MutateGateBias => MutationOperator::TopologyMutateGateBias,
+            T::AddNode => M::Topology(T::AddNode),
+            T::RemoveNode => M::Topology(T::RemoveNode),
+            T::RetargetNodeTarget => M::Topology(T::RetargetNodeTarget),
+            T::AddRouteTarget => M::Topology(T::AddRouteTarget),
+            T::AddFeedbackRoute => M::Topology(T::AddFeedbackRoute),
+            T::RemoveRouteTarget => M::Topology(T::RemoveRouteTarget),
+            T::ChangeEntryNode => M::Topology(T::ChangeEntryNode),
+            T::SwapNodeBackend => M::Topology(T::SwapNodeBackend),
+            T::CopyNode => M::Topology(T::CopyNode),
+            T::CopyMeshBackwardSlice => M::Topology(T::CopyMeshBackwardSlice),
+            T::CopyMeshForwardSlice => M::Topology(T::CopyMeshForwardSlice),
+            T::SpliceNode => M::Topology(T::SpliceNode),
+            T::SwapRouteTargets => M::Topology(T::SwapRouteTargets),
+            T::MutateGateBias => M::Topology(T::MutateGateBias),
         };
         assert_eq!(
             mo.complexity_effect(),
@@ -321,27 +318,23 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
         );
     }
 
-    for &vm in &VmOperator::ALL {
+    for &vm in &V::ALL {
         let mo = match vm {
-            VmOperator::VmConstantMutation => MutationOperator::VmConstantMutation,
-            VmOperator::VmInstructionMutation => MutationOperator::VmInstructionMutation,
-            VmOperator::VmDeleteInstruction => MutationOperator::VmDeleteInstruction,
-            VmOperator::VmRegisterCountMutation => MutationOperator::VmRegisterCountMutation,
-            VmOperator::VmInstructionRawFieldMutation => {
-                MutationOperator::VmInstructionRawFieldMutation
-            }
-            VmOperator::VmCopyInstructionBlock => MutationOperator::VmCopyInstructionBlock,
-            VmOperator::VmCopyInstructionBlockRemapped => {
-                MutationOperator::VmCopyInstructionBlockRemapped
-            }
-            VmOperator::VmCopyConstantBlock => MutationOperator::VmCopyConstantBlock,
-            VmOperator::VmCopyGeneBackwardSlice => MutationOperator::VmCopyGeneBackwardSlice,
-            VmOperator::VmCopyGeneForwardSlice => MutationOperator::VmCopyGeneForwardSlice,
-            VmOperator::VmInsertReadStoreMotif => MutationOperator::VmInsertReadStoreMotif,
-            VmOperator::VmInsertReadBidMotif => MutationOperator::VmInsertReadBidMotif,
-            VmOperator::VmInsertLoadCompareMotif => MutationOperator::VmInsertLoadCompareMotif,
-            VmOperator::VmMutateSlotAddress => MutationOperator::VmMutateSlotAddress,
-            VmOperator::VmMutatePairedSlotAddress => MutationOperator::VmMutatePairedSlotAddress,
+            V::VmConstantMutation => M::Vm(V::VmConstantMutation),
+            V::VmInstructionMutation => M::Vm(V::VmInstructionMutation),
+            V::VmDeleteInstruction => M::Vm(V::VmDeleteInstruction),
+            V::VmRegisterCountMutation => M::Vm(V::VmRegisterCountMutation),
+            V::VmInstructionRawFieldMutation => M::Vm(V::VmInstructionRawFieldMutation),
+            V::VmCopyInstructionBlock => M::Vm(V::VmCopyInstructionBlock),
+            V::VmCopyInstructionBlockRemapped => M::Vm(V::VmCopyInstructionBlockRemapped),
+            V::VmCopyConstantBlock => M::Vm(V::VmCopyConstantBlock),
+            V::VmCopyGeneBackwardSlice => M::Vm(V::VmCopyGeneBackwardSlice),
+            V::VmCopyGeneForwardSlice => M::Vm(V::VmCopyGeneForwardSlice),
+            V::VmInsertReadStoreMotif => M::Vm(V::VmInsertReadStoreMotif),
+            V::VmInsertReadBidMotif => M::Vm(V::VmInsertReadBidMotif),
+            V::VmInsertLoadCompareMotif => M::Vm(V::VmInsertLoadCompareMotif),
+            V::VmMutateSlotAddress => M::Vm(V::VmMutateSlotAddress),
+            V::VmMutatePairedSlotAddress => M::Vm(V::VmMutatePairedSlotAddress),
         };
         assert_eq!(
             mo.complexity_effect(),
@@ -351,69 +344,61 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
         );
     }
 
-    for &graph in &GraphOperator::ALL {
+    for &graph in &G::ALL {
         let mo = match graph {
-            GraphOperator::AlterGraphEdgeWeight => MutationOperator::GraphAlterGraphEdgeWeight,
-            GraphOperator::SwapGraphOperator => MutationOperator::GraphSwapGraphOperator,
-            GraphOperator::MutateGraphOperatorParam => {
-                MutationOperator::GraphMutateGraphOperatorParam
-            }
-            GraphOperator::AddInternalGraphNode => MutationOperator::GraphAddInternalGraphNode,
-            GraphOperator::RemoveInternalGraphNode => {
-                MutationOperator::GraphRemoveInternalGraphNode
-            }
-            GraphOperator::AddGraphEdge => MutationOperator::GraphAddGraphEdge,
-            GraphOperator::RetargetGraphEdge => MutationOperator::GraphRetargetGraphEdge,
-            GraphOperator::RemoveGraphEdge => MutationOperator::GraphRemoveGraphEdge,
-            GraphOperator::GraphRawFieldMutation => MutationOperator::GraphRawFieldMutation,
-            GraphOperator::CopyInternalNode => MutationOperator::GraphCopyInternalNode,
-            GraphOperator::CopySubgraph => MutationOperator::GraphCopySubgraph,
-            GraphOperator::CopyNodeInputs => MutationOperator::GraphCopyNodeInputs,
-            GraphOperator::EnableHebbian => MutationOperator::GraphEnableHebbian,
-            GraphOperator::DisableHebbian => MutationOperator::GraphDisableHebbian,
-            GraphOperator::MutateHebbianRule => MutationOperator::GraphMutateHebbianRule,
-            GraphOperator::MutateHebbianRate => MutationOperator::GraphMutateHebbianRate,
-            GraphOperator::ToggleHebbianLamarckian => {
-                MutationOperator::GraphToggleHebbianLamarckian
-            }
-            GraphOperator::EnableRewardModulation => MutationOperator::GraphEnableRewardModulation,
-            GraphOperator::DisableRewardModulation => {
-                MutationOperator::GraphDisableRewardModulation
-            }
-            GraphOperator::MutateRewardSource => MutationOperator::GraphMutateRewardSource,
-            GraphOperator::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
-            GraphOperator::AddBundleLive => MutationOperator::GraphAddBundleLive,
-            GraphOperator::AddBundleSilent => MutationOperator::GraphAddBundleSilent,
-            GraphOperator::AlterBundleScale => MutationOperator::GraphAlterBundleScale,
-            GraphOperator::ShiftBundleOffset => MutationOperator::GraphShiftBundleOffset,
-            GraphOperator::RetargetBundle => MutationOperator::GraphRetargetBundle,
-            GraphOperator::RemoveBundle => MutationOperator::GraphRemoveBundle,
-            GraphOperator::SetScope => MutationOperator::GraphSetScope,
-            GraphOperator::DetachGraphEdge => MutationOperator::GraphDetachGraphEdge,
-            GraphOperator::EnableRetention => MutationOperator::GraphEnableRetention,
-            GraphOperator::DisableRetention => MutationOperator::GraphDisableRetention,
-            GraphOperator::MutateRetention => MutationOperator::GraphMutateRetention,
-            GraphOperator::EnableBundleRetention => MutationOperator::GraphEnableBundleRetention,
-            GraphOperator::DisableBundleRetention => MutationOperator::GraphDisableBundleRetention,
-            GraphOperator::MutateBundleRetention => MutationOperator::GraphMutateBundleRetention,
+            G::AlterGraphEdgeWeight => M::Graph(G::AlterGraphEdgeWeight),
+            G::SwapGraphOperator => M::Graph(G::SwapGraphOperator),
+            G::MutateGraphOperatorParam => M::Graph(G::MutateGraphOperatorParam),
+            G::AddInternalGraphNode => M::Graph(G::AddInternalGraphNode),
+            G::RemoveInternalGraphNode => M::Graph(G::RemoveInternalGraphNode),
+            G::AddGraphEdge => M::Graph(G::AddGraphEdge),
+            G::RetargetGraphEdge => M::Graph(G::RetargetGraphEdge),
+            G::RemoveGraphEdge => M::Graph(G::RemoveGraphEdge),
+            G::GraphRawFieldMutation => M::Graph(G::GraphRawFieldMutation),
+            G::CopyInternalNode => M::Graph(G::CopyInternalNode),
+            G::CopySubgraph => M::Graph(G::CopySubgraph),
+            G::CopyNodeInputs => M::Graph(G::CopyNodeInputs),
+            G::EnableHebbian => M::Graph(G::EnableHebbian),
+            G::DisableHebbian => M::Graph(G::DisableHebbian),
+            G::MutateHebbianRule => M::Graph(G::MutateHebbianRule),
+            G::MutateHebbianRate => M::Graph(G::MutateHebbianRate),
+            G::ToggleHebbianLamarckian => M::Graph(G::ToggleHebbianLamarckian),
+            G::EnableRewardModulation => M::Graph(G::EnableRewardModulation),
+            G::DisableRewardModulation => M::Graph(G::DisableRewardModulation),
+            G::MutateRewardSource => M::Graph(G::MutateRewardSource),
+            G::MutateTraceDecay => M::Graph(G::MutateTraceDecay),
+            G::AddBundleLive => M::Graph(G::AddBundleLive),
+            G::AddBundleSilent => M::Graph(G::AddBundleSilent),
+            G::AlterBundleScale => M::Graph(G::AlterBundleScale),
+            G::ShiftBundleOffset => M::Graph(G::ShiftBundleOffset),
+            G::RetargetBundle => M::Graph(G::RetargetBundle),
+            G::RemoveBundle => M::Graph(G::RemoveBundle),
+            G::SetScope => M::Graph(G::SetScope),
+            G::DetachGraphEdge => M::Graph(G::DetachGraphEdge),
+            G::EnableRetention => M::Graph(G::EnableRetention),
+            G::DisableRetention => M::Graph(G::DisableRetention),
+            G::MutateRetention => M::Graph(G::MutateRetention),
+            G::EnableBundleRetention => M::Graph(G::EnableBundleRetention),
+            G::DisableBundleRetention => M::Graph(G::DisableBundleRetention),
+            G::MutateBundleRetention => M::Graph(G::MutateBundleRetention),
         };
-        // `complexity_effect` delegates to `operator()`, so pinning the
-        // mapping pins the classification.
+        // `From` is the one mapping into the catalog, so pinning it pins
+        // the operator every classification reads.
         assert_eq!(
             mo,
-            graph.operator(),
+            M::from(graph),
             "GraphOperator maps {:?} to the wrong MutationOperator",
             graph
         );
     }
 
-    for &ir in &InputRefOperator::ALL {
+    for &ir in &I::ALL {
         let mo = match ir {
-            InputRefOperator::AddSensorLive => MutationOperator::InputRefAddSensorLive,
-            InputRefOperator::AddSensorSilent => MutationOperator::InputRefAddSensorSilent,
-            InputRefOperator::Prune => MutationOperator::InputRefPrune,
-            InputRefOperator::Swap => MutationOperator::InputRefSwap,
-            InputRefOperator::RawFieldMutation => MutationOperator::InputRefRawFieldMutation,
+            I::AddSensorLive => M::InputRef(I::AddSensorLive),
+            I::AddSensorSilent => M::InputRef(I::AddSensorSilent),
+            I::Prune => M::InputRef(I::Prune),
+            I::Swap => M::InputRef(I::Swap),
+            I::RawFieldMutation => M::InputRef(I::RawFieldMutation),
         };
         assert_eq!(
             mo.complexity_effect(),
@@ -426,7 +411,7 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
 
 /// The Graph catalog is one consistent set (T25.F08 invariant 1): `ALL`
 /// covers every variant once, `operator()` is injective onto exactly the
-/// Graph-domain members of `MutationOperator::all()`, every key is unique
+/// Graph-domain members of `MutationOperator::ALL`, every key is unique
 /// and `Graph.`-prefixed, and `all()` is the four domains' catalogs. The hand-written map above stays the
 /// identity oracle.
 #[test]
@@ -502,18 +487,14 @@ fn the_graph_catalog_is_a_bijection_onto_its_engine_operators() {
         12
     );
     assert_eq!(InputRefOperator::ALL.len(), 5);
-    assert_eq!(MutationOperator::all().len(), 69);
+    assert_eq!(MutationOperator::ALL.len(), 69);
 
     let image: HashSet<MutationOperator> = GraphOperator::ALL
         .into_iter()
-        .map(GraphOperator::operator)
+        .map(MutationOperator::from)
         .collect();
-    assert_eq!(
-        image.len(),
-        GraphOperator::ALL.len(),
-        "operator() is injective"
-    );
-    let graph_domain: HashSet<MutationOperator> = MutationOperator::all()
+    assert_eq!(image.len(), GraphOperator::ALL.len(), "From is injective");
+    let graph_domain: HashSet<MutationOperator> = MutationOperator::ALL
         .into_iter()
         .filter(|op| op.domain() == MutationDomain::Graph)
         .collect();
@@ -521,23 +502,23 @@ fn the_graph_catalog_is_a_bijection_onto_its_engine_operators() {
 
     let keys: HashSet<&str> = GraphOperator::ALL
         .into_iter()
-        .map(|op| op.operator().as_key())
+        .map(|op| MutationOperator::from(op).as_key())
         .collect();
     assert_eq!(keys.len(), GraphOperator::ALL.len(), "keys are unique");
     assert!(keys.iter().all(|key| key.starts_with("Graph.")));
 
     assert_eq!(
-        MutationOperator::all().len(),
+        MutationOperator::ALL.len(),
         TopologyOperator::ALL.len()
             + VmOperator::ALL.len()
             + GraphOperator::ALL.len()
             + InputRefOperator::ALL.len()
     );
-    let all_keys: HashSet<&str> = MutationOperator::all()
+    let all_keys: HashSet<&str> = MutationOperator::ALL
         .into_iter()
         .map(MutationOperator::as_key)
         .collect();
-    assert_eq!(all_keys.len(), MutationOperator::all().len());
+    assert_eq!(all_keys.len(), MutationOperator::ALL.len());
 }
 
 #[test]
@@ -556,13 +537,22 @@ fn record_reachability_increments_correct_counter() {
 fn reachability_accounting_matches_applied_events() {
     let mut s = MutationSummary::zero();
     // Simulate 3 applied events with reachability tracking
-    s.record_applied(MutationDomain::Topology, MutationOperator::TopologyAddNode);
+    s.record_applied(
+        MutationDomain::Topology,
+        MutationOperator::Topology(TopologyOperator::AddNode),
+    );
     s.record_reachability(TargetReachability::Reachable);
 
-    s.record_applied(MutationDomain::Vm, MutationOperator::VmConstantMutation);
+    s.record_applied(
+        MutationDomain::Vm,
+        MutationOperator::Vm(VmOperator::VmConstantMutation),
+    );
     s.record_reachability(TargetReachability::Unreachable);
 
-    s.record_applied(MutationDomain::Topology, MutationOperator::TopologyAddNode);
+    s.record_applied(
+        MutationDomain::Topology,
+        MutationOperator::Topology(TopologyOperator::AddNode),
+    );
     s.record_reachability(TargetReachability::NotApplicable);
 
     let reachability_total =
@@ -573,7 +563,7 @@ fn reachability_accounting_matches_applied_events() {
 #[test]
 fn operator_funnel_tracks_stage_counts_and_skip_reason_breakdown() {
     let mut s = MutationSummary::zero();
-    let operator = MutationOperator::VmInstructionMutation;
+    let operator = MutationOperator::Vm(VmOperator::VmInstructionMutation);
     let domain = MutationDomain::Vm;
 
     s.record_attempt(domain, operator);
@@ -611,11 +601,127 @@ fn operator_funnel_tracks_stage_counts_and_skip_reason_breakdown() {
 
 #[test]
 fn operator_keys_are_unique_and_domain_qualified() {
-    let operators = MutationOperator::all();
+    let operators = MutationOperator::ALL;
     let keys: std::collections::HashSet<_> =
         operators.iter().map(|operator| operator.as_key()).collect();
     assert_eq!(keys.len(), operators.len());
     for operator in operators {
         assert!(operator.as_key().contains('.'));
     }
+}
+
+/// Every operator's key on `ac3747005`, in today's flat order (T30.F10
+/// invariant 2): the nested catalog reproduces it verbatim.
+#[rustfmt::skip]
+const KEYS_AT_AC3747005: [&str; 69] = [
+    "Topology.AddNode", "Topology.RemoveNode", "Topology.RetargetNodeTarget",
+    "Topology.AddRouteTarget", "Topology.AddFeedbackRoute", "Topology.RemoveRouteTarget",
+    "Topology.ChangeEntryNode", "Topology.SwapNodeBackend", "Topology.CopyNode",
+    "Topology.CopyMeshBackwardSlice", "Topology.CopyMeshForwardSlice", "Topology.SpliceNode",
+    "Topology.SwapRouteTargets", "Topology.MutateGateBias",
+    "Vm.VmConstantMutation", "Vm.VmInstructionMutation", "Vm.VmDeleteInstruction",
+    "Vm.VmRegisterCountMutation", "Vm.VmInstructionRawFieldMutation", "Vm.CopyInstructionBlock",
+    "Vm.CopyInstructionBlockRemapped", "Vm.CopyConstantBlock", "Vm.CopyGeneBackwardSlice",
+    "Vm.CopyGeneForwardSlice", "Vm.InsertReadStoreMotif", "Vm.InsertReadBidMotif",
+    "Vm.InsertLoadCompareMotif", "Vm.MutateSlotAddress", "Vm.MutatePairedSlotAddress",
+    "Graph.AlterGraphEdgeWeight", "Graph.SwapGraphOperator", "Graph.MutateGraphOperatorParam",
+    "Graph.AddInternalGraphNode", "Graph.RemoveInternalGraphNode", "Graph.AddGraphEdge",
+    "Graph.RetargetGraphEdge", "Graph.RemoveGraphEdge", "Graph.GraphRawFieldMutation",
+    "Graph.CopyInternalNode", "Graph.CopySubgraph", "Graph.CopyNodeInputs",
+    "Graph.EnableHebbian", "Graph.DisableHebbian", "Graph.MutateHebbianRule",
+    "Graph.MutateHebbianRate", "Graph.ToggleHebbianLamarckian", "Graph.EnableRewardModulation",
+    "Graph.DisableRewardModulation", "Graph.MutateRewardSource", "Graph.MutateTraceDecay",
+    "Graph.AddBundleLive", "Graph.AddBundleSilent", "Graph.AlterBundleScale",
+    "Graph.ShiftBundleOffset", "Graph.RetargetBundle", "Graph.RemoveBundle", "Graph.SetScope",
+    "Graph.DetachGraphEdge", "Graph.EnableRetention", "Graph.DisableRetention",
+    "Graph.MutateRetention", "Graph.EnableBundleRetention", "Graph.DisableBundleRetention",
+    "Graph.MutateBundleRetention",
+    "InputRef.AddSensorLive", "InputRef.AddSensorSilent", "InputRef.Prune", "InputRef.Swap",
+    "InputRef.RawFieldMutation",
+];
+
+/// T30.F10 invariants 1-3: the nested catalog derives every operator fact
+/// from its domain enum, in today's order, keys and serde form.
+#[test]
+fn the_nested_catalog_derives_every_operator_fact() {
+    use crate::config::MutationConfig;
+    use crate::mutation::graph::GraphOperator;
+    use crate::mutation::input_ref::InputRefOperator;
+    use crate::mutation::topology::TopologyOperator;
+    use crate::mutation::vm::VmOperator;
+    use std::collections::HashSet;
+
+    let keys: Vec<&str> = MutationOperator::ALL.iter().map(|op| op.as_key()).collect();
+    assert_eq!(keys, KEYS_AT_AC3747005, "keys and order are today's");
+    assert_eq!(
+        keys.iter().collect::<HashSet<_>>().len(),
+        MutationOperator::ALL.len()
+    );
+    assert!(
+        MutationOperator::ALL.windows(2).all(|w| w[0] < w[1]),
+        "the derived nested order is the flat order"
+    );
+
+    let expected: Vec<MutationOperator> = TopologyOperator::ALL
+        .into_iter()
+        .map(MutationOperator::from)
+        .chain(VmOperator::ALL.into_iter().map(MutationOperator::from))
+        .chain(GraphOperator::ALL.into_iter().map(MutationOperator::from))
+        .chain(
+            InputRefOperator::ALL
+                .into_iter()
+                .map(MutationOperator::from),
+        )
+        .collect();
+    assert_eq!(MutationOperator::ALL.to_vec(), expected);
+    let catalog: Vec<MutationOperator> = MutationDomain::all()
+        .into_iter()
+        .flat_map(|domain| domain.catalog().iter().copied())
+        .collect();
+    assert_eq!(catalog, expected);
+
+    let config = MutationConfig {
+        large_copy_weight_percent: 30,
+        ..MutationConfig::default()
+    };
+    for domain in MutationDomain::all() {
+        for &op in domain.catalog() {
+            assert_eq!(op.domain(), domain);
+            assert!(op.as_key().starts_with(&format!("{}.", domain.as_key())));
+            let json = serde_json::to_string(&op).unwrap();
+            assert_eq!(json, format!("\"{}\"", op.as_key()));
+            assert_eq!(serde_json::from_str::<MutationOperator>(&json).unwrap(), op);
+        }
+    }
+    for &op in &MutationOperator::ALL {
+        let (effect, weight) = match op {
+            MutationOperator::Topology(o) => (o.complexity_effect(), o.tuned_weight(30)),
+            MutationOperator::Vm(o) => (o.complexity_effect(), u16::from(o.weight())),
+            MutationOperator::Graph(o) => (o.complexity_effect(), u16::from(o.weight())),
+            MutationOperator::InputRef(o) => (o.complexity_effect(), u16::from(o.weight())),
+        };
+        assert_eq!(op.complexity_effect(), effect, "{op:?}");
+        assert_eq!(op.weight(&config), weight, "{op:?}");
+    }
+    assert!(serde_json::from_str::<MutationOperator>("\"GraphAddGraphEdge\"").is_err());
+
+    let debug = |op: MutationOperator| format!("{op:?}");
+    assert_eq!(debug(TopologyOperator::AddNode.into()), "TopologyAddNode");
+    assert_eq!(
+        debug(VmOperator::VmConstantMutation.into()),
+        "VmConstantMutation"
+    );
+    assert_eq!(
+        debug(VmOperator::VmCopyInstructionBlock.into()),
+        "VmCopyInstructionBlock"
+    );
+    assert_eq!(
+        debug(GraphOperator::GraphRawFieldMutation.into()),
+        "GraphRawFieldMutation"
+    );
+    assert_eq!(
+        debug(GraphOperator::AddGraphEdge.into()),
+        "GraphAddGraphEdge"
+    );
+    assert_eq!(debug(InputRefOperator::Prune.into()), "InputRefPrune");
 }

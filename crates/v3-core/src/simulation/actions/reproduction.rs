@@ -1296,21 +1296,22 @@ mod tests {
     #[test]
     fn a_births_attribute_changes_reach_the_run_totals_by_scope() {
         use crate::config::SimulationConfig;
+        use crate::mutation::graph::GraphOperator;
         use crate::mutation::types::MutationOperator as Op;
         use crate::simulation::seeding::seed_simulation_with_founder_genomes;
         use rand::SeedableRng;
 
         const ATTRIBUTE: [Op; 10] = [
-            Op::GraphEnableHebbian,
-            Op::GraphDisableHebbian,
-            Op::GraphMutateHebbianRule,
-            Op::GraphMutateHebbianRate,
-            Op::GraphToggleHebbianLamarckian,
-            Op::GraphEnableRewardModulation,
-            Op::GraphDisableRewardModulation,
-            Op::GraphMutateRewardSource,
-            Op::GraphMutateTraceDecay,
-            Op::GraphSetScope,
+            Op::Graph(GraphOperator::EnableHebbian),
+            Op::Graph(GraphOperator::DisableHebbian),
+            Op::Graph(GraphOperator::MutateHebbianRule),
+            Op::Graph(GraphOperator::MutateHebbianRate),
+            Op::Graph(GraphOperator::ToggleHebbianLamarckian),
+            Op::Graph(GraphOperator::EnableRewardModulation),
+            Op::Graph(GraphOperator::DisableRewardModulation),
+            Op::Graph(GraphOperator::MutateRewardSource),
+            Op::Graph(GraphOperator::MutateTraceDecay),
+            Op::Graph(GraphOperator::SetScope),
         ];
         let mut reached = [false; 2];
         for seed in 0..64 {

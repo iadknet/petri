@@ -10,25 +10,11 @@ use crate::genome::cgp::{CgpGraphBackendDef, Scope};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{
-    BirthEdgeClass, BundleEdits, MutationOperator, MutationSkipReason, TargetReachability,
+    BirthEdgeClass, BundleEdits, EventReport, MutationSkipReason, TargetReachability,
 };
 
-/// What an applied Graph event reports beside its reachability.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub(crate) struct GraphEventReport {
-    /// The class of the vote-sink edge an `AddGraphEdge` pushed (T11.F30).
-    pub class: Option<BirthEdgeClass>,
-    /// The scope the change of one of the thirteen attribute operators (the
-    /// nine plasticity operators, `SetScope` and the three edge retention
-    /// operators) landed on (T25.F08, T25.F09).
-    pub attribute_scope: Option<Scope>,
-    /// What the event did to bundles (T25.F11), from the container's
-    /// return values.
-    pub bundle_edits: BundleEdits,
-}
-
 /// Graph mutation operator variants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum GraphOperator {
     AlterGraphEdgeWeight,
     SwapGraphOperator,
@@ -153,54 +139,90 @@ impl GraphOperator {
         }
     }
 
-    /// The engine's operator key for this operator: the one table every
-    /// per-operator classification of a Graph operator reads.
+    /// The operator's stable key, `<Domain>.<Name>`: benchmark summary
+    /// keys, server payloads and the serde form of `MutationOperator`.
     #[must_use]
-    pub const fn operator(self) -> MutationOperator {
+    pub const fn as_key(self) -> &'static str {
         match self {
-            Self::AlterGraphEdgeWeight => MutationOperator::GraphAlterGraphEdgeWeight,
-            Self::SwapGraphOperator => MutationOperator::GraphSwapGraphOperator,
-            Self::MutateGraphOperatorParam => MutationOperator::GraphMutateGraphOperatorParam,
-            Self::AddInternalGraphNode => MutationOperator::GraphAddInternalGraphNode,
-            Self::RemoveInternalGraphNode => MutationOperator::GraphRemoveInternalGraphNode,
-            Self::AddGraphEdge => MutationOperator::GraphAddGraphEdge,
-            Self::RetargetGraphEdge => MutationOperator::GraphRetargetGraphEdge,
-            Self::RemoveGraphEdge => MutationOperator::GraphRemoveGraphEdge,
-            Self::GraphRawFieldMutation => MutationOperator::GraphRawFieldMutation,
-            Self::CopyInternalNode => MutationOperator::GraphCopyInternalNode,
-            Self::CopySubgraph => MutationOperator::GraphCopySubgraph,
-            Self::CopyNodeInputs => MutationOperator::GraphCopyNodeInputs,
-            Self::EnableHebbian => MutationOperator::GraphEnableHebbian,
-            Self::DisableHebbian => MutationOperator::GraphDisableHebbian,
-            Self::MutateHebbianRule => MutationOperator::GraphMutateHebbianRule,
-            Self::MutateHebbianRate => MutationOperator::GraphMutateHebbianRate,
-            Self::ToggleHebbianLamarckian => MutationOperator::GraphToggleHebbianLamarckian,
-            Self::EnableRewardModulation => MutationOperator::GraphEnableRewardModulation,
-            Self::DisableRewardModulation => MutationOperator::GraphDisableRewardModulation,
-            Self::MutateRewardSource => MutationOperator::GraphMutateRewardSource,
-            Self::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
-            Self::AddBundleLive => MutationOperator::GraphAddBundleLive,
-            Self::AddBundleSilent => MutationOperator::GraphAddBundleSilent,
-            Self::AlterBundleScale => MutationOperator::GraphAlterBundleScale,
-            Self::ShiftBundleOffset => MutationOperator::GraphShiftBundleOffset,
-            Self::RetargetBundle => MutationOperator::GraphRetargetBundle,
-            Self::RemoveBundle => MutationOperator::GraphRemoveBundle,
-            Self::SetScope => MutationOperator::GraphSetScope,
-            Self::DetachGraphEdge => MutationOperator::GraphDetachGraphEdge,
-            Self::EnableRetention => MutationOperator::GraphEnableRetention,
-            Self::DisableRetention => MutationOperator::GraphDisableRetention,
-            Self::MutateRetention => MutationOperator::GraphMutateRetention,
-            Self::EnableBundleRetention => MutationOperator::GraphEnableBundleRetention,
-            Self::DisableBundleRetention => MutationOperator::GraphDisableBundleRetention,
-            Self::MutateBundleRetention => MutationOperator::GraphMutateBundleRetention,
+            Self::AlterGraphEdgeWeight => "Graph.AlterGraphEdgeWeight",
+            Self::SwapGraphOperator => "Graph.SwapGraphOperator",
+            Self::MutateGraphOperatorParam => "Graph.MutateGraphOperatorParam",
+            Self::AddInternalGraphNode => "Graph.AddInternalGraphNode",
+            Self::RemoveInternalGraphNode => "Graph.RemoveInternalGraphNode",
+            Self::AddGraphEdge => "Graph.AddGraphEdge",
+            Self::RetargetGraphEdge => "Graph.RetargetGraphEdge",
+            Self::RemoveGraphEdge => "Graph.RemoveGraphEdge",
+            Self::GraphRawFieldMutation => "Graph.GraphRawFieldMutation",
+            Self::CopyInternalNode => "Graph.CopyInternalNode",
+            Self::CopySubgraph => "Graph.CopySubgraph",
+            Self::CopyNodeInputs => "Graph.CopyNodeInputs",
+            Self::EnableHebbian => "Graph.EnableHebbian",
+            Self::DisableHebbian => "Graph.DisableHebbian",
+            Self::MutateHebbianRule => "Graph.MutateHebbianRule",
+            Self::MutateHebbianRate => "Graph.MutateHebbianRate",
+            Self::ToggleHebbianLamarckian => "Graph.ToggleHebbianLamarckian",
+            Self::EnableRewardModulation => "Graph.EnableRewardModulation",
+            Self::DisableRewardModulation => "Graph.DisableRewardModulation",
+            Self::MutateRewardSource => "Graph.MutateRewardSource",
+            Self::MutateTraceDecay => "Graph.MutateTraceDecay",
+            Self::AddBundleLive => "Graph.AddBundleLive",
+            Self::AddBundleSilent => "Graph.AddBundleSilent",
+            Self::AlterBundleScale => "Graph.AlterBundleScale",
+            Self::ShiftBundleOffset => "Graph.ShiftBundleOffset",
+            Self::RetargetBundle => "Graph.RetargetBundle",
+            Self::RemoveBundle => "Graph.RemoveBundle",
+            Self::SetScope => "Graph.SetScope",
+            Self::DetachGraphEdge => "Graph.DetachGraphEdge",
+            Self::EnableRetention => "Graph.EnableRetention",
+            Self::DisableRetention => "Graph.DisableRetention",
+            Self::MutateRetention => "Graph.MutateRetention",
+            Self::EnableBundleRetention => "Graph.EnableBundleRetention",
+            Self::DisableBundleRetention => "Graph.DisableBundleRetention",
+            Self::MutateBundleRetention => "Graph.MutateBundleRetention",
         }
     }
 
-    /// Whether this operator increases, decreases, or preserves genome
-    /// complexity, as its [`MutationOperator`] classifies it.
+    /// Whether this operator increases, decreases, or preserves genome complexity.
     #[must_use]
     pub const fn complexity_effect(self) -> crate::mutation::types::ComplexityEffect {
-        self.operator().complexity_effect()
+        use crate::mutation::types::ComplexityEffect;
+        match self {
+            Self::AddInternalGraphNode
+            | Self::AddGraphEdge
+            | Self::CopyInternalNode
+            | Self::CopySubgraph
+            | Self::CopyNodeInputs
+            | Self::EnableHebbian
+            | Self::EnableRewardModulation
+            | Self::AddBundleLive
+            | Self::AddBundleSilent => ComplexityEffect::Increasing,
+            Self::RemoveInternalGraphNode
+            | Self::RemoveGraphEdge
+            | Self::DisableHebbian
+            | Self::DisableRewardModulation
+            | Self::RemoveBundle => ComplexityEffect::Decreasing,
+            Self::AlterGraphEdgeWeight
+            | Self::SwapGraphOperator
+            | Self::MutateGraphOperatorParam
+            | Self::RetargetGraphEdge
+            | Self::GraphRawFieldMutation
+            | Self::MutateHebbianRule
+            | Self::MutateHebbianRate
+            | Self::ToggleHebbianLamarckian
+            | Self::MutateRewardSource
+            | Self::MutateTraceDecay
+            | Self::AlterBundleScale
+            | Self::ShiftBundleOffset
+            | Self::RetargetBundle
+            | Self::SetScope
+            | Self::DetachGraphEdge
+            | Self::EnableRetention
+            | Self::DisableRetention
+            | Self::MutateRetention
+            | Self::EnableBundleRetention
+            | Self::DisableBundleRetention
+            | Self::MutateBundleRetention => ComplexityEffect::Neutral,
+        }
     }
 
     /// Whether this operator has a site to apply to on one Graph-backend
@@ -306,7 +328,7 @@ impl GraphMutator {
     }
 
     /// [`Self::apply_in`] with what the event reports
-    /// beside its reachability ([`GraphEventReport`]); the same draws.
+    /// beside its reachability ([`EventReport`]); the same draws.
     pub(crate) fn apply_classified(
         genome: &mut CreatureGenome,
         op: GraphOperator,
@@ -314,7 +336,7 @@ impl GraphMutator {
         rng: &mut impl Rng,
         config: &MutationConfig,
         context: &SensorContext,
-    ) -> Result<(TargetReachability, GraphEventReport), MutationSkipReason> {
+    ) -> Result<(TargetReachability, EventReport), MutationSkipReason> {
         let applicable = Self::applicable_indices(genome, op, context);
         if applicable.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
@@ -338,7 +360,7 @@ impl GraphMutator {
         rng: &mut impl Rng,
         _config: &MutationConfig,
         context: &SensorContext,
-    ) -> Result<GraphEventReport, MutationSkipReason> {
+    ) -> Result<EventReport, MutationSkipReason> {
         match op {
             GraphOperator::AlterGraphEdgeWeight => {
                 unreported(operators::alter_edge_weight(genome, node_idx, rng))
@@ -355,9 +377,9 @@ impl GraphMutator {
             GraphOperator::RemoveInternalGraphNode => {
                 unreported(operators::remove_internal_node(genome, node_idx, rng))
             }
-            GraphOperator::AddGraphEdge => Ok(GraphEventReport {
+            GraphOperator::AddGraphEdge => Ok(EventReport {
                 class: operators::add_graph_edge(genome, node_idx, context, rng)?,
-                ..GraphEventReport::default()
+                ..EventReport::default()
             }),
             GraphOperator::RetargetGraphEdge => edited(operators::retarget_graph_edge(
                 genome, node_idx, context, rng,
@@ -483,29 +505,25 @@ impl GraphMutator {
 }
 
 /// An event that reports nothing beside its reachability.
-fn unreported(
-    result: Result<(), MutationSkipReason>,
-) -> Result<GraphEventReport, MutationSkipReason> {
-    result.map(|()| GraphEventReport::default())
+fn unreported(result: Result<(), MutationSkipReason>) -> Result<EventReport, MutationSkipReason> {
+    result.map(|()| EventReport::default())
 }
 
 /// An attribute change reporting the scope it landed on.
-fn scoped(
-    result: Result<Scope, MutationSkipReason>,
-) -> Result<GraphEventReport, MutationSkipReason> {
-    result.map(|scope| GraphEventReport {
+fn scoped(result: Result<Scope, MutationSkipReason>) -> Result<EventReport, MutationSkipReason> {
+    result.map(|scope| EventReport {
         attribute_scope: Some(scope),
-        ..GraphEventReport::default()
+        ..EventReport::default()
     })
 }
 
 /// A bundle-touching event reporting its edits.
 fn edited(
     result: Result<BundleEdits, MutationSkipReason>,
-) -> Result<GraphEventReport, MutationSkipReason> {
-    result.map(|bundle_edits| GraphEventReport {
+) -> Result<EventReport, MutationSkipReason> {
+    result.map(|bundle_edits| EventReport {
         bundle_edits,
-        ..GraphEventReport::default()
+        ..EventReport::default()
     })
 }
 
@@ -513,11 +531,11 @@ fn edited(
 /// bundle's sink, if any (T25.F11 invariant 8).
 fn created(
     result: Result<(BundleEdits, Option<BirthEdgeClass>), MutationSkipReason>,
-) -> Result<GraphEventReport, MutationSkipReason> {
-    result.map(|(bundle_edits, class)| GraphEventReport {
+) -> Result<EventReport, MutationSkipReason> {
+    result.map(|(bundle_edits, class)| EventReport {
         class,
         bundle_edits,
-        ..GraphEventReport::default()
+        ..EventReport::default()
     })
 }
 

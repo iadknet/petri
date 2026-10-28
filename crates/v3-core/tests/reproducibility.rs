@@ -26,6 +26,8 @@ use v3_core::config::SimulationConfig;
 use v3_core::contracts::{NodeId, Position, RouteTarget};
 use v3_core::creature::action_log::ActionType;
 use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
+use v3_core::mutation::topology::TopologyOperator;
+use v3_core::mutation::vm::VmOperator;
 use v3_core::mutation::MutationOperator;
 use v3_core::simulation::seeding::seed_simulation_with_founder_genomes;
 use v3_core::simulation::{run_tick, seed_simulation, Simulation};
@@ -242,11 +244,17 @@ fn two_simulations_with_the_same_seed_are_byte_identical() {
         {
             assert_eq!(a, b, "creature {index} diverged at tick {tick}");
         }
-        compared_mutated_descendant |= applied(&first, MutationOperator::VmMutatePairedSlotAddress)
-            > 0
-            && applied(&first, MutationOperator::TopologyCopyMeshBackwardSlice)
-                + applied(&first, MutationOperator::TopologyCopyMeshForwardSlice)
-                > 0
+        compared_mutated_descendant |= applied(
+            &first,
+            MutationOperator::Vm(VmOperator::VmMutatePairedSlotAddress),
+        ) > 0
+            && applied(
+                &first,
+                MutationOperator::Topology(TopologyOperator::CopyMeshBackwardSlice),
+            ) + applied(
+                &first,
+                MutationOperator::Topology(TopologyOperator::CopyMeshForwardSlice),
+            ) > 0
             && first
                 .creatures
                 .values()
@@ -257,9 +265,18 @@ fn two_simulations_with_the_same_seed_are_byte_identical() {
         }
     }
 
-    let paired = applied(&first, MutationOperator::VmMutatePairedSlotAddress);
-    let backward = applied(&first, MutationOperator::TopologyCopyMeshBackwardSlice);
-    let forward = applied(&first, MutationOperator::TopologyCopyMeshForwardSlice);
+    let paired = applied(
+        &first,
+        MutationOperator::Vm(VmOperator::VmMutatePairedSlotAddress),
+    );
+    let backward = applied(
+        &first,
+        MutationOperator::Topology(TopologyOperator::CopyMeshBackwardSlice),
+    );
+    let forward = applied(
+        &first,
+        MutationOperator::Topology(TopologyOperator::CopyMeshForwardSlice),
+    );
     eprintln!(
         "seed {SEED}, {TICKS} ticks: births={}, final_population={}, \
          applied operators={}, Vm.MutatePairedSlotAddress={paired}, \

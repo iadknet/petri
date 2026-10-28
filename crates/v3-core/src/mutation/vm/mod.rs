@@ -5,7 +5,7 @@ use crate::contracts::InputReference;
 use crate::genome::analysis::{vm_is_output_instruction, vm_register_write};
 use crate::genome::{BackendDef, CreatureGenome, VmBackendDef};
 use crate::mutation::reachability::TargetSelector;
-use crate::mutation::types::{MutationSkipReason, TargetReachability};
+use crate::mutation::types::{EventReport, MutationSkipReason, TargetReachability};
 
 pub(crate) mod operators;
 use operators::*;
@@ -16,7 +16,7 @@ pub(crate) use operators::{
 };
 
 /// VM mutation operator variants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum VmOperator {
     VmConstantMutation,
     VmInstructionMutation,
@@ -53,6 +53,29 @@ impl VmOperator {
         Self::VmMutateSlotAddress,
         Self::VmMutatePairedSlotAddress,
     ];
+
+    /// The operator's stable key, `<Domain>.<Name>`: benchmark summary
+    /// keys, server payloads and the serde form of `MutationOperator`.
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::VmConstantMutation => "Vm.VmConstantMutation",
+            Self::VmInstructionMutation => "Vm.VmInstructionMutation",
+            Self::VmDeleteInstruction => "Vm.VmDeleteInstruction",
+            Self::VmRegisterCountMutation => "Vm.VmRegisterCountMutation",
+            Self::VmInstructionRawFieldMutation => "Vm.VmInstructionRawFieldMutation",
+            Self::VmCopyInstructionBlock => "Vm.CopyInstructionBlock",
+            Self::VmCopyInstructionBlockRemapped => "Vm.CopyInstructionBlockRemapped",
+            Self::VmCopyConstantBlock => "Vm.CopyConstantBlock",
+            Self::VmCopyGeneBackwardSlice => "Vm.CopyGeneBackwardSlice",
+            Self::VmCopyGeneForwardSlice => "Vm.CopyGeneForwardSlice",
+            Self::VmInsertReadStoreMotif => "Vm.InsertReadStoreMotif",
+            Self::VmInsertReadBidMotif => "Vm.InsertReadBidMotif",
+            Self::VmInsertLoadCompareMotif => "Vm.InsertLoadCompareMotif",
+            Self::VmMutateSlotAddress => "Vm.MutateSlotAddress",
+            Self::VmMutatePairedSlotAddress => "Vm.MutatePairedSlotAddress",
+        }
+    }
 
     /// Per-operator weight reflecting impact tier.
     /// 4 = refinement, 2 = moderate, 1 = structural.
@@ -186,8 +209,9 @@ impl VmMutator {
 
     /// Apply a VM operator to the genome.
     ///
-    /// Returns `Ok(TargetReachability)` on success, or `Err(MutationSkipReason::NoApplicableTarget)`
-    /// if no VM-backend node has a site this operator can apply to. The skip
+    /// Returns the target's reachability and an empty [`EventReport`] on
+    /// success, or `Err(MutationSkipReason::NoApplicableTarget)` if no
+    /// VM-backend node has a site this operator can apply to. The skip
     /// happens before the draw, so the engine records it as no-eligible-node
     /// with no selected target.
     pub fn apply(
@@ -196,7 +220,7 @@ impl VmMutator {
         targets: &mut TargetSelector<'_>,
         rng: &mut impl Rng,
         config: &MutationConfig,
-    ) -> Result<TargetReachability, MutationSkipReason> {
+    ) -> Result<(TargetReachability, EventReport), MutationSkipReason> {
         let applicable = Self::applicable_indices(genome, op);
         if applicable.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
@@ -205,7 +229,8 @@ impl VmMutator {
         let (node_idx, reachability) = targets
             .select(&applicable, rng)
             .ok_or(MutationSkipReason::NoApplicableTarget)?;
-        Self::apply_to_node(genome, op, node_idx, rng, config).map(|()| reachability)
+        Self::apply_to_node(genome, op, node_idx, rng, config)
+            .map(|()| (reachability, EventReport::default()))
     }
 
     /// Dispatch `op` onto one already-selected node.

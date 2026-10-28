@@ -9,6 +9,8 @@ use v3_core::config::SimulationConfig;
 use v3_core::contracts::Position;
 use v3_core::creature::action_log::ActionType;
 use v3_core::kernel::occupancy_grid::OCCUPANCY_CELL_COUNT;
+use v3_core::mutation::graph::GraphOperator;
+use v3_core::mutation::topology::TopologyOperator;
 use v3_core::simulation::seed_simulation;
 use v3_core::simulation::seeding::seed_simulation_with_founder_genomes;
 
@@ -93,7 +95,7 @@ fn grid_for(population: u64) -> OccupancyGrid {
 /// to the tick (T25.F11).
 fn bundles_for(tick: u64) -> crate::bench::bundles::Bundles {
     let created = std::collections::HashMap::from([(
-        v3_core::mutation::MutationOperator::GraphAddBundleLive,
+        v3_core::mutation::MutationOperator::Graph(GraphOperator::AddBundleLive),
         [[tick, 0], [0, 0], [0, 0]],
     )]);
     crate::bench::bundles::Bundles::census(std::iter::empty(), &created)
@@ -776,7 +778,7 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
     stats.bundles_removed_total = 2;
     stats.mutation_attribute_changes_total_by_scope = [7, 4];
     stats.mutation_operator_funnel_total_by_operator.insert(
-        MutationOperator::GraphDetachGraphEdge,
+        MutationOperator::Graph(GraphOperator::DetachGraphEdge),
         v3_core::mutation::types::MutationOperatorFunnel {
             attempted: 6,
             applicable: 5,
@@ -797,7 +799,7 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
         ..MutationValueTotals::default()
     };
     stats.mutation_value_totals_by_operator.insert(
-        MutationOperator::TopologyAddNode,
+        MutationOperator::Topology(TopologyOperator::AddNode),
         MutationValueTotals {
             carriers_observed_total: 2,
             invalid_action_total: 1,

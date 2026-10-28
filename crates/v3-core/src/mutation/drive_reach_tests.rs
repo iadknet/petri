@@ -16,8 +16,11 @@ use crate::genome::cgp::{CgpGraphBackendDef, OutputSinkKind};
 use crate::genome::{BackendDef, NodeGenome, VmInstruction};
 use crate::mutation::graph::bundle::{add_sensor_by_law, BirthLaw};
 use crate::mutation::graph::operators::add_edge;
+use crate::mutation::graph::GraphOperator;
+use crate::mutation::input_ref::InputRefOperator;
 use crate::mutation::types::{BirthEdgeClass, MutationDomain, MutationOperator, MutationSummary};
 use crate::mutation::vm::operators::random_vm_instruction;
+use crate::mutation::vm::VmOperator;
 
 /// The vote sink whose edge count grew between `before` and `after`.
 fn grown_vote_sink(before: &CgpGraphBackendDef, after: &CgpGraphBackendDef) -> Option<VoteSink> {
@@ -227,46 +230,78 @@ fn summary(
 #[test]
 fn a_birth_has_a_class_only_for_one_applied_edge_or_creation() {
     use MutationDomain::{Graph, InputRef, Vm};
-    use MutationOperator::{
-        GraphAddBundleLive, GraphAddBundleSilent, GraphAddGraphEdge, GraphRemoveGraphEdge,
-        InputRefAddSensorLive, InputRefAddSensorSilent, VmDeleteInstruction,
-    };
     let drive = Some(BirthEdgeClass::Drive);
     let direction = Some(BirthEdgeClass::Direction);
     assert_eq!(
-        summary(&[(Graph, GraphAddGraphEdge, drive)]).birth_edge_class(),
+        summary(&[(
+            Graph,
+            MutationOperator::Graph(GraphOperator::AddGraphEdge),
+            drive
+        )])
+        .birth_edge_class(),
         drive
     );
     assert_eq!(
-        summary(&[(InputRef, InputRefAddSensorLive, direction)]).birth_edge_class(),
+        summary(&[(
+            InputRef,
+            MutationOperator::InputRef(InputRefOperator::AddSensorLive),
+            direction
+        )])
+        .birth_edge_class(),
         direction
     );
-    for operator in [GraphAddBundleLive, GraphAddBundleSilent] {
+    for operator in [
+        MutationOperator::Graph(GraphOperator::AddBundleLive),
+        MutationOperator::Graph(GraphOperator::AddBundleSilent),
+    ] {
         assert_eq!(
             summary(&[(Graph, operator, direction)]).birth_edge_class(),
             direction
         );
     }
     assert_eq!(
-        summary(&[(InputRef, InputRefAddSensorSilent, drive)]).birth_edge_class(),
+        summary(&[(
+            InputRef,
+            MutationOperator::InputRef(InputRefOperator::AddSensorSilent),
+            drive
+        )])
+        .birth_edge_class(),
         drive
     );
     // One applied event of any other operator has no class, even with a
     // recorded vote-sink push.
     assert_eq!(
-        summary(&[(Graph, GraphRemoveGraphEdge, drive)]).birth_edge_class(),
+        summary(&[(
+            Graph,
+            MutationOperator::Graph(GraphOperator::RemoveGraphEdge),
+            drive
+        )])
+        .birth_edge_class(),
         None
     );
     // A compute-input edge, an `Eat` sink or a VM node: no vote-sink push.
     assert_eq!(
-        summary(&[(Graph, GraphAddGraphEdge, None)]).birth_edge_class(),
+        summary(&[(
+            Graph,
+            MutationOperator::Graph(GraphOperator::AddGraphEdge),
+            None
+        )])
+        .birth_edge_class(),
         None
     );
     // A repeated same-operator birth has no class, whatever both pushed.
     assert_eq!(
         summary(&[
-            (Graph, GraphAddGraphEdge, drive),
-            (Graph, GraphAddGraphEdge, drive)
+            (
+                Graph,
+                MutationOperator::Graph(GraphOperator::AddGraphEdge),
+                drive
+            ),
+            (
+                Graph,
+                MutationOperator::Graph(GraphOperator::AddGraphEdge),
+                drive
+            )
         ])
         .birth_edge_class(),
         None
@@ -274,16 +309,32 @@ fn a_birth_has_a_class_only_for_one_applied_edge_or_creation() {
     // Any second applied event, of any operator, removes the class.
     assert_eq!(
         summary(&[
-            (Graph, GraphAddGraphEdge, drive),
-            (Graph, GraphRemoveGraphEdge, None)
+            (
+                Graph,
+                MutationOperator::Graph(GraphOperator::AddGraphEdge),
+                drive
+            ),
+            (
+                Graph,
+                MutationOperator::Graph(GraphOperator::RemoveGraphEdge),
+                None
+            )
         ])
         .birth_edge_class(),
         None
     );
     assert_eq!(
         summary(&[
-            (InputRef, InputRefAddSensorLive, direction),
-            (Vm, VmDeleteInstruction, None)
+            (
+                InputRef,
+                MutationOperator::InputRef(InputRefOperator::AddSensorLive),
+                direction
+            ),
+            (
+                Vm,
+                MutationOperator::Vm(VmOperator::VmDeleteInstruction),
+                None
+            )
         ])
         .birth_edge_class(),
         None

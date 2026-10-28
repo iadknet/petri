@@ -205,6 +205,7 @@ mod tests {
     use v3_core::contracts::{InputReference, WorldInputKey};
     use v3_core::creature::founder::v3alpha1_founder_genome;
     use v3_core::genome::cgp::{BundleBirth, BundleSource};
+    use v3_core::mutation::graph::GraphOperator;
 
     fn context() -> v3_core::contracts::SensorContext {
         SimulationConfig::default().sensor_context(1)
@@ -255,7 +256,7 @@ mod tests {
         let reachable: Vec<usize> = (0..genome.nodes.len()).collect();
         let mut created = std::collections::HashMap::new();
         created.insert(
-            MutationOperator::GraphAddBundleLive,
+            MutationOperator::Graph(GraphOperator::AddBundleLive),
             [[1, 0], [0, 2], [0, 0]],
         );
         let block = Bundles::census([(&genome, reachable.as_slice(), None)], &created);

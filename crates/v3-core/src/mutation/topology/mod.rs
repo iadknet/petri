@@ -4,7 +4,7 @@ use crate::config::MutationConfig;
 use crate::contracts::SensorContext;
 use crate::genome::CreatureGenome;
 use crate::mutation::reachability::TargetSelector;
-use crate::mutation::types::{MutationSkipReason, TargetReachability};
+use crate::mutation::types::{EventReport, MutationSkipReason, TargetReachability};
 
 // Re-exported for use via `use super::*` in tests.
 #[cfg(test)]
@@ -17,7 +17,7 @@ mod routing;
 mod structural;
 
 /// Topology mutation operator variants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TopologyOperator {
     AddNode,
     RemoveNode,
@@ -52,6 +52,28 @@ impl TopologyOperator {
         Self::SwapRouteTargets,
         Self::MutateGateBias,
     ];
+
+    /// The operator's stable key, `<Domain>.<Name>`: benchmark summary
+    /// keys, server payloads and the serde form of `MutationOperator`.
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::AddNode => "Topology.AddNode",
+            Self::RemoveNode => "Topology.RemoveNode",
+            Self::RetargetNodeTarget => "Topology.RetargetNodeTarget",
+            Self::AddRouteTarget => "Topology.AddRouteTarget",
+            Self::AddFeedbackRoute => "Topology.AddFeedbackRoute",
+            Self::RemoveRouteTarget => "Topology.RemoveRouteTarget",
+            Self::ChangeEntryNode => "Topology.ChangeEntryNode",
+            Self::SwapNodeBackend => "Topology.SwapNodeBackend",
+            Self::CopyNode => "Topology.CopyNode",
+            Self::CopyMeshBackwardSlice => "Topology.CopyMeshBackwardSlice",
+            Self::CopyMeshForwardSlice => "Topology.CopyMeshForwardSlice",
+            Self::SpliceNode => "Topology.SpliceNode",
+            Self::SwapRouteTargets => "Topology.SwapRouteTargets",
+            Self::MutateGateBias => "Topology.MutateGateBias",
+        }
+    }
 
     /// Per-operator weight reflecting impact tier.
     /// 40 = refinement, 20 = moderate, 10 = structural; `ChangeEntryNode`
@@ -170,6 +192,7 @@ impl TopologyMutator {
             config,
             &crate::config::SimulationConfig::default().sensor_context(1),
         )
+        .map(|(reachability, _)| reachability)
     }
 
     /// [`Self::apply`] under the run's sensor context.
@@ -180,8 +203,8 @@ impl TopologyMutator {
         rng: &mut impl Rng,
         _config: &MutationConfig,
         context: &SensorContext,
-    ) -> Result<TargetReachability, MutationSkipReason> {
-        match op {
+    ) -> Result<(TargetReachability, EventReport), MutationSkipReason> {
+        let reachability = match op {
             TopologyOperator::AddNode => structural::apply_splice_node(genome, targets, rng),
             TopologyOperator::ChangeEntryNode => structural::apply_change_entry_node(genome, rng)
                 .map(|()| TargetReachability::NotApplicable),
@@ -217,7 +240,8 @@ impl TopologyMutator {
             TopologyOperator::MutateGateBias => {
                 routing::apply_mutate_gate_bias(genome, targets, rng)
             }
-        }
+        }?;
+        Ok((reachability, EventReport::default()))
     }
 }
 

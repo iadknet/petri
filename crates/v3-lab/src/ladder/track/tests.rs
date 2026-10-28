@@ -10,6 +10,8 @@ use v3_core::contracts::{InputReference, Position, WorldInputKey};
 use v3_core::creature::founder::founder_genome_with_age_gate;
 use v3_core::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSink};
 use v3_core::genome::VmBackendDef;
+use v3_core::mutation::graph::GraphOperator;
+use v3_core::mutation::input_ref::InputRefOperator;
 use v3_core::mutation::reachability::ParentExecuted;
 use v3_core::mutation::{
     MutationDomain, MutationEngine, MutationEventRecord, MutationOperator, MutationSkipReason,
@@ -223,7 +225,7 @@ fn a_birth_counts_events_on_the_parents_sites_by_operator_and_reason() {
     let applied = MutationEventOutcome::Applied(TargetReachability::Reachable);
     let events = vec![
         event(
-            Some(MutationOperator::GraphAddGraphEdge),
+            Some(MutationOperator::Graph(GraphOperator::AddGraphEdge)),
             Some(n0),
             applied,
             Vec::new(),
@@ -233,20 +235,29 @@ fn a_birth_counts_events_on_the_parents_sites_by_operator_and_reason() {
             Some(n1),
             MutationEventOutcome::Skipped(MutationSkipReason::NoApplicableTarget),
             vec![
-                (MutationOperator::GraphRemoveGraphEdge, Some(NodeId(n0))),
-                (MutationOperator::GraphSwapGraphOperator, None),
-                (MutationOperator::GraphRetargetGraphEdge, Some(NodeId(99))),
+                (
+                    MutationOperator::Graph(GraphOperator::RemoveGraphEdge),
+                    Some(NodeId(n0)),
+                ),
+                (
+                    MutationOperator::Graph(GraphOperator::SwapGraphOperator),
+                    None,
+                ),
+                (
+                    MutationOperator::Graph(GraphOperator::RetargetGraphEdge),
+                    Some(NodeId(99)),
+                ),
             ],
         ),
         // Off the sites, or with no target: never targeted.
         event(
-            Some(MutationOperator::GraphAddGraphEdge),
+            Some(MutationOperator::Graph(GraphOperator::AddGraphEdge)),
             Some(99),
             applied,
             Vec::new(),
         ),
         event(
-            Some(MutationOperator::InputRefAddSensorLive),
+            Some(MutationOperator::InputRef(InputRefOperator::AddSensorLive)),
             None,
             MutationEventOutcome::Skipped(MutationSkipReason::ParseabilityViolation),
             Vec::new(),
@@ -265,8 +276,8 @@ fn a_birth_counts_events_on_the_parents_sites_by_operator_and_reason() {
     assert_eq!(
         birth.targeted,
         Targeted {
-            requested: map(&[("GraphAddGraphEdge", 1), ("none", 1)]),
-            applied: map(&[("GraphAddGraphEdge", 1)]),
+            requested: map(&[("Graph.AddGraphEdge", 1), ("none", 1)]),
+            applied: map(&[("Graph.AddGraphEdge", 1)]),
             skipped: map(&[("none", 1)]),
             skipped_by_reason: map(&[("NoApplicableTarget", 1)]),
         }
@@ -283,10 +294,13 @@ fn a_birth_counts_events_on_the_parents_sites_by_operator_and_reason() {
         &sites,
         &parent,
         &summary(vec![event(
-            Some(MutationOperator::GraphAddGraphEdge),
+            Some(MutationOperator::Graph(GraphOperator::AddGraphEdge)),
             Some(n0),
             MutationEventOutcome::Skipped(MutationSkipReason::NumericProposalRejected),
-            vec![(MutationOperator::GraphRemoveGraphEdge, Some(NodeId(n1)))],
+            vec![(
+                MutationOperator::Graph(GraphOperator::RemoveGraphEdge),
+                Some(NodeId(n1)),
+            )],
         )]),
     );
     assert!(!quiet.touching);

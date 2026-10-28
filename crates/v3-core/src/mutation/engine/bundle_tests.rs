@@ -15,6 +15,29 @@ use crate::genome::cgp::{
     test_support::edit_sinks, BundleId, CgpGraphBackendDef, OutputSinkKind, Scope,
 };
 use crate::genome::{NodeGenome, VmBackendDef, VmInstruction};
+use crate::mutation::graph::GraphOperator;
+use crate::mutation::input_ref::InputRefOperator;
+use crate::mutation::BundleEdits;
+
+/// One gated Graph event through the engine's [`apply_event`], with the
+/// bundle edits and attribute scope it reported: empty when the gate rolled
+/// it back, since only a committed event carries its [`EventReport`].
+fn gated_graph_event(
+    genome: &mut CreatureGenome,
+    op: GraphOperator,
+    targets: &mut TargetSelector<'_>,
+    rng: &mut impl rand::Rng,
+    config: &MutationConfig,
+    context: &SensorContext,
+) -> (
+    Result<(TargetReachability, EventReport), MutationSkipReason>,
+    BundleEdits,
+    Option<Scope>,
+) {
+    let result = apply_event(genome, op.into(), targets, rng, config, context);
+    let report = result.map_or_else(|_| EventReport::default(), |(_, report)| report);
+    (result, report.bundle_edits, report.attribute_scope)
+}
 
 fn graph_index(genome: &CreatureGenome) -> usize {
     genome
@@ -118,7 +141,7 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
     let all: Vec<usize> = (0..valid.nodes.len()).collect();
     for seed in 0..8 {
         let mut committed = valid.clone();
-        let (result, edits, _) = apply_graph_event(
+        let (result, edits, _) = gated_graph_event(
             &mut committed,
             GraphOperator::RemoveBundle,
             &mut TargetSelector::reachable_only(&all, 0.0),
@@ -130,7 +153,7 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
         assert_eq!(edits.removed, 1);
 
         let mut rolled_back = broken.clone();
-        let (result, edits, scope) = apply_graph_event(
+        let (result, edits, scope) = gated_graph_event(
             &mut rolled_back,
             GraphOperator::RemoveBundle,
             &mut TargetSelector::reachable_only(&all, 0.0),
@@ -160,7 +183,7 @@ fn a_rolled_back_attribute_change_reports_no_scope() {
     for op in [GraphOperator::EnableHebbian, GraphOperator::SetScope] {
         for seed in 0..16 {
             let mut committed = valid.clone();
-            let (result, _, scope) = apply_graph_event(
+            let (result, _, scope) = gated_graph_event(
                 &mut committed,
                 op,
                 &mut TargetSelector::reachable_only(&all, 0.0),
@@ -172,7 +195,7 @@ fn a_rolled_back_attribute_change_reports_no_scope() {
             assert!(scope.is_some(), "{op:?} seed {seed} reports its scope");
 
             let mut rolled_back = broken.clone();
-            let (result, edits, scope) = apply_graph_event(
+            let (result, edits, scope) = gated_graph_event(
                 &mut rolled_back,
                 op,
                 &mut TargetSelector::reachable_only(&all, 0.0),
@@ -224,7 +247,7 @@ fn a_committed_detach_counts_one_graph_edge_detached() {
     let all = every_node(&genome);
     for seed in 0..16 {
         let mut detached = genome.clone();
-        let (result, edits, scope) = apply_graph_event(
+        let (result, edits, scope) = gated_graph_event(
             &mut detached,
             GraphOperator::DetachGraphEdge,
             &mut TargetSelector::reachable_only(&all, 0.0),
@@ -263,7 +286,7 @@ fn a_last_member_detach_removes_the_bundle_and_counts_one_removal() {
     }
     let all = every_node(&genome);
     let mut detached = genome.clone();
-    let (result, edits, _) = apply_graph_event(
+    let (result, edits, _) = gated_graph_event(
         &mut detached,
         GraphOperator::DetachGraphEdge,
         &mut TargetSelector::reachable_only(&all, 0.0),
@@ -283,7 +306,10 @@ fn a_last_member_detach_removes_the_bundle_and_counts_one_removal() {
     assert!(graph_mut(&mut detached.nodes[idx]).bundles().is_empty());
     assert_eq!(detached.genome_size(), genome.genome_size());
     let mut summary = MutationSummary::zero();
-    summary.record_bundle_edits(MutationOperator::GraphDetachGraphEdge, edits);
+    summary.record_bundle_edits(
+        MutationOperator::Graph(GraphOperator::DetachGraphEdge),
+        edits,
+    );
     assert_eq!(
         (summary.graph_edges_detached, summary.bundles_removed),
         (1, 1)
@@ -426,7 +452,7 @@ fn a_sole_members_detach_moves_genome_size_by_the_unit_rule() {
             let mut detached_once = false;
             for seed in 0..64 {
                 let mut mutated = genome.clone();
-                let (result, edits, _) = apply_graph_event(
+                let (result, edits, _) = gated_graph_event(
                     &mut mutated,
                     op,
                     &mut TargetSelector::reachable_only(&all, 0.0),
@@ -483,7 +509,7 @@ fn a_committed_attribute_change_reports_the_scope_it_landed_on() {
     let mut seen = [false; 3];
     for seed in 0..256 {
         let mut changed = genome.clone();
-        let (result, _, scope) = apply_graph_event(
+        let (result, _, scope) = gated_graph_event(
             &mut changed,
             GraphOperator::EnableHebbian,
             &mut TargetSelector::reachable_only(&all, 0.0),
@@ -517,7 +543,7 @@ fn a_committed_attribute_change_reports_the_scope_it_landed_on() {
     let mut scopes = [false; 2];
     for seed in 0..64 {
         let mut changed = genome.clone();
-        let (result, _, scope) = apply_graph_event(
+        let (result, _, scope) = gated_graph_event(
             &mut changed,
             GraphOperator::SetScope,
             &mut TargetSelector::reachable_only(&all, 0.0),
@@ -544,7 +570,7 @@ fn a_committed_attribute_change_reports_the_scope_it_landed_on() {
         GraphOperator::AlterGraphEdgeWeight,
     ] {
         let mut changed = genome.clone();
-        let (result, _, scope) = apply_graph_event(
+        let (result, _, scope) = gated_graph_event(
             &mut changed,
             op,
             &mut TargetSelector::reachable_only(&all, 0.0),
@@ -568,7 +594,7 @@ fn a_committed_attribute_change_reports_the_scope_it_landed_on() {
 fn record_bundle_edits_accumulates_across_events() {
     let mut summary = MutationSummary::zero();
     summary.record_bundle_edits(
-        MutationOperator::GraphRemoveBundle,
+        MutationOperator::Graph(GraphOperator::RemoveBundle),
         BundleEdits {
             detached: 2,
             removed: 1,
@@ -576,7 +602,7 @@ fn record_bundle_edits_accumulates_across_events() {
         },
     );
     summary.record_bundle_edits(
-        MutationOperator::GraphRemoveBundle,
+        MutationOperator::Graph(GraphOperator::RemoveBundle),
         BundleEdits {
             detached: 3,
             removed: 4,
@@ -595,38 +621,42 @@ fn expected_delta(
     after: &CgpGraphBackendDef,
 ) -> Option<Vec<i64>> {
     match op {
-        MutationOperator::GraphAddBundleSilent | MutationOperator::GraphAddBundleLive => {
-            Some(vec![1])
-        }
+        MutationOperator::Graph(GraphOperator::AddBundleSilent)
+        | MutationOperator::Graph(GraphOperator::AddBundleLive) => Some(vec![1]),
         // One declaration and one record per field set (T25.F11
         // invariant 8).
-        MutationOperator::InputRefAddSensorLive | MutationOperator::InputRefAddSensorSilent => {
+        MutationOperator::InputRef(InputRefOperator::AddSensorLive)
+        | MutationOperator::InputRef(InputRefOperator::AddSensorSilent) => {
             let made = after.bundles().len() - before.bundles().len();
             Some(vec![1 + i64::try_from(made).unwrap()])
         }
-        MutationOperator::GraphDetachGraphEdge => {
+        MutationOperator::Graph(GraphOperator::DetachGraphEdge) => {
             Some(vec![if after.bundles().len() < before.bundles().len() {
                 0
             } else {
                 1
             }])
         }
-        MutationOperator::GraphRemoveBundle => Some(vec![-1]),
-        MutationOperator::GraphRemoveGraphEdge
+        MutationOperator::Graph(GraphOperator::RemoveBundle) => Some(vec![-1]),
+        MutationOperator::Graph(GraphOperator::RemoveGraphEdge)
             if after.bundles().len() < before.bundles().len() =>
         {
             Some(vec![-1])
         }
-        MutationOperator::GraphRemoveGraphEdge if member_removed(before, after) => Some(vec![0]),
-        MutationOperator::GraphAlterBundleScale
-        | MutationOperator::GraphShiftBundleOffset
-        | MutationOperator::GraphRetargetBundle
-        | MutationOperator::GraphEnableRetention
-        | MutationOperator::GraphDisableRetention
-        | MutationOperator::GraphMutateRetention
-        | MutationOperator::GraphEnableBundleRetention
-        | MutationOperator::GraphDisableBundleRetention
-        | MutationOperator::GraphMutateBundleRetention => Some(vec![0]),
+        MutationOperator::Graph(GraphOperator::RemoveGraphEdge)
+            if member_removed(before, after) =>
+        {
+            Some(vec![0])
+        }
+        MutationOperator::Graph(GraphOperator::AlterBundleScale)
+        | MutationOperator::Graph(GraphOperator::ShiftBundleOffset)
+        | MutationOperator::Graph(GraphOperator::RetargetBundle)
+        | MutationOperator::Graph(GraphOperator::EnableRetention)
+        | MutationOperator::Graph(GraphOperator::DisableRetention)
+        | MutationOperator::Graph(GraphOperator::MutateRetention)
+        | MutationOperator::Graph(GraphOperator::EnableBundleRetention)
+        | MutationOperator::Graph(GraphOperator::DisableBundleRetention)
+        | MutationOperator::Graph(GraphOperator::MutateBundleRetention) => Some(vec![0]),
         _ => None,
     }
 }
@@ -806,7 +836,7 @@ proptest! {
             // Every committed attribute change reports one scope (T25.F08).
             let attribute_events: u32 = ATTRIBUTE_OPERATORS
                 .iter()
-                .filter_map(|op| summary.applied_by_operator.get(&op.operator()))
+                .filter_map(|op| summary.applied_by_operator.get(&MutationOperator::from(*op)))
                 .sum();
             prop_assert_eq!(summary.attribute_changes_by_scope.iter().sum::<u32>(), attribute_events);
             prop_assert!(!summary.skip_reasons.contains_key(&MutationSkipReason::GraphInvariantViolation));
@@ -838,13 +868,13 @@ proptest! {
             }).sum::<usize>());
             if matches!(
                 op,
-                MutationOperator::GraphRemoveBundle
-                    | MutationOperator::GraphRemoveGraphEdge
-                    | MutationOperator::GraphDetachGraphEdge
+                MutationOperator::Graph(GraphOperator::RemoveBundle)
+                    | MutationOperator::Graph(GraphOperator::RemoveGraphEdge)
+                    | MutationOperator::Graph(GraphOperator::DetachGraphEdge)
             ) {
                 prop_assert_eq!(summary.bundles_removed as usize, removed);
             }
-            if op == MutationOperator::GraphDetachGraphEdge {
+            if op == MutationOperator::Graph(GraphOperator::DetachGraphEdge) {
                 prop_assert_eq!(summary.graph_edges_detached, 1);
             }
         }

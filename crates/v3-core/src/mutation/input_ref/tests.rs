@@ -798,7 +798,7 @@ fn apply_add_to_node(
     node_idx: usize,
     rng: &mut SmallRng,
     food_type_count: usize,
-) -> Result<InputRefEventReport, MutationSkipReason> {
+) -> Result<crate::mutation::types::EventReport, MutationSkipReason> {
     InputRefMutator::apply_to_node(
         genome,
         op,

@@ -1,8 +1,14 @@
 use std::collections::HashMap;
+use std::fmt;
 
+use crate::config::{MutationConfig, ReachableBiasConfig};
 use crate::contracts::votes::VoteSink;
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::genome::cgp::Scope;
+use crate::mutation::graph::GraphOperator;
+use crate::mutation::input_ref::InputRefOperator;
+use crate::mutation::topology::TopologyOperator;
+use crate::mutation::vm::VmOperator;
 
 /// Whether a mutation operator increases, decreases, or preserves genome complexity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -230,398 +236,217 @@ impl MutationDomain {
     pub const fn all() -> [Self; 4] {
         [Self::Topology, Self::Vm, Self::Graph, Self::InputRef]
     }
+
+    /// This domain's operators: its slice of [`MutationOperator::ALL`], in
+    /// the domain enum's `ALL` order.
+    #[must_use]
+    pub fn catalog(self) -> &'static [MutationOperator] {
+        const TOPOLOGY: usize = TopologyOperator::ALL.len();
+        const VM: usize = TOPOLOGY + VmOperator::ALL.len();
+        const GRAPH: usize = VM + GraphOperator::ALL.len();
+        let all = &MutationOperator::ALL;
+        match self {
+            Self::Topology => &all[..TOPOLOGY],
+            Self::Vm => &all[TOPOLOGY..VM],
+            Self::Graph => &all[VM..GRAPH],
+            Self::InputRef => &all[GRAPH..],
+        }
+    }
+
+    /// The domain's production reachable bias.
+    #[must_use]
+    pub const fn reachable_bias(self, config: &ReachableBiasConfig) -> f64 {
+        match self {
+            Self::Topology => config.topology,
+            Self::Vm => config.vm,
+            Self::Graph => config.graph,
+            Self::InputRef => config.input_ref,
+        }
+    }
 }
 
-/// Mutation operator selected for one attempted mutation event.
+/// Mutation operator selected for one attempted mutation event: one of the
+/// four domain enums' operators (T30.F10). The domain enum owns every fact
+/// about its operators (key, weight, complexity effect); this enum derives
+/// them from the variant. Its derived order is today's flat order: the
+/// domains in variant order, then each domain enum's declaration order.
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
+#[serde(into = "&'static str", try_from = "String")]
 pub enum MutationOperator {
-    // Topology
-    TopologyAddNode,
-    TopologyRemoveNode,
-    TopologyRetargetNodeTarget,
-    TopologyAddRouteTarget,
-    TopologyAddFeedbackRoute,
-    TopologyRemoveRouteTarget,
-    TopologyChangeEntryNode,
-    TopologySwapNodeBackend,
-    TopologyCopyNode,
-    TopologyCopyMeshBackwardSlice,
-    TopologyCopyMeshForwardSlice,
-    TopologySpliceNode,
-    TopologySwapRouteTargets,
-    TopologyMutateGateBias,
-    // VM
-    VmConstantMutation,
-    VmInstructionMutation,
-    VmDeleteInstruction,
-    VmRegisterCountMutation,
-    VmInstructionRawFieldMutation,
-    VmCopyInstructionBlock,
-    VmCopyInstructionBlockRemapped,
-    VmCopyConstantBlock,
-    VmCopyGeneBackwardSlice,
-    VmCopyGeneForwardSlice,
-    VmInsertReadStoreMotif,
-    VmInsertReadBidMotif,
-    VmInsertLoadCompareMotif,
-    VmMutateSlotAddress,
-    VmMutatePairedSlotAddress,
-    // Graph
-    GraphAlterGraphEdgeWeight,
-    GraphSwapGraphOperator,
-    GraphMutateGraphOperatorParam,
-    GraphAddInternalGraphNode,
-    GraphRemoveInternalGraphNode,
-    GraphAddGraphEdge,
-    GraphRetargetGraphEdge,
-    GraphRemoveGraphEdge,
-    GraphRawFieldMutation,
-    GraphCopyInternalNode,
-    GraphCopySubgraph,
-    GraphCopyNodeInputs,
-    GraphEnableHebbian,
-    GraphDisableHebbian,
-    GraphMutateHebbianRule,
-    GraphMutateHebbianRate,
-    GraphToggleHebbianLamarckian,
-    GraphEnableRewardModulation,
-    GraphDisableRewardModulation,
-    GraphMutateRewardSource,
-    GraphMutateTraceDecay,
-    GraphAddBundleLive,
-    GraphAddBundleSilent,
-    GraphAlterBundleScale,
-    GraphShiftBundleOffset,
-    GraphRetargetBundle,
-    GraphRemoveBundle,
-    GraphSetScope,
-    GraphDetachGraphEdge,
-    GraphEnableRetention,
-    GraphDisableRetention,
-    GraphMutateRetention,
-    GraphEnableBundleRetention,
-    GraphDisableBundleRetention,
-    GraphMutateBundleRetention,
-    // InputRef
-    InputRefAddSensorLive,
-    InputRefAddSensorSilent,
-    InputRefPrune,
-    InputRefSwap,
-    InputRefRawFieldMutation,
+    Topology(TopologyOperator),
+    Vm(VmOperator),
+    Graph(GraphOperator),
+    InputRef(InputRefOperator),
+}
+
+/// Concatenates the four domain `ALL` lists in domain order.
+const fn catalog_of() -> [MutationOperator; 69] {
+    let mut all = [MutationOperator::Topology(TopologyOperator::AddNode); 69];
+    let mut i = 0;
+    let mut j = 0;
+    while j < TopologyOperator::ALL.len() {
+        all[i] = MutationOperator::Topology(TopologyOperator::ALL[j]);
+        i += 1;
+        j += 1;
+    }
+    j = 0;
+    while j < VmOperator::ALL.len() {
+        all[i] = MutationOperator::Vm(VmOperator::ALL[j]);
+        i += 1;
+        j += 1;
+    }
+    j = 0;
+    while j < GraphOperator::ALL.len() {
+        all[i] = MutationOperator::Graph(GraphOperator::ALL[j]);
+        i += 1;
+        j += 1;
+    }
+    j = 0;
+    while j < InputRefOperator::ALL.len() {
+        all[i] = MutationOperator::InputRef(InputRefOperator::ALL[j]);
+        i += 1;
+        j += 1;
+    }
+    assert!(i == 69, "ALL holds every domain operator once");
+    all
 }
 
 impl MutationOperator {
+    /// Every operator, the four domain `ALL` lists in domain order.
+    pub const ALL: [Self; 69] = catalog_of();
+
+    /// The domain's own operator, as its `Debug` names it.
+    fn inner(&self) -> &dyn fmt::Debug {
+        match self {
+            Self::Topology(op) => op,
+            Self::Vm(op) => op,
+            Self::Graph(op) => op,
+            Self::InputRef(op) => op,
+        }
+    }
+
+    /// The domain enum's own `Debug` name (`AddNode`, `VmConstantMutation`).
+    #[must_use]
+    pub fn inner_name(self) -> String {
+        format!("{:?}", self.inner())
+    }
+
     #[must_use]
     pub const fn as_key(self) -> &'static str {
         match self {
-            Self::TopologyAddNode => "Topology.AddNode",
-            Self::TopologyRemoveNode => "Topology.RemoveNode",
-            Self::TopologyRetargetNodeTarget => "Topology.RetargetNodeTarget",
-            Self::TopologyAddRouteTarget => "Topology.AddRouteTarget",
-            Self::TopologyAddFeedbackRoute => "Topology.AddFeedbackRoute",
-            Self::TopologyRemoveRouteTarget => "Topology.RemoveRouteTarget",
-            Self::TopologyChangeEntryNode => "Topology.ChangeEntryNode",
-            Self::TopologySwapNodeBackend => "Topology.SwapNodeBackend",
-            Self::TopologyCopyNode => "Topology.CopyNode",
-            Self::TopologyCopyMeshBackwardSlice => "Topology.CopyMeshBackwardSlice",
-            Self::TopologyCopyMeshForwardSlice => "Topology.CopyMeshForwardSlice",
-            Self::TopologySpliceNode => "Topology.SpliceNode",
-            Self::TopologySwapRouteTargets => "Topology.SwapRouteTargets",
-            Self::TopologyMutateGateBias => "Topology.MutateGateBias",
-            Self::VmConstantMutation => "Vm.VmConstantMutation",
-            Self::VmInstructionMutation => "Vm.VmInstructionMutation",
-            Self::VmDeleteInstruction => "Vm.VmDeleteInstruction",
-            Self::VmRegisterCountMutation => "Vm.VmRegisterCountMutation",
-            Self::VmInstructionRawFieldMutation => "Vm.VmInstructionRawFieldMutation",
-            Self::VmCopyInstructionBlock => "Vm.CopyInstructionBlock",
-            Self::VmCopyInstructionBlockRemapped => "Vm.CopyInstructionBlockRemapped",
-            Self::VmCopyConstantBlock => "Vm.CopyConstantBlock",
-            Self::VmCopyGeneBackwardSlice => "Vm.CopyGeneBackwardSlice",
-            Self::VmCopyGeneForwardSlice => "Vm.CopyGeneForwardSlice",
-            Self::VmInsertReadStoreMotif => "Vm.InsertReadStoreMotif",
-            Self::VmInsertReadBidMotif => "Vm.InsertReadBidMotif",
-            Self::VmInsertLoadCompareMotif => "Vm.InsertLoadCompareMotif",
-            Self::VmMutateSlotAddress => "Vm.MutateSlotAddress",
-            Self::VmMutatePairedSlotAddress => "Vm.MutatePairedSlotAddress",
-            Self::GraphAlterGraphEdgeWeight => "Graph.AlterGraphEdgeWeight",
-            Self::GraphSwapGraphOperator => "Graph.SwapGraphOperator",
-            Self::GraphMutateGraphOperatorParam => "Graph.MutateGraphOperatorParam",
-            Self::GraphAddInternalGraphNode => "Graph.AddInternalGraphNode",
-            Self::GraphRemoveInternalGraphNode => "Graph.RemoveInternalGraphNode",
-            Self::GraphAddGraphEdge => "Graph.AddGraphEdge",
-            Self::GraphRetargetGraphEdge => "Graph.RetargetGraphEdge",
-            Self::GraphRemoveGraphEdge => "Graph.RemoveGraphEdge",
-            Self::GraphRawFieldMutation => "Graph.GraphRawFieldMutation",
-            Self::GraphCopyInternalNode => "Graph.CopyInternalNode",
-            Self::GraphCopySubgraph => "Graph.CopySubgraph",
-            Self::GraphCopyNodeInputs => "Graph.CopyNodeInputs",
-            Self::GraphEnableHebbian => "Graph.EnableHebbian",
-            Self::GraphDisableHebbian => "Graph.DisableHebbian",
-            Self::GraphMutateHebbianRule => "Graph.MutateHebbianRule",
-            Self::GraphMutateHebbianRate => "Graph.MutateHebbianRate",
-            Self::GraphToggleHebbianLamarckian => "Graph.ToggleHebbianLamarckian",
-            Self::GraphEnableRewardModulation => "Graph.EnableRewardModulation",
-            Self::GraphDisableRewardModulation => "Graph.DisableRewardModulation",
-            Self::GraphMutateRewardSource => "Graph.MutateRewardSource",
-            Self::GraphMutateTraceDecay => "Graph.MutateTraceDecay",
-            Self::GraphAddBundleLive => "Graph.AddBundleLive",
-            Self::GraphAddBundleSilent => "Graph.AddBundleSilent",
-            Self::GraphAlterBundleScale => "Graph.AlterBundleScale",
-            Self::GraphShiftBundleOffset => "Graph.ShiftBundleOffset",
-            Self::GraphRetargetBundle => "Graph.RetargetBundle",
-            Self::GraphRemoveBundle => "Graph.RemoveBundle",
-            Self::GraphSetScope => "Graph.SetScope",
-            Self::GraphDetachGraphEdge => "Graph.DetachGraphEdge",
-            Self::GraphEnableRetention => "Graph.EnableRetention",
-            Self::GraphDisableRetention => "Graph.DisableRetention",
-            Self::GraphMutateRetention => "Graph.MutateRetention",
-            Self::GraphEnableBundleRetention => "Graph.EnableBundleRetention",
-            Self::GraphDisableBundleRetention => "Graph.DisableBundleRetention",
-            Self::GraphMutateBundleRetention => "Graph.MutateBundleRetention",
-            Self::InputRefAddSensorLive => "InputRef.AddSensorLive",
-            Self::InputRefAddSensorSilent => "InputRef.AddSensorSilent",
-            Self::InputRefPrune => "InputRef.Prune",
-            Self::InputRefSwap => "InputRef.Swap",
-            Self::InputRefRawFieldMutation => "InputRef.RawFieldMutation",
+            Self::Topology(op) => op.as_key(),
+            Self::Vm(op) => op.as_key(),
+            Self::Graph(op) => op.as_key(),
+            Self::InputRef(op) => op.as_key(),
         }
     }
 
     #[must_use]
     pub const fn domain(self) -> MutationDomain {
         match self {
-            Self::TopologyAddNode
-            | Self::TopologyRemoveNode
-            | Self::TopologyRetargetNodeTarget
-            | Self::TopologyAddRouteTarget
-            | Self::TopologyAddFeedbackRoute
-            | Self::TopologyRemoveRouteTarget
-            | Self::TopologyChangeEntryNode
-            | Self::TopologySwapNodeBackend
-            | Self::TopologyCopyNode
-            | Self::TopologyCopyMeshBackwardSlice
-            | Self::TopologyCopyMeshForwardSlice
-            | Self::TopologySpliceNode
-            | Self::TopologySwapRouteTargets
-            | Self::TopologyMutateGateBias => MutationDomain::Topology,
-            Self::VmConstantMutation
-            | Self::VmInstructionMutation
-            | Self::VmDeleteInstruction
-            | Self::VmRegisterCountMutation
-            | Self::VmInstructionRawFieldMutation
-            | Self::VmCopyInstructionBlock
-            | Self::VmCopyInstructionBlockRemapped
-            | Self::VmCopyConstantBlock
-            | Self::VmCopyGeneBackwardSlice
-            | Self::VmCopyGeneForwardSlice
-            | Self::VmInsertReadStoreMotif
-            | Self::VmInsertReadBidMotif
-            | Self::VmInsertLoadCompareMotif
-            | Self::VmMutateSlotAddress
-            | Self::VmMutatePairedSlotAddress => MutationDomain::Vm,
-            Self::GraphAlterGraphEdgeWeight
-            | Self::GraphSwapGraphOperator
-            | Self::GraphMutateGraphOperatorParam
-            | Self::GraphAddInternalGraphNode
-            | Self::GraphRemoveInternalGraphNode
-            | Self::GraphAddGraphEdge
-            | Self::GraphRetargetGraphEdge
-            | Self::GraphRemoveGraphEdge
-            | Self::GraphRawFieldMutation
-            | Self::GraphCopyInternalNode
-            | Self::GraphCopySubgraph
-            | Self::GraphCopyNodeInputs
-            | Self::GraphEnableHebbian
-            | Self::GraphDisableHebbian
-            | Self::GraphMutateHebbianRule
-            | Self::GraphMutateHebbianRate
-            | Self::GraphToggleHebbianLamarckian
-            | Self::GraphEnableRewardModulation
-            | Self::GraphDisableRewardModulation
-            | Self::GraphMutateRewardSource
-            | Self::GraphMutateTraceDecay
-            | Self::GraphAddBundleLive
-            | Self::GraphAddBundleSilent
-            | Self::GraphAlterBundleScale
-            | Self::GraphShiftBundleOffset
-            | Self::GraphRetargetBundle
-            | Self::GraphRemoveBundle
-            | Self::GraphSetScope
-            | Self::GraphDetachGraphEdge
-            | Self::GraphEnableRetention
-            | Self::GraphDisableRetention
-            | Self::GraphMutateRetention
-            | Self::GraphEnableBundleRetention
-            | Self::GraphDisableBundleRetention
-            | Self::GraphMutateBundleRetention => MutationDomain::Graph,
-            Self::InputRefAddSensorLive
-            | Self::InputRefAddSensorSilent
-            | Self::InputRefPrune
-            | Self::InputRefSwap
-            | Self::InputRefRawFieldMutation => MutationDomain::InputRef,
+            Self::Topology(_) => MutationDomain::Topology,
+            Self::Vm(_) => MutationDomain::Vm,
+            Self::Graph(_) => MutationDomain::Graph,
+            Self::InputRef(_) => MutationDomain::InputRef,
         }
     }
 
     #[must_use]
     pub const fn complexity_effect(self) -> ComplexityEffect {
         match self {
-            // Topology: structural additions
-            Self::TopologyAddNode
-            | Self::TopologyCopyNode
-            | Self::TopologyCopyMeshBackwardSlice
-            | Self::TopologyCopyMeshForwardSlice
-            | Self::TopologySpliceNode
-            | Self::TopologySwapNodeBackend
-            | Self::TopologyAddRouteTarget
-            | Self::TopologyAddFeedbackRoute => ComplexityEffect::Increasing,
-            // Topology: structural removals
-            Self::TopologyRemoveNode | Self::TopologyRemoveRouteTarget => {
-                ComplexityEffect::Decreasing
-            }
-            // Topology: rewiring / neutral
-            Self::TopologyRetargetNodeTarget
-            | Self::TopologyChangeEntryNode
-            | Self::TopologySwapRouteTargets
-            | Self::TopologyMutateGateBias => ComplexityEffect::Neutral,
-            // VM: copy/motif-insert operators are increasing
-            Self::VmCopyInstructionBlock
-            | Self::VmCopyInstructionBlockRemapped
-            | Self::VmCopyConstantBlock
-            | Self::VmCopyGeneBackwardSlice
-            | Self::VmCopyGeneForwardSlice
-            | Self::VmInsertReadStoreMotif
-            | Self::VmInsertReadBidMotif
-            | Self::VmInsertLoadCompareMotif => ComplexityEffect::Increasing,
-            Self::VmDeleteInstruction => ComplexityEffect::Decreasing,
-            // VM: all others neutral (mutate existing content, no structural growth)
-            Self::VmConstantMutation
-            | Self::VmInstructionMutation
-            | Self::VmRegisterCountMutation
-            | Self::VmInstructionRawFieldMutation
-            | Self::VmMutateSlotAddress
-            | Self::VmMutatePairedSlotAddress => ComplexityEffect::Neutral,
-            // Graph: structural additions
-            Self::GraphAddInternalGraphNode
-            | Self::GraphAddGraphEdge
-            | Self::GraphCopyInternalNode
-            | Self::GraphCopySubgraph
-            | Self::GraphCopyNodeInputs
-            | Self::GraphEnableHebbian
-            | Self::GraphEnableRewardModulation
-            | Self::GraphAddBundleLive
-            | Self::GraphAddBundleSilent => ComplexityEffect::Increasing,
-            // Graph: structural removals
-            Self::GraphRemoveInternalGraphNode
-            | Self::GraphRemoveGraphEdge
-            | Self::GraphDisableHebbian
-            | Self::GraphDisableRewardModulation
-            | Self::GraphRemoveBundle => ComplexityEffect::Decreasing,
-            // Graph: rewiring / neutral
-            Self::GraphAlterGraphEdgeWeight
-            | Self::GraphSwapGraphOperator
-            | Self::GraphMutateGraphOperatorParam
-            | Self::GraphRetargetGraphEdge
-            | Self::GraphRawFieldMutation
-            | Self::GraphMutateHebbianRule
-            | Self::GraphMutateHebbianRate
-            | Self::GraphToggleHebbianLamarckian
-            | Self::GraphMutateRewardSource
-            | Self::GraphMutateTraceDecay
-            | Self::GraphAlterBundleScale
-            | Self::GraphShiftBundleOffset
-            | Self::GraphRetargetBundle
-            | Self::GraphSetScope
-            | Self::GraphDetachGraphEdge
-            | Self::GraphEnableRetention
-            | Self::GraphDisableRetention
-            | Self::GraphMutateRetention
-            | Self::GraphEnableBundleRetention
-            | Self::GraphDisableBundleRetention
-            | Self::GraphMutateBundleRetention => ComplexityEffect::Neutral,
-            // InputRef: add / remove / neutral
-            Self::InputRefAddSensorLive | Self::InputRefAddSensorSilent => {
-                ComplexityEffect::Increasing
-            }
-            Self::InputRefPrune => ComplexityEffect::Decreasing,
-            Self::InputRefSwap | Self::InputRefRawFieldMutation => ComplexityEffect::Neutral,
+            Self::Topology(op) => op.complexity_effect(),
+            Self::Vm(op) => op.complexity_effect(),
+            Self::Graph(op) => op.complexity_effect(),
+            Self::InputRef(op) => op.complexity_effect(),
         }
     }
 
+    /// The operator's selection weight within its domain: Topology's in
+    /// hundredths through the large-copy tuning, the other three their
+    /// own tier weights, so each domain's total keeps its units.
     #[must_use]
-    pub const fn all() -> [Self; 69] {
-        [
-            Self::TopologyAddNode,
-            Self::TopologyRemoveNode,
-            Self::TopologyRetargetNodeTarget,
-            Self::TopologyAddRouteTarget,
-            Self::TopologyAddFeedbackRoute,
-            Self::TopologyRemoveRouteTarget,
-            Self::TopologyChangeEntryNode,
-            Self::TopologySwapNodeBackend,
-            Self::TopologyCopyNode,
-            Self::TopologyCopyMeshBackwardSlice,
-            Self::TopologyCopyMeshForwardSlice,
-            Self::TopologySpliceNode,
-            Self::TopologySwapRouteTargets,
-            Self::TopologyMutateGateBias,
-            Self::VmConstantMutation,
-            Self::VmInstructionMutation,
-            Self::VmDeleteInstruction,
-            Self::VmRegisterCountMutation,
-            Self::VmInstructionRawFieldMutation,
-            Self::VmCopyInstructionBlock,
-            Self::VmCopyInstructionBlockRemapped,
-            Self::VmCopyConstantBlock,
-            Self::VmCopyGeneBackwardSlice,
-            Self::VmCopyGeneForwardSlice,
-            Self::VmInsertReadStoreMotif,
-            Self::VmInsertReadBidMotif,
-            Self::VmInsertLoadCompareMotif,
-            Self::VmMutateSlotAddress,
-            Self::VmMutatePairedSlotAddress,
-            Self::GraphAlterGraphEdgeWeight,
-            Self::GraphSwapGraphOperator,
-            Self::GraphMutateGraphOperatorParam,
-            Self::GraphAddInternalGraphNode,
-            Self::GraphRemoveInternalGraphNode,
-            Self::GraphAddGraphEdge,
-            Self::GraphRetargetGraphEdge,
-            Self::GraphRemoveGraphEdge,
-            Self::GraphRawFieldMutation,
-            Self::GraphCopyInternalNode,
-            Self::GraphCopySubgraph,
-            Self::GraphCopyNodeInputs,
-            Self::GraphEnableHebbian,
-            Self::GraphDisableHebbian,
-            Self::GraphMutateHebbianRule,
-            Self::GraphMutateHebbianRate,
-            Self::GraphToggleHebbianLamarckian,
-            Self::GraphEnableRewardModulation,
-            Self::GraphDisableRewardModulation,
-            Self::GraphMutateRewardSource,
-            Self::GraphMutateTraceDecay,
-            Self::GraphAddBundleLive,
-            Self::GraphAddBundleSilent,
-            Self::GraphAlterBundleScale,
-            Self::GraphShiftBundleOffset,
-            Self::GraphRetargetBundle,
-            Self::GraphRemoveBundle,
-            Self::GraphSetScope,
-            Self::GraphDetachGraphEdge,
-            Self::GraphEnableRetention,
-            Self::GraphDisableRetention,
-            Self::GraphMutateRetention,
-            Self::GraphEnableBundleRetention,
-            Self::GraphDisableBundleRetention,
-            Self::GraphMutateBundleRetention,
-            Self::InputRefAddSensorLive,
-            Self::InputRefAddSensorSilent,
-            Self::InputRefPrune,
-            Self::InputRefSwap,
-            Self::InputRefRawFieldMutation,
-        ]
+    pub fn weight(self, config: &MutationConfig) -> u16 {
+        match self {
+            Self::Topology(op) => op.tuned_weight(config.large_copy_weight_percent),
+            Self::Vm(op) => u16::from(op.weight()),
+            Self::Graph(op) => u16::from(op.weight()),
+            Self::InputRef(op) => u16::from(op.weight()),
+        }
     }
+}
+
+/// Today's flat name: the domain, then the inner variant's name, the domain
+/// omitted when the inner name already starts with it (`TopologyAddNode`,
+/// `VmConstantMutation`, `GraphRawFieldMutation`). The draw-stream pin
+/// hashes this text.
+impl fmt::Debug for MutationOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let domain = self.domain().as_key();
+        let inner = self.inner_name();
+        if !inner.starts_with(domain) {
+            f.write_str(domain)?;
+        }
+        f.write_str(&inner)
+    }
+}
+
+impl From<MutationOperator> for &'static str {
+    fn from(operator: MutationOperator) -> Self {
+        operator.as_key()
+    }
+}
+
+impl TryFrom<String> for MutationOperator {
+    type Error = String;
+
+    fn try_from(key: String) -> Result<Self, Self::Error> {
+        Self::ALL
+            .into_iter()
+            .find(|operator| operator.as_key() == key)
+            .ok_or_else(|| format!("unknown mutation operator key {key:?}"))
+    }
+}
+
+impl From<TopologyOperator> for MutationOperator {
+    fn from(op: TopologyOperator) -> Self {
+        Self::Topology(op)
+    }
+}
+
+impl From<VmOperator> for MutationOperator {
+    fn from(op: VmOperator) -> Self {
+        Self::Vm(op)
+    }
+}
+
+impl From<GraphOperator> for MutationOperator {
+    fn from(op: GraphOperator) -> Self {
+        Self::Graph(op)
+    }
+}
+
+impl From<InputRefOperator> for MutationOperator {
+    fn from(op: InputRefOperator) -> Self {
+        Self::InputRef(op)
+    }
+}
+
+/// What one committed event reports beside its reachability (T30.F10): the
+/// class of the vote-sink edge an `AddGraphEdge` or a creation pushed
+/// (T11.F30, T25.F11), the scope an attribute operator's change landed on
+/// (T25.F08, T25.F09) and what the event did to bundles (T25.F11).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EventReport {
+    /// The class of the vote-sink edge the event pushed.
+    pub class: Option<BirthEdgeClass>,
+    /// The scope the change of one of the thirteen attribute operators (the
+    /// nine plasticity operators, `SetScope` and the three edge retention
+    /// operators) landed on.
+    pub attribute_scope: Option<Scope>,
+    /// What the event did to bundles, from the container's return values.
+    pub bundle_edits: BundleEdits,
 }
 
 /// Whether a mutation target node is reachable from the mesh entry node.
@@ -803,11 +628,11 @@ impl MutationSummary {
     pub fn birth_edge_class(&self) -> Option<BirthEdgeClass> {
         let single = self.applied_events == 1
             && [
-                MutationOperator::GraphAddGraphEdge,
-                MutationOperator::GraphAddBundleLive,
-                MutationOperator::GraphAddBundleSilent,
-                MutationOperator::InputRefAddSensorLive,
-                MutationOperator::InputRefAddSensorSilent,
+                MutationOperator::Graph(GraphOperator::AddGraphEdge),
+                MutationOperator::Graph(GraphOperator::AddBundleLive),
+                MutationOperator::Graph(GraphOperator::AddBundleSilent),
+                MutationOperator::InputRef(InputRefOperator::AddSensorLive),
+                MutationOperator::InputRef(InputRefOperator::AddSensorSilent),
             ]
             .iter()
             .any(|operator| self.applied_by_operator.get(operator) == Some(&1));

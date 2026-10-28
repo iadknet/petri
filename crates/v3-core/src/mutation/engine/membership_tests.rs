@@ -14,6 +14,7 @@ use crate::contracts::{InputReference, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::genome::analysis::mesh_reachable_nodes;
 use crate::genome::{NodeGenome, VmBackendDef, VmInstruction};
+use crate::mutation::topology::TopologyOperator;
 use crate::mutation::MutationEventRecord;
 
 fn rng(seed: u64) -> SmallRng {
@@ -102,7 +103,7 @@ fn birth(
 }
 
 fn applied_removal_of(event: &MutationEventRecord, id: u32) -> bool {
-    event.operator == Some(MutationOperator::TopologyRemoveNode)
+    event.operator == Some(MutationOperator::Topology(TopologyOperator::RemoveNode))
         && event.outcome.is_applied()
         && event.target == Some(NodeId::new(id))
 }
@@ -168,7 +169,7 @@ fn expected_telemetry(
             if let Some(id) = event.target {
                 expected.executed_targets += u32::from(member(id, executed));
             }
-            if event.operator == Some(MutationOperator::TopologyRemoveNode) {
+            if event.operator == Some(MutationOperator::Topology(TopologyOperator::RemoveNode)) {
                 removed.extend(event.target);
             }
         }
@@ -318,7 +319,8 @@ fn a_node_created_on_a_removed_id_and_index_is_never_a_member() {
             let events = &birth.summary.events;
             applied_removal_of(&events[0], 2)
                 && events[1].outcome.is_applied()
-                && events[2].operator != Some(MutationOperator::TopologyRemoveNode)
+                && events[2].operator
+                    != Some(MutationOperator::Topology(TopologyOperator::RemoveNode))
                 && targeted_class(&events[2]).is_some()
                 && events[2].target == Some(NodeId::new(2))
         },
@@ -520,7 +522,7 @@ fn draws_after_a_removal(events: &[MutationEventRecord]) -> bool {
     events
         .iter()
         .position(|event| {
-            event.operator == Some(MutationOperator::TopologyRemoveNode)
+            event.operator == Some(MutationOperator::Topology(TopologyOperator::RemoveNode))
                 && event.outcome.is_applied()
         })
         .is_some_and(|first| {
@@ -576,9 +578,9 @@ fn every_topology_event_removes_one_node_or_appends_fresh_ones() {
                 let mut genome = parent.clone();
                 let before: Vec<NodeId> = genome.nodes.iter().map(|node| node.node_id).collect();
                 let sets = crate::mutation::reachability::TargetSets::new(&reachable, &[]);
-                let _ = apply_topology_event(
+                let _ = apply_event(
                     &mut genome,
-                    op,
+                    op.into(),
                     &mut sets.selector(0.5, 0.0),
                     &mut rng(seed),
                     &config,
@@ -590,7 +592,7 @@ fn every_topology_event_removes_one_node_or_appends_fresh_ones() {
                 if after == before {
                     continue;
                 }
-                changed.insert(topology_operator_key(op));
+                changed.insert(MutationOperator::from(op));
                 let one_removed = after.len() + 1 == before.len()
                     && (0..before.len()).any(|gone| {
                         before[..gone]
@@ -609,12 +611,12 @@ fn every_topology_event_removes_one_node_or_appends_fresh_ones() {
         }
     }
     for op in [
-        MutationOperator::TopologyRemoveNode,
-        MutationOperator::TopologyAddNode,
-        MutationOperator::TopologySpliceNode,
-        MutationOperator::TopologyCopyNode,
-        MutationOperator::TopologyCopyMeshBackwardSlice,
-        MutationOperator::TopologyCopyMeshForwardSlice,
+        MutationOperator::Topology(TopologyOperator::RemoveNode),
+        MutationOperator::Topology(TopologyOperator::AddNode),
+        MutationOperator::Topology(TopologyOperator::SpliceNode),
+        MutationOperator::Topology(TopologyOperator::CopyNode),
+        MutationOperator::Topology(TopologyOperator::CopyMeshBackwardSlice),
+        MutationOperator::Topology(TopologyOperator::CopyMeshForwardSlice),
     ] {
         assert!(
             changed.contains(&op),

@@ -4,6 +4,7 @@ use crate::creature::founder::v3alpha1_founder_genome;
 use crate::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource};
 use crate::genome::{BackendDef, CreatureGenome, HebbianRule, PlasticityConfig, VmInstruction};
 use crate::ledger::DeathCause;
+use crate::mutation::topology::TopologyOperator;
 use crate::mutation::MutationOperator;
 use crate::simulation::actions::ReproductionActionResult;
 use crate::simulation::reproductive_success::{
@@ -60,7 +61,7 @@ fn reproductive_success_records_every_class_cause_and_generation_once() {
             creature.generation = index as u64;
             if index % 2 != 0 {
                 creature.birth_mutation_operators =
-                    vec![MutationOperator::TopologyAddNode].into_boxed_slice();
+                    vec![MutationOperator::Topology(TopologyOperator::AddNode)].into_boxed_slice();
             }
             if cause != DeathCause::ExternalRemoval {
                 creature.energy = 0.0;

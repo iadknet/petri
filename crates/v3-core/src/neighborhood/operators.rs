@@ -7,16 +7,12 @@ use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use rayon::prelude::*;
 
-use crate::config::{MutationConfig, ReachableBiasConfig};
-use crate::contracts::SensorContext;
+use crate::config::MutationConfig;
 use crate::genome::analysis::mesh_reachable_nodes;
 use crate::genome::CreatureGenome;
-use crate::mutation::graph::{GraphMutator, GraphOperator};
-use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
+use crate::mutation::engine::dispatch;
 use crate::mutation::reachability::TargetSets;
-use crate::mutation::topology::{TopologyMutator, TopologyOperator};
-use crate::mutation::types::{MutationSkipReason, TargetReachability};
-use crate::mutation::vm::{VmMutator, VmOperator};
+use crate::mutation::types::{MutationDomain, MutationOperator};
 use crate::neighborhood::battery::{Battery, Signature};
 use crate::neighborhood::classify::{classify, Tally};
 use crate::neighborhood::EvalContext;
@@ -39,88 +35,40 @@ pub struct OperatorRow {
     pub tally: Tally,
 }
 
-/// One operator across the four mutation domains, unified behind a single
-/// `apply` so every domain's trials can share one flat parallel job instead
-/// of one rayon call per operator.
-#[derive(Debug, Clone, Copy)]
-enum OperatorKind {
-    Vm(VmOperator),
-    Graph(GraphOperator),
-    Topology(TopologyOperator),
-    InputRef(InputRefOperator),
+/// The battery's row order: the VM, graph, topology and input-reference
+/// catalogs, each in its domain enum's `ALL` order.
+const ROW_DOMAINS: [MutationDomain; 4] = [
+    MutationDomain::Vm,
+    MutationDomain::Graph,
+    MutationDomain::Topology,
+    MutationDomain::InputRef,
+];
+
+/// Every operator in row order.
+fn row_operators() -> Vec<MutationOperator> {
+    ROW_DOMAINS
+        .into_iter()
+        .flat_map(|domain| domain.catalog().iter().copied())
+        .collect()
 }
 
-impl OperatorKind {
-    fn all() -> Vec<Self> {
-        VmOperator::ALL
-            .into_iter()
-            .map(Self::Vm)
-            .chain(GraphOperator::ALL.into_iter().map(Self::Graph))
-            .chain(TopologyOperator::ALL.into_iter().map(Self::Topology))
-            .chain(InputRefOperator::ALL.into_iter().map(Self::InputRef))
-            .collect()
+/// A domain's family label in the battery's rows.
+const fn family(domain: MutationDomain) -> &'static str {
+    match domain {
+        MutationDomain::Vm => "vm",
+        MutationDomain::Graph => "graph",
+        MutationDomain::Topology => "topology",
+        MutationDomain::InputRef => "input_ref",
     }
+}
 
-    const fn family(self) -> &'static str {
-        match self {
-            Self::Vm(_) => "vm",
-            Self::Graph(_) => "graph",
-            Self::Topology(_) => "topology",
-            Self::InputRef(_) => "input_ref",
-        }
-    }
-
-    fn name(self) -> String {
-        match self {
-            Self::Vm(op) => format!("{op:?}"),
-            Self::Graph(op) => format!("{op:?}"),
-            Self::Topology(op) => format!("{op:?}"),
-            Self::InputRef(op) => format!("{op:?}"),
-        }
-    }
-
-    const fn seed_base(self) -> u64 {
-        match self {
-            Self::Vm(_) => VM_SEED_BASE,
-            Self::Graph(_) => GRAPH_SEED_BASE,
-            Self::Topology(_) => TOPOLOGY_SEED_BASE,
-            Self::InputRef(_) => INPUT_REF_SEED_BASE,
-        }
-    }
-
-    const fn reachable_bias(self, config: &ReachableBiasConfig) -> f64 {
-        match self {
-            Self::Vm(_) => config.vm,
-            Self::Graph(_) => config.graph,
-            Self::Topology(_) => config.topology,
-            Self::InputRef(_) => config.input_ref,
-        }
-    }
-
-    fn apply(
-        self,
-        genome: &mut CreatureGenome,
-        targets: &TargetSets<'_>,
-        mutation_config: &MutationConfig,
-        context: &SensorContext,
-        rng: &mut SmallRng,
-    ) -> Result<TargetReachability, MutationSkipReason> {
-        let mut targets = targets.selector(
-            self.reachable_bias(&mutation_config.reachable_bias),
-            mutation_config.executed_bias,
-        );
-        match self {
-            Self::Vm(op) => VmMutator::apply(genome, op, &mut targets, rng, mutation_config),
-            Self::Graph(op) => {
-                GraphMutator::apply_in(genome, op, &mut targets, rng, mutation_config, context)
-            }
-            Self::Topology(op) => {
-                TopologyMutator::apply_in(genome, op, &mut targets, rng, mutation_config, context)
-            }
-            Self::InputRef(op) => {
-                InputRefMutator::apply_in(genome, op, &mut targets, rng, mutation_config, context)
-            }
-        }
+/// A domain's trial seed base.
+const fn seed_base(domain: MutationDomain) -> u64 {
+    match domain {
+        MutationDomain::Vm => VM_SEED_BASE,
+        MutationDomain::Graph => GRAPH_SEED_BASE,
+        MutationDomain::Topology => TOPOLOGY_SEED_BASE,
+        MutationDomain::InputRef => INPUT_REF_SEED_BASE,
     }
 }
 
@@ -130,9 +78,9 @@ impl OperatorKind {
 /// empty evolved sample) always has the full row set to fill in.
 #[must_use]
 pub fn operator_catalog() -> Vec<(&'static str, String)> {
-    OperatorKind::all()
+    row_operators()
         .into_iter()
-        .map(|op| (op.family(), op.name()))
+        .map(|op| (family(op.domain()), op.inner_name()))
         .collect()
 }
 
@@ -161,7 +109,7 @@ pub fn per_operator_rows(
     let executed =
         battery.executed_indices(subject, context.runtime, context.shared_memory_decay_rate);
     let targets = TargetSets::new(&reachable, &executed);
-    let ops = OperatorKind::all();
+    let ops = row_operators();
 
     let jobs: Vec<(usize, u32)> = (0..ops.len())
         .flat_map(|op_idx| (0..trials).map(move |trial| (op_idx, trial)))
@@ -173,18 +121,22 @@ pub fn per_operator_rows(
             || vec![Tally::default(); ops.len()],
             |mut acc, (op_idx, trial)| {
                 let op = ops[op_idx];
-                let seed = seed_offset + op.seed_base() + u64::from(trial);
+                let seed = seed_offset + seed_base(op.domain()) + u64::from(trial);
                 let mut rng = SmallRng::seed_from_u64(seed);
                 let mut genome = subject.clone();
-                let outcome = op
-                    .apply(
-                        &mut genome,
-                        &targets,
-                        mutation_config,
-                        &context.sensors,
-                        &mut rng,
-                    )
-                    .map(|_| genome);
+                let mut selector = targets.selector(
+                    op.domain().reachable_bias(&mutation_config.reachable_bias),
+                    mutation_config.executed_bias,
+                );
+                let outcome = dispatch(
+                    &mut genome,
+                    op,
+                    &mut selector,
+                    &mut rng,
+                    mutation_config,
+                    &context.sensors,
+                )
+                .map(|_| genome);
                 let trial_tally = match outcome {
                     Err(_) => Tally::default().skip(),
                     Ok(genome) => {
@@ -213,8 +165,8 @@ pub fn per_operator_rows(
     ops.into_iter()
         .zip(tallies)
         .map(|(op, tally)| OperatorRow {
-            family: op.family(),
-            operator: op.name(),
+            family: family(op.domain()),
+            operator: op.inner_name(),
             tally,
         })
         .collect()
@@ -224,7 +176,13 @@ pub fn per_operator_rows(
 mod tests {
     use super::*;
     use crate::config::FounderProfile;
+    use crate::config::ReachableBiasConfig;
     use crate::creature::founder::founder_genome;
+    use crate::mutation::graph::{GraphMutator, GraphOperator};
+    use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
+    use crate::mutation::topology::{TopologyMutator, TopologyOperator};
+    use crate::mutation::types::MutationSkipReason;
+    use crate::mutation::vm::{VmMutator, VmOperator};
 
     #[test]
     fn catalog_covers_every_operator_in_the_four_all_lists_once() {
@@ -272,7 +230,7 @@ mod tests {
         }
     }
 
-    /// `operator_catalog`'s family labels come from `OperatorKind::family`,
+    /// `operator_catalog`'s family labels come from the battery's `family`,
     /// in the four `ALL` lists' order (VM, graph, topology, input
     /// reference): the family boundaries fall exactly at each list's length.
     /// A stub `family` returning a fixed string would collapse every

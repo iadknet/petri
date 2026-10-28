@@ -1,6 +1,10 @@
 use super::*;
 use crate::contracts::{InputReference, RouteTarget};
 use crate::genome::{VmBackendDef, VmInstruction};
+use crate::mutation::graph::GraphOperator;
+use crate::mutation::input_ref::InputRefOperator;
+use crate::mutation::topology::TopologyOperator;
+use crate::mutation::vm::VmOperator;
 use crate::mutation::TargetReachability;
 use proptest::prelude::*;
 
@@ -134,7 +138,10 @@ fn an_id_reused_after_deletion_is_two_modules() {
         &mut tracker,
         1,
         &after_removal,
-        &summary_with(vec![applied(MutationOperator::TopologyRemoveNode, 1)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::RemoveNode),
+            1,
+        )]),
     );
     // Node id 1 is free again and a later birth reuses it.
     let reborn = vec![vm_node(0, 1), vm_node(1, 2)];
@@ -142,7 +149,10 @@ fn an_id_reused_after_deletion_is_two_modules() {
         &mut tracker,
         5,
         &reborn,
-        &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::AddNode),
+            0,
+        )]),
     );
     let modules: Vec<_> = tracker
         .modules()
@@ -168,7 +178,10 @@ fn copy_provenance_needs_both_a_copy_event_and_matching_content() {
         &mut copied,
         1,
         &[vm_node(0, 3), vm_node(1, 3)],
-        &summary_with(vec![applied(MutationOperator::TopologyCopyNode, 0)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::CopyNode),
+            0,
+        )]),
     );
     assert_eq!(
         copied.modules().last().map(|module| module.provenance),
@@ -182,7 +195,10 @@ fn copy_provenance_needs_both_a_copy_event_and_matching_content() {
         &mut detour,
         1,
         &[vm_node(0, 3), vm_node(1, 7)],
-        &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::AddNode),
+            0,
+        )]),
     );
     assert_eq!(
         detour.modules().last().map(|module| module.provenance),
@@ -196,7 +212,10 @@ fn copy_provenance_needs_both_a_copy_event_and_matching_content() {
         &mut coincidence,
         1,
         &[vm_node(0, 3), vm_node(1, 3)],
-        &summary_with(vec![applied(MutationOperator::TopologySpliceNode, 0)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::SpliceNode),
+            0,
+        )]),
     );
     assert_eq!(
         coincidence.modules().last().map(|module| module.provenance),
@@ -215,7 +234,10 @@ fn copy_provenance_compares_only_against_the_pre_birth_nodes() {
         &mut changed_source,
         1,
         &[vm_node(0, 5), vm_node(1, 5)],
-        &summary_with(vec![applied(MutationOperator::TopologyCopyNode, 0)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::CopyNode),
+            0,
+        )]),
     );
     assert_eq!(
         changed_source.modules().last().map(|m| m.provenance),
@@ -230,7 +252,10 @@ fn copy_provenance_compares_only_against_the_pre_birth_nodes() {
         &mut twins,
         1,
         &[vm_node(0, 3), vm_node(1, 7), vm_node(2, 7)],
-        &summary_with(vec![applied(MutationOperator::TopologyCopyNode, 0)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::CopyNode),
+            0,
+        )]),
     );
     assert_eq!(
         twins
@@ -254,14 +279,20 @@ fn the_censoring_split_keeps_every_module_in_the_denominator() {
         &mut tracker,
         1,
         &grown,
-        &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::AddNode),
+            0,
+        )]),
     );
     let pruned = vec![vm_node(0, 1), vm_node(1, 1), vm_node(3, 1)];
     birth(
         &mut tracker,
         2,
         &pruned,
-        &summary_with(vec![applied(MutationOperator::TopologyRemoveNode, 2)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::RemoveNode),
+            2,
+        )]),
     );
     tracker.record_reading(0, 3, &ids(&[0, 1]), Some(&ids(&[1])));
     let reading = tracker.checkpoint(3);
@@ -297,8 +328,8 @@ fn a_selected_inapplicable_event_is_separated_from_a_missing_eligible_node() {
         1,
         &founder,
         &summary_with(vec![
-            selected_inapplicable(MutationOperator::GraphAddGraphEdge, 0),
-            no_eligible(MutationOperator::VmDeleteInstruction),
+            selected_inapplicable(MutationOperator::Graph(GraphOperator::AddGraphEdge), 0),
+            no_eligible(MutationOperator::Vm(VmOperator::VmDeleteInstruction)),
         ]),
     );
     let reading = tracker.checkpoint(1);
@@ -333,16 +364,19 @@ fn a_module_named_only_by_a_discarded_operator_reaches_the_selected_only_rung() 
         &mut tracker,
         1,
         &grown,
-        &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::AddNode),
+            0,
+        )]),
     );
     birth(
         &mut tracker,
         2,
         &grown,
         &summary_with(vec![applied_after_discard(
-            MutationOperator::TopologyMutateGateBias,
+            MutationOperator::Topology(TopologyOperator::MutateGateBias),
             0,
-            MutationOperator::TopologyRemoveRouteTarget,
+            MutationOperator::Topology(TopologyOperator::RemoveRouteTarget),
             Some(1),
         )]),
     );
@@ -361,7 +395,10 @@ fn a_module_named_only_by_a_discarded_operator_reaches_the_selected_only_rung() 
     // The discard is per operator; no event-level skip happened at all.
     assert_eq!(
         pooled.discarded_selected_inapplicable_by_operator,
-        BTreeMap::from([(MutationOperator::TopologyRemoveRouteTarget, 1)])
+        BTreeMap::from([(
+            MutationOperator::Topology(TopologyOperator::RemoveRouteTarget),
+            1
+        )])
     );
     assert!(pooled.discarded_no_eligible_node_by_operator.is_empty());
     assert!(pooled.selected_inapplicable_by_domain.is_empty());
@@ -378,16 +415,19 @@ fn a_discarded_operator_that_selected_nothing_counts_as_no_eligible_node() {
         1,
         &founder,
         &summary_with(vec![applied_after_discard(
-            MutationOperator::TopologyMutateGateBias,
+            MutationOperator::Topology(TopologyOperator::MutateGateBias),
             0,
-            MutationOperator::TopologyRemoveRouteTarget,
+            MutationOperator::Topology(TopologyOperator::RemoveRouteTarget),
             None,
         )]),
     );
     let pooled = &tracker.checkpoint(1).opportunities;
     assert_eq!(
         pooled.discarded_no_eligible_node_by_operator,
-        BTreeMap::from([(MutationOperator::TopologyRemoveRouteTarget, 1)])
+        BTreeMap::from([(
+            MutationOperator::Topology(TopologyOperator::RemoveRouteTarget),
+            1
+        )])
     );
     assert!(pooled
         .discarded_selected_inapplicable_by_operator
@@ -404,7 +444,10 @@ fn retention_splits_the_previous_checkpoints_contributors() {
         &mut tracker,
         1,
         &grown,
-        &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::AddNode),
+            0,
+        )]),
     );
     // Founder node 0 contributes at both checkpoints. Retention is a cohort
     // reading, so it must never count that founder.
@@ -419,7 +462,10 @@ fn retention_splits_the_previous_checkpoints_contributors() {
         &mut tracker,
         2,
         &pruned,
-        &summary_with(vec![applied(MutationOperator::TopologyRemoveNode, 3)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::RemoveNode),
+            3,
+        )]),
     );
     tracker.record_reading(0, 2, &ids(&[0, 1, 2]), Some(&ids(&[0, 1])));
     let second = tracker.checkpoint(2);
@@ -498,15 +544,15 @@ proptest! {
                         // even ids had already been selected by it, odd ids
                         // left it with nothing to select.
                         applied_after_discard(
-                            MutationOperator::TopologyAddNode,
+                            MutationOperator::Topology(TopologyOperator::AddNode),
                             id,
-                            MutationOperator::TopologyMutateGateBias,
+                            MutationOperator::Topology(TopologyOperator::MutateGateBias),
                             (id % 2 == 0).then_some(id),
                         )
                     } else if id % 3 == 0 {
-                        no_eligible(MutationOperator::TopologyRemoveRouteTarget)
+                        no_eligible(MutationOperator::Topology(TopologyOperator::RemoveRouteTarget))
                     } else {
-                        selected_inapplicable(MutationOperator::TopologyRemoveRouteTarget, id)
+                        selected_inapplicable(MutationOperator::Topology(TopologyOperator::RemoveRouteTarget), id)
                     })
                     .collect();
                 tracker.record_birth(BirthObservation {
@@ -678,8 +724,8 @@ fn pooling_one_birth_sums_every_event_total() {
     assert_eq!(pooled.zero_event_births, 1);
 
     let mut summary = summary_with(vec![
-        applied(MutationOperator::TopologyAddNode, 0),
-        applied(MutationOperator::TopologyAddNode, 1),
+        applied(MutationOperator::Topology(TopologyOperator::AddNode), 0),
+        applied(MutationOperator::Topology(TopologyOperator::AddNode), 1),
     ]);
     summary.unreachable_target_events = 3;
     summary.executed_target_events = 5;
@@ -705,7 +751,10 @@ fn an_internally_changed_module_reaches_the_changed_only_rung() {
         &mut tracker,
         1,
         &grown,
-        &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::AddNode),
+            0,
+        )]),
     );
     // A later birth leaves node 2's id in place and changes its content.
     let changed = vec![vm_node(0, 1), vm_node(2, 9)];
@@ -713,7 +762,10 @@ fn an_internally_changed_module_reaches_the_changed_only_rung() {
         &mut tracker,
         2,
         &changed,
-        &summary_with(vec![applied(MutationOperator::VmRegisterCountMutation, 2)]),
+        &summary_with(vec![applied(
+            MutationOperator::Vm(VmOperator::VmRegisterCountMutation),
+            2,
+        )]),
     );
     let module = tracker
         .modules()
@@ -750,7 +802,10 @@ fn a_deleted_founder_leaves_the_founder_row() {
         &mut tracker,
         1,
         &pruned,
-        &summary_with(vec![applied(MutationOperator::TopologyRemoveNode, 1)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::RemoveNode),
+            1,
+        )]),
     );
     let founders = tracker.checkpoint(1).founders;
     assert_eq!(founders.created, 2);
@@ -775,7 +830,7 @@ fn opportunities_strategy() -> impl Strategy<Value = Opportunities> {
             executed_target_events: scalars[7],
             applied_by_operator: operators
                 .into_iter()
-                .map(|(index, count)| (MutationOperator::all()[index], count))
+                .map(|(index, count)| (MutationOperator::ALL[index], count))
                 .collect(),
             ..Opportunities::default()
         })
@@ -837,7 +892,10 @@ fn a_copy_names_its_first_matching_source_and_flags_ambiguity() {
         &mut tracker,
         1,
         &[vm_node(0, 3), vm_node(1, 3), vm_node(2, 5), vm_node(3, 3)],
-        &summary_with(vec![applied(MutationOperator::TopologyCopyNode, 1)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::CopyNode),
+            1,
+        )]),
     );
     birth(
         &mut tracker,
@@ -849,7 +907,10 @@ fn a_copy_names_its_first_matching_source_and_flags_ambiguity() {
             vm_node(3, 3),
             vm_node(4, 5),
         ],
-        &summary_with(vec![applied(MutationOperator::TopologyCopyNode, 2)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::CopyNode),
+            2,
+        )]),
     );
 
     // Assert
@@ -892,13 +953,19 @@ fn the_birth_payload_is_the_creation_content_not_the_current_one() {
         &mut tracker,
         1,
         &[vm_node(0, 3), vm_node(1, 2)],
-        &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::AddNode),
+            0,
+        )]),
     );
     birth(
         &mut tracker,
         2,
         &[vm_node(0, 3), vm_node(1, 9)],
-        &summary_with(vec![applied(MutationOperator::VmRegisterCountMutation, 1)]),
+        &summary_with(vec![applied(
+            MutationOperator::Vm(VmOperator::VmRegisterCountMutation),
+            1,
+        )]),
     );
     let created = module(&tracker, 1, 1);
     assert_eq!(
@@ -926,7 +993,10 @@ fn rebasing_birth_payloads_moves_the_live_modules_only() {
         &mut tracker,
         1,
         &[vm_node(0, 3)],
-        &summary_with(vec![applied(MutationOperator::TopologyRemoveNode, 1)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::RemoveNode),
+            1,
+        )]),
     );
     tracker.rebase_birth_payloads(0, &[vm_node(0, 9), vm_node(1, 9)]);
     let live = module(&tracker, 0, 0);
@@ -957,7 +1027,10 @@ fn exposure_counts_every_selection_by_surface_and_outcome() {
         &mut tracker,
         1,
         &[vm_node(0, 3), vm_node(1, 3)],
-        &summary_with(vec![applied(MutationOperator::TopologyCopyNode, 0)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::CopyNode),
+            0,
+        )]),
     );
     // Two applied payload edits, one applied split edit, one discarded
     // payload pick, one discarded split pick, and an input-ref edit.
@@ -966,20 +1039,23 @@ fn exposure_counts_every_selection_by_surface_and_outcome() {
         2,
         &[vm_node(0, 3), vm_node(1, 4)],
         &summary_with(vec![
-            applied(MutationOperator::VmRegisterCountMutation, 1),
+            applied(MutationOperator::Vm(VmOperator::VmRegisterCountMutation), 1),
             applied_after_discard(
-                MutationOperator::VmConstantMutation,
+                MutationOperator::Vm(VmOperator::VmConstantMutation),
                 1,
-                MutationOperator::VmDeleteInstruction,
+                MutationOperator::Vm(VmOperator::VmDeleteInstruction),
                 Some(1),
             ),
             applied_after_discard(
-                MutationOperator::TopologyMutateGateBias,
+                MutationOperator::Topology(TopologyOperator::MutateGateBias),
                 1,
-                MutationOperator::TopologyRemoveRouteTarget,
+                MutationOperator::Topology(TopologyOperator::RemoveRouteTarget),
                 Some(1),
             ),
-            applied(MutationOperator::InputRefAddSensorLive, 1),
+            applied(
+                MutationOperator::InputRef(InputRefOperator::AddSensorLive),
+                1,
+            ),
         ]),
     );
     birth(
@@ -987,7 +1063,7 @@ fn exposure_counts_every_selection_by_surface_and_outcome() {
         5,
         &[vm_node(0, 3), vm_node(1, 4)],
         &summary_with(vec![selected_inapplicable(
-            MutationOperator::GraphAddGraphEdge,
+            MutationOperator::Graph(GraphOperator::AddGraphEdge),
             1,
         )]),
     );
@@ -1062,7 +1138,10 @@ fn a_new_route_entry_naming_a_module_is_one_split_exposure_per_birth() {
         &mut tracker,
         1,
         &[router.clone(), vm_node(1, 3)],
-        &summary_with(vec![applied(MutationOperator::TopologyAddRouteTarget, 0)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::AddRouteTarget),
+            0,
+        )]),
     );
     assert_eq!(
         module(&tracker, 1, 0).exposure.split,
@@ -1082,7 +1161,10 @@ fn a_new_route_entry_naming_a_module_is_one_split_exposure_per_birth() {
         &mut tracker,
         2,
         &[router.clone(), vm_node(1, 3)],
-        &summary_with(vec![applied(MutationOperator::TopologyMutateGateBias, 0)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::MutateGateBias),
+            0,
+        )]),
     );
     assert_eq!(module(&tracker, 1, 0).exposure.split.applied, 1);
     // A created node whose targets name the module counts too.
@@ -1096,7 +1178,10 @@ fn a_new_route_entry_naming_a_module_is_one_split_exposure_per_birth() {
         &mut tracker,
         3,
         &[router, vm_node(1, 3), added],
-        &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::AddNode),
+            0,
+        )]),
     );
     assert_eq!(module(&tracker, 1, 0).exposure.split.applied, 2);
 }
@@ -1118,7 +1203,10 @@ fn scene_dispatch_counts_follow_the_latest_reading_and_clear_on_deletion() {
         &mut tracker,
         1,
         &[vm_node(0, 3)],
-        &summary_with(vec![applied(MutationOperator::TopologyRemoveNode, 1)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::RemoveNode),
+            1,
+        )]),
     );
     assert_eq!(module(&tracker, 1, 0).scenes_dispatched, 0);
     assert_eq!(module(&tracker, 1, 0).deleted_depth, Some(1));
@@ -1132,15 +1220,18 @@ fn the_lineage_row_counts_cohort_modules_with_an_applied_site() {
         &mut tracker,
         1,
         &[vm_node(0, 3), vm_node(1, 1), vm_node(2, 2)],
-        &summary_with(vec![applied(MutationOperator::TopologyAddNode, 0)]),
+        &summary_with(vec![applied(
+            MutationOperator::Topology(TopologyOperator::AddNode),
+            0,
+        )]),
     );
     birth(
         &mut tracker,
         2,
         &[vm_node(0, 3), vm_node(1, 4), vm_node(2, 2)],
         &summary_with(vec![
-            applied(MutationOperator::VmRegisterCountMutation, 1),
-            selected_inapplicable(MutationOperator::VmDeleteInstruction, 2),
+            applied(MutationOperator::Vm(VmOperator::VmRegisterCountMutation), 1),
+            selected_inapplicable(MutationOperator::Vm(VmOperator::VmDeleteInstruction), 2),
         ]),
     );
     let reading = tracker.checkpoint(2);
@@ -1152,29 +1243,35 @@ fn the_lineage_row_counts_cohort_modules_with_an_applied_site() {
 fn every_operator_has_exactly_one_edit_surface() {
     use MutationOperator as Op;
     assert_eq!(
-        EditSurface::of(Op::TopologyRetargetNodeTarget),
+        EditSurface::of(Op::Topology(TopologyOperator::RetargetNodeTarget)),
         EditSurface::Split
     );
     assert_eq!(
-        EditSurface::of(Op::TopologyAddFeedbackRoute),
+        EditSurface::of(Op::Topology(TopologyOperator::AddFeedbackRoute)),
         EditSurface::Split
     );
     assert_eq!(
-        EditSurface::of(Op::TopologyChangeEntryNode),
+        EditSurface::of(Op::Topology(TopologyOperator::ChangeEntryNode)),
         EditSurface::Split
     );
     assert_eq!(
-        EditSurface::of(Op::TopologySwapNodeBackend),
+        EditSurface::of(Op::Topology(TopologyOperator::SwapNodeBackend)),
         EditSurface::Payload
     );
     assert_eq!(
-        EditSurface::of(Op::VmInsertReadBidMotif),
+        EditSurface::of(Op::Vm(VmOperator::VmInsertReadBidMotif)),
         EditSurface::Payload
     );
     assert_eq!(
-        EditSurface::of(Op::GraphMutateTraceDecay),
+        EditSurface::of(Op::Graph(GraphOperator::MutateTraceDecay)),
         EditSurface::Payload
     );
-    assert_eq!(EditSurface::of(Op::TopologyCopyNode), EditSurface::Other);
-    assert_eq!(EditSurface::of(Op::InputRefSwap), EditSurface::Other);
+    assert_eq!(
+        EditSurface::of(Op::Topology(TopologyOperator::CopyNode)),
+        EditSurface::Other
+    );
+    assert_eq!(
+        EditSurface::of(Op::InputRef(InputRefOperator::Swap)),
+        EditSurface::Other
+    );
 }

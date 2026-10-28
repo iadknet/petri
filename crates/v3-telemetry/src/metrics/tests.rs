@@ -166,7 +166,7 @@ fn populated() -> SimStats {
         s.mutation_events_skipped_by_reason.insert(reason, 1);
     }
     let inputs = WorldInputKey::universe(types);
-    for operator in MutationOperator::all() {
+    for operator in MutationOperator::ALL {
         s.mutation_events_attempted_total_by_operator
             .insert(operator, 1);
         s.mutation_events_applied_total_by_operator
@@ -253,7 +253,7 @@ type Family = (String, MetricKind, Vec<Attribute>);
 fn op() -> Attribute {
     (
         "petri.operator",
-        strings(MutationOperator::all(), |k| k.as_key().to_owned()),
+        strings(MutationOperator::ALL, |k| k.as_key().to_owned()),
     )
 }
 

@@ -6,6 +6,9 @@ use crate::genome::cgp::{
     CgpGraphBackendDef, EdgeSurface, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
 };
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
+use crate::mutation::graph::GraphOperator;
+use crate::mutation::input_ref::InputRefOperator;
+use crate::mutation::vm::VmOperator;
 use crate::mutation::{
     MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome, MutationOperator,
     MutationSkipReason, MutationSummary,
@@ -58,9 +61,9 @@ proptest::proptest! {
         config.large_copy_weight_percent = 0;
         let mut genome = v3alpha1_founder_genome();
         let summary = apply_events(&mut genome, &config, &[], &mut rng(seed), 1);
-        for operator in [MutationOperator::TopologyCopyNode,
-            MutationOperator::TopologyCopyMeshBackwardSlice,
-            MutationOperator::TopologyCopyMeshForwardSlice] {
+        for operator in [MutationOperator::Topology(TopologyOperator::CopyNode),
+            MutationOperator::Topology(TopologyOperator::CopyMeshBackwardSlice),
+            MutationOperator::Topology(TopologyOperator::CopyMeshForwardSlice)] {
             proptest::prop_assert!(!summary.operator_funnel_by_operator.contains_key(&operator));
             proptest::prop_assert!(!summary.attempted_by_operator.contains_key(&operator));
         }
@@ -155,13 +158,13 @@ fn engine_records_added_input_classes_for_topology_add_node() {
         let summary = apply_events(&mut genome, &config, &[], &mut r, 1);
         if summary
             .applied_by_operator
-            .contains_key(&MutationOperator::TopologyAddNode)
+            .contains_key(&MutationOperator::Topology(TopologyOperator::AddNode))
         {
             let newborn = genome.nodes.last().expect("newborn node should exist");
             let expected = classify_expected_added_input_classes(&newborn.input_refs);
             let recorded = summary
                 .added_node_input_classes_by_operator
-                .get(&MutationOperator::TopologyAddNode)
+                .get(&MutationOperator::Topology(TopologyOperator::AddNode))
                 .expect("input classes should be recorded");
             for class in expected {
                 assert_eq!(recorded.get(&class), Some(&1));
@@ -256,13 +259,13 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
         let summary = apply_events(&mut genome, &config, &[], &mut r, 1);
         if summary
             .applied_by_operator
-            .contains_key(&MutationOperator::TopologySpliceNode)
+            .contains_key(&MutationOperator::Topology(TopologyOperator::SpliceNode))
         {
             let newborn = genome.nodes.last().expect("spliced node should exist");
             let expected = classify_expected_added_input_classes(&newborn.input_refs);
             let recorded = summary
                 .added_node_input_classes_by_operator
-                .get(&MutationOperator::TopologySpliceNode)
+                .get(&MutationOperator::Topology(TopologyOperator::SpliceNode))
                 .expect("input classes should be recorded");
             for class in expected {
                 assert_eq!(recorded.get(&class), Some(&1));
@@ -297,11 +300,15 @@ fn engine_records_added_input_classes_for_graph_add_internal_graph_node() {
         let summary = apply_events(&mut genome, &config, &[], &mut r, 1);
         if summary
             .applied_by_operator
-            .contains_key(&MutationOperator::GraphAddInternalGraphNode)
+            .contains_key(&MutationOperator::Graph(
+                GraphOperator::AddInternalGraphNode,
+            ))
         {
             let recorded = summary
                 .added_node_input_classes_by_operator
-                .get(&MutationOperator::GraphAddInternalGraphNode)
+                .get(&MutationOperator::Graph(
+                    GraphOperator::AddInternalGraphNode,
+                ))
                 .expect("input classes should be recorded");
             for class in expected {
                 assert_eq!(recorded.get(&class), Some(&1));
@@ -332,11 +339,15 @@ fn engine_records_added_world_inputs_for_graph_add_internal_graph_node() {
         let summary = apply_events(&mut genome, &config, &[], &mut r, 1);
         if summary
             .applied_by_operator
-            .contains_key(&MutationOperator::GraphAddInternalGraphNode)
+            .contains_key(&MutationOperator::Graph(
+                GraphOperator::AddInternalGraphNode,
+            ))
         {
             let recorded = summary
                 .added_node_world_inputs_by_operator
-                .get(&MutationOperator::GraphAddInternalGraphNode)
+                .get(&MutationOperator::Graph(
+                    GraphOperator::AddInternalGraphNode,
+                ))
                 .expect("world inputs should be recorded");
             assert_eq!(
                 recorded.get(&WorldInputKey::AreaFoodSummary {
@@ -376,7 +387,7 @@ fn graph_add_internal_node_reads_inputs_of_the_graph_that_grew_not_the_first_gra
         crate::genome::cgp::ComputeNodeKind::Add,
         Vec::new(),
     ));
-    let operator = MutationOperator::GraphAddInternalGraphNode;
+    let operator = MutationOperator::Graph(GraphOperator::AddInternalGraphNode);
 
     assert_eq!(
         collect_added_node_input_classes(&before, &after, operator),
@@ -682,9 +693,9 @@ fn apply_topology_event_adds_pass_through_detour() {
     let mut genome = v3alpha1_founder_genome();
     let before_nodes = genome.nodes.len();
     let mut r = rng(10_001);
-    let reachability = apply_topology_event(
+    let (reachability, _) = apply_event(
         &mut genome,
-        TopologyOperator::AddNode,
+        TopologyOperator::AddNode.into(),
         &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &config,
@@ -1642,9 +1653,9 @@ fn an_edge_operator_selects_the_module_that_has_an_edge() {
     genome.nodes.push(edged);
 
     let edge_operators = [
-        MutationOperator::GraphRemoveGraphEdge,
-        MutationOperator::GraphRetargetGraphEdge,
-        MutationOperator::GraphAlterGraphEdgeWeight,
+        MutationOperator::Graph(GraphOperator::RemoveGraphEdge),
+        MutationOperator::Graph(GraphOperator::RetargetGraphEdge),
+        MutationOperator::Graph(GraphOperator::AlterGraphEdgeWeight),
     ];
     let mut applied = 0;
     for seed in 0u64..2_000 {
@@ -1747,10 +1758,10 @@ fn a_discarded_operator_stays_visible_when_a_later_operator_applied() {
         edge_operator_discarded += u32::from(event.discarded.iter().any(|&(operator, _)| {
             matches!(
                 operator,
-                MutationOperator::GraphRemoveGraphEdge
-                    | MutationOperator::GraphRetargetGraphEdge
-                    | MutationOperator::GraphAlterGraphEdgeWeight
-                    | MutationOperator::GraphCopyNodeInputs
+                MutationOperator::Graph(GraphOperator::RemoveGraphEdge)
+                    | MutationOperator::Graph(GraphOperator::RetargetGraphEdge)
+                    | MutationOperator::Graph(GraphOperator::AlterGraphEdgeWeight)
+                    | MutationOperator::Graph(GraphOperator::CopyNodeInputs)
             )
         }));
     }
@@ -1907,15 +1918,14 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
     def.seed_compute_rows(vec![vec![Some(0.75)]]);
     let before = original.clone();
     assert_eq!(
-        apply_graph_event(
+        apply_event(
             &mut original,
-            GraphOperator::AlterGraphEdgeWeight,
+            GraphOperator::AlterGraphEdgeWeight.into(),
             &mut TargetSelector::reachable_only(&[0], 1.0),
             &mut rng(9),
             &config,
             &crate::config::test_sensor_context(1)
-        )
-        .0,
+        ),
         Err(MutationSkipReason::ParseabilityViolation)
     );
     assert_eq!(original, before);

@@ -192,21 +192,21 @@ regression past its threshold would show it wrong.
 
 ## Implementation Tasks
 
-- [ ] 1. In `mutation/types`: write invariant 2's catalog test first; then
+- [x] 1. In `mutation/types`: write invariant 2's catalog test first; then
       the nested `MutationOperator`, `EventReport`, `ALL`,
       `MutationDomain::catalog` and `reachable_bias`, the derived facts,
       the four `From` impls, the hand-written `Debug` and the `as_key()`
       serde form (invariants 1–4); `as_key` and `Ord` on the four domain
       enums, `GraphOperator`'s own `complexity_effect` table.
-- [ ] 2. The four domain entries return `(TargetReachability, EventReport)`
+- [x] 2. The four domain entries return `(TargetReachability, EventReport)`
       (invariant 4); delete `GraphEventReport` (moved),
       `InputRefEventReport` and `GraphOperator::operator`.
-- [ ] 3. In `engine/mod.rs`: the ungated `dispatch`, `apply_event`, the one
+- [x] 3. In `engine/mod.rs`: the ungated `dispatch`, `apply_event`, the one
       selection function and the rewritten event loop (invariants 4 and
       5); delete the three key functions, the four wrappers,
       `ClassifiedResult` and the `too_many_lines` allowance; the battery
       in `neighborhood/operators.rs` drops `OperatorKind` for the dispatch.
-- [ ] 4. Callers of invariant 6 (compiler-driven): readers,
+- [x] 4. Callers of invariant 6 (compiler-driven): readers,
       `recruitment_paths` with the `WORKAROUND(T30.F09)` comment on
       `ProductionEvent`, `v3-cli`, `v3-lab` (`key_of`, tests, fixture),
       and every test file naming a flat variant.
@@ -216,15 +216,15 @@ regression past its threshold would show it wrong.
 
 ## Verification
 
-- [ ] Invariant 1: `grep -rnE "topology_operator_key|vm_operator_key|input_ref_operator_key|MutationOperator::all\(\)|GraphEventReport|InputRefEventReport|OperatorKind" crates`
+- [x] Invariant 1: `grep -rnE "topology_operator_key|vm_operator_key|input_ref_operator_key|MutationOperator::all\(\)|GraphEventReport|InputRefEventReport|OperatorKind" crates`
       is empty, and `grep -n "fn operator" crates/v3-core/src/mutation/graph/mod.rs`
       is empty (`ProductionEvent::operator` in `recruitment_paths` stays
       until T30.F09).
-- [ ] Invariant 2: `cargo test -p v3-core mutation::types` passes with the
+- [x] Invariant 2: `cargo test -p v3-core mutation::types` passes with the
       catalog test; the `as_key` strings of every operator equal the list
       on `ac3747005` (`types/mod.rs:319-387`), by a diff recorded in the
       readings.
-- [ ] Invariant 5: `grep -n too_many_lines crates/v3-core/src/mutation/engine/mod.rs`
+- [x] Invariant 5: `grep -n too_many_lines crates/v3-core/src/mutation/engine/mod.rs`
       is empty; `cargo test -p v3-core draw_stream` passes with hash
       `14_628_003_425_138_151_748` unchanged.
 - [ ] Invariants 6 and 7: `make check` exits 0, no test deleted or ignored.
