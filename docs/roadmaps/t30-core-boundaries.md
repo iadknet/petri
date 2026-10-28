@@ -48,6 +48,10 @@ behavior.
   - Goal: Every population census is computed once in core's readers and each benchmark sample block is declared once with its retention policy, so a new block is not wired by hand in five places and the summary keeps the same minimum, with no simulation behavior change.
 - [ ] **T30.F14 — The Inspector Reads Resolved Views** — Depends on: None
   - Goal: The creature inspector shows what the genome resolves, with the server forwarding core's facts and the frontend matching nothing the core already matched, with no behavior change.
+- [ ] **T30.F15 — One Definition per Population Statistic** — Depends on: T30.F13
+  - Goal: Mean energy, clade entropy and mean capacity each have one definition in core's readers, so the benchmark report, the server, the NDJSON stream and telemetry never disagree on the same quantity, with no simulation behavior change.
+- [ ] **T30.F16 — World-Input Keys Name Their Food Type** — Depends on: T30.F13
+  - Goal: Every world-input count that leaves core is keyed by its food type as well as its family, so two food types' counts never share a key or overwrite each other, with no simulation behavior change.
 
 ## Notes for AI Agents
 
@@ -341,6 +345,51 @@ behavior.
   (`transport/brain.rs`) is mirrored and compared field by field in
   `useCreatureDetailResource.ts`, so a new field would be ignored; the
   server sends a context identity the client compares whole.
+- F15 and F16 were added on 2026-10-28 at the user's direction to pay
+  T30.F13's two unpaid accepts, proposed at its closure: "Plan the two payer
+  rows (paired definitions R4–R6, and the food-typed world-input wire keys
+  R11 with its sibling) with the track-design review"
+  ([F15–F16 design review](../progress/readings/t30-f15-f16-design-review.md);
+  audit rows in [T30.F13's readings](../progress/readings/t30-f13.md)).
+  Neither changes a trajectory, population or draw; each changes named
+  outputs on purpose, so its spec lists every pin literal it moves with the
+  reason, and any other moved pin is a defect.
+- F15: T30.F13 kept two definitions side by side in readers, each marked
+  `WORKAROUND(T30.F13)`: mean energy (`PopulationCensus::mean_energy`, an
+  `f64` sum, for the benchmark sample; `mean_energy_live`, an `f32` sum, for
+  NDJSON, the CLI run's `final_mean_energy` (`v3-cli/src/lib.rs`), server
+  status and health, `petri.tick.mean_energy` and the viability gate), clade
+  entropy (`CladeCensus::entropy_nats` in lineage-id order for the sample
+  and `lineage_diversity`; `effective_lineages_live` over ascending counts
+  for the server's `lineages_effective`) and mean capacity
+  (`distributions.rs`'s sorted-order mean for the benchmark `capacity`
+  block; `mean_capacity_live` in creature order for
+  `petri.tick.mean_capacity`), all in `crates/v3-core/src/neighborhood/`.
+  Each quantity keeps the benchmark's definition, so stored reports and the
+  benchmark series stay comparable and the summary does not move; the live
+  outputs read it, an `f32` wire field casting the `f64` result, and change
+  by rounding only. The live functions and all six paired-definition
+  markers are deleted.
+- F16: `WorldInputKey::as_key` (`contracts/inputs.rs`) is the family name
+  and drops the food type, yet three outputs key counts by it, so
+  `FoodHere{0}` and `FoodHere{1}` share a key: the server's
+  `vm_live_read_world_inputs_current` (`v3-server/src/state.rs`, marked
+  `WORKAROUND(T30.F13)`) and
+  `mutation_added_node_world_inputs_total_by_operator` (`state.rs`), where
+  one count overwrites the other, and telemetry's `petri.world_input` label
+  on the same mutation counter (`v3-telemetry/src/metrics.rs`), whose
+  `Families::nested` sums them into one family total, so that series splits
+  into food-typed series and the exporter keeps summing equal labels. Telemetry's sensor census and the
+  benchmark already key by `world_input_key_label`
+  (`neighborhood/sensor_census.rs`). The food-typed label becomes
+  `WorldInputKey`'s own transport key in contracts, every count that leaves
+  core keys by it, and the readers' separate label function goes; `as_key`
+  stays the family name the inspector and its fixtures use. The wire and
+  telemetry keys for food-parameterized families change (no compatibility
+  aliases); the frontend's generated types are unchanged, since the maps are
+  string-keyed. F11 also edits how the engine collects the added node's world
+  inputs; concurrent sessions reconcile `simulation/stats.rs` at
+  integration.
 - The master order puts F03 first (user, 2026-10-25), F01 and F07 before
   T25.F11, F08 after F07 (assistant proposal), F02 and F06 before T28, and
   F09 after F06 (assistant proposal), as preferences, not prerequisites.
