@@ -2462,3 +2462,40 @@ fn an_unresolvable_pair_has_no_coordinates() {
         .birth_coordinates(id, &ring_refs(), &crate::contracts::SensorContext::WIDEST)
         .is_empty());
 }
+
+/// A bundle over the widest `ActionQueue` (65,536 fields) lists every birth
+/// coordinate present: presence is a keyed lookup, not a scan of the members
+/// per coordinate (quadratic at this width, about 2.15 billion comparisons).
+#[test]
+fn the_widest_queue_bundle_lists_every_coordinate_present() {
+    // Arrange: one bundle over every queue field under the widest context,
+    // its members appended in I10 order (the record and edges `add_bundle`
+    // writes, without its per-member insertion search).
+    let refs = [InputReference::ActionQueue];
+    let context = crate::contracts::SensorContext::WIDEST;
+    let source = BundleSource::Sensor {
+        ref_idx: 0,
+        field_set: 0,
+    };
+    let set = source
+        .resolve_in(&refs, &context)
+        .expect("the queue resolves");
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    let wiring = *plans(&def, &set).first().expect("an admissible plan");
+    let coordinates = wiring.coordinates(&set);
+    assert_eq!(coordinates.len(), 65_536);
+    let id = BundleId::new(0);
+    def.bundles.push(Bundle::new(source, wiring));
+    for &(field, site) in &coordinates {
+        let sink = def.site_sink(&wiring, site).expect("a sink of the wiring");
+        let member = CgpGraphBackendDef::new_member(id, source, field);
+        def.output_sinks.0[sink].inputs.0.push(member);
+    }
+
+    // Act
+    let births = def.birth_coordinates(id, &refs, &context);
+
+    // Assert
+    assert_eq!(births.len(), 65_536);
+    assert!(births.iter().all(|c| c.present));
+}

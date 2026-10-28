@@ -6,7 +6,12 @@ import type { BrainEdge } from "../../types/generated/BrainEdge.ts";
 import type { BrainSink } from "../../types/generated/BrainSink.ts";
 import type { GraphBrain } from "../../types/generated/GraphBrain.ts";
 import type { Site } from "../../types/generated/Site.ts";
-import { EdgeBundleList } from "./EdgeBundleList.tsx";
+import {
+	collectBundleMembers,
+	coordinateKey,
+	EdgeBundleList,
+	indexMembers,
+} from "./EdgeBundleList.tsx";
 
 /** A member of bundle 0 as the brain view resolves it: every number given,
  * none composed here. */
@@ -259,5 +264,23 @@ describe("EdgeBundleList", () => {
 			<EdgeBundleList graphDef={graphBrain()} inputRefs={[]} learning={null} />,
 		);
 		expect(container.innerHTML).toBe("");
+	});
+});
+
+describe("indexMembers", () => {
+	it("finds every member of the widest queue bundle by coordinate", () => {
+		const width = 65_536;
+		const sink: BrainSink = { kind: { ActionVote: "Eat" }, edges: [] };
+		for (let field = 0; field < width; field++) {
+			sink.edges.push(member(field, "Sink", { own: 0, genomic: 0, pattern: 1, scale: 0 }));
+		}
+		const graph = graphBrain({ output_sinks: [sink], bundles: [ringBundle(0)] });
+		const index = indexMembers(collectBundleMembers(graph, null)[0] ?? []);
+		let found = 0;
+		for (let field = 0; field < width; field++) {
+			if (index.get(coordinateKey(field, "Sink"))?.field === field) found++;
+		}
+		expect(found).toBe(width);
+		expect(index.get(coordinateKey(0, { Direction: 0 }))).toBeUndefined();
 	});
 });

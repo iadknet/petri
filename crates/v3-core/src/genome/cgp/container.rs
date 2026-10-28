@@ -7,6 +7,7 @@
 //! goes through a primitive below, which applies the seed rule of the write
 //! it replaces. The container draws no random numbers.
 
+use std::collections::HashSet;
 use std::fmt;
 use std::ops::Deref;
 
@@ -1162,7 +1163,7 @@ impl CgpGraphBackendDef {
             .resolve_in(input_refs, context)
             .map(|set| record.wiring.coordinates(&set))
             .unwrap_or_default();
-        let members: Vec<(u16, Site)> = self
+        let members: HashSet<(u16, Site)> = self
             .members(bundle)
             .filter_map(|member| {
                 let edge = self.edge_at(member);
@@ -1492,7 +1493,7 @@ impl CgpGraphBackendDef {
             }
         }
         let mut members = vec![0u32; self.bundles.len()];
-        let mut coordinates = std::collections::HashSet::new();
+        let mut coordinates = HashSet::new();
         for sink in self.output_sinks.iter() {
             let mut previous: Option<(BundleId, u16)> = None;
             let mut in_members = false;

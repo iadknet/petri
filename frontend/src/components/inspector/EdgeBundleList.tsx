@@ -68,11 +68,21 @@ export function collectBundleMembers(
 	return members;
 }
 
-/** Whether two sites are the same. */
-function sameSite(a: Site | undefined, b: Site): boolean {
-	if (a === undefined) return false;
-	if (typeof a === "string" || typeof b === "string") return a === b;
-	return a.Direction === b.Direction;
+/** A birth coordinate `(field, site)` as a lookup key. */
+export function coordinateKey(field: number, site: Site): string {
+	return `${field}:${typeof site === "string" ? site : site.Direction}`;
+}
+
+/** A bundle's members by coordinate, the first at each (one lookup per
+ * birth coordinate; a queue bundle carries up to 65,536). */
+export function indexMembers(members: readonly BundleMember[]): Map<string, BundleMember> {
+	const index = new Map<string, BundleMember>();
+	for (const member of members) {
+		if (member.field === undefined || member.site === undefined) continue;
+		const key = coordinateKey(member.field, member.site);
+		if (!index.has(key)) index.set(key, member);
+	}
+	return index;
 }
 
 /** A geometric wiring's kind and offset; `null` for `Plain`. */
@@ -210,6 +220,7 @@ function BundleRow({
 	learnedScale: number | undefined;
 }) {
 	const [open, setOpen] = useState(true);
+	const byCoordinate = indexMembers(members);
 	const wiringName =
 		"Plain" in bundle.wiring
 			? `Plain → ${formatVoteSink(bundle.wiring.Plain.sink)}`
@@ -242,15 +253,12 @@ function BundleRow({
 			{open ? (
 				<ul className="ml-4 space-y-0.5 text-slate-400">
 					{bundle.coordinates.map((coordinate) => {
-						const member = members.find(
-							(candidate) =>
-								candidate.field === coordinate.field && sameSite(candidate.site, coordinate.site),
-						);
+						const key = coordinateKey(coordinate.field, coordinate.site);
+						const member = byCoordinate.get(key);
 						const at = `${fieldLabel(bundle.source, coordinate.field, inputRefs)} → ${siteLabel(
 							coordinate.site,
 							bundle.wiring,
 						)}`;
-						const key = `${coordinate.field}:${JSON.stringify(coordinate.site)}`;
 						return member ? (
 							<li key={key} data-testid="edge-bundle-member">
 								{at} <MemberWeights member={member} />
