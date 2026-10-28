@@ -1,4 +1,4 @@
-//! The ring-rule census (`ring-rules-v2`, T11.F31, T25.F03): which
+//! The ring-rule census (`ring-rules-v3`, T11.F31, T25.F03, T25.F11): which
 //! direction-general rules "vote kind `K` toward direction `d` from ring
 //! channel `d − offset`" a population carries, through direct edges or one
 //! bus hop, and the `Ring` edge bundles it carries.
@@ -30,7 +30,7 @@ use crate::genome::{BackendDef, CreatureGenome};
 use crate::neighborhood::sensor_census::world_input_key_label;
 
 /// The census version the goal summary records.
-pub const RING_RULES_VERSION: &str = "ring-rules-v2";
+pub const RING_RULES_VERSION: &str = "ring-rules-v3";
 
 /// The weight magnitude above which an edge carries a path, and above which
 /// a bundle's scale counts as nonzero.

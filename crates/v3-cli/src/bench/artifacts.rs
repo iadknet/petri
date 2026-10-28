@@ -1482,7 +1482,7 @@ mod tests {
         let case = json!({"case": "c", "mutation_supply": {
             "events_applied_total": 3,
             "bundles_removed_total": 2,
-            "attribute_changes_by_scope": {"edge": 5, "group": 1},
+            "attribute_changes_by_scope": {"edge": 5, "bundle": 1},
             "operator_funnel_by_operator": {"Graph.DetachGraphEdge": {
                 "attempted": 2, "applicable": 2, "structurally_valid": 2,
                 "applied": 1, "skipped": 1

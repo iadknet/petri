@@ -1,4 +1,4 @@
-//! The per-world `ring_rules` block (T11.F31, T25.F03, `ring-rules-v2`): the
+//! The per-world `ring_rules` block (T11.F31, T25.F03, T25.F11, `ring-rules-v3`): the
 //! ring-rule census of the terminal population, projected from
 //! `v3_core::neighborhood::ring_rules`. Rows are space-separated strings, as in
 //! `input_use`, so the committed summary stays inside its budget.
@@ -79,7 +79,7 @@ mod tests {
         config.population.initial_creatures = 3;
         let sim = seed_simulation(config, 1);
         let block = observe_world(&sim);
-        assert_eq!(block.version, "ring-rules-v2");
+        assert_eq!(block.version, "ring-rules-v3");
         assert_eq!(block.creatures, sim.creatures.len() as u64);
         assert_eq!(
             block.rule_rows,

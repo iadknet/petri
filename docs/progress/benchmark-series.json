@@ -218,6 +218,20 @@
       "before": "input-use-v4: ActionQueue's first 12 channels were drawn and a channel past them was kept and marked beyond the draw width (*)",
       "after": "input-use-v5: ActionQueue's width follows the configured queue (3 x max_actions_per_turn, 30 at the default), every channel below it is drawn and a read at or past it is OutOfWidth; the * marker is gone and UpstreamBus is a family",
       "comparison": "ActionQueue rows 12 to 29 change from beyond-draw-width to drawn channels; other families like-for-like"
+    },
+    {
+      "feature": "T25.F11",
+      "counter": "ring_rules (ring-rules-v2 -> ring-rules-v3)",
+      "before": "ring-rules-v2: ring_group_* fields (carriers, groups, nonzero, unreachable, members, row format and rows); path (ii) took a bus hop only through an UpstreamSlot(j) read",
+      "after": "ring-rules-v3: the same fields renamed ring_bundle_* over Ring bundles; path (ii) also takes the hop through an UpstreamBus read of field j as bus slot j",
+      "comparison": "ring_bundle_* counts are like-for-like with ring_group_* under the rename; direction_general and the rule rows gain UpstreamBus bus-hop paths, so they are not like-for-like where a population routes ring channels through the bus"
+    },
+    {
+      "feature": "T25.F11",
+      "counter": "attribute_changes_by_scope (group -> bundle)",
+      "before": "mutation_supply.attribute_changes_by_scope keyed edge and group",
+      "after": "keyed edge and bundle",
+      "comparison": "bundle is like-for-like with group under the rename (committed attribute changes that landed on the bundle scope)"
     }
   ],
   "goal_worlds": {

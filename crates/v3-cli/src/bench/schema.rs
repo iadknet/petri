@@ -1076,11 +1076,13 @@ pub struct MutationSupply {
     /// Bundle members committed events detached (T25.F03); absent in reports
     /// stored before T25.F03.
     pub graph_edges_detached_total: u64,
-    /// Edge bundles committed events removed (T25.F03); absent in reports
-    /// stored before T25.F03.
+    /// Edge bundles committed events removed (T25.F03, renamed from
+    /// `groups_removed_total` at T25.F11); absent in reports stored before
+    /// T25.F11.
     pub bundles_removed_total: u64,
-    /// Committed attribute changes by the scope they landed on (T25.F08);
-    /// absent in reports stored before T25.F08.
+    /// Committed attribute changes by the scope they landed on (T25.F08,
+    /// scope `group` renamed `bundle` at T25.F11); absent in reports stored
+    /// before T25.F08.
     pub attribute_changes_by_scope: AttributeChangesByScope,
     /// The event funnel of every operator an event tried, keyed
     /// `MutationOperator::as_key()` (T25.F08); absent in reports stored
