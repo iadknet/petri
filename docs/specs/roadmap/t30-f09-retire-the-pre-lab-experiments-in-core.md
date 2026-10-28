@@ -9,9 +9,9 @@
 
 The two capability experiments placed in `v3-core` before the T22 lab rule
 leave the workspace with everything only they used: the recruitment-paths
-experiment (`neighborhood/recruitment_paths`, `712951212`, 2026-09-12) and
-T20.F01's discovery and ecological-opportunity assay
-(`neighborhood/opportunity`, `a0939c050`, 2026-09-25), their goal-profile
+experiment (`neighborhood/recruitment_paths`, `712951212`) and T20.F01's
+discovery and ecological-opportunity assay (`neighborhood/opportunity`,
+`a0939c050`), their goal-profile
 indicator and its wall-clock field, the `recruitment` and `input-opportunity`
 commands, and the recruitment half of the slow tier. The authored
 controllers the lab builds its comparators from move into `v3-lab`, with one
@@ -26,10 +26,9 @@ changes.
   experiments asked.
 - `neighborhood/recruitment.rs` and `neighborhood/recruitment/` (T13.F01's
   module-recruitment census, the drift walk's `recruitment` and
-  `opportunities` blocks), `neighborhood/input_use/` (T20.F01's input-use
-  census) and `neighborhood/drift.rs` stay as they are.
-- The Graph's tolerance of partial sink catalogs (`insert_member`'s
-  `expect`, `can_add_edge`, `RetargetBundle`'s skip orders): T30.F12.
+  `opportunities` blocks), `neighborhood/input_use/` and
+  `neighborhood/drift.rs` stay as they are.
+- The Graph's tolerance of partial sink catalogs: T30.F12.
 - The VM and Topology test-only samplers (`WORKAROUND(T25.F08)`): T30.F05.
 - History keeps its text: closed specs, `docs/progress.md` rows,
   `docs/progress/features/*.json`, `docs/progress/readings/`,
@@ -158,8 +157,10 @@ that moves, or a lab test or slow-tier lab run failing, would show it wrong.
       `tests/lab_run.rs` import the lab module; the lab's existing
       comparator tests keep their assertions.
 - [x] Core: delete `neighborhood/recruitment_paths/`,
-      `neighborhood/opportunity/`, their `pub mod` lines and
-      `crates/v3-core/tests/recruitment_paths.rs`; delete
+      `neighborhood/opportunity/`, their `pub mod` lines,
+      `crates/v3-core/tests/recruitment_paths.rs` and
+      `mesh_execution::ancestral_payload_replacement` (T13.F07's
+      counterfactual, no other caller); delete
       `GraphMutator::apply`, its test callers passing a context to
       `apply_in`; `mutation/engine/mod.rs`'s doc names the drift walk as
       the one instrument on `FOUNDER_GENOME_SIZE_UNITS`.
