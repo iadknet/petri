@@ -21,9 +21,8 @@ changes.
 
 ## Non-Goals
 
-- A new lab assay or reading: `docs/lab.md`'s why-not ladder (Supply,
-  Benefit and Retention rungs) already routes the questions the two
-  experiments asked.
+- A new lab assay or reading: `docs/lab.md`'s why-not ladder already
+  routes the questions the two experiments asked.
 - `neighborhood/recruitment.rs` and `neighborhood/recruitment/` (T13.F01's
   module-recruitment census, the drift walk's `recruitment` and
   `opportunities` blocks), `neighborhood/input_use/` and
@@ -45,8 +44,7 @@ Inputs:
   shared Ring-wiring operation
   ([F09 design review](../../progress/readings/t30-f09-design-review.md)).
 - `AGENTS.md`'s lab rule and `docs/architecture.md` section 2: `v3-lab` owns
-  capability assays and is never depended on; `v3-core` owns the simulation
-  library.
+  capability assays and is never depended on.
 - The T25.F11 accept this row pays: `WORKAROUND(T25.F11)` at
   `neighborhood/recruitment_paths/mod.rs:1`.
 - `docs/workflow.md`'s slow-tests row and the Makefile's test targets.
@@ -84,8 +82,8 @@ Invariants:
 6. Stored reports and summaries still parse and compare: `bench/schema.rs`
    has no `deny_unknown_fields` and `bench/comparison.rs` never read
    `recruitment_paths`.
-7. The slow tier's lab half is unchanged: the six `lab_run` tests the
-   Makefile names run under `make rust-test-slow`, and nothing else does.
+7. The slow tier's lab half is unchanged: `make rust-test-slow` runs the
+   six `lab_run` tests the Makefile names and nothing else.
 8. No test is deleted other than tests of deleted code; a test whose subject
    survives is kept and retargeted.
 
@@ -105,8 +103,8 @@ Boundary changed: none; the desired state already places capability assays
 in the lab, so `docs/architecture.md` needs no edit. One shared rule changes:
 the slow-tests trigger, owned by `docs/workflow.md`'s Verification plan table
 and applied by every spec's Verification Plan and by the `rust-test-slow`
-target, keeps only its lab half, and the two worked examples that cited the
-recruitment half (T02.F08, T11.F31) are reclassified under it. The Graph's
+target, keeps only its lab half, and the T02.F08 and T11.F31 worked
+examples are reclassified under it. The Graph's
 partial-catalog tolerance (T30.F12) is neither used nor paid: the deleted
 fixtures build full catalogs (`recruitment_paths/fixtures.rs:526-535` maps
 every sink to one of the same kind, emptying edge lists), so this row
@@ -114,8 +112,7 @@ touches nothing of it.
 
 ## Telemetry
 
-Signals removed; none added. No counter, config value or mechanism switch
-changes.
+Signals removed; none added; no counter, config value or switch changes.
 
 | Signal | Kind | Source | Context carried |
 | --- | --- | --- | --- |
@@ -147,15 +144,16 @@ that moves, or a lab test or slow-tier lab run failing, would show it wrong.
       (`Family` with `reference()`, the constants with `RING_MOVES`,
       `AuthoredStructure`, `controller`), dropping the assay-only parts
       (`Family::ALL`, `index`, `as_key`, `authored_sub_indices`,
-      `authored_channels`, the inert `Z_k` scale and derives nothing in
-      the lab uses). One
+      `authored_channels`, the inert `Z_k` scale, the `Scalar` family, the
+      `AuthoredStructure` counts and derives nothing in the lab uses). One
       operation appends a family's reference at the vote node's next index
       and wires its structure reading that index; `controller()` (asserting
       the founder's seven references) and `comparator::barrier_comparator`
       (asserting eight) both call it, so the comparator no longer repeats
       the Ring wiring. `comparator.rs`, `calibration.rs`, `eval.rs` and
-      `tests/lab_run.rs` import the lab module; the lab's existing
-      comparator tests keep their assertions.
+      `tests/lab_run.rs` import the lab module. The assay's test of
+      production visibility (diagonal barriers hide no cardinal ring cell)
+      moves to `sensors::visibility`'s tests.
 - [x] Core: delete `neighborhood/recruitment_paths/`,
       `neighborhood/opportunity/`, their `pub mod` lines,
       `crates/v3-core/tests/recruitment_paths.rs` and
@@ -263,13 +261,14 @@ the drop.
 
 ## Notes for AI Agents
 
-- Decision: (user, 2026-10-27) the experiments retire rather than move to the
-  lab, and the retirement covers T20.F01's discovery assay and the
-  `input-opportunity` command; the controllers and `Family` move to the lab
+- Decision: (user, 2026-10-27) the experiments retire rather than move,
+  T20.F01's assay and the `input-opportunity` command included; the
+  controllers and `Family` move to the lab
   with reference indices, constants and genomes unchanged.
 - Decision: the controllers land in `crates/v3-lab/src/controllers.rs`;
   `controller()` and `barrier_comparator` share one family-append
-  operation; the assay-only `Family` helpers are deleted, not moved.
+  operation; the assay-only parts of the controllers (`Family` helpers, the
+  `Scalar` family, the `AuthoredStructure` counts) are deleted, not moved.
 - Decision: `GraphMutator::apply` is deleted outright; test callers pass an
   explicit `SensorContext`, never a hidden default.
 - Deferred: Codex round 1 F4: `recruitment_paths/fixtures.rs:535` builds a
