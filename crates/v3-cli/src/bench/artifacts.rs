@@ -9,7 +9,9 @@ use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 use v3_core::neighborhood::mesh_summary::{MeshRowReading, MeshSummary};
 
-use super::{retention, ComparisonInputs, Report};
+use super::{ComparisonInputs, Report};
+
+mod sample_retention;
 
 pub const SUMMARY_KIND: &str = "petri-benchmark-summary";
 pub const SUMMARY_VERSION: u32 = 2;
@@ -308,7 +310,7 @@ fn persistence(source: &Value, report: &Report) -> Result<Value, String> {
                         let sample = &samples[source_index];
                         let mut selected =
                             aggregate_fields(sample, &measured.samples[source_index].tracking)?;
-                        for (key, value) in pick(sample, &retention::sample_fields())
+                        for (key, value) in pick(sample, &sample_retention::sample_fields())
                             .as_object()
                             .into_iter()
                             .flatten()
@@ -663,13 +665,13 @@ fn keep_neighborhood(source: &Value) -> Value {
 }
 
 /// Project a checkpoint by the sample's retention declarations
-/// (`retention`): kept keys whole, each projected block narrowed to its
-/// every-checkpoint fields, and on the `last` checkpoint its last-only
+/// (`sample_retention`): kept keys whole, each projected block narrowed to
+/// its every-checkpoint fields, and on the `last` checkpoint its last-only
 /// fields too.
 fn keep_sample(source: &Value, last: bool) -> Value {
     keep_object(source, |sample| {
-        let mut out = pick(sample, &retention::kept_sample_fields());
-        for (key, every, last_only) in retention::projected_sample_fields() {
+        let mut out = pick(sample, &sample_retention::kept_sample_fields());
+        for (key, every, last_only) in sample_retention::projected_sample_fields() {
             keep_field(&mut out, sample, key, |block| {
                 keep_object(block, |block| {
                     let mut out = pick(block, &every);
