@@ -216,15 +216,14 @@ that moves, or a lab test or slow-tier lab run failing, would show it wrong.
       tests only.
 - [ ] Invariants 1, 3 and 8: `make check` -> exit 0; `make check-docs` ->
       exit 0.
-- [ ] Gate profile and invariant 1: summary at
+- [x] Gate profile and invariant 1: summary at
       `docs/progress/features/t30-f09.json`; a structural diff of the gate
       report's `deterministic` block against the epoch's full report (the
       main checkout's `.bench-artifacts/t25-f11/gate.json`, when present
       locally) lists exactly the removed `goal_indicators.recruitment_paths`,
       and the same diff of the two summaries' `deterministic` blocks lists
-      nothing (diff output in the readings; the summary diff alone when the
-      full report is not available locally, recorded as such); raw hash and
-      byte count in the readings, series entry added, no full report staged.
+      nothing (both done; diffs, hash and byte counts in the readings);
+      series entry added, no full report staged.
 
 ## Performance and Goal Impact
 
@@ -240,7 +239,8 @@ experiment, so its wall clock moves only with the host. No indicator can
 move; `recruitment_paths` is removed, not redefined, and the series records
 the drop.
 
-**Measured verdict.** Pending.
+**Measured verdict.** Gate: make and CLI exit 0, `severe=false`, metrics ok;
+the `deterministic` diff lists only `recruitment_paths`; bytes in readings.
 
 - Summary of the declared profile: [gate](../../progress/features/t30-f09.json).
 - Full readings: [`docs/progress/readings/t30-f09.md`](../../progress/readings/t30-f09.md).
