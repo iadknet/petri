@@ -180,33 +180,39 @@ a different summary from the same full report would show it wrong.
 
 ## Implementation Tasks
 
-- [ ] Census pins first: tests capturing each inventory calculation's
+- [x] Census pins first: tests capturing each inventory calculation's
       output, and the NDJSON, telemetry `Census` and server status and
       health values built from them, on fixture populations (bundles of
       every wiring on reachable and unreachable nodes, several clades,
       pending births, plastic edges, an empty population), committed
       against the pre-move code.
-- [ ] The Graph bundle iterator and the one weight floor; the six id
+- [x] The Graph bundle iterator and the one weight floor; the six id
       conversions and the three floors read them (invariant 3).
-- [ ] Move C1–C22 into readers (invariant 1) with both definitions of
+- [x] Move C1–C22 into readers (invariant 1) with both definitions of
       each invariant-2 quantity and their `WORKAROUND(T30.F13)` comments,
       `RingRuleCensus` reading the bundle census (invariant 3); the CLI,
       telemetry and server read the readers; the pins stay green.
-- [ ] The composed sample record and the retention declarations; the
+- [x] The composed sample record and the retention declarations; the
       three keep-lists derived; the declaration and retained-set tests
       (invariants 4 and 5).
-- [ ] `docs/architecture.md` readers row edit (in the plan commit) and
-      any doc that cites a moved path.
+- [x] `docs/architecture.md` readers row edit (in the plan commit) and
+      any doc that cites a moved path: no current-state doc does; closed
+      feature specs and readings keep the paths of their time.
 
 ## Verification
 
-- [ ] Census pins: the pin tests' names and their pre-move commit.
+- [x] Census pins, committed against the pre-move code at `b945d8cd8`:
+      `bench::census_pins` (report, crafted-population, extinct, bundle and
+      NDJSON pins), `artifacts::tests::mesh_summary_keeps_its_pre_move_reading_of_partial_rows`,
+      `metrics::tests::the_tick_census_keeps_its_pre_move_values` (telemetry),
+      `state::census_pins` (server status and health); every literal is
+      unchanged after the move.
 - [ ] Workspace: `make check` exit 0.
-- [ ] No outer-crate census remains: a `grep` for folds over
+- [x] No outer-crate census remains: a `grep` for folds over
       `sim.creatures` in `v3-cli/src`, `v3-telemetry/src`,
       `v3-server/src`, its hits each a per-creature record or a reader
       call, listed in the readings.
-- [ ] Converter parity: `bench-summarize` on
+- [x] Converter parity: `bench-summarize` on
       `.bench-artifacts/t25-f11/goal.json` and
       `.bench-artifacts/t30-f10/gate.json` (main checkout) with main's
       and the feature's build; `deterministic` and `omitted_details`
@@ -214,6 +220,13 @@ a different summary from the same full report would show it wrong.
       replaced by the newest stored one it can, and the readings say so).
 - [ ] Gate: summary at `docs/progress/features/t30-f13.json`, raw hash and
       bytes in the readings, series entry, no full report staged.
+
+Commands run on the build (2026-10-28), each exit 0: `cargo check --workspace
+--all-targets`; `cargo fmt --all --check`; `make rust-clippy`; `cargo test -p
+v3-core` (viability first: `--test viability`, 30 passed); `cargo test -p
+v3-cli -p v3-server -p v3-telemetry`; `node scripts/architecture-check.mjs`;
+`v3-cli bench-summarize` on both stored reports with the pre-move and the
+feature release builds (readings). `make check` and the gate are not yet run.
 
 ## Performance and Goal Impact
 
