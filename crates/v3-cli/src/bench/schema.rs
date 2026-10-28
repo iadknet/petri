@@ -6,12 +6,10 @@ use super::input_use::{undefined_input_use, InputUse};
 use super::mutation_effects::{undefined_mutation_effects, MutationEffects};
 use super::profiles::GoalCase;
 use super::ring_rules::{undefined_ring_rules, RingRules};
-use super::run::millis;
 use super::tracking::{PersistenceSample, WorldTracking};
 use crate::{fraction_or_undefined, six, UNDEFINED};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::time::Instant;
 use v3_core::neighborhood;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -234,9 +232,6 @@ pub struct GoalIndicators {
     pub mutational_neighborhood: Indicator<MutationalNeighborhood>,
     #[serde(default = "undefined_drift_depth")]
     pub drift_depth: Indicator<DriftDepth>,
-    /// One explicit default-task experiment per goal report, outside its worlds.
-    #[serde(default = "undefined_recruitment_paths")]
-    pub recruitment_paths: Indicator<neighborhood::recruitment_paths::Report>,
     pub strategy_count: String,
     pub strategy_causal_distinctness: String,
     pub evolutionary_activity: String,
@@ -395,25 +390,6 @@ pub(super) fn undefined_mutational_neighborhood() -> Indicator<MutationalNeighbo
 
 pub(super) fn undefined_evolved_neighborhood() -> Indicator<EvolvedNeighborhoodHalf> {
     Indicator::Undefined(UNDEFINED.to_string())
-}
-
-pub(super) fn undefined_recruitment_paths() -> Indicator<neighborhood::recruitment_paths::Report> {
-    Indicator::Undefined("unmeasured; recruitment-paths-v2 is goal-only".into())
-}
-
-pub(super) fn timed_recruitment_paths(
-    goal: bool,
-    sizes: neighborhood::recruitment_paths::Sizes,
-) -> (
-    Indicator<neighborhood::recruitment_paths::Report>,
-    Option<f64>,
-) {
-    if !goal {
-        return (undefined_recruitment_paths(), None);
-    }
-    let start = Instant::now();
-    let reading = neighborhood::recruitment_paths::observe(sizes);
-    (Indicator::Defined(reading), Some(millis(start.elapsed())))
 }
 
 pub(super) fn undefined_drift_depth() -> Indicator<DriftDepth> {
@@ -1179,9 +1155,6 @@ pub struct Environment {
     /// Complete goal-only mutation walk and readings; absent when unrun.
     #[serde(default)]
     pub drift_depth_wall_clock_ms: Option<f64>,
-    /// Entire report-level task experiment, outside all ecological observations.
-    #[serde(default)]
-    pub recruitment_paths_wall_clock_ms: Option<f64>,
     /// Evolved-half neighborhood wall time per seed (goal profile only).
     #[serde(default)]
     pub neighborhood_evolved_wall_clock_ms_per_seed: Vec<SeedFinalStateObservation>,

@@ -145,10 +145,10 @@ that moves, or a lab test or slow-tier lab run failing, would show it wrong.
 
 ## Implementation Tasks
 
-- [ ] Pin first: before any other edit, record invariant 2's two digests
+- [x] Pin first: before any other edit, record invariant 2's two digests
       in the readings (a lab test run with `--nocapture`, kept only in the
       working tree); the same step on the final code must print the same.
-- [ ] Lab: add `crates/v3-lab/src/controllers.rs` with the controller
+- [x] Lab: add `crates/v3-lab/src/controllers.rs` with the controller
       construction moved from `neighborhood/opportunity/controllers.rs`
       (`Family` with `reference()`, the constants, `AuthoredStructure`,
       `controller`), dropping the assay-only helpers (`Family::ALL`,
@@ -160,19 +160,19 @@ that moves, or a lab test or slow-tier lab run failing, would show it wrong.
       the Ring wiring. `comparator.rs`, `calibration.rs`, `eval.rs` and
       `tests/lab_run.rs` import the lab module; the lab's existing
       comparator tests keep their assertions.
-- [ ] Core: delete `neighborhood/recruitment_paths/`,
+- [x] Core: delete `neighborhood/recruitment_paths/`,
       `neighborhood/opportunity/`, their `pub mod` lines and
       `crates/v3-core/tests/recruitment_paths.rs`; delete
       `GraphMutator::apply`, its test callers passing a context to
       `apply_in`; `mutation/engine/mod.rs`'s doc names the drift walk as
       the one instrument on `FOUNDER_GENOME_SIZE_UNITS`.
-- [ ] CLI: delete `v3-cli/src/recruitment.rs`, `opportunity.rs`, their
+- [x] CLI: delete `v3-cli/src/recruitment.rs`, `opportunity.rs`, their
       `pub mod` lines, the `Recruitment` and `InputOpportunity` arms, args
       and runners in `main.rs`, and the `measure` module's `AssayReadings`,
       `assay_end`, `read_summary`, `recruitment*` and `opportunity*`
       functions with `measure/tests.rs`; the command doc comment lists the
       surviving commands.
-- [ ] Bench: delete `ProfileParams.recruitment` and every `Sizes` use,
+- [x] Bench: delete `ProfileParams.recruitment` and every `Sizes` use,
       `GoalIndicators.recruitment_paths`, `undefined_recruitment_paths`,
       `timed_recruitment_paths`, the `recruitment_paths_wall_clock_ms`
       fields of `RunTimings` and the environment block, the artifact
@@ -181,14 +181,14 @@ that moves, or a lab test or slow-tier lab run failing, would show it wrong.
       omitted-paths entry and the `wall_caps.recruitment_seconds_per_report`
       field of `measurement_evidence`) and the tests of those paths in
       `run/tests.rs` and `tests/bench_artifacts.rs`.
-- [ ] Telemetry: `MeasurementStart.command`'s doc lists the surviving
+- [x] Telemetry: `MeasurementStart.command`'s doc lists the surviving
       commands; `MeasurementStart.pilot`, `MeasurementEnd.stop_reason`,
       `horizon` and `gate_favorable`, their attribute lines and their test
       rows are deleted.
-- [ ] Makefile: `rust-test-temporal-fixtures` loses its `recruitment_paths`
+- [x] Makefile: `rust-test-temporal-fixtures` loses its `recruitment_paths`
       line; `rust-test-slow` loses its recruitment line and names only the
       lab runs in its help text.
-- [ ] Docs: `docs/workflow.md`'s slow-tests `run` row keeps the lab half and
+- [x] Docs: `docs/workflow.md`'s slow-tests `run` row keeps the lab half and
       the T02.F08 and T11.F31 worked-example rows read `not run`;
       `docs/benchmark-artifacts.md` drops the Recruitment S0 row, the
       recruitment items of the summaries-omit sentence and of the `claims`
@@ -203,13 +203,13 @@ that moves, or a lab test or slow-tier lab run failing, would show it wrong.
 
 ## Verification
 
-- [ ] Invariant 4: the grep -> empty (command and output in the readings).
-- [ ] Invariant 5: `grep -rn "GraphMutator::apply(" crates` -> empty.
-- [ ] Invariant 2: the two comparator digests on `ac3747005` and on the
+- [x] Invariant 4: the grep -> empty (command and output in the readings).
+- [x] Invariant 5: `grep -rn "GraphMutator::apply(" crates` -> empty.
+- [x] Invariant 2: the two comparator digests on `ac3747005` and on the
       final code, equal (commands and digests in the readings);
       `cargo test -p v3-lab` -> pass with the existing comparator tests'
       assertions unchanged.
-- [ ] Invariant 6: `cargo test -p v3-cli` -> pass, the artifact reader's
+- [x] Invariant 6: `cargo test -p v3-cli` -> pass, the artifact reader's
       historical-report tests among them.
 - [ ] Invariant 7: `make rust-test-slow` -> exit 0 on the final code, lab
       tests only.

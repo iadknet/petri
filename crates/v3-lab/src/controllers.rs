@@ -4,8 +4,8 @@
 //! instruments, never production genomes, mutation targets or fitness
 //! signals.
 //!
-//! Every weight and threshold is a fixed constant, never tuned on assay
-//! outcomes (first recorded for T20.F01's `input-opportunity-v1`).
+//! Every weight and threshold is a fixed constant, recorded at T20.F01 and
+//! never tuned on assay outcomes.
 
 use v3_core::config::OrdinaryFoodTypeId;
 use v3_core::contracts::food_idx;

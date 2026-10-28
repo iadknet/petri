@@ -750,13 +750,11 @@ Selection randomization rules (internal to `MutationEngine`):
   founder at 0.485 requested events per birth. Natural analog: per-base copy error. If the count is
   zero, `MutationEngine` returns `MutationSummary { attempted_events: 0,
   applied_events: 0, skipped_events: 0, ... }` immediately.
-- The two instruments, the drift walk and the recruitment-paths legacy
-  panel, draw the same rule on a fixed unit count: the canonical V3Alpha1
-  founder's `genome_size()` (`FOUNDER_GENOME_SIZE_UNITS`, 80), whatever the
-  walked genome's size, so their exposure is an instrument constant
-  (`Binomial(80, per_unit_rate)`, 0.485 requested events per birth at
-  the default rate). The recruitment-paths S0 panel draws on the child's own
-  size, as production does.
+- The one instrument, the drift walk, draws the same rule on a fixed unit
+  count: the canonical V3Alpha1 founder's `genome_size()`
+  (`FOUNDER_GENOME_SIZE_UNITS`, 80), whatever the walked genome's size, so
+  its exposure is an instrument constant (`Binomial(80, per_unit_rate)`,
+  0.485 requested events per birth at the default rate).
 - Every requested event becomes one attempted event; a skip does not cause an
   extra requested event. `attempted_events = applied_events + skipped_events`.
 - For each event, select topology with `mesh_layer_probability`; otherwise

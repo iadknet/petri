@@ -7,10 +7,10 @@
 //! `run_simulation` reads it, so its public signature does not depend on the
 //! `telemetry` feature. Nothing installed means off.
 //!
-//! A measurement command (`bench`, `recruitment`, `input-opportunity`;
-//! T21.F06) starts it held through [`Measurement`]: `bench` seeds record
-//! `run.started` and `run.ended` at their timer boundaries, and nothing is
-//! exported until the command has written its summary.
+//! A measurement command (`bench`, `profile-ticks`; T21.F06) starts it held
+//! through [`Measurement`]: `bench` seeds record `run.started` and
+//! `run.ended` at their timer boundaries, and nothing is exported until the
+//! command has written its summary.
 
 use std::sync::OnceLock;
 

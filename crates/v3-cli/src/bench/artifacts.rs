@@ -8,8 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
-use super::{ComparisonInputs, Indicator, Report};
-use v3_core::neighborhood::recruitment_paths as recruitment;
+use super::{ComparisonInputs, Report};
 
 pub const SUMMARY_KIND: &str = "petri-benchmark-summary";
 pub const SUMMARY_VERSION: u32 = 2;
@@ -334,89 +333,6 @@ fn persistence(source: &Value, report: &Report) -> Result<Value, String> {
     Ok(Value::Object(out))
 }
 
-fn constructed_stage(stage: &recruitment::ConstructionStage) -> Value {
-    json!({"name":stage.name,"edits":stage.edits,"seed":stage.seed,
-        "task_summary":stage.task.summary(),"battery_class":stage.battery_class,
-        "incumbent_actions_unchanged":stage.incumbent_actions_unchanged,"useful":stage.useful})
-}
-
-/// Counts come from observed proposal rows, not sizes.proposals(). No assay,
-/// mutation, task evaluation or estimate is rerun during projection.
-fn recruitment_summary(source: &Value, report: &recruitment::Report) -> Value {
-    let mut out = pick(
-        source,
-        &[
-            "version",
-            "config",
-            "config_digest",
-            "sizes",
-            "supply",
-            "supply_rule",
-            "task_definition",
-            "mutation_context",
-            "construction_resolution",
-            "observation_resolution",
-            "rng_control",
-            "limitations",
-            "total_proposals",
-            "opportunities",
-            "pairs",
-        ],
-    );
-    out["constructed"] = json!(report.constructed.iter().map(|path| json!({
-        "backend":path.backend,"stages":path.stages.iter().map(constructed_stage).collect::<Vec<_>>(),
-        "copy_stages":path.copy_stages.iter().map(constructed_stage).collect::<Vec<_>>(),
-        "split_stage":path.split_stage.as_ref().map(constructed_stage)
-    })).collect::<Vec<_>>());
-    out["starts"] =
-        json!(report.starts.iter().map(|start| json!({
-        "name":start.name,"task":start.task,"backend":start.backend,"scaffold":start.scaffold,
-        "creation_operator":start.creation_operator,"mutable_sites":start.mutable_sites,
-        "genome_size":start.genome_size,"task_summary":start.task_reading.summary(),
-        "history":start.history.iter().map(constructed_stage).collect::<Vec<_>>()
-    })).collect::<Vec<_>>());
-    out["arms"] = json!(report.arms.iter().map(|arm| {
-        let mut outcomes: BTreeMap<String, u64> = BTreeMap::new();
-        let mut inapplicable: BTreeMap<_, BTreeMap<_, u64>> = BTreeMap::new();
-        let mut unresolved = 0u64;
-        let mut total = 0u64;
-        let lineages = arm.lineages.iter().map(|lineage| {
-            total += lineage.proposals.len() as u64;
-            for proposal in &lineage.proposals {
-                for (&backend, operators) in &proposal.selected_inapplicable_by_backend_operator {
-                    for (&operator, &count) in operators {
-                        *inapplicable.entry(backend).or_default().entry(operator).or_default() += count;
-                    }
-                }
-                unresolved += proposal.selected_inapplicable_backend_unresolved;
-                for (name, present) in [("chosen", proposal.chosen), ("discovery",proposal.discovery),
-                    ("viable_path",proposal.viable_path), ("parent_live",proposal.parent_live),
-                    ("all_scenes_survived",proposal.outcome.surviving_scenes == 8)] {
-                    *outcomes.entry(name.into()).or_default() += u64::from(present);
-                }
-                *outcomes.entry(format!("correct_a_{}",proposal.outcome.correct_a)).or_default() += 1;
-                *outcomes.entry(format!("correct_b_{}",proposal.outcome.correct_b)).or_default() += 1;
-                for event in &proposal.events {
-                    *outcomes.entry(format!("event_{}",event.outcome)).or_default() += 1;
-                }
-            }
-            json!({"batch":lineage.batch,"lineage":lineage.lineage,"proposal_count":lineage.proposals.len(),
-                "proposal_discovery":lineage.proposal_discovery,"retained_discovery":lineage.retained_discovery,
-                "viable_retained_discovery":lineage.viable_retained_discovery,"retention":lineage.retention,
-                "specialized_discovery":lineage.specialized_discovery,
-                "horizons":lineage.horizons.iter().map(|horizon| json!({"offset":horizon.offset,
-                    "at_generation":horizon.at_generation,"outcome":horizon.outcome,"score":horizon.score})).collect::<Vec<_>>(),
-                "ladder":lineage.ladder,"classification":lineage.classification})
-        }).collect::<Vec<_>>();
-        json!({"start":arm.start,"task":arm.task,"policy":arm.policy,"summary":arm.summary,
-            "batches":arm.batches,"opportunities":arm.opportunities,"proposal_count":total,
-            "selected_inapplicable_by_backend_operator":inapplicable,
-            "selected_inapplicable_backend_unresolved":unresolved,
-            "outcome_counts":outcomes,"lineages":lineages})
-    }).collect::<Vec<_>>());
-    out
-}
-
 fn goal_indicators(source: &Value, report: &Report) -> Result<Value, String> {
     let measured = &report.deterministic.goal_indicators;
     let mut out = pick(
@@ -443,12 +359,6 @@ fn goal_indicators(source: &Value, report: &Report) -> Result<Value, String> {
     out["population_persistence"] = persistence(&source["population_persistence"], report)?;
     if let Some(value) = source.get("mutational_neighborhood") {
         out["mutational_neighborhood"] = neighborhood(value);
-    }
-    if let Some(value) = source.get("recruitment_paths") {
-        out["recruitment_paths"] = match &measured.recruitment_paths {
-            Indicator::Defined(experiment) => recruitment_summary(value, experiment),
-            Indicator::Undefined(_) => value.clone(),
-        };
     }
     if let Some(cases) = source.get("cases").and_then(Value::as_array) {
         out["cases"] = json!(cases
@@ -488,23 +398,28 @@ fn goal_indicators(source: &Value, report: &Report) -> Result<Value, String> {
 }
 
 fn claims(source: &Value) -> Vec<Claim> {
-    // Fixed source locations, never a traversal that grows with proposal count.
-    ["/deterministic/totals/creature_ticks", "/deterministic/totals/births",
-        "/deterministic/per_creature_tick/vm_steps", "/comparison/severe",
+    // Fixed source locations, never a traversal that grows with the report.
+    [
+        "/deterministic/totals/creature_ticks",
+        "/deterministic/totals/births",
+        "/deterministic/per_creature_tick/vm_steps",
+        "/comparison/severe",
         "/deterministic/goal_indicators/population_persistence/per_seed/0/final_population",
         "/deterministic/goal_indicators/population_persistence/per_seed/0/minimum_population",
         "/deterministic/goal_indicators/cases/0/drift_depth/readings/0/lineages",
-        "/deterministic/goal_indicators/recruitment_paths/total_proposals",
-        "/deterministic/goal_indicators/recruitment_paths/opportunities/attempted",
-        "/deterministic/goal_indicators/recruitment_paths/arms/0/summary/retained_discovery/numerator",
-        "/deterministic/goal_indicators/recruitment_paths/arms/0/summary/retained_discovery/denominator",
-        "/deterministic/goal_indicators/recruitment_paths/arms/0/lineages/0/proposals/0/outcome/correct_a",
-        "/deterministic/goal_indicators/recruitment_paths/arms/0/lineages/0/proposals/0/chosen",
-        "/deterministic/goal_indicators/recruitment_paths/pairs/0/lineages/0/matched_proposals_before_divergence",
-        "/deterministic/goal_indicators/recruitment_paths/constructed/0/stages/0/useful",
-        "/environment/wall_clock_ms_total"]
-        .into_iter().filter_map(|pointer| source.pointer(pointer).filter(|value| !value.is_array() && !value.is_object())
-            .map(|value| Claim { pointer:pointer.into(), value:value.clone() })).collect()
+        "/environment/wall_clock_ms_total",
+    ]
+    .into_iter()
+    .filter_map(|pointer| {
+        source
+            .pointer(pointer)
+            .filter(|value| !value.is_array() && !value.is_object())
+            .map(|value| Claim {
+                pointer: pointer.into(),
+                value: value.clone(),
+            })
+    })
+    .collect()
 }
 
 /// The full-report-to-v1 stage, unchanged from summary version 1. Its output
@@ -1413,7 +1328,7 @@ pub fn measurement_evidence(invocation: &Invocation, severe: bool) -> Value {
             "wall_severe_percent":super::WALL_CLOCK_SEVERE_PERCENT,"wall_levels_fatal":false},
         "wall_caps":{"source":"docs/workflow.md, T13.F02 observation wall budget and T15.F01 predeclaration; closure checks, not CLI exit gates",
             "founder_seconds_per_world":10,"evolved_seconds_per_world":180,"drift_seconds_per_world":30,
-            "recruitment_seconds_per_report":120,"goal_investigation_seconds":900},
+            "goal_investigation_seconds":900},
         "inheritance":null})
 }
 

@@ -80,7 +80,6 @@ fn small_sweep_config(seed: u64, horizon: u64) -> v3_core::config::SimulationCon
         food_coverage: None,
         neighborhood: NeighborhoodSizes::default(),
         drift: Default::default(),
-        recruitment: v3_core::neighborhood::recruitment_paths::Sizes::TEST,
         mutation_effects: Default::default(),
     });
     assert_eq!(
@@ -478,7 +477,6 @@ pub(super) fn small_profile(name: &str) -> ProfileParams {
         food_coverage: Some(1.0),
         neighborhood: NeighborhoodSizes::default(),
         drift: Default::default(),
-        recruitment: v3_core::neighborhood::recruitment_paths::Sizes::TEST,
         mutation_effects: Default::default(),
     }
 }
@@ -495,7 +493,6 @@ fn world_set_case_tracking_matches_a_replayed_run() {
     params.ticks = 4;
     params.neighborhood = NeighborhoodSizes::default();
     params.drift = Default::default();
-    params.recruitment = v3_core::neighborhood::recruitment_paths::Sizes::TEST;
     params.mutation_effects = Default::default();
     let (report, _) = run_deterministic(&params).expect("a valid profile");
 
@@ -583,7 +580,6 @@ pub(super) fn small_world_set_params() -> ProfileParams {
     params.ticks = 1;
     params.neighborhood = NeighborhoodSizes::default();
     params.drift = Default::default();
-    params.recruitment = v3_core::neighborhood::recruitment_paths::Sizes::TEST;
     params.mutation_effects = Default::default();
     params
 }

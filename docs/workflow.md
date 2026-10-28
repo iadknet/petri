@@ -527,7 +527,7 @@ to the next carrier as a `Deferred:` bullet.
 
 | Slow tests (`make rust-test-slow`) | Declare for |
 | --- | --- |
-| `run` | a change to mutation operators or their draws, the sink or input catalogs, or recruitment code: the tier pins the recruitment-paths experiment's recorded readings, which such changes move; or a change to `crates/v3-lab`: the tier holds the lab's end-to-end runs |
+| `run` | a change to `crates/v3-lab`: the tier holds the lab's end-to-end runs |
 | `not run` | everything else |
 
 **Worked examples**: closed program 1 features, classified under these rules:
@@ -540,8 +540,8 @@ to the next carrier as a `Deferred:` bullet.
 | T24.F03 food growth phase timing | timing spans inside the tick loop; seeded output byte-identical | `gate` | `not run` |
 | T16.F02 effort-priced actions | action costs: early ecology moves | `gate + goal` | `not run` |
 | Effort-cost defaults, 2026-10-10 | three cost values only | `gate + goal` | `not run` |
-| T02.F08 partial bites | a new action sink and its decoding | `gate + goal` | `run` (sink catalog) |
-| T11.F31 ring projection motif | a mutation operator whose claim, avoidance evolving, shows only in long runs | `gate + goal-long` | `run` (draws) |
+| T02.F08 partial bites | a new action sink and its decoding | `gate + goal` | `not run` |
+| T11.F31 ring projection motif | a mutation operator whose claim, avoidance evolving, shows only in long runs | `gate + goal-long` | `not run` |
 
 The slow tier holds `#[ignore]` tests marked `slow tier`, kept out of
 `make check` because they cost minutes (user decision, 2026-10-12). When

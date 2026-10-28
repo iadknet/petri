@@ -232,6 +232,13 @@
       "before": "mutation_supply.attribute_changes_by_scope keyed edge and group",
       "after": "keyed edge and bundle",
       "comparison": "bundle is like-for-like with group under the rename (committed attribute changes that landed on the bundle scope)"
+    },
+    {
+      "feature": "T30.F09",
+      "counter": "goal_indicators.recruitment_paths and environment.recruitment_paths_wall_clock_ms (retired)",
+      "before": "the recruitment-paths-v3 goal-only experiment block, run once per goal world set, with its wall clock; gate, sweep and synthetic reports carried the Undefined string and a null wall clock",
+      "after": "absent: the experiment is retired with T20.F01's input-opportunity assay; the lab's why-not ladder routes their questions",
+      "comparison": "no like-for-like; past full reports keep the block and past summaries its wall clock, claims and omitted-path entry, as history"
     }
   ],
   "goal_worlds": {

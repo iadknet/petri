@@ -141,11 +141,10 @@ Mutation randomization semantics:
    trigger, minimum, maximum, or continuation. Rate 0 requests nothing, rate
    1 one event per unit. The default requests about 0.485 events per founder
    birth.
-2. The two instruments, the drift walk and the recruitment-paths legacy
-   panel, draw the same rule on the canonical V3Alpha1 founder's
-   `genome_size()` (80) instead of the walked genome's own size, so their
-   exposure is `Binomial(80, per_unit_rate)` whatever the genome's size. No
-   config field selects a different count.
+2. The one instrument, the drift walk, draws the same rule on the canonical
+   V3Alpha1 founder's `genome_size()` (80) instead of the walked genome's own
+   size, so its exposure is `Binomial(80, per_unit_rate)` whatever the
+   genome's size. No config field selects a different count.
 3. For each event, select topology with `mesh_layer_probability`; otherwise
    select VM, graph, or input-reference mutation with equal probability.
 4. Select among eligible operators using their existing operator weights.

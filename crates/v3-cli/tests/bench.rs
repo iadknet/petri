@@ -53,7 +53,6 @@ fn tiny_report() -> bench::Report {
         food_coverage: Some(1.0),
         neighborhood: bench::NeighborhoodSizes::default(),
         drift: Default::default(),
-        recruitment: v3_core::neighborhood::recruitment_paths::Sizes::TEST,
         mutation_effects: Default::default(),
     };
     bench::build_report(&params, "t10-f10-synthetic-check").expect("a valid profile")
@@ -74,7 +73,6 @@ fn tiny_sweep_params() -> bench::ProfileParams {
         food_coverage: None,
         neighborhood: bench::NeighborhoodSizes::default(),
         drift: Default::default(),
-        recruitment: v3_core::neighborhood::recruitment_paths::Sizes::TEST,
         mutation_effects: Default::default(),
     }
 }
@@ -95,7 +93,6 @@ fn tiny_goal_params() -> bench::ProfileParams {
         food_coverage: None,
         neighborhood: bench::NeighborhoodSizes::default(),
         drift: Default::default(),
-        recruitment: v3_core::neighborhood::recruitment_paths::Sizes::TEST,
         mutation_effects: Default::default(),
     }
 }
@@ -647,19 +644,6 @@ fn tiny_goal_profile_observations_are_deterministic_and_goal_only() {
             .final_state_observation_ms_per_seed
             .len(),
         params.seeds.len()
-    );
-    // Integration tests link the non-test library build, so the reduced
-    // experiment must come from the params, not from `cfg(test)`.
-    let recruitment = one_thread
-        .deterministic
-        .goal_indicators
-        .recruitment_paths
-        .defined()
-        .expect("recruitment paths are measured in the goal profile");
-    assert_eq!(
-        recruitment.sizes,
-        v3_core::neighborhood::recruitment_paths::Sizes::TEST,
-        "the tiny goal fixture must run the reduced recruitment-paths experiment"
     );
 
     let sweep = bench::build_report(&tiny_sweep_params(), "t01-f12-sweep-undefined-check")

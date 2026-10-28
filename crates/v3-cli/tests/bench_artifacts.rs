@@ -1442,209 +1442,11 @@ fn output_defaults_resolve_main_and_linked_checkouts_with_spaces() {
     .is_ok());
 }
 
-/// Integer-keyed maps (`Transitions::retained_at`) serialize with string keys;
-/// the goal reader must parse them back inside `Indicator::Defined`, which the
-/// buffered `#[serde(untagged)]` derive could not once a lineage retained.
-#[test]
-fn goal_reader_reads_back_recruitment_paths_with_retained_transitions() {
-    use v3_core::neighborhood::recruitment_paths as recruitment;
-    let dir = Temp::new();
-    let raw_path = dir.0.join("raw.json");
-    let mut source = world_source();
-    let mut experiment = recruitment::observe(recruitment::Sizes::TEST);
-    experiment.arms[0].summary.transitions.retained_at = [(16, 2), (64, 1)].into();
-    source["deterministic"]["goal_indicators"]["recruitment_paths"] =
-        serde_json::to_value(&experiment).unwrap();
-    let raw = serde_json::to_vec_pretty(&source).unwrap();
-    std::fs::write(&raw_path, &raw).unwrap();
-
-    artifacts::summarize(&raw, &raw_path, &provenance())
-        .expect("the goal reader accepts the writer's recruitment paths");
-
-    let report: bench::Report = serde_json::from_slice(&raw).unwrap();
-    let read = report
-        .deterministic
-        .goal_indicators
-        .recruitment_paths
-        .defined()
-        .expect("a measured reading stays defined");
-    assert_eq!(
-        read.arms[0].summary.transitions,
-        experiment.arms[0].summary.transitions
-    );
-}
-
 #[test]
 fn goal_reader_keeps_bare_strings_undefined() {
     let indicator: bench::Indicator<bench::DriftDepth> =
         serde_json::from_str("\"Undefined\"").unwrap();
     assert_eq!(indicator, bench::Indicator::Undefined("Undefined".into()));
-}
-
-/// The v1 stage still pools recruitment rows exactly as summary version 1
-/// did, so full-report and v1-summary routes to v2 agree; v2 then drops the
-/// whole block (see `v2_omitted_details_names_every_dropped_path_and_keeps_v1_notes`).
-#[test]
-fn v1_stage_recruitment_projection_keeps_estimates_counts_and_pairing_but_no_trace_payloads() {
-    use v3_core::neighborhood::recruitment_paths as recruitment;
-    let dir = Temp::new();
-    let raw_path = dir.0.join("raw.json");
-    let mut source = world_source();
-    let mut experiment = recruitment::observe(recruitment::Sizes::TEST);
-    // Known nonzero rows exercise pooling independently of which tiny mutations occur.
-    use v3_core::mutation::MutationOperator;
-    use v3_core::neighborhood::recruitment::ModuleBackend;
-    for (index, proposal) in experiment.arms[0].lineages[0]
-        .proposals
-        .iter_mut()
-        .enumerate()
-    {
-        proposal.selected_inapplicable_by_backend_operator.clear();
-        proposal.selected_inapplicable_by_backend_operator.insert(
-            ModuleBackend::Vm,
-            [(MutationOperator::VmConstantMutation, 3)].into(),
-        );
-        proposal.selected_inapplicable_backend_unresolved = index as u64 + 1;
-    }
-    source["deterministic"]["goal_indicators"]["recruitment_paths"] =
-        serde_json::to_value(&experiment).unwrap();
-    let raw = serde_json::to_vec(&source).unwrap();
-    std::fs::write(&raw_path, &raw).unwrap();
-    let summary = artifacts::summarize_v1(&raw, &raw_path, &provenance()).unwrap();
-    let compact = &summary.deterministic["goal_indicators"]["recruitment_paths"];
-    let proposal_count = experiment.arms[0].lineages[0].proposals.len() as u64;
-    assert_eq!(
-        compact["arms"][0]["selected_inapplicable_by_backend_operator"]["Vm"]["VmConstantMutation"],
-        proposal_count * 3
-    );
-    assert_eq!(
-        compact["arms"][0]["selected_inapplicable_backend_unresolved"],
-        proposal_count * (proposal_count + 1) / 2
-    );
-    assert_eq!(compact["total_proposals"], experiment.total_proposals);
-    assert_eq!(
-        compact["pairs"],
-        serde_json::to_value(&experiment.pairs).unwrap()
-    );
-    assert_eq!(
-        compact["opportunities"],
-        serde_json::to_value(&experiment.opportunities).unwrap()
-    );
-    let stage = &experiment.constructed[0].stages[0];
-    assert_eq!(
-        compact["constructed"][0]["stages"][0],
-        json!({
-            "name": stage.name,
-            "edits": stage.edits,
-            "seed": stage.seed,
-            "task_summary": stage.task.summary(),
-            "battery_class": stage.battery_class,
-            "incumbent_actions_unchanged": stage.incumbent_actions_unchanged,
-            "useful": stage.useful,
-        })
-    );
-    let mut total = 0;
-    for (index, arm) in experiment.arms.iter().enumerate() {
-        let projected = &compact["arms"][index];
-        let actual_count = arm
-            .lineages
-            .iter()
-            .map(|lineage| lineage.proposals.len())
-            .sum::<usize>();
-        total += actual_count;
-        assert_eq!(projected["proposal_count"], actual_count);
-        assert_eq!(
-            projected["summary"],
-            serde_json::to_value(&arm.summary).unwrap()
-        );
-        // T13.F06 readings ride the whole `summary` block into the summary.
-        assert_eq!(
-            projected["summary"]["checkpoint_cost"]
-                .as_array()
-                .unwrap()
-                .len(),
-            3
-        );
-        assert_eq!(
-            projected["summary"]["damage"]["task_dead"]["denominator"],
-            actual_count
-        );
-        assert_eq!(
-            projected["batches"],
-            serde_json::to_value(&arm.batches).unwrap()
-        );
-        assert_eq!(
-            projected["outcome_counts"]["chosen"],
-            arm.lineages
-                .iter()
-                .flat_map(|l| &l.proposals)
-                .filter(|p| p.chosen)
-                .count()
-        );
-        assert_eq!(
-            projected["lineages"][0]["retention"],
-            serde_json::to_value(&arm.lineages[0].retention).unwrap()
-        );
-        // T13.F07: the ladder and classification block rides the summary,
-        // and each lineage row keeps its class, ladder and horizon outcomes.
-        assert_eq!(
-            projected["summary"]["transitions"],
-            serde_json::to_value(&arm.summary.transitions).unwrap()
-        );
-        assert_eq!(
-            projected["summary"]["transitions"]["lineages"],
-            arm.lineages.len()
-        );
-        assert_eq!(
-            projected["lineages"][0]["classification"],
-            serde_json::to_value(arm.lineages[0].classification).unwrap()
-        );
-        assert_eq!(
-            projected["lineages"][0]["ladder"],
-            serde_json::to_value(arm.lineages[0].ladder).unwrap()
-        );
-        assert_eq!(
-            projected["lineages"][0]["horizons"]
-                .as_array()
-                .unwrap()
-                .len(),
-            arm.lineages[0].horizons.len()
-        );
-    }
-    assert_eq!(compact["supply"], "founder_units");
-    assert_eq!(total as u64, experiment.total_proposals);
-    let compact_bytes = serde_json::to_vec(compact).unwrap();
-    let text = String::from_utf8(compact_bytes).unwrap();
-    for forbidden in [
-        "\"genome\":",
-        "\"delta\":",
-        "\"scenes\":",
-        "\"proposals\":",
-        "\"first_successful_path\":",
-        "\"battery\":",
-    ] {
-        assert!(
-            !text.contains(forbidden),
-            "unexpected raw payload {forbidden}"
-        );
-    }
-    let mut duplicated = source;
-    let proposals = duplicated["deterministic"]["goal_indicators"]["recruitment_paths"]["arms"][0]
-        ["lineages"][0]["proposals"]
-        .as_array_mut()
-        .unwrap();
-    let rows = proposals.clone();
-    for _ in 0..50 {
-        proposals.extend(rows.clone());
-    }
-    let expanded = serde_json::to_vec(&duplicated).unwrap();
-    std::fs::write(&raw_path, &expanded).unwrap();
-    let expanded_summary = artifacts::summarize_v1(&expanded, &raw_path, &provenance()).unwrap();
-    assert_eq!(summary.claims.len(), expanded_summary.claims.len());
-    assert!(
-        artifacts::summary_bytes(&expanded_summary).unwrap().len()
-            < artifacts::summary_bytes(&summary).unwrap().len() + 300
-    );
 }
 
 /// A world's `mutation_effects` block (T11.F26) rides the v1 stage whole; v2
@@ -1864,15 +1666,11 @@ fn neighborhood_read_block() -> Value {
     })
 }
 
-/// A goal report carrying detail v2 drops: recruitment rows and the
-/// neighborhood genome rows.
+/// A goal report carrying detail v2 drops: the neighborhood genome rows.
 fn detailed_goal_source() -> Value {
-    use v3_core::neighborhood::recruitment_paths as recruitment;
     let mut source = world_source();
     source["deterministic"]["goal_indicators"]["cases"][0]["neighborhood_read"] =
         neighborhood_read_block();
-    source["deterministic"]["goal_indicators"]["recruitment_paths"] =
-        serde_json::to_value(recruitment::observe(recruitment::Sizes::TEST)).unwrap();
     source
 }
 
@@ -1963,7 +1761,6 @@ fn v2_from_a_full_report_and_from_its_v1_summary_agree_and_repeat_exactly() {
         "deterministic",
         &mut dropped,
     );
-    assert!(dropped.contains(&"deterministic.goal_indicators.recruitment_paths".to_string()));
     assert!(dropped.contains(&"deterministic.totals".to_string()));
     let read = &from_full["deterministic"]["goal_indicators"]["cases"][0]["neighborhood_read"];
     assert_eq!(read["genome_count"], 2);
@@ -2016,7 +1813,6 @@ fn v2_omitted_details_names_every_dropped_path_and_keeps_v1_notes() {
         assert!(omitted.contains(path), "{path} dropped but not named");
     }
     for expected in [
-        "deterministic.goal_indicators.recruitment_paths",
         "deterministic.goal_indicators.cases[].neighborhood_read.genomes",
         "deterministic.goal_indicators.cases[].drift_depth.readings[].opportunities",
         "deterministic.goal_indicators.cases[].mutation_value_totals_by_operator",

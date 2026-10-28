@@ -422,12 +422,13 @@ mod tests {
 
         for op in GraphOperator::ALL {
             let tally = fixture.tally(trials, seed_offset, GRAPH_SEED_BASE, |genome, rng| {
-                GraphMutator::apply(
+                GraphMutator::apply_in(
                     genome,
                     op,
                     &mut sets.selector(rb.graph, executed_bias),
                     rng,
                     &config.mutation,
+                    &context.sensors,
                 )
                 .map(|_| ())
             });

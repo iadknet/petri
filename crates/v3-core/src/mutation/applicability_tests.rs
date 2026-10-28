@@ -340,7 +340,7 @@ proptest! {
             let mut genome = base.clone();
             let mut rng = SmallRng::seed_from_u64(seed);
             let mut targets = selector();
-            let result = GraphMutator::apply(&mut genome, op, &mut targets, &mut rng, &config);
+            let result = GraphMutator::apply_in(&mut genome, op, &mut targets, &mut rng, &config, &crate::config::test_sensor_context(1));
             if applicable.is_empty() {
                 prop_assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
                 prop_assert_eq!(&genome, &base, "{:?} mutated on a skip", op);
@@ -416,7 +416,7 @@ proptest! {
             let mut rng = SmallRng::seed_from_u64(seed);
             let mut targets = TargetSelector::reachable_only(&reachable, 1.0);
             prop_assert!(
-                GraphMutator::apply(&mut genome, op, &mut targets, &mut rng, &config).is_ok()
+                GraphMutator::apply_in(&mut genome, op, &mut targets, &mut rng, &config, &crate::config::test_sensor_context(1)).is_ok()
             );
             let pick = targets.first_pick().expect("an applied event records its pick");
             prop_assert!(applicable.contains(&pick), "{op:?} picked {pick} outside {applicable:?}");
@@ -500,7 +500,7 @@ proptest! {
                 let mut rng = SmallRng::seed_from_u64(seed);
                 let mut targets = selector();
                 prop_assert!(
-                    GraphMutator::apply(&mut genome, op, &mut targets, &mut rng, &config).is_ok(),
+                    GraphMutator::apply_in(&mut genome, op, &mut targets, &mut rng, &config, &crate::config::test_sensor_context(1)).is_ok(),
                     "{op:?} skipped on the padded genome"
                 );
             }
@@ -574,12 +574,13 @@ fn growth_operators_reach_a_blank_graph_module() {
     // Grow one compute node the way the engine would, then the copy
     // operators reach the module too.
     let mut rng = SmallRng::seed_from_u64(7);
-    GraphMutator::apply(
+    GraphMutator::apply_in(
         &mut genome,
         GraphOperator::AddInternalGraphNode,
         &mut selector(),
         &mut rng,
         &config,
+        &crate::config::test_sensor_context(1),
     )
     .expect("growth applies to a blank module");
     assert_eq!(

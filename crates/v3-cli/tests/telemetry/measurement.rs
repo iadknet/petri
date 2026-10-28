@@ -1,7 +1,7 @@
-//! Measurement commands (T21.F06): `bench`, `recruitment`,
-//! `input-opportunity` and `profile-ticks` with telemetry on record the measurement and, for
-//! `bench`, each seed at region boundaries only; the exporter sends nothing
-//! before the measurement has ended; the deterministic output is the same
+//! Measurement commands (T21.F06): `bench` and `profile-ticks` with
+//! telemetry on record the measurement and, for `bench`, each seed at region
+//! boundaries only; the exporter sends nothing before the measurement has
+//! ended; the deterministic output is the same
 //! with telemetry off, on, and on against a closed port.
 
 use std::collections::BTreeMap;
@@ -446,133 +446,6 @@ fn bench_exit_paths_end_the_measurement_with_their_code() {
     std::thread::sleep(Duration::from_millis(100));
     assert!(receiver.records().is_empty());
     assert!(!scratch.path("refused.json").exists());
-}
-
-/// A git checkout with one empty commit, as the recruitment CLI test builds.
-fn checkout(scratch: &Scratch) {
-    let git = |args: &[&str]| {
-        let output = Command::new("git")
-            .current_dir(&scratch.0)
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(output.status.success(), "{}", text(&output.stderr));
-    };
-    git(&["init", "--quiet"]);
-    git(&[
-        "-c",
-        "user.name=Test",
-        "-c",
-        "user.email=test@example.invalid",
-        "-c",
-        "core.hooksPath=/dev/null",
-        "commit",
-        "--quiet",
-        "--allow-empty",
-        "-m",
-        "fixture",
-    ]);
-}
-
-#[test]
-fn assays_record_one_measurement_with_their_summary_totals() {
-    let scratch = Scratch::new("recruitment");
-    checkout(&scratch);
-    let raw_path = scratch.path("raw.json");
-    let summary_path = scratch.path("summary.json");
-    let receiver = Receiver::start();
-    let output = cli(
-        &scratch.0,
-        &[
-            "--telemetry",
-            "on",
-            "recruitment",
-            "--feature",
-            "t21-f06-fixture",
-            "--pilot",
-            "--threads",
-            "1",
-            "--wall-cap-secs",
-            "0",
-            "--out",
-            raw_path.to_str().unwrap(),
-            "--summary-out",
-            summary_path.to_str().unwrap(),
-        ],
-        Some(receiver.endpoint()),
-        &[],
-    );
-    assert_eq!(output.status.code(), Some(3), "{output:?}");
-    assert_eq!(receiver.records().len(), 2);
-    let (started, ended) = measurement_pair(&receiver);
-    let summary = read_json(&summary_path);
-    assert_eq!(started.attribute("petri.command"), Some("recruitment"));
-    assert_eq!(started.attribute("petri.pilot"), Some("true"));
-    assert_eq!(started.attribute("petri.threads"), Some("1"));
-    assert_eq!(
-        started.attribute("petri.config_digest"),
-        summary["config_digest"].as_str()
-    );
-    assert_eq!(ended.attribute("petri.exit_code"), Some("3"));
-    assert_eq!(ended.attribute("petri.incomplete"), Some("true"));
-    assert_eq!(
-        ended.attribute("petri.stop_reason"),
-        summary["stop_reason"].as_str()
-    );
-    assert!(ended.attribute("petri.stop_reason").is_some());
-    assert_eq!(ended.attribute("petri.summary_path"), summary_path.to_str());
-    assert_eq!(
-        ended.attribute("petri.raw_sha256"),
-        summary["raw"]["sha256"].as_str()
-    );
-    assert_eq!(
-        ended.attribute("petri.raw_bytes"),
-        Some(summary["raw"]["bytes"].to_string().as_str())
-    );
-    let counts = serde_json::json!({
-        "expected_proposals": summary["expected_proposals"],
-        "lineage_count": summary["lineage_count"],
-        "proposal_count": summary["proposal_count"],
-    });
-    assert_eq!(ended.body.as_deref(), Some(compact(&counts).as_str()));
-    assert_exported_after(&receiver, &ended);
-    let stderr = text(&output.stderr);
-    assert!(stderr.contains("incomplete:"), "{stderr}");
-    assert_line_last(&stderr, ended.attribute("petri.run_id").unwrap());
-
-    let blocker = scratch.path("blocker");
-    std::fs::write(&blocker, "").unwrap();
-    let unwritable = blocker.join("raw.json");
-    let receiver = Receiver::start();
-    let output = cli(
-        &scratch.0,
-        &[
-            "--telemetry",
-            "on",
-            "input-opportunity",
-            "--feature",
-            "t21-f06-fixture",
-            "--pilot",
-            "--out",
-            unwritable.to_str().unwrap(),
-        ],
-        Some(receiver.endpoint()),
-        &[],
-    );
-    assert_eq!(output.status.code(), Some(1), "{output:?}");
-    assert!(output.stdout.is_empty(), "no replicate ran");
-    let (started, ended) = measurement_pair(&receiver);
-    assert_eq!(
-        started.attribute("petri.command"),
-        Some("input-opportunity")
-    );
-    assert_eq!(started.attribute("petri.config_digest"), None);
-    assert_eq!(ended.attribute("petri.exit_code"), Some("1"));
-    assert_eq!(ended.body, None);
-    assert_line_last(
-        &text(&output.stderr),
-        ended.attribute("petri.run_id").unwrap(),
-    );
 }
 
 #[test]

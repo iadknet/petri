@@ -53,7 +53,6 @@ fn goal_cases_keep_distinct_full_population_structure_distributions() {
     params.ticks = 40;
     params.neighborhood = NeighborhoodSizes::default();
     params.drift = Default::default();
-    params.recruitment = v3_core::neighborhood::recruitment_paths::Sizes::TEST;
     params.mutation_effects = Default::default();
     let (report, _) = run_deterministic(&params).expect("a valid profile");
     let mut expected_cases = Vec::new();
@@ -102,7 +101,6 @@ fn goal_world_set_executes_three_named_configs_with_case_observations() {
     params.ticks = 1;
     params.neighborhood = NeighborhoodSizes::default();
     params.drift = Default::default();
-    params.recruitment = v3_core::neighborhood::recruitment_paths::Sizes::TEST;
     params.mutation_effects = Default::default();
     let (report, timings) = run_deterministic(&params).expect("a valid profile");
     assert_eq!(report.profile.name, "goal-worlds-v1");
@@ -336,7 +334,6 @@ fn synthetic_timings(seed_wall_clock_ms: &[f64]) -> RunTimings {
         final_state_observation_ms_per_seed: Vec::new(),
         neighborhood_founder_wall_clock_ms: 0.0,
         drift_depth_wall_clock_ms: None,
-        recruitment_paths_wall_clock_ms: None,
         neighborhood_evolved_wall_clock_ms_per_seed: Vec::new(),
         neighborhood_read_wall_clock_ms_per_seed: Vec::new(),
         mutation_effects_wall_clock_ms_per_seed: Vec::new(),
@@ -387,70 +384,20 @@ fn build_environment_reports_zero_cost_when_no_creature_ran() {
     assert_eq!(environment.wall_clock_ms_per_creature_tick, 0.0);
 }
 
+/// Stored reports carry blocks a later closure retired (T30.F09 removed a
+/// goal-only experiment and its wall clock); the reader ignores them.
 #[test]
-fn recruitment_paths_is_goal_only_and_historical_absence_is_unmeasured() {
-    let goal = build_report(&small_profile("goal"), "recruitment_paths-test").unwrap();
-    let reading = goal
-        .deterministic
-        .goal_indicators
-        .recruitment_paths
-        .defined()
-        .unwrap();
-    assert_eq!(reading.version, "recruitment-paths-v3");
-    assert_eq!(reading.total_proposals, reading.sizes.proposals());
-    assert!(goal.environment.recruitment_paths_wall_clock_ms.unwrap() > 0.0);
-    for name in ["gate", "sweep", "synthetic"] {
-        let report = build_report(&small_profile(name), "recruitment_paths-test").unwrap();
-        assert!(report
-            .deterministic
-            .goal_indicators
-            .recruitment_paths
-            .defined()
-            .is_none());
-        assert_eq!(report.environment.recruitment_paths_wall_clock_ms, None);
-    }
-    let mut old = serde_json::to_value(goal).unwrap();
-    old["deterministic"]["goal_indicators"]
-        .as_object_mut()
-        .unwrap()
-        .remove("recruitment_paths");
-    old["environment"]
-        .as_object_mut()
-        .unwrap()
-        .remove("recruitment_paths_wall_clock_ms");
-    let old: Report = serde_json::from_value(old).unwrap();
-    assert!(old
-        .deterministic
-        .goal_indicators
-        .recruitment_paths
-        .defined()
-        .is_none());
-    assert_eq!(old.environment.recruitment_paths_wall_clock_ms, None);
-}
-
-#[test]
-fn recruitment_paths_is_once_per_world_set_and_reduced_results_are_deterministic() {
-    let mut params = small_profile(GOAL_WORLD_SET);
-    params.seeds = goal_recipe_seeds();
-    let (report, timings) = run_deterministic(&params).unwrap();
-    assert_eq!(report.goal_indicators.cases.len(), 3);
-    let reading = report.goal_indicators.recruitment_paths.defined().unwrap();
+fn a_report_carrying_a_retired_block_still_parses() {
+    let report = build_report(&small_profile("gate"), "retired-block-test").unwrap();
+    let mut stored = serde_json::to_value(&report).unwrap();
+    stored["deterministic"]["goal_indicators"]["retired_experiment"] =
+        serde_json::json!("unmeasured; retired-experiment-v1 is goal-only");
+    stored["environment"]["retired_experiment_wall_clock_ms"] = serde_json::Value::Null;
+    let read: Report = serde_json::from_value(stored).unwrap();
     assert_eq!(
-        reading.total_proposals,
-        neighborhood::recruitment_paths::Sizes::TEST.proposals()
+        serde_json::to_value(&read).unwrap(),
+        serde_json::to_value(&report).unwrap()
     );
-    let encoded = serde_json::to_value(&report.goal_indicators).unwrap();
-    for case in encoded["cases"].as_array().unwrap() {
-        assert!(case.get("recruitment_paths").is_none());
-    }
-    let (again, elapsed) =
-        timed_recruitment_paths(true, neighborhood::recruitment_paths::Sizes::TEST);
-    assert_eq!(
-        serde_json::to_value(&again).unwrap(),
-        serde_json::to_value(&report.goal_indicators.recruitment_paths).unwrap()
-    );
-    assert!(timings.recruitment_paths_wall_clock_ms.unwrap() > 0.0);
-    assert!(elapsed.unwrap() > 0.0);
 }
 
 #[test]

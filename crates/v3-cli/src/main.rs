@@ -15,9 +15,9 @@ static ALLOC: dhat::Alloc = dhat::Alloc;
 #[command(name = "v3-cli")]
 struct Cli {
     /// Export run telemetry over OTLP (`on` or `off`); beats PETRI_TELEMETRY,
-    /// default on. `run` exports its run; `bench`, `recruitment`,
-    /// `input-opportunity` and `profile-ticks` export one measurement record
-    /// pair (and `bench` one run per seed) after their work ends.
+    /// default on. `run` exports its run; `bench` and `profile-ticks` export
+    /// one measurement record pair (and `bench` one run per seed) after their
+    /// work ends.
     #[cfg(feature = "telemetry")]
     #[arg(long, global = true, value_name = "on|off")]
     telemetry: Option<v3_telemetry::Switch>,
@@ -33,16 +33,6 @@ enum Commands {
     BenchSummarize(SummarizeArgs),
     /// Saved-world tooling.
     World(WorldArgs),
-    /// The T13.F07 S0 recruitment panel under production supply: a compact
-    /// raw record under the artifact root and a summary under
-    /// docs/progress/features. Exit status 3 when a cap stopped the run and
-    /// the record is marked incomplete.
-    Recruitment(RecruitmentArgs),
-    /// The T20.F01 ecological opportunity assay: a raw replicate record
-    /// under the artifact root and a summary under docs/progress/features.
-    /// Exit status 3 when a cap stopped the run and the record is marked
-    /// incomplete.
-    InputOpportunity(InputOpportunityArgs),
     /// The profiling harness: a default-config world seeded with 42 and run
     /// for `--ticks`, with the tick loop timed (`v3_cli::profile`). Run it
     /// under samply on the `profiling` build, or with the `dhat-heap`
@@ -60,61 +50,6 @@ struct ProfileTicksArgs {
     /// The square world's side, in cells.
     #[arg(long, default_value_t = 200)]
     world_size: u16,
-}
-
-#[derive(clap::Args)]
-struct InputOpportunityArgs {
-    #[arg(long)]
-    feature: String,
-    /// One replicate per world: the pilot that projects the full run.
-    #[arg(long)]
-    pilot: bool,
-    /// Private rayon pool of this many threads (>= 1). Omit it to use the
-    /// rayon global pool.
-    #[arg(long)]
-    threads: Option<NonZeroUsize>,
-    /// Stop between replicates once this many seconds have elapsed.
-    #[arg(long, default_value_t = v3_cli::opportunity::DEFAULT_WALL_CAP_SECS)]
-    wall_cap_secs: u64,
-    /// Stop between replicates once the raw record reaches this many bytes.
-    #[arg(long, default_value_t = v3_cli::opportunity::DEFAULT_BYTE_CAP)]
-    byte_cap: u64,
-    /// Raw record destination; the summary path is unaffected.
-    #[arg(long)]
-    out: Option<std::path::PathBuf>,
-    /// Summary destination; the raw path is unaffected.
-    #[arg(long)]
-    summary_out: Option<std::path::PathBuf>,
-}
-
-#[derive(clap::Args)]
-struct RecruitmentArgs {
-    #[arg(long)]
-    feature: String,
-    /// Batch 0, lineages 0-1, every arm: the feasibility pilot whose
-    /// lineages are a prefix of the panel.
-    #[arg(long)]
-    pilot: bool,
-    /// Private rayon pool of this many threads (>= 1); arms and lineages run
-    /// in parallel. Omit it to use the rayon global pool.
-    #[arg(long)]
-    threads: Option<NonZeroUsize>,
-    /// Stop between lineages once this many seconds have elapsed.
-    #[arg(long, default_value_t = v3_cli::recruitment::DEFAULT_WALL_CAP_SECS)]
-    wall_cap_secs: u64,
-    /// Stop between lineages once the raw record reaches this many bytes.
-    #[arg(long, default_value_t = v3_cli::recruitment::DEFAULT_BYTE_CAP)]
-    byte_cap: u64,
-    /// Rebuild every proposal from the written record and compare
-    /// fingerprints; the result goes into the summary.
-    #[arg(long)]
-    replay_check: bool,
-    /// Raw record destination; the summary path is unaffected.
-    #[arg(long)]
-    out: Option<std::path::PathBuf>,
-    /// Summary destination; the raw path is unaffected.
-    #[arg(long)]
-    summary_out: Option<std::path::PathBuf>,
 }
 
 #[derive(clap::Args)]
@@ -312,8 +247,6 @@ fn main() {
                 }
             }
         }
-        Commands::Recruitment(args) => run_recruitment(args, switch),
-        Commands::InputOpportunity(args) => run_input_opportunity(args, switch),
         Commands::ProfileTicks(args) => run_profile_ticks(&args, switch),
         Commands::World(args) => match args.command {
             WorldCommands::Inspect(args) => {
@@ -497,7 +430,6 @@ fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), S
                 food_coverage: args.food_coverage,
                 neighborhood: NeighborhoodSizes::default(),
                 drift: Default::default(),
-                recruitment: v3_core::neighborhood::recruitment_paths::Sizes::PRODUCTION,
                 mutation_effects: Default::default(),
             };
             if params.recipe.is_some() {
@@ -521,111 +453,6 @@ fn exit_with(code: u8) {
     if code != 0 {
         std::process::exit(i32::from(code));
     }
-}
-
-fn working_directory() -> std::path::PathBuf {
-    std::env::current_dir().unwrap_or_else(|e| {
-        eprintln!("error: cannot identify the working directory: {e}");
-        std::process::exit(1);
-    })
-}
-
-fn run_input_opportunity(args: InputOpportunityArgs, switch: Switch) {
-    let options = v3_cli::opportunity::Options {
-        pilot: args.pilot,
-        threads: args.threads,
-        wall_cap: std::time::Duration::from_secs(args.wall_cap_secs),
-        byte_cap: args.byte_cap,
-        raw: args.out,
-        summary: args.summary_out,
-        source_revision: bench::detect_git_revision(),
-        ..v3_cli::opportunity::Options::new(&args.feature, working_directory())
-    };
-    let measurement = measure::opportunity(switch, &options);
-    let result = v3_cli::opportunity::run(&options);
-    let code = match &result {
-        Ok(outcome) => {
-            println!(
-                "wrote {} ({} bytes, {} replicates) and {}",
-                outcome.raw.display(),
-                outcome.bytes,
-                outcome.replicates,
-                outcome.summary.display()
-            );
-            if outcome.incomplete {
-                eprintln!("incomplete: a cap stopped the run between replicates");
-                3
-            } else {
-                0
-            }
-        }
-        Err(e) => {
-            eprintln!("error: {e}");
-            1
-        }
-    };
-    measure::opportunity_end(
-        measurement,
-        code,
-        result
-            .as_ref()
-            .ok()
-            .map(|outcome| outcome.summary.as_path()),
-    );
-    exit_with(code);
-}
-
-fn run_recruitment(args: RecruitmentArgs, switch: Switch) {
-    let options = v3_cli::recruitment::Options {
-        pilot: args.pilot,
-        threads: args.threads,
-        wall_cap: std::time::Duration::from_secs(args.wall_cap_secs),
-        byte_cap: args.byte_cap,
-        replay_check: args.replay_check,
-        raw: args.out,
-        summary: args.summary_out,
-        source_revision: bench::detect_git_revision(),
-        ..v3_cli::recruitment::Options::new(&args.feature, working_directory())
-    };
-    let measurement = measure::recruitment(switch, &options);
-    let result = v3_cli::recruitment::run(&options);
-    let code = match &result {
-        Ok(outcome) => {
-            println!(
-                "wrote {} ({} bytes, {} lineages, {} proposals) and {}",
-                outcome.raw.display(),
-                outcome.bytes,
-                outcome.lineage_count,
-                outcome.proposal_count,
-                outcome.summary.display()
-            );
-            if let Some(check) = outcome.replay_check {
-                println!(
-                    "replay check: {}/{} proposals matched",
-                    check.matched, check.proposals
-                );
-            }
-            if outcome.incomplete {
-                eprintln!("incomplete: a cap stopped the run between lineages");
-                3
-            } else {
-                0
-            }
-        }
-        Err(e) => {
-            eprintln!("error: {e}");
-            1
-        }
-    };
-    measure::recruitment_end(
-        measurement,
-        code,
-        result
-            .as_ref()
-            .ok()
-            .map(|outcome| outcome.summary.as_path()),
-    );
-    exit_with(code);
 }
 
 fn run_profile_ticks(args: &ProfileTicksArgs, switch: Switch) {
@@ -854,16 +681,10 @@ struct Switch;
 
 /// Measurement records (T21.F06): `measurement.started` after argument
 /// resolution and before the command's work, `measurement.ended` after its
-/// output, then release and the bounded flush. Summary readings are taken
-/// from the files the command already wrote.
+/// output, then release and the bounded flush.
 #[cfg(feature = "telemetry")]
 mod measure {
-    use std::path::Path;
-
-    use serde::de::DeserializeOwned;
-    use serde_json::{json, Value};
-    use v3_cli::opportunity::RunSummary as OpportunitySummary;
-    use v3_cli::recruitment::RunSummary as RecruitmentSummary;
+    use serde_json::json;
     use v3_cli::telemetry::Measurement;
     use v3_telemetry::{MeasurementEnd, MeasurementStart};
 
@@ -922,171 +743,6 @@ mod measure {
         measurement.finish(end);
     }
 
-    pub(super) fn recruitment(
-        switch: Switch,
-        options: &v3_cli::recruitment::Options,
-    ) -> Measurement {
-        let digest = v3_core::config::config_digest(
-            &v3_core::neighborhood::recruitment_paths::task_config(),
-        );
-        begin(
-            switch,
-            MeasurementStart {
-                command: "recruitment",
-                feature: Some(&options.feature),
-                pilot: Some(options.pilot),
-                config_digest: Some(&digest),
-                threads: threads(options.threads),
-                ..MeasurementStart::default()
-            },
-        )
-    }
-
-    pub(super) fn opportunity(
-        switch: Switch,
-        options: &v3_cli::opportunity::Options,
-    ) -> Measurement {
-        begin(
-            switch,
-            MeasurementStart {
-                command: "input-opportunity",
-                feature: Some(&options.feature),
-                pilot: Some(options.pilot),
-                threads: threads(options.threads),
-                ..MeasurementStart::default()
-            },
-        )
-    }
-
-    /// What an assay's written summary gives its `measurement.ended`.
-    #[derive(Debug, PartialEq)]
-    struct AssayReadings<'a> {
-        incomplete: bool,
-        stop_reason: Option<&'a str>,
-        horizon: Option<u64>,
-        gate_favorable: Option<bool>,
-        raw_sha256: &'a str,
-        raw_bytes: u64,
-        /// The totals block.
-        body: Value,
-    }
-
-    /// Reads the summary an assay wrote at `path`.
-    fn read_summary<T: DeserializeOwned>(path: &Path) -> Result<T, String> {
-        let bytes = std::fs::read(path)
-            .map_err(|error| format!("cannot read summary {}: {error}", path.display()))?;
-        serde_json::from_slice(&bytes)
-            .map_err(|error| format!("cannot parse summary {}: {error}", path.display()))
-    }
-
-    /// An assay's `measurement.ended`: its summary's readings. No summary (an
-    /// error exit) records only the code; a summary that cannot be read as
-    /// its command's `RunSummary` records only the code and the path, and
-    /// says why on stderr.
-    fn assay_end<T: DeserializeOwned>(
-        measurement: Measurement,
-        code: u8,
-        summary_path: Option<&Path>,
-        readings: fn(&T) -> AssayReadings<'_>,
-    ) {
-        let mut end = MeasurementEnd {
-            exit_code: code,
-            ..MeasurementEnd::default()
-        };
-        let path_text;
-        let summary;
-        if let Some(path) = summary_path.filter(|_| measurement.is_recording()) {
-            path_text = path.display().to_string();
-            end.summary_path = Some(&path_text);
-            summary = read_summary::<T>(path);
-            match &summary {
-                Ok(summary) => {
-                    let readings = readings(summary);
-                    end.incomplete = Some(readings.incomplete);
-                    end.stop_reason = readings.stop_reason;
-                    end.horizon = readings.horizon;
-                    end.gate_favorable = readings.gate_favorable;
-                    end.raw_sha256 = Some(readings.raw_sha256);
-                    end.raw_bytes = Some(readings.raw_bytes);
-                    end.body = Some(readings.body.to_string());
-                }
-                Err(message) => {
-                    eprintln!("telemetry: measurement.ended without readings: {message}")
-                }
-            }
-        }
-        measurement.finish(end);
-    }
-
-    /// The recruitment summary's readings; the body is its three counts.
-    fn recruitment_readings(summary: &RecruitmentSummary) -> AssayReadings<'_> {
-        AssayReadings {
-            incomplete: summary.incomplete,
-            stop_reason: summary.stop_reason.as_deref(),
-            horizon: None,
-            gate_favorable: None,
-            raw_sha256: &summary.raw.sha256,
-            raw_bytes: summary.raw.bytes,
-            body: json!({
-                "expected_proposals": summary.expected_proposals,
-                "lineage_count": summary.lineage_count,
-                "proposal_count": summary.proposal_count,
-            }),
-        }
-    }
-
-    /// The input-opportunity summary's readings; the body holds, per world,
-    /// its case name, requested replicates, and the count and sums of its
-    /// replicate rows, and per family and world the verdict row's counts.
-    fn opportunity_readings(summary: &OpportunitySummary) -> AssayReadings<'_> {
-        let worlds: Vec<Value> = summary
-            .worlds
-            .iter()
-            .map(|world| {
-                let rows = &world.replicates;
-                json!({
-                    "case": world.case.name,
-                    "replicates_requested": world.replicates_requested,
-                    "replicates": rows.len(),
-                    "ticks": rows.iter().map(|row| row.ticks).sum::<u64>(),
-                    "births_total": rows.iter().map(|row| row.births_total).sum::<u64>(),
-                })
-            })
-            .collect();
-        let verdicts: Vec<Value> = summary
-            .worlds
-            .iter()
-            .flat_map(|world| &world.verdicts)
-            .map(|row| {
-                json!({
-                    "family": row.family,
-                    "world": row.world,
-                    "verdict": row.verdict,
-                    "sampled": row.sampled,
-                    "exposed": row.exposed,
-                    "applied": row.applied,
-                })
-            })
-            .collect();
-        AssayReadings {
-            incomplete: summary.incomplete,
-            stop_reason: summary.stop_reason.as_deref(),
-            horizon: Some(summary.horizon),
-            gate_favorable: Some(summary.gate_favorable),
-            raw_sha256: &summary.raw.sha256,
-            raw_bytes: summary.raw.bytes,
-            body: json!({ "worlds": worlds, "verdicts": verdicts }),
-        }
-    }
-
-    pub(super) fn recruitment_end(measurement: Measurement, code: u8, summary: Option<&Path>) {
-        assay_end(measurement, code, summary, recruitment_readings);
-    }
-
-    pub(super) fn opportunity_end(measurement: Measurement, code: u8, summary: Option<&Path>) {
-        assay_end(measurement, code, summary, opportunity_readings);
-    }
-
     pub(super) fn profile_ticks(switch: Switch, options: &v3_cli::profile::Options) -> Measurement {
         // Building the config to digest it is work only a record needs.
         let digest =
@@ -1119,16 +775,11 @@ mod measure {
             ..MeasurementEnd::default()
         });
     }
-
-    #[cfg(test)]
-    mod tests;
 }
 
 /// The reference build records nothing.
 #[cfg(not(feature = "telemetry"))]
 mod measure {
-    use std::path::Path;
-
     use super::{BenchDone, PreparedBench, Switch};
 
     pub(super) struct Measurement;
@@ -1138,18 +789,6 @@ mod measure {
     }
 
     pub(super) fn bench_end(_: Measurement, _: u8, _: &Result<BenchDone, String>) {}
-
-    pub(super) fn recruitment(_: Switch, _: &v3_cli::recruitment::Options) -> Measurement {
-        Measurement
-    }
-
-    pub(super) fn opportunity(_: Switch, _: &v3_cli::opportunity::Options) -> Measurement {
-        Measurement
-    }
-
-    pub(super) fn recruitment_end(_: Measurement, _: u8, _: Option<&Path>) {}
-
-    pub(super) fn opportunity_end(_: Measurement, _: u8, _: Option<&Path>) {}
 
     pub(super) fn profile_ticks(_: Switch, _: &v3_cli::profile::Options) -> Measurement {
         Measurement
@@ -1255,8 +894,6 @@ mod tests {
             Commands::Run(_)
             | Commands::World(_)
             | Commands::BenchSummarize(_)
-            | Commands::Recruitment(_)
-            | Commands::InputOpportunity(_)
             | Commands::ProfileTicks(_) => {
                 panic!("expected the bench subcommand")
             }
@@ -1278,98 +915,6 @@ mod tests {
         let repeated =
             Cli::try_parse_from(["v3-cli", "profile-ticks", "--ticks", "2", "--ticks", "3"]);
         assert!(repeated.is_err(), "a repeated --ticks is a usage error");
-    }
-
-    #[test]
-    fn recruitment_arguments_parse_with_their_defaults_and_flags() {
-        let Commands::Recruitment(args) = Cli::try_parse_from([
-            "v3-cli",
-            "recruitment",
-            "--feature",
-            "t13-f07-current-policy-recruitment-transitions",
-        ])
-        .expect("arguments must parse")
-        .command
-        else {
-            panic!("expected the recruitment subcommand");
-        };
-        assert!(!args.pilot);
-        assert_eq!(args.threads, None);
-        assert_eq!(
-            args.wall_cap_secs,
-            v3_cli::recruitment::DEFAULT_WALL_CAP_SECS
-        );
-        assert_eq!(args.byte_cap, v3_cli::recruitment::DEFAULT_BYTE_CAP);
-        assert!(!args.replay_check);
-        let Commands::Recruitment(args) = Cli::try_parse_from([
-            "v3-cli",
-            "recruitment",
-            "--feature",
-            "x",
-            "--pilot",
-            "--threads",
-            "4",
-            "--wall-cap-secs",
-            "10",
-            "--byte-cap",
-            "1000",
-            "--replay-check",
-        ])
-        .expect("arguments must parse")
-        .command
-        else {
-            panic!("expected the recruitment subcommand");
-        };
-        assert!(args.pilot && args.replay_check);
-        assert_eq!(
-            (args.threads, args.wall_cap_secs, args.byte_cap),
-            (NonZeroUsize::new(4), 10, 1000)
-        );
-        assert!(Cli::try_parse_from(["v3-cli", "recruitment"]).is_err());
-        assert!(
-            Cli::try_parse_from(["v3-cli", "recruitment", "--feature", "x", "--threads", "0"])
-                .is_err()
-        );
-    }
-
-    #[test]
-    fn input_opportunity_arguments_parse_with_their_defaults_and_flags() {
-        let parse = |args: &[&str]| match Cli::try_parse_from(args)
-            .expect("arguments must parse")
-            .command
-        {
-            Commands::InputOpportunity(args) => args,
-            _ => panic!("expected the input-opportunity subcommand"),
-        };
-        let args = parse(&["v3-cli", "input-opportunity", "--feature", "t20-f01"]);
-        assert!(!args.pilot);
-        assert_eq!(args.threads, None);
-        assert_eq!(
-            (args.wall_cap_secs, args.byte_cap),
-            (
-                v3_cli::opportunity::DEFAULT_WALL_CAP_SECS,
-                v3_cli::opportunity::DEFAULT_BYTE_CAP
-            )
-        );
-        let args = parse(&[
-            "v3-cli",
-            "input-opportunity",
-            "--feature",
-            "x",
-            "--pilot",
-            "--threads",
-            "2",
-            "--wall-cap-secs",
-            "5",
-            "--byte-cap",
-            "99",
-        ]);
-        assert!(args.pilot);
-        assert_eq!(
-            (args.threads, args.wall_cap_secs, args.byte_cap),
-            (NonZeroUsize::new(2), 5, 99)
-        );
-        assert!(Cli::try_parse_from(["v3-cli", "input-opportunity"]).is_err());
     }
 
     #[test]

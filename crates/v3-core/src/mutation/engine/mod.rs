@@ -112,8 +112,8 @@ impl MutationEngine {
 
     /// [`Self::apply_mutations_in`] with the supply draw on
     /// a caller-supplied unit count: `Binomial(units, per_unit_rate)`
-    /// requested events. The drift walk and `recruitment_paths` pass the
-    /// instrument constant `FOUNDER_GENOME_SIZE_UNITS` (T11.F20); engine
+    /// requested events. The drift walk, the one instrument on this draw, passes
+    /// the constant `FOUNDER_GENOME_SIZE_UNITS` (T11.F20); engine
     /// tests pass explicit counts (rate 1.0 on N units requests exactly N).
     ///
     /// `parent_reachable_nodes` and `parent_executed` are sorted parent node

@@ -329,15 +329,13 @@ impl RunHandle {
 /// (T21.F06): an absent field is omitted from the record.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct MeasurementStart<'a> {
-    /// `bench`, `recruitment`, `input-opportunity`, `profile-ticks`, `run` or
-    /// `why-not`.
+    /// `bench`, `profile-ticks`, `run` or `why-not`.
     pub command: &'a str,
     pub feature: Option<&'a str>,
     /// The benchmark profile.
     pub profile: Option<&'a str>,
     /// The lab's assay.
     pub assay: Option<&'a str>,
-    pub pilot: Option<bool>,
     /// The lab's `--seed`, or the profiling harness's fixed seed.
     pub seed: Option<u64>,
     /// A benchmark's seeds, recorded comma-joined.
@@ -355,9 +353,6 @@ pub struct MeasurementEnd<'a> {
     pub exit_code: u8,
     pub incomplete: Option<bool>,
     pub severe: Option<bool>,
-    pub stop_reason: Option<&'a str>,
-    pub horizon: Option<u64>,
-    pub gate_favorable: Option<bool>,
     pub summary_path: Option<&'a str>,
     pub raw_sha256: Option<&'a str>,
     pub raw_bytes: Option<u64>,
@@ -865,9 +860,6 @@ impl Telemetry {
                 .into_iter()
                 .filter_map(|(key, value)| Some((Key::from_static_str(key), u64_value(value?)))),
         );
-        if let Some(pilot) = start.pilot {
-            attributes.push(("petri.pilot".into(), AnyValue::Boolean(pilot)));
-        }
         if let Some(seeds) = start.seeds {
             let joined: Vec<String> = seeds.iter().map(u64::to_string).collect();
             attributes.push(("petri.seeds".into(), AnyValue::from(joined.join(","))));
@@ -903,28 +895,20 @@ impl Telemetry {
         let flags = [
             ("petri.incomplete", end.incomplete),
             ("petri.severe", end.severe),
-            ("petri.gate_favorable", end.gate_favorable),
         ];
         attributes.extend(flags.into_iter().filter_map(|(key, value)| {
             Some((Key::from_static_str(key), AnyValue::Boolean(value?)))
         }));
         let text = [
-            ("petri.stop_reason", end.stop_reason),
             ("petri.summary_path", end.summary_path),
             ("petri.raw_sha256", end.raw_sha256),
         ];
         attributes.extend(text.into_iter().filter_map(|(key, value)| {
             Some((Key::from_static_str(key), AnyValue::from(value?.to_owned())))
         }));
-        let counts = [
-            ("petri.horizon", end.horizon),
-            ("petri.raw_bytes", end.raw_bytes),
-        ];
-        attributes.extend(
-            counts
-                .into_iter()
-                .filter_map(|(key, value)| Some((Key::from_static_str(key), u64_value(value?)))),
-        );
+        if let Some(raw_bytes) = end.raw_bytes {
+            attributes.push(("petri.raw_bytes".into(), u64_value(raw_bytes)));
+        }
         active.emit_record(&measurement.id, "measurement.ended", attributes, end.body);
         active
             .shared

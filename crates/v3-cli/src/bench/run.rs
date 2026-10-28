@@ -20,8 +20,8 @@ use super::profiles::{
 use super::progress::{Progress, INTERVAL};
 use super::ring_rules::{undefined_ring_rules, RingRules};
 use super::schema::{
-    ratio, timed_recruitment_paths, undefined_neighborhood_read, Deterministic, DriftDepth,
-    Environment, GoalCaseObservation, Host, Indicator, LineageDiversitySeed, MemorySensitivitySeed,
+    ratio, undefined_neighborhood_read, Deterministic, DriftDepth, Environment,
+    GoalCaseObservation, Host, Indicator, LineageDiversitySeed, MemorySensitivitySeed,
     NeighborhoodEvolvedSeed, NeighborhoodFounderHalf, NeighborhoodRead, PerCreatureTick, PerSeed,
     PopulationPersistenceSeed, Report, SeedFinalStateObservation, SeedPhaseWallClock,
     SeedThroughput, SeedWallClock, StructuralCompanionsSeed, TemporalMemorySensitivitySeed,
@@ -117,7 +117,6 @@ pub struct RunTimings {
     pub neighborhood_founder_wall_clock_ms: f64,
     /// Complete goal-only mutation walk and readings; absent when unrun.
     pub drift_depth_wall_clock_ms: Option<f64>,
-    pub recruitment_paths_wall_clock_ms: Option<f64>,
     /// Evolved-half neighborhood wall time per seed (goal profile only).
     pub neighborhood_evolved_wall_clock_ms_per_seed: Vec<SeedFinalStateObservation>,
     /// Neighborhood-read wall time per seed (goal world set only).
@@ -638,7 +637,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
     let totals = accumulate_totals(&per_seed);
     let per_creature_tick = normalized_totals(&totals);
 
-    let mut goal_indicators = assemble_goal_indicators(
+    let goal_indicators = assemble_goal_indicators(
         params,
         &totals,
         GoalIndicatorInputs {
@@ -655,13 +654,7 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
         },
     );
 
-    if observe_goal_indicators {
-        progress.log("recruitment paths");
-    }
-    let (recruitment_paths, recruitment_paths_wall_clock_ms) =
-        timed_recruitment_paths(observe_goal_indicators, params.recruitment);
     progress.log("profile done");
-    goal_indicators.recruitment_paths = recruitment_paths;
 
     let deterministic = Deterministic {
         graph_work_definition: "graph_relax_iters: entered single-evaluation visits, entered when the graph has a compute node or a wired effect surface (T13.F04), including unaffordable visits (T11.F06); historical deltas cross definitions".to_string(),
@@ -679,7 +672,6 @@ pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTi
         final_state_observation_ms_per_seed,
         neighborhood_founder_wall_clock_ms,
         drift_depth_wall_clock_ms,
-        recruitment_paths_wall_clock_ms,
         neighborhood_evolved_wall_clock_ms_per_seed,
         neighborhood_read_wall_clock_ms_per_seed,
         mutation_effects_wall_clock_ms_per_seed,
@@ -789,7 +781,6 @@ fn build_environment(timings: RunTimings, totals: &Totals, threads: usize) -> En
         final_state_observation_ms_per_seed,
         neighborhood_founder_wall_clock_ms,
         drift_depth_wall_clock_ms,
-        recruitment_paths_wall_clock_ms,
         neighborhood_evolved_wall_clock_ms_per_seed,
         neighborhood_read_wall_clock_ms_per_seed,
         mutation_effects_wall_clock_ms_per_seed,
@@ -850,7 +841,6 @@ fn build_environment(timings: RunTimings, totals: &Totals, threads: usize) -> En
         final_state_observation_ms_total,
         neighborhood_founder_wall_clock_ms,
         drift_depth_wall_clock_ms,
-        recruitment_paths_wall_clock_ms,
         neighborhood_evolved_wall_clock_ms_per_seed,
         neighborhood_evolved_wall_clock_ms_total,
         neighborhood_read_wall_clock_ms_per_seed,

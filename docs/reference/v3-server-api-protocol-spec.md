@@ -255,8 +255,8 @@ Request rules:
 - Mutation tuning lives at top-level `mutation.*` in the startup/config keyspace
   (not under `runtime.*`). `mutation.per_unit_rate` is the only mutation-count
   field: each birth requests `Binomial(genome_size(), per_unit_rate)` events,
-  and the drift walk and recruitment-paths instruments draw the same rule on
-  the canonical founder's 80 units. The keys of the retired per-birth rule
+  and the drift walk, the one instrument, draws the same rule on the
+  canonical founder's 80 units. The keys of the retired per-birth rule
   are unknown fields and are rejected (T11.F20).
 - `population.initial_creatures` and `population.founder_profile` are
   restart-only (Section 4.8).

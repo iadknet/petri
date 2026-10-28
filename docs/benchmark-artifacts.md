@@ -27,7 +27,6 @@ per-tick traces unless a spec predeclares them with a projected size; the
 | Goal | `.bench-artifacts/<feature>/goal.json` | `docs/progress/features/<feature>-goal.json` |
 | Goal-long (40,000 ticks, its own `goal_worlds_long` series) | `.bench-artifacts/<feature>/goal-long.json` | `docs/progress/features/<feature>-goal-long.json` |
 | Sweep | `.bench-artifacts/<feature>/sweep.json` | `docs/progress/features/<feature>-sweep.json` |
-| Recruitment S0 (`v3-cli recruitment`, `--pilot` adds `-pilot`) | `.bench-artifacts/<feature>/recruitment-s0.json` (`recruitment-s0-pilot.json`): compact per-lineage records streamed as they complete, `incomplete: true` when a cap stopped the run; exit status 3. The byte cap is checked after each record lands, so lineages already in flight on other threads still append: the raw file may exceed `--byte-cap` by up to `threads − 1` lineage records. | `docs/progress/features/<feature>-s0.json` (`-s0-pilot.json`): `petri-recruitment-s0-summary`, per-arm estimates, ladder and classification counts, raw bytes/sha256, thread count, optional replay check. The writer is unchanged, but an S0 summary over 1 MiB is not committed: it stays local-only beside its raw file under `.bench-artifacts/<feature>/`, and the committed reading carries its numbers plus its path, SHA-256 and bytes. |
 
 The first entry from `git worktree list --porcelain -z` identifies the main
 checkout, including when called from a linked worktree or a path containing
@@ -87,12 +86,11 @@ Kept values are byte-identical to the v1 stage, and existing `Undefined`,
 missing fields and measured zero keep their meanings.
 `neighborhood_read.genomes` is replaced by its count, `genome_count`.
 
-Summaries do not carry recruitment paths, per-genome neighborhood rows,
-per-operator mutation value totals, drift `opportunities` and `recruitment`
-detail, experiment proposal totals, outcomes, denominators, or batch and
-lineage uncertainty. From a world's `mutation_effects` block (T11.F26) they keep
-only what the page's view reads; its rule text, per-parent structure counts and
-control expectations stay in the full report. That detail stays in the full
+Summaries do not carry per-genome neighborhood rows, per-operator mutation
+value totals, or drift `opportunities` and `recruitment` detail. From a
+world's `mutation_effects` block (T11.F26) they keep only what the page's
+view reads; its rule text, per-parent structure counts and control
+expectations stay in the full report. That detail stays in the full
 report and the closure readings. `omitted_details` keeps the v1 stage notes and then names every
 dropped `deterministic` path (arrays as `[]`).
 
@@ -129,13 +127,10 @@ floating-point readings as well as integer counters and fractional strings.
 Historical full reports and summaries use the same profile, case, severity,
 value-only-reading and host-matching rules. No synthetic full report is rebuilt.
 
-`claims` selects up to 16 fixed JSON pointers into the raw report, omitting
+`claims` selects up to eight fixed JSON pointers into the raw report, omitting
 unavailable locations: creature-tick and birth totals; normalized VM work;
 severe verdict; the first seed's final/minimum population; the first world's
-first drift checkpoint lineage count; recruitment total/attempted proposals;
-the first arm's retained discovery numerator/denominator; its first proposal's
-Task A score and chosen flag; the first pair's matched-proposal count; the
-first constructed stage's useful flag; and total simulation wall time. Each
+first drift checkpoint lineage count; and total simulation wall time. Each
 extract is a scalar or count whose pointer resolves in the hashed raw JSON.
 
 ## Convert an existing full report
