@@ -40,6 +40,40 @@ fn the_census_mean_capacity_is_the_living_population_mean_and_zero_at_extinction
     assert_eq!(extinct.mean_capacity, 0.0);
 }
 
+/// The census carries the readers' mean energy and mean capacity uncast:
+/// energies whose `f32` sum would round keep their `f64` mean. Exact
+/// equality: the census reads the one definition, it computes nothing.
+#[test]
+fn the_census_means_are_the_readers_definitions_uncast_and_zero_at_extinction() {
+    let mut config = v3_core::config::SimulationConfig::default();
+    config.world.width = 16;
+    config.world.height = 16;
+    config.population.initial_creatures = 3;
+    let mut sim = v3_core::simulation::seed_simulation(config, 5);
+    for ((creature, energy), capacity) in sim
+        .creatures
+        .values_mut()
+        .zip([16_777_216.0_f32, 1.0, 1.0])
+        .zip([110.0_f32, 40.0, 60.0])
+    {
+        creature.energy = energy;
+        creature.body.capacity = capacity;
+    }
+
+    let census = Census::of(&sim);
+    let mean_energy = v3_core::neighborhood::population::PopulationCensus::of(&sim)
+        .mean_energy()
+        .expect("a living population");
+    let capacity = capacity_distribution(&sim).expect("a living population");
+    sim.creatures.clear();
+    let extinct = Census::of(&sim);
+
+    assert_eq!(census.mean_energy.to_bits(), mean_energy.to_bits());
+    assert_eq!(census.mean_capacity.to_bits(), capacity.mean.to_bits());
+    assert_eq!(extinct.mean_energy.to_bits(), 0.0_f64.to_bits());
+    assert_eq!(extinct.mean_capacity.to_bits(), 0.0_f64.to_bits());
+}
+
 #[test]
 fn an_interval_snapshot_waits_for_the_interval_since_the_last_one_or_the_start() {
     let start = Instant::now();
@@ -1103,5 +1137,7 @@ fn the_tick_census_keeps_its_pre_move_values() {
     assert_eq!(empty, EMPTY_CENSUS_PIN);
 }
 
-const LIVING_CENSUS_PIN: &str = "population=93 mean_energy=0x41f60aa1 mean_capacity=0x40690d09791e4792 mean_genome_size=0x405404d1344d1345 mean_mesh_nodes=0x4000160581605816 mean_generation=0x3fe44d1344d1344d";
+/// T30.F15 re-pinned `mean_energy`: the field widened to `f64` and carries
+/// core's mean uncast (was the `f32` sum `0x41f60aa1`).
+const LIVING_CENSUS_PIN: &str = "population=93 mean_energy=0x403ec1541fad6b5b mean_capacity=0x40690d09791e4792 mean_genome_size=0x405404d1344d1345 mean_mesh_nodes=0x4000160581605816 mean_generation=0x3fe44d1344d1344d";
 const EMPTY_CENSUS_PIN: &str = "population=0 mean_energy=0x0 mean_capacity=0x0 mean_genome_size=0x0 mean_mesh_nodes=0x0 mean_generation=0x0";

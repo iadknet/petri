@@ -351,11 +351,12 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
     let means = census.structure_means();
     let complexity = census.complexity();
     let clades = CladeCensus::of(census.lineage_ids());
+    let mean_energy = census.mean_energy().map_or(0.0, |energy| energy as f32);
 
     let status = StatusPayload {
         state: handle.status,
         population: sim.creatures.len(),
-        mean_energy: census.mean_energy_live(),
+        mean_energy,
         last_tick_actions: LastTickActions {
             move_count: stats.last_tick_move,
             eat: stats.last_tick_eat,
@@ -476,7 +477,7 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
 
     let health = HealthPayload {
         population: sim.creatures.len(),
-        mean_energy: census.mean_energy_live(),
+        mean_energy,
         last_tick_food_occupancy_depletion_mean: stats.last_tick_food_occupancy_depletion_mean,
         last_tick_food_occupancy_depletion_occupied_cells: stats
             .last_tick_food_occupancy_depletion_occupied_cells,
@@ -678,7 +679,9 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
         generation_max: census.generation_max(),
         genome_size_mean: means.genome_size as f32,
         lineages_alive: u32::try_from(clades.surviving()).unwrap_or(u32::MAX),
-        lineages_effective: clades.effective_lineages_live(),
+        lineages_effective: clades
+            .effective_lineages()
+            .map_or(0.0, |count| count as f32),
         world_inputs_read_mean: census.mean_world_inputs_read() as f32,
         plasticity_changes_total: stats.plasticity_changes_total,
         shared_memory_writes_changed_total: stats.shared_memory_writes_changed_total,

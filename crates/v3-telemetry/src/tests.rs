@@ -711,7 +711,9 @@ fn a_snapshot_reaches_the_receiver_with_the_run_resource_and_census() {
     assert_eq!(value("petri.tick.population"), census.population as f64);
     assert_eq!(
         value("petri.tick.mean_energy"),
-        f64::from(v3_core::neighborhood::population::PopulationCensus::of(&sim).mean_energy_live())
+        v3_core::neighborhood::population::PopulationCensus::of(&sim)
+            .mean_energy()
+            .unwrap_or(0.0)
     );
     assert_eq!(
         value("petri.run.creature_ticks"),

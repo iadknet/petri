@@ -2,6 +2,8 @@
 //! the NDJSON stream emit, pinned on fixture populations against the code
 //! before the censuses moved into core's readers. A pin that moves is a
 //! defect; only the call expressions below may change, never the literals.
+//! T30.F15 re-pinned one literal, `NDJSON_PINS` `stream`: its `tick_sample`
+//! and `run_completed` mean energies are now core's `f64` mean cast to `f32`.
 //!
 //! Each pin hashes a sorted-key JSON rendering (`serde_json::Value`), so a
 //! mismatch names the block and prints its JSON for a diff against the
@@ -666,7 +668,7 @@ fn the_ndjson_stream_keeps_its_pre_move_values() {
 #[rustfmt::skip]
 const NDJSON_PINS: &[(&str, &str)] = &[(
     "stream",
-    "0058a90947ba17a652265ff32a2c03c4e6a32849575f3b5767dfcf707a3e62f1",
+    "4c7ca23267416a82fbba43446c3ed4683d34c6af35e03170ce388bee307b86d3",
 )];
 
 /// The bundle census over chosen reachable sets: every node reachable, none

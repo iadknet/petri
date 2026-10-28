@@ -1021,10 +1021,10 @@ fn mean_energy_is_positive_in_viable_sim() {
     for _ in 0..10 {
         run_tick(&mut sim, &mut None);
     }
+    let mean_energy = PopulationCensus::of(&sim).mean_energy();
     assert!(
-        PopulationCensus::of(&sim).mean_energy_live() > 0.0,
-        "mean_energy should be positive in a viable simulation, got {}",
-        PopulationCensus::of(&sim).mean_energy_live()
+        mean_energy.is_some_and(|energy| energy > 0.0),
+        "mean_energy should be positive in a viable simulation, got {mean_energy:?}"
     );
 }
 

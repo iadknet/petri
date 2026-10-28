@@ -123,38 +123,46 @@ pin table would show it wrong.
 
 ## Implementation Tasks
 
-- [ ] Record each pin in the readings' pin table as it renders on
+- [x] Record each pin in the readings' pin table as it renders on
       `2ce6e4632` (the JSON a hashed pin prints, the bits a bit pin shows).
-- [ ] Delete `mean_energy_live`, `mean_capacity_live` and
+- [x] Delete `mean_energy_live`, `mean_capacity_live` and
       `effective_lineages_live` with the six paired-definition markers; add
       the effective lineage count to `CladeCensus`; make the module and item
       docs of `population.rs`, `clades.rs` and `distributions.rs` state one
       definition (audit A1–A3).
-- [ ] Repoint every live output in invariant 2's table, widen telemetry's
+- [x] Repoint every live output in invariant 2's table, widen telemetry's
       `Census.mean_energy` to `f64` (A4) and correct its doc, which says it
       copies `tick_sample`'s expressions, and repoint the tests that read the
       deleted functions (`v3-core/tests/viability.rs`,
       `v3-telemetry/src/tests.rs`, the reader tests).
-- [ ] Replace the two "two definitions" reader tests with tests that each
+- [x] Replace the two "two definitions" reader tests with tests that each
       live output equals its definition (cast where `f32`) on a living
       population and is `0` on an empty one.
-- [ ] Re-pin only the moved literals of the pin table, note in each pin
+- [x] Re-pin only the moved literals of the pin table, note in each pin
       module's header which literals T30.F15 re-pinned, and record the
       before and after values in the readings.
 - [ ] Run the declared `gate` profile and the overhead check.
 
 ## Verification
 
-- [ ] No paired definition remains:
+- [x] No paired definition remains:
       `grep -rnE 'WORKAROUND\(T30\.F13\): one definition|mean_energy_live|mean_capacity_live|effective_lineages_live' crates/`
       -> no match.
 - [ ] Live outputs equal the one definition: the new reader, CLI, server
       and telemetry tests, in `make check`.
-- [ ] Pins: `cargo test -p v3-cli census_pins`,
+      They pass under `cargo test` of `v3-core --features telemetry-seams
+      --lib`, `v3-cli`, `v3-server` and `v3-telemetry`; `make check` is
+      not yet run.
+- [x] Pins: `cargo test -p v3-cli census_pins`,
       `cargo test -p v3-server census_pins` and
       `cargo test -p v3-telemetry the_tick_census` pass; the before/after
       table in the readings shows only the pin table's fields moved.
-- [ ] `cargo test -p v3-core --test viability` passes.
+      Moved: `NDJSON_PINS` `stream` (three `f32` mean energies) and
+      `LIVING_CENSUS_PIN` `mean_energy` (`f64` bits); every other pin holds.
+- [x] `cargo test -p v3-core --test viability` passes.
+- [x] Build: `cargo check --workspace --all-targets` (and with
+      `--all-features`), `cargo fmt --all --check` and `make rust-clippy`
+      pass.
 - [ ] `make check` exits 0.
 - [ ] Overhead: `scripts/telemetry-overhead` (stack up, `run` workload) ->
       pass, its pair count, ratio interval and time used in the readings.

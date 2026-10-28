@@ -1,7 +1,9 @@
 //! Census pins (T30.F13): the population values the status and health
 //! payloads carry, pinned on a living and an empty population against the
 //! code before the censuses moved into core's readers. Only the call
-//! expressions may change, never the literals.
+//! expressions may change, never the literals. T30.F15 re-pinned none: the
+//! readers' mean energy and effective lineage count cast to `f32` render
+//! these populations' bits unchanged.
 
 use super::*;
 use crate::query::cache::build_food_fertility_u8;
@@ -75,6 +77,40 @@ fn an_empty_population_keeps_its_pre_move_census_values() {
     let measured = census_fields(&frame_of(seed_simulation(config, 29)));
     println!("PIN {measured}");
     assert_eq!(measured, EMPTY_PIN);
+}
+
+/// Each payload's `f32` mean energy and effective lineage count is the
+/// reader's value cast, on energies whose `f32` sum would round them away,
+/// and `0` on an empty population. Exact equality: the payload only casts.
+#[test]
+fn the_payloads_cast_the_readers_mean_energy_and_effective_lineages() {
+    let mut sim = living();
+    for (creature, energy) in sim
+        .creatures
+        .values_mut()
+        .zip([16_777_216.0_f32].into_iter().chain(std::iter::repeat(1.0)))
+    {
+        creature.energy = energy;
+    }
+    let census = PopulationCensus::of(&sim);
+    let mean_energy = census.mean_energy().expect("a living population") as f32;
+    let effective = CladeCensus::of(census.lineage_ids())
+        .effective_lineages()
+        .expect("a living population") as f32;
+    let frame = frame_of(sim);
+    assert_eq!(frame.status.mean_energy.to_bits(), mean_energy.to_bits());
+    assert_eq!(frame.health.mean_energy.to_bits(), mean_energy.to_bits());
+    assert_eq!(
+        frame.health.lineages_effective.to_bits(),
+        effective.to_bits()
+    );
+
+    let mut config = SimulationConfig::default();
+    config.population.initial_creatures = 0;
+    let empty = frame_of(seed_simulation(config, 29));
+    assert_eq!(empty.status.mean_energy.to_bits(), 0.0_f32.to_bits());
+    assert_eq!(empty.health.mean_energy.to_bits(), 0.0_f32.to_bits());
+    assert_eq!(empty.health.lineages_effective.to_bits(), 0.0_f32.to_bits());
 }
 
 const LIVING_PIN: &str = "status.mean_energy=0x41f60aa1 health.mean_energy=0x41f60aa1 complexity=0x42745816/61/63 generation=0x3f22689a/1 genome_size=0x42a0268a lineages=45/0x42272ab5 world_inputs_read=0x40000000 population=93/93 vm_reads={}";

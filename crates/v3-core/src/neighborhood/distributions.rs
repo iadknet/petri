@@ -8,7 +8,9 @@ use crate::simulation::Simulation;
 /// A trait's distribution at one sampled tick. Percentiles are nearest-rank
 /// over the sorted values: the `q` percentile is the value at rank
 /// `ceil(q × n)` (1-based), so every reported value is one some creature
-/// carries. The mean sums the sorted values in `f64`.
+/// carries. The mean sums the sorted values in `f64`: through
+/// [`capacity_distribution`] it is the one definition of mean capacity, which
+/// the benchmark `capacity` block and `petri.tick.mean_capacity` read.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TraitDistribution {
     pub min: f64,
@@ -42,11 +44,6 @@ impl TraitDistribution {
         let share = |bound: f32| {
             sorted.iter().filter(|&&value| value == bound).count() as f64 / count as f64
         };
-        // WORKAROUND(T30.F13): one definition of mean capacity — this
-        // sorted-order mean (the benchmark `capacity` block) and the live
-        // creature-order mean (`PopulationCensus::mean_capacity_live`) are
-        // kept side by side, bit-identical to their consumers; unifying them
-        // changes a live output's arithmetic, which needs its own decision.
         let mean = sorted.iter().copied().map(f64::from).sum::<f64>() / count as f64;
         Some(Self {
             min: f64::from(sorted[0]),

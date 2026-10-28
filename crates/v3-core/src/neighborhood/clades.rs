@@ -3,8 +3,8 @@
 //! profile of how each surviving clade made its living (T14.F07).
 //!
 //! Counting is keyed in a `BTreeMap`, so the counts never depend on how the
-//! caller iterated the population. Clade entropy keeps two definitions side
-//! by side because its consumers sum it in two orders (T30.F13 invariant 2).
+//! caller iterated the population. Clade entropy has one definition, summed
+//! in lineage-id order, and the effective lineage count is its `exp`.
 
 use std::collections::BTreeMap;
 
@@ -34,13 +34,9 @@ impl CladeCensus {
     }
 
     /// Shannon entropy of the clade distribution in nats, summed in
-    /// lineage-id order (the benchmark sample and `lineage_diversity`).
-    /// `None` for an empty population.
-    // WORKAROUND(T30.F13): one definition of clade entropy — the
-    // lineage-id-order sum here and the ascending-count sum
-    // (`effective_lineages_live`) are kept side by side, bit-identical to
-    // their consumers; unifying them changes a live output's arithmetic,
-    // which needs its own decision.
+    /// lineage-id order: the one definition the benchmark sample,
+    /// `lineage_diversity` and the effective lineage count read. `None` for
+    /// an empty population.
     #[must_use]
     pub fn entropy_nats(&self) -> Option<f64> {
         let total: u64 = self.counts.values().sum();
@@ -54,28 +50,12 @@ impl CladeCensus {
         }))
     }
 
-    /// `exp` of the clade entropy summed over ascending counts: the number
-    /// of equally common lineages with the same diversity (the server's
-    /// `lineages_effective`). `0.0` for an empty population.
-    // WORKAROUND(T30.F13): one definition of clade entropy — see
-    // `entropy_nats`.
+    /// The effective lineage count, `exp` of [`Self::entropy_nats`]: the
+    /// number of equally common lineages with the same diversity (the
+    /// server's `lineages_effective`). `None` for an empty population.
     #[must_use]
-    pub fn effective_lineages_live(&self) -> f32 {
-        let total: u64 = self.counts.values().sum();
-        if total == 0 {
-            return 0.0;
-        }
-        let mut counts: Vec<u64> = self.counts.values().copied().collect();
-        counts.sort_unstable();
-        let total = total as f64;
-        let entropy: f64 = counts
-            .iter()
-            .map(|&n| {
-                let share = n as f64 / total;
-                -share * share.ln()
-            })
-            .sum();
-        entropy.exp() as f32
+    pub fn effective_lineages(&self) -> Option<f64> {
+        self.entropy_nats().map(f64::exp)
     }
 }
 
@@ -202,40 +182,33 @@ mod tests {
     use proptest::prelude::*;
 
     #[test]
-    fn an_empty_population_has_no_clade_and_no_entropy() {
+    fn an_empty_population_has_no_clade_no_entropy_and_no_effective_lineages() {
         let census = CladeCensus::of([]);
         assert_eq!(census.surviving(), 0);
         assert_eq!(census.entropy_nats(), None);
-        assert_eq!(
-            census.effective_lineages_live().to_bits(),
-            0.0_f32.to_bits()
-        );
+        assert_eq!(census.effective_lineages(), None);
     }
 
-    /// Lineage-id order and ascending-count order are two summation orders:
-    /// on clades whose id order is not their count order the two entropies
-    /// can differ in the last bits, which is why both are kept.
     #[test]
-    fn the_two_entropy_orders_are_two_definitions() {
-        let ids =
-            (0..40u32).flat_map(|id| std::iter::repeat_n(id, ((id * 7919) % 13 + 1) as usize));
-        let census = CladeCensus::of(ids);
-        let by_id = census.entropy_nats().expect("a living population");
-        let mut counts: Vec<u64> = census.counts.values().copied().collect();
-        counts.sort_unstable();
-        let total = counts.iter().sum::<u64>() as f64;
-        let by_count: f64 = counts
-            .iter()
-            .map(|&n| {
-                let share = n as f64 / total;
-                -share * share.ln()
-            })
-            .sum();
-        assert_eq!(census.effective_lineages_live(), by_count.exp() as f32);
-        assert_ne!(by_id.to_bits(), by_count.to_bits());
+    fn equally_common_clades_count_as_that_many_effective_lineages() {
+        let census = CladeCensus::of([3, 3, 7, 7, 9, 9, 11, 11]);
+        let effective = census.effective_lineages().expect("a living population");
+        assert!((effective - 4.0).abs() < 1e-12);
     }
 
     proptest! {
+        /// The effective lineage count is exactly `exp` of the entropy, and
+        /// both are absent exactly when no creature lives.
+        #[test]
+        fn effective_lineages_is_the_exp_of_the_entropy(ids in prop::collection::vec(0u32..6, 0..40)) {
+            let census = CladeCensus::of(ids.iter().copied());
+            prop_assert_eq!(
+                census.effective_lineages().map(f64::to_bits),
+                census.entropy_nats().map(|entropy| entropy.exp().to_bits())
+            );
+            prop_assert_eq!(census.effective_lineages().is_none(), ids.is_empty());
+        }
+
         /// Counts never depend on input order, sizes sum to the input, and
         /// profile sizes match the counts.
         #[test]

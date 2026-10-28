@@ -159,13 +159,18 @@ pub fn run_simulation<W: std::io::Write>(
         event_type: "run_completed",
         ticks_executed: ticks,
         final_population: sim.creatures.len(),
-        final_mean_energy: PopulationCensus::of(&sim).mean_energy_live(),
+        final_mean_energy: live_mean_energy(&PopulationCensus::of(&sim)),
     };
     emit(out, &completed)?;
     #[cfg(feature = "telemetry")]
     telemetry::end_run(telemetry_run, &sim, &mut window);
 
     Ok(())
+}
+
+/// The stream's `f32` mean energy: the census mean cast, `0.0` at extinction.
+fn live_mean_energy(census: &PopulationCensus<'_>) -> f32 {
+    census.mean_energy().map_or(0.0, |energy| energy as f32)
 }
 
 pub(crate) fn build_tick_sample(
@@ -179,7 +184,7 @@ pub(crate) fn build_tick_sample(
         event_type: "tick_sample",
         tick,
         population: census.population(),
-        mean_energy: census.mean_energy_live(),
+        mean_energy: live_mean_energy(&census),
         mean_genome_size: means.genome_size,
         mean_mesh_nodes: means.mesh_nodes,
         mean_generation: means.generation,
@@ -227,3 +232,62 @@ pub mod inspect;
 pub mod profile;
 #[cfg(feature = "telemetry")]
 pub mod telemetry;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config(creatures: u32) -> SimulationConfig {
+        let mut config = SimulationConfig::default();
+        config.world.width = 16;
+        config.world.height = 16;
+        config.population.initial_creatures = creatures;
+        config
+    }
+
+    /// The stream's `f32` mean energy is the census mean cast, on energies
+    /// whose `f32` sum would round the small ones away, and `0` when empty.
+    /// Exact equality: the stream only casts.
+    #[test]
+    fn the_tick_sample_casts_the_census_mean_energy() {
+        let mut sim = seed_simulation(config(3), 5);
+        for (creature, energy) in sim.creatures.values_mut().zip([16_777_216.0_f32, 1.0, 1.0]) {
+            creature.energy = energy;
+        }
+        let expected = PopulationCensus::of(&sim)
+            .mean_energy()
+            .expect("a living population") as f32;
+        assert_eq!(
+            build_tick_sample(&sim, sim.tick).mean_energy.to_bits(),
+            expected.to_bits()
+        );
+        sim.creatures.clear();
+        assert_eq!(
+            build_tick_sample(&sim, sim.tick).mean_energy.to_bits(),
+            0.0_f32.to_bits()
+        );
+    }
+
+    /// `run_completed` reports the final population's mean energy with the
+    /// final `tick_sample`'s value.
+    #[test]
+    fn run_completed_reports_the_final_tick_samples_mean_energy() {
+        for creatures in [0, 6] {
+            let mut out = Vec::new();
+            run_simulation(config(creatures), 7, 5, 2, &mut out).expect("a run");
+            let lines: Vec<serde_json::Value> = String::from_utf8(out)
+                .expect("UTF-8")
+                .lines()
+                .map(|line| serde_json::from_str(line).expect("a JSON line"))
+                .collect();
+            let [.., last_sample, completed] = lines.as_slice() else {
+                panic!("a run emits a final tick_sample and run_completed");
+            };
+            assert_eq!(last_sample["event_type"], "tick_sample");
+            assert_eq!(
+                completed["final_mean_energy"], last_sample["mean_energy"],
+                "{creatures} founders"
+            );
+        }
+    }
+}

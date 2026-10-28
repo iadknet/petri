@@ -26,6 +26,7 @@ use v3_core::contracts::ActionType;
 use v3_core::genome::cgp::Scope;
 use v3_core::ledger::DeathCause;
 use v3_core::mutation::{FORM_KEYS, WIRING_KEYS};
+use v3_core::neighborhood::distributions::capacity_distribution;
 use v3_core::neighborhood::drives::DriveCensus;
 use v3_core::neighborhood::plasticity_census::{LearnedScales, PlasticityCensus};
 use v3_core::neighborhood::population::PopulationCensus;
@@ -122,12 +123,15 @@ pub(crate) fn stamp(now_ns: u64, previous_ns: Option<u64>) -> u64 {
     })
 }
 
-/// The population census, with the CLI `tick_sample`'s expressions.
+/// The population census, each value read from core's one definition of it,
+/// uncast.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Census {
     pub population: usize,
-    pub mean_energy: f32,
-    /// Mean heritable energy capacity, `body.capacity` (T26.F02).
+    /// `PopulationCensus::mean_energy`.
+    pub mean_energy: f64,
+    /// Mean heritable energy capacity, `body.capacity` (T26.F02): the
+    /// capacity distribution's mean.
     pub mean_capacity: f64,
     pub mean_genome_size: f64,
     pub mean_mesh_nodes: f64,
@@ -184,8 +188,8 @@ impl Census {
             drive_carriers: drives.kinds.map(|kind| kind.drive_carriers),
             drive_fanout_creatures: drives.kinds.map(|kind| kind.fanout_creatures),
             population,
-            mean_energy: census.mean_energy_live(),
-            mean_capacity: census.mean_capacity_live(),
+            mean_energy: census.mean_energy().unwrap_or(0.0),
+            mean_capacity: capacity_distribution(sim).map_or(0.0, |capacity| capacity.mean),
             mean_genome_size: means.genome_size,
             mean_mesh_nodes: means.mesh_nodes,
             mean_generation: means.generation,

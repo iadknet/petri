@@ -2,12 +2,10 @@
 //! population that the benchmark sample, the NDJSON stream, the telemetry
 //! gauges and the server's status and health payloads carry.
 //!
-//! Each output is one definition, computed here with the arithmetic its
-//! consumers emit: integer sums divided in `f64`, the iteration order of the
-//! population as given, and `0` for an empty population where a consumer
-//! reports one. Two quantities keep two definitions side by side because
-//! their consumers compute them differently (T30.F13 invariant 2); unifying
-//! either changes a live output's arithmetic.
+//! Each quantity has one definition, computed here once: integer sums
+//! divided in `f64`, in the population's order as given. Means are `0` for an
+//! empty population except mean energy, which is `None` there: each output
+//! applies its own extinction value, and an `f32` output only casts.
 //!
 //! Observation only: it reads creature state the tick already wrote.
 
@@ -81,12 +79,10 @@ impl<'a> PopulationCensus<'a> {
         total as f64 / self.creatures.len() as f64
     }
 
-    /// The benchmark sample's mean energy: an `f64` sum over `f32` energies
-    /// in population order. `None` for an empty population.
-    // WORKAROUND(T30.F13): one definition of mean energy — the benchmark
-    // `f64` mean and the live `f32` mean (`mean_energy_live`) are kept side
-    // by side, bit-identical to their consumers; unifying them changes a
-    // live output's arithmetic, which needs its own decision.
+    /// Mean energy: an `f64` sum over the `f32` energies in population order
+    /// over the count, the one definition the benchmark sample, the NDJSON
+    /// stream, the server payloads and `petri.tick.mean_energy` read. `None`
+    /// for an empty population.
     #[must_use]
     pub fn mean_energy(&self) -> Option<f64> {
         if self.creatures.is_empty() {
@@ -94,38 +90,6 @@ impl<'a> PopulationCensus<'a> {
         }
         let total: f64 = self.creatures.iter().map(|c| f64::from(c.energy)).sum();
         Some(total / self.creatures.len() as f64)
-    }
-
-    /// The live mean energy (NDJSON, server status and health,
-    /// `petri.tick.mean_energy`): an `f32` sum divided in `f32`. `0.0` for an
-    /// empty population.
-    // WORKAROUND(T30.F13): one definition of mean energy — see `mean_energy`.
-    #[must_use]
-    pub fn mean_energy_live(&self) -> f32 {
-        if self.creatures.is_empty() {
-            0.0
-        } else {
-            self.creatures.iter().map(|c| c.energy).sum::<f32>() / self.creatures.len() as f32
-        }
-    }
-
-    /// The live mean heritable capacity (`petri.tick.mean_capacity`): an
-    /// `f64` sum in population order. `0.0` for an empty population.
-    // WORKAROUND(T30.F13): one definition of mean capacity — the live
-    // creature-order mean here and the benchmark sorted-order mean
-    // (`distributions::capacity_distribution`) are kept side by side,
-    // bit-identical to their consumers; unifying them changes a live
-    // output's arithmetic, which needs its own decision.
-    #[must_use]
-    pub fn mean_capacity_live(&self) -> f64 {
-        if self.creatures.is_empty() {
-            return 0.0;
-        }
-        self.creatures
-            .iter()
-            .map(|c| f64::from(c.body.capacity))
-            .sum::<f64>()
-            / self.creatures.len() as f64
     }
 
     /// The structure and lineage-depth means.
@@ -264,8 +228,6 @@ mod tests {
         let census = PopulationCensus::of(&sim);
         assert_eq!(census.structure_means(), StructureMeans::default());
         assert_eq!(census.mean_energy(), None);
-        assert_eq!(census.mean_energy_live().to_bits(), 0.0_f32.to_bits());
-        assert_eq!(census.mean_capacity_live().to_bits(), 0.0_f64.to_bits());
         assert_eq!(census.complexity(), ComplexityRange::default());
         assert_eq!(census.generation_max(), 0);
         assert_eq!(census.pending_births(), PendingBirths::default());
@@ -288,21 +250,15 @@ mod tests {
         );
     }
 
-    /// The two mean-energy definitions are distinct readings: on energies
-    /// whose `f32` sum rounds, they differ.
+    /// Mean energy sums in `f64`: energies whose `f32` sum would swallow
+    /// the small terms keep them.
     #[test]
-    fn the_benchmark_and_live_mean_energies_are_two_definitions() {
+    fn mean_energy_sums_the_f32_energies_in_f64() {
         let mut sim = sim(3);
-        for (creature, energy) in sim.creatures.values_mut().zip([0.1_f32, 0.2, 0.7]) {
+        for (creature, energy) in sim.creatures.values_mut().zip([16_777_216.0_f32, 1.0, 1.0]) {
             creature.energy = energy;
         }
         let census = PopulationCensus::of(&sim);
-        let benchmark = census.mean_energy().expect("a living population");
-        let live = census.mean_energy_live();
-        assert_eq!(
-            benchmark,
-            (f64::from(0.1_f32) + f64::from(0.2_f32) + f64::from(0.7_f32)) / 3.0
-        );
-        assert_ne!(f64::from(live), benchmark);
+        assert_eq!(census.mean_energy(), Some(16_777_218.0 / 3.0));
     }
 }
