@@ -1,12 +1,13 @@
 import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiRequestError, api } from "../api/rest.ts";
+import { useConfigStore } from "../stores/config.ts";
 import {
 	creatureInspectorSelectors,
 	useCreatureInspectorStore,
 } from "../stores/creatureInspector.ts";
 import { useSimulationStore } from "../stores/simulation.ts";
-import { MOCK_STATUS } from "../test/fixtures.ts";
+import { MOCK_CONFIG, MOCK_STATUS } from "../test/fixtures.ts";
 import type { CreatureDetailResponse } from "../types/generated/CreatureDetailResponse.ts";
 import type { NodeLearning } from "../types/generated/NodeLearning.ts";
 import { useCreatureDetailResource } from "./useCreatureDetailResource.ts";
@@ -96,6 +97,7 @@ describe("useCreatureDetailResource", () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date("2026-03-07T10:00:00Z"));
 		useSimulationStore.getState().reset();
+		useConfigStore.getState().reset();
 		useCreatureInspectorStore.getState().clearSelection();
 	});
 
@@ -309,23 +311,62 @@ describe("useCreatureDetailResource", () => {
 		expect(brainContext).toEqual(wider);
 	});
 
-	it("carries the brain on the next poll when a tick aborts the brain refetch", async () => {
-		const wider = { food_type_count: 1, action_queue_slots: 20 };
-		const { brain: _brain, ...polled } = {
-			...buildCreatureDetail(),
-			latest_tick: 2733,
-			brain_context: wider,
-		};
+	it("refetches the brain when a paused config commit changes the queue, without a tick", async () => {
+		const wider = { food_type_count: 1, action_queue_slots: 60 };
 		const refetchedBrain = { entry_node_id: 9, nodes: [] };
 		vi.mocked(api.getCreature)
 			.mockResolvedValueOnce(buildCreatureDetail())
-			.mockResolvedValueOnce(polled)
-			.mockImplementationOnce(() => new Promise(() => {}))
 			.mockResolvedValueOnce({
 				...buildCreatureDetail(),
-				latest_tick: 2734,
 				brain: refetchedBrain,
 				brain_context: wider,
+			});
+		useConfigStore.getState().setServerConfig(MOCK_CONFIG, "paused");
+
+		useCreatureInspectorStore.getState().selectCreature(7);
+		await act(async () => {
+			render(<Harness />);
+			await Promise.resolve();
+		});
+		await act(async () => {
+			useConfigStore
+				.getState()
+				.commitServerConfig(
+					{ ...MOCK_CONFIG, runtime: { ...MOCK_CONFIG.runtime, max_actions_per_turn: 20 } },
+					"paused",
+				);
+			await Promise.resolve();
+		});
+
+		expect(api.getCreature).toHaveBeenCalledTimes(2);
+		expect(vi.mocked(api.getCreature).mock.calls[1]?.[2]).toEqual({ since_tick: 2732 });
+		const { brain, brainContext } = useCreatureInspectorStore.getState().staticDetail;
+		expect(brain).toEqual(refetchedBrain);
+		expect(brainContext).toEqual(wider);
+	});
+
+	it("lands a brain refresh while ticks keep arriving faster than every response", async () => {
+		const wider = { food_type_count: 1, action_queue_slots: 20 };
+		const refetchedBrain = { entry_node_id: 9, nodes: [] };
+		// Every poll after the first resolves 150 ms later under the wider
+		// context, and honours its abort signal.
+		vi.mocked(api.getCreature)
+			.mockResolvedValueOnce(buildCreatureDetail())
+			.mockImplementation((_id, signal, query) => {
+				const { brain: _brain, ...withoutBrain } = {
+					...buildCreatureDetail(),
+					latest_tick: 2733,
+					brain_context: wider,
+				};
+				const response: CreatureDetailResponse =
+					query?.exclude === "brain" ? withoutBrain : { ...withoutBrain, brain: refetchedBrain };
+				return new Promise((resolve, reject) => {
+					const timer = setTimeout(() => resolve(response), 150);
+					signal?.addEventListener("abort", () => {
+						clearTimeout(timer);
+						reject(new DOMException("aborted", "AbortError"));
+					});
+				});
 			});
 
 		useCreatureInspectorStore.getState().selectCreature(7);
@@ -333,23 +374,13 @@ describe("useCreatureDetailResource", () => {
 			render(<Harness />);
 			await Promise.resolve();
 		});
-		act(() => {
-			vi.advanceTimersByTime(200);
-			useSimulationStore.getState().setTick(2733);
-		});
-		await act(async () => {
-			await Promise.resolve();
-		});
-		act(() => {
-			vi.advanceTimersByTime(200);
-			useSimulationStore.getState().setTick(2734);
-		});
-		await act(async () => {
-			await Promise.resolve();
-		});
+		for (let tick = 2733; tick < 2743; tick++) {
+			await act(async () => {
+				await vi.advanceTimersByTimeAsync(100);
+				useSimulationStore.getState().setTick(tick);
+			});
+		}
 
-		expect(api.getCreature).toHaveBeenCalledTimes(4);
-		expect(vi.mocked(api.getCreature).mock.calls[3]?.[2]).toEqual({ since_tick: 2733 });
 		const { brain, brainContext } = useCreatureInspectorStore.getState().staticDetail;
 		expect(brain).toEqual(refetchedBrain);
 		expect(brainContext).toEqual(wider);

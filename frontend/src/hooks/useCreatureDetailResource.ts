@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { ApiRequestError, api } from "../api/rest.ts";
+import { useConfigStore } from "../stores/config.ts";
 import {
 	creatureInspectorSelectors,
 	useCreatureInspectorStore,
@@ -12,14 +13,17 @@ function sameBrainContext(a: BrainContext, b: BrainContext): boolean {
 }
 
 export function useCreatureDetailResource() {
+	// The request in flight, cleared when it settles. A tick never replaces
+	// it: with responses slower than ticks, every poll would abort its
+	// predecessor and none would land.
 	const abortRef = useRef<AbortController | null>(null);
 	const currentIdRef = useRef<number | null>(null);
 	const lastFetchRef = useRef<number>(0);
 	const latestTickRef = useRef<number | null>(null);
 	const hasFullFetchRef = useRef(false);
-	// The held brain resolves under another context than the latest poll's:
-	// every fetch carries the brain until one lands, so a poll that aborts
-	// the refetch carries it instead.
+	// The held brain resolves under another context than the latest poll's
+	// or the committed config's: every fetch carries the brain until one
+	// lands.
 	const brainStaleRef = useRef(false);
 	const MIN_FETCH_INTERVAL = 100;
 
@@ -90,6 +94,8 @@ export function useCreatureDetailResource() {
 				useCreatureInspectorStore
 					.getState()
 					.setError(err instanceof Error ? err.message : "failed to fetch creature");
+			} finally {
+				if (abortRef.current === controller) abortRef.current = null;
 			}
 		};
 
@@ -112,6 +118,7 @@ export function useCreatureDetailResource() {
 			if (
 				state.tick !== prev.tick &&
 				currentIdRef.current !== null &&
+				abortRef.current === null &&
 				!creatureInspectorSelectors.isDead(useCreatureInspectorStore.getState())
 			) {
 				const now = Date.now();
@@ -119,6 +126,23 @@ export function useCreatureDetailResource() {
 					lastFetchRef.current = now;
 					fetchCreature(currentIdRef.current, true);
 				}
+			}
+		});
+
+		// A committed queue change (`max_actions_per_turn`) moves the brain
+		// context with no tick while paused: refetch the brain under it,
+		// replacing a request sent under the old config.
+		const unsubConfig = useConfigStore.subscribe((state, prev) => {
+			const queue = state.serverConfig?.runtime.max_actions_per_turn;
+			const prevQueue = prev.serverConfig?.runtime.max_actions_per_turn;
+			if (
+				prevQueue !== undefined &&
+				queue !== prevQueue &&
+				currentIdRef.current !== null &&
+				!creatureInspectorSelectors.isDead(useCreatureInspectorStore.getState())
+			) {
+				brainStaleRef.current = true;
+				fetchCreature(currentIdRef.current, true);
 			}
 		});
 
@@ -133,6 +157,7 @@ export function useCreatureDetailResource() {
 		return () => {
 			unsubInspector();
 			unsubSim();
+			unsubConfig();
 			abortRef.current?.abort();
 		};
 	}, []);
