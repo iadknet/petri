@@ -228,8 +228,9 @@ a different summary from the same full report would show it wrong.
 
 Commands run on the feature head (2026-10-28), each exit 0: `cargo check
 --workspace --all-targets`; `cargo fmt --all --check`; `make rust-clippy`;
-`cargo test -p v3-core` (viability first: `--test viability`, 30 passed);
-`cargo test -p v3-core -p v3-cli -p v3-server -p v3-telemetry`; `node
+`cargo test -p v3-core -p v3-cli -p v3-server -p v3-telemetry` (viability
+30 passed within it; no default or tick-loop change since the build, where
+`--test viability` ran first); `node
 scripts/architecture-check.mjs`. `v3-cli bench-summarize` parity on both
 stored reports ran on the build at `aa3cc6402` (readings); the later commits
 change no converter code. Every pin literal is unchanged. `make check` and the gate are not yet run.
