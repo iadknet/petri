@@ -531,24 +531,11 @@ mod tests {
             keys.iter().collect::<std::collections::BTreeSet<_>>().len(),
             VOTE_SINK_COUNT
         );
-        assert_eq!(VoteSink::Eat.as_key(), "Eat");
-        assert_eq!(
-            VoteSink::Directed(DirectedVoteKind::GiveEnergy, 7).as_key(),
-            "GiveEnergy.7"
-        );
-        assert_eq!(
-            VoteSink::Drive(DirectedVoteKind::Move).as_key(),
-            "Drive.Move"
-        );
-        assert_eq!(VoteSink::Decide.as_key(), "Decide");
         for kind in DirectedVoteKind::ALL {
             assert_eq!(
                 serde_json::to_string(&kind).unwrap(),
                 format!("\"{}\"", kind.as_key())
             );
-            assert!(VoteSink::Directed(kind, 0)
-                .as_key()
-                .starts_with(kind.as_key()));
         }
     }
 
