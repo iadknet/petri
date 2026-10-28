@@ -18,9 +18,8 @@ is identical to main's; any that moves is a defect.
 
 ## Non-Goals
 
-- Operators reporting the node they added and the `tracked_before` clone
-  (T30.F11); the sink catalog (T30.F12); the gate and route resolution
-  moving into the genome and the deletion of the test-only
+- The `tracked_before` clone (T30.F11); the sink catalog (T30.F12); the
+  gate and route resolution moving into the genome and the test-only
   `TopologyOperator::random` and `VmOperator::random` samplers (T30.F05,
   user 2026-10-27); retiring `neighborhood/recruitment_paths` (T30.F09).
 - Any change to an operator's weight, key string, complexity effect,
@@ -48,9 +47,8 @@ Invariants:
    today's flat name: the domain name then the inner variant's `Debug`,
    the domain name omitted when the inner name already starts with it
    (`TopologyAddNode`, `VmConstantMutation`, `GraphRawFieldMutation`),
-   because `engine/draw_stream_tests.rs:31` hashes the event records'
-   `Debug` text and that pin must not move; a unit test checks those three
-   names and one `InputRef` name. The four domain enums keep their
+   because `engine/draw_stream_tests.rs:31` hashes the events' `Debug`
+   text; a unit test checks those three names and one `InputRef` name. The four domain enums keep their
    variants and `ALL` lists in today's order and add `PartialOrd, Ord`, so
    the nested enum's derived order equals today's flat order (`BTreeMap`
    and serialized key order unchanged). The flat
@@ -67,8 +65,9 @@ Invariants:
    `weight(&MutationConfig) -> u16` returns
    `tuned_weight(config.large_copy_weight_percent)` for Topology and
    `u16::from(weight())` for the other three, so each domain's total keeps
-   today's units. `MutationOperator::ALL: [Self; 69]` is built from the
-   four domain `ALL`s in domain order; `MutationDomain::catalog(self) ->
+   today's units. `MutationOperator::ALL: [Self; COUNT]`, `COUNT` the sum
+   of the four domain `ALL` lengths (no literal 69 outside tests), is
+   built from them in domain order; `MutationDomain::catalog(self) ->
    &'static [MutationOperator]` is that domain's slice of it;
    `MutationDomain::reachable_bias(self, &ReachableBiasConfig) -> f64`
    picks today's field (`config` imports nothing from `mutation`). Four
@@ -88,9 +87,18 @@ Invariants:
    the historical `v3-lab/tests/fixtures/summary-v2-wall.json` is not an
    exporter and stays as committed. Every benchmark summary key, server payload and frontend
    label already reads `as_key()` and is unchanged.
-4. **One report and one dispatch.** `mutation/types` defines
+4. **One report and one dispatch.** A leaf module `mutation/event`
+   defines
    `EventReport { class: Option<BirthEdgeClass>, attribute_scope: Option<Scope>, bundle_edits: BundleEdits }`
-   (today's `GraphEventReport`, moved and renamed, `Default`). Each
+   (today's `GraphEventReport`, moved and renamed, `Default`) beside the
+   vocabulary every domain module reads: `ComplexityEffect`,
+   `MutationSkipReason`, `TargetReachability`, `BirthEdgeClass`,
+   `BundleEdits` with `wiring_index`, `WIRING_KEYS` and `FORM_KEYS`. It
+   imports nothing from `mutation`; the domain modules and
+   `reachability` import it, `types` re-exports it (every outside path
+   unchanged) and imports the four domain enums, so mutation's modules
+   order `event` → domain modules → `types` → `engine` with no cycle.
+   Each
    domain's production entry (`TopologyMutator::apply_in`,
    `VmMutator::apply`, `GraphMutator::apply_classified`,
    `InputRefMutator::apply_classified`) returns
@@ -104,9 +112,8 @@ Invariants:
    entry; the engine's `apply_event` is `apply_gated` over it, the gate's
    snapshot, parseability and `validate_graph` checks and restore
    unchanged. The per-operator battery (`neighborhood/operators.rs:45-124`)
-   deletes its private `OperatorKind` (a nested operator enum with its own
-   `all`, `family`, `name`, `seed_base`, `reachable_bias` and ungated
-   per-domain `apply`) and iterates `MutationOperator` through that
+   deletes its private `OperatorKind` (a third nested operator enum with
+   its own per-domain dispatch) and iterates `MutationOperator` through that
    dispatch and `MutationDomain::reachable_bias`, keeping its row order
    (`Vm`, `Graph`, `Topology`, `InputRef` catalogs), `family` labels, seed
    bases and the inner enum's `Debug` as each row's name, so every tally
@@ -115,21 +122,22 @@ Invariants:
    domain as today (`gen_bool(config.mesh_layer_probability)`; when false
    `gen_range(0u8..3)`: 0 Vm, 1 Graph, 2 InputRef) and then calls one
    function (`select_and_apply(domain, ..)` or the implementer's name)
-   that: builds `available` from `domain.catalog()` keeping operators that
-   pass `!restricted || complexity_effect().is_decreasing()` and
-   `weight(config) > 0` (a no-op outside Topology); loops `select_weighted_index` by `weight(config)`; takes
-   `tracked_before` for the three tracked operators (`WORKAROUND(T30.F11)`,
-   marker kept); builds the selector from
-   `domain.reachable_bias(&config.reachable_bias)` through today's
-   `pressure_adjusted_bias` and `executed_bias`; applies through
-   `apply_event`; on `NoApplicableTarget` records the discard with the
-   selector's first pick and `swap_remove`s the operator; and returns the
-   `SelectedEvent` (now holding the `EventReport`) or `None` when the list
-   is exhausted. The recording that follows (`record_domain_skip`,
-   `record_attempt`, `record_event`, the applied branch with its bundle,
-   scope, class, added-node and membership updates) is unchanged in order.
-   The `too_many_lines` allowance on `apply_mutations_on_units` is deleted;
-   `vm/operators.rs:102` keeps its own.
+   whose steps are the table's, in order; the recording that follows it
+   (`record_domain_skip`, `record_attempt`, `record_event`, the applied
+   branch with its bundle, scope, class, added-node and membership
+   updates) is unchanged in order. The `too_many_lines` allowance on
+   `apply_mutations_on_units` is deleted; `vm/operators.rs:102` keeps its
+   own.
+
+   | Step | Today's rule, kept |
+   | --- | --- |
+   | build `available` | from `domain.catalog()`, keeping operators that pass `!restricted \|\| complexity_effect().is_decreasing()` and `weight(config) > 0` (a no-op outside Topology) |
+   | draw | `select_weighted_index` by `weight(config)`, looping while the list is non-empty |
+   | track | `tracked_before` for the three tracked operators (`WORKAROUND(T30.F11)`, marker kept) |
+   | selector | from `domain.reachable_bias(&config.reachable_bias)` through `pressure_adjusted_bias` and `executed_bias` |
+   | apply | `apply_event` (gated) |
+   | `NoApplicableTarget` | record the discard with the selector's first pick, `swap_remove` the operator, next draw |
+   | return | the `SelectedEvent` (holding the `EventReport`), or `None` when the list is exhausted |
 6. **Callers.** Each site below changes as its row says and nothing else
    about it; `MutationDomain`, `MutationSkipReason`, `BirthEdgeClass`,
    `MutationSummary`, `MutationEventRecord` and `SimStats` keep their
@@ -146,8 +154,8 @@ Invariants:
    deterministic blocks (the mutational-neighborhood battery's rows among
    them) equal the epoch; every `as_key` string, weight,
    `ComplexityEffect` and applicability predicate is the value on
-   `ac3747005`. The only output whose spelling changes is invariant 3's,
-   outside every pin and stored benchmark key.
+   `ac3747005`. Only invariant 3's spelling changes, outside every pin
+   and stored benchmark key.
 
 ## Architecture
 
@@ -161,12 +169,13 @@ changed: "an operator's identity, domain, key, weight and complexity
 effect" had two owners, the domain enum and the flat enum in
 `mutation/types`, kept in agreement by hand; after the feature the domain
 enum owns each fact and the nested enum derives it (rules 1 and 3), and
-the battery calls mutation's dispatch instead of repeating it. Rule 4 is
-unchanged: the engine samples, the domain mutators apply, and
-`apply_gated` stays until T30.F05 moves the gate. Boundaries do not
-change and the desired state needs no edit (section 4 already describes
-this dispatch). T30.F11's `tracked_before` clone is used as it is under
-its marker: the node an operator added is F11's to report.
+the battery calls mutation's dispatch instead of repeating it. Rule 2
+holds inside `mutation` too: the domain enums stay in the modules that
+hold their behavior, and the event vocabulary they share sits below them
+in `mutation/event` (invariant 4). Rule 4 is unchanged: the engine
+samples, the domain mutators apply, and `apply_gated` stays until T30.F05
+moves the gate. Boundaries do not change and the desired state needs no
+edit. T30.F11's `tracked_before` clone stays under its marker.
 
 ## Telemetry
 
@@ -213,6 +222,10 @@ regression past its threshold would show it wrong.
 - [ ] 5. `make check` (the draw-stream pin and `tests/reproducibility.rs`
       run inside it).
 - [ ] 6. At close: run the declared gate profile and the slow tier.
+- [ ] 7. Review remediation: the leaf `mutation/event` module with
+      `types` re-exporting it (invariant 4), `COUNT` in place of the
+      literal 69 (invariant 2), and the domain-mapping test collapsed to
+      four outer-variant arms.
 
 ## Verification
 
