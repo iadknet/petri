@@ -48,7 +48,7 @@ behavior.
   - Goal: Every population census is computed once in core's readers and each benchmark sample block is declared once with its retention policy, so a new block is not wired by hand in five places and the summary keeps the same minimum, with no simulation behavior change.
 - [ ] **T30.F14 — The Inspector Reads Resolved Views** — Depends on: None
   - Goal: The creature inspector shows what the genome resolves, with the server forwarding core's facts and the frontend matching nothing the core already matched, with no behavior change.
-- [ ] **T30.F15 — One Definition per Population Statistic** — Depends on: T30.F13
+- [x] **T30.F15 — One Definition per Population Statistic** — Depends on: T30.F13
   - Goal: Mean energy, clade entropy and mean capacity each have one definition in core's readers, so the benchmark report, the server, the NDJSON stream and telemetry never disagree on the same quantity, with no simulation behavior change.
 - [ ] **T30.F16 — World-Input Keys Name Their Food Type** — Depends on: T30.F13
   - Goal: Every world-input count that leaves core is keyed by its food type as well as its family, so two food types' counts never share a key or overwrite each other, with no simulation behavior change.

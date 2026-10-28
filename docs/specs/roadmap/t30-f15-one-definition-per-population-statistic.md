@@ -1,6 +1,6 @@
 # T30.F15 — One Definition per Population Statistic
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-28
 **Feature**: T30.F15
 **Track**: [T30 — Core Boundaries](../../roadmaps/t30-core-boundaries.md)
@@ -141,18 +141,15 @@ pin table would show it wrong.
 - [x] Re-pin only the moved literals of the pin table, note in each pin
       module's header which literals T30.F15 re-pinned, and record the
       before and after values in the readings.
-- [ ] Run the declared `gate` profile and the overhead check.
+- [x] Run the declared `gate` profile and the overhead check.
 
 ## Verification
 
 - [x] No paired definition remains:
       `grep -rnE 'WORKAROUND\(T30\.F13\): one definition|mean_energy_live|mean_capacity_live|effective_lineages_live' crates/`
       -> no match.
-- [ ] Live outputs equal the one definition: the new reader, CLI, server
-      and telemetry tests, in `make check`.
-      They pass under `cargo test` of `v3-core --features telemetry-seams
-      --lib`, `v3-cli`, `v3-server` and `v3-telemetry`; `make check` is
-      not yet run.
+- [x] Live outputs equal the one definition: the new reader, CLI, server
+      and telemetry tests, in `make check`, which passes at 5be24e7f9.
 - [x] Pins: `cargo test -p v3-cli census_pins`,
       `cargo test -p v3-server census_pins` and
       `cargo test -p v3-telemetry the_tick_census` pass; the before/after
@@ -163,12 +160,12 @@ pin table would show it wrong.
 - [x] Build: `cargo check --workspace --all-targets` (and with
       `--all-features`), `cargo fmt --all --check` and `make rust-clippy`
       pass.
-- [ ] `make check` exits 0.
+- [x] `make check` exits 0 (tested commit 5be24e7f9).
 - [x] Overhead: `scripts/telemetry-overhead` (stack up, `run` workload) ->
       pass, its pair count, ratio interval and time used in the readings.
-      INCONCLUSIVE, not a pass: spread attempt 1 0.2476, attempt 2 0.0708
-      -> 24 pairs at 5303 ms do not fit the 300 s cap (102.6 s used); 0
-      pairs, no ratio or interval.
+      Pass on the user-authorized fresh check (2026-10-28): 24/24 pairs,
+      median 1.0036, 90% interval [0.9934, 1.0131], 218.6 s; the first
+      attempt was inconclusive (cold stack, 0 pairs).
 - [x] Gate: summary at `docs/progress/features/t30-f15.json`, raw hash and
       byte count checked, series entry points to it, no full report staged.
       `make bench PROFILE=gate FEATURE=t30-f15` exit 0, `severe=false`;
@@ -215,9 +212,9 @@ spread 0.0801, 24/24 pairs, median ratio 1.0036, 90% interval [0.9934,
 
 ## Success Criteria
 
-- [ ] Each of the three quantities has one definition in readers, and every
+- [x] Each of the three quantities has one definition in readers, and every
       output carrying it reads that definition.
-- [ ] The benchmark report and summary are unchanged; only the pin table's
+- [x] The benchmark report and summary are unchanged; only the pin table's
       fields moved.
 
 ## Notes for AI Agents
@@ -231,3 +228,9 @@ spread 0.0801, 24/24 pairs, median ratio 1.0036, 90% interval [0.9934,
   as `f64` so its `f64` gauge is not rounded through `f32` (audit A1–A4).
 - Decision: final review lens1 P2 (order-insensitive capacity fixture)
   remediated with an order-sensitive fixture; lens2 and lens3 clear.
+- Decision: user override for this run, Opus at effort high in every role
+  the workflow gives Fable (spec owner, advisor channel); Fable unused.
+- Cost: `/usage` totals not supplied at closure; implementer passes 3
+  (advisor consults 2, 1, 2); spec-owner resumes after Plan 0; Codex
+  challenge rounds 2, final verdict ready; final review lens1 1 P2,
+  lens2 0, lens3 0.
