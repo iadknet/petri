@@ -195,7 +195,7 @@ a different summary from the same full report would show it wrong.
 - [x] The composed sample record and the retention declarations; the
       three keep-lists derived; the declaration and retained-set tests
       (invariants 4 and 5).
-- [ ] A `WORKAROUND(T30.F13)` comment at the server's
+- [x] A `WORKAROUND(T30.F13)` comment at the server's
       `vm_live_read_world_inputs_current` key conversion
       (`v3-server/src/state.rs`) naming the intended design: wire keys
       carry the food type (`world_input_key_label`), so food-parameterized
@@ -226,37 +226,13 @@ a different summary from the same full report would show it wrong.
 - [ ] Gate: summary at `docs/progress/features/t30-f13.json`, raw hash and
       bytes in the readings, series entry, no full report staged.
 
-Commands run on the build (2026-10-28), each exit 0: `cargo check --workspace
---all-targets`; `cargo fmt --all --check`; `make rust-clippy`; `cargo test -p
-v3-core` (viability first: `--test viability`, 30 passed); `cargo test -p
-v3-cli -p v3-server -p v3-telemetry`; `node scripts/architecture-check.mjs`;
-`v3-cli bench-summarize` on both stored reports with the pre-move and the
-feature release builds (readings). `make check` and the gate are not yet run.
-
-## Performance and Goal Impact
-
-**Predeclaration — written before the run.** Not a mechanism feature. The
-gate's deterministic blocks are byte-identical to the epoch; its nine work
-counters sit at 0% against the epoch reference and no threshold is
-crossed. Expected compute cost: none in the tick loop (no simulation code
-changes); the sampled-tick observation may take a second pass over the
-population where one reader no longer shares a loop with another, inside
-timing noise. No indicator moves; no epoch re-pin.
-
-**Measured verdict.** Pending.
-
-- Summary of the declared profile: [gate](../../progress/features/t30-f13.json).
-- Full readings: [`docs/progress/readings/t30-f13.md`](../../progress/readings/t30-f13.md).
-
-## Success Criteria
-
-- [ ] Every inventory census is computed once, in readers; outer crates
-      format only (invariants 1–3).
-- [ ] A persistence sample is one composed record whose retention
-      declarations derive the summary keep-lists, and the summary for any
-      full report is unchanged (invariants 4–6).
-- [ ] Gate deterministic blocks identical to the epoch; every existing pin
-      unchanged.
+Commands run on the feature head (2026-10-28), each exit 0: `cargo check
+--workspace --all-targets`; `cargo fmt --all --check`; `make rust-clippy`;
+`cargo test -p v3-core` (viability first: `--test viability`, 30 passed);
+`cargo test -p v3-core -p v3-cli -p v3-server -p v3-telemetry`; `node
+scripts/architecture-check.mjs`. `v3-cli bench-summarize` parity on both
+stored reports ran on the build at `aa3cc6402` (readings); the later commits
+change no converter code. Every pin literal is unchanged. `make check` and the gate are not yet run.
 
 ## Notes for AI Agents
 
