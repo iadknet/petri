@@ -249,7 +249,7 @@ regression past its threshold would show it wrong.
 | `cargo test -p v3-core` | pass; draw-stream hash unchanged, `reproducibility` 4 passed |
 | `cargo test -p v3-cli` | pass |
 | Task 7 (2026-10-28): check, fmt, clippy; `cargo test -p v3-core`; `cargo test -p v3-cli -p v3-lab -p v3-telemetry -p v3-server`; upward-import grep | clean; pass, hash unchanged; 742 passed; empty (readings) |
-| Closure at tested commit `786668ec2`: `make check`; `make rust-test-slow` | exit 0 (frontend 680/680; first run timed out `ConfigPanel` "clamps the slider", 4.7 s of 5 s alone, untouched frontend); exit 0, 9 slow tests passed |
+| Closure at tested commit `6106b4a85` (rebased onto T30.F09; superseded `786668ec2` passed both): `make check`; `make rust-test-slow` | exit 0 (frontend 680/680; one earlier run on each commit timed out `ConfigPanel` "clamps the slider", 4.7 s of 5 s alone, frontend untouched); exit 0, 6 slow tests passed |
 
 ## Performance and Goal Impact
 
