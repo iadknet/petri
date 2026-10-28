@@ -195,6 +195,11 @@ a different summary from the same full report would show it wrong.
 - [x] The composed sample record and the retention declarations; the
       three keep-lists derived; the declaration and retained-set tests
       (invariants 4 and 5).
+- [ ] A `WORKAROUND(T30.F13)` comment at the server's
+      `vm_live_read_world_inputs_current` key conversion
+      (`v3-server/src/state.rs`) naming the intended design: wire keys
+      carry the food type (`world_input_key_label`), so food-parameterized
+      inputs never share a key (readings R11).
 - [x] `docs/architecture.md` readers row edit (in the plan commit) and
       any doc that cites a moved path: no current-state doc does; closed
       feature specs and readings keep the paths of their time.
@@ -259,4 +264,11 @@ timing noise. No indicator moves; no epoch re-pin.
 - Deferred: unpaid accept, the paired benchmark and live definitions of
   mean energy, clade entropy and mean capacity in the readers census
   (invariant 2, R4–R6); payer proposed to the user at closure.
+- Deferred: unpaid accept, `v3-server/src/state.rs`
+  `vm_live_read_world_inputs_current` keys counts by
+  `WorldInputKey::as_key()`, which drops the food type, so two food types'
+  counts collide and one survives (today the last in key order; before
+  this feature, whichever `HashMap` order put last); payer proposed to the
+  user at closure, with the same keying in
+  `mutation_added_node_world_inputs_total_by_operator` (readings R11).
 - Exception: a fourth Codex job (spec-round3 template, priors rounds 1–2, round 3 via readings) confirmed 3.F3's C22 fix and upheld no blocking finding; its not-ready verdict rested only on the superseded 2.F3 rebuttal, withdrawn as round 4 directed; orchestrator decision 2026-10-28.
