@@ -8,7 +8,6 @@ export type CreatureLiveCircuitDiagnostics = {
 	barrier_reader_without_decision_writer_reachable_node_count: number;
 	distinct_upstream_slots_read: Array<number>;
 	distinct_payload_slots_written: Array<number>;
-	distinct_custom_output_slots_written: Array<number>;
 	reachable_read_class_counts: { [key in string]: number };
 	reachable_write_class_counts: { [key in string]: number };
 };

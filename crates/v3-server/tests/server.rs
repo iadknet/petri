@@ -2633,6 +2633,18 @@ fn brain_sink_edge(
     &graph[list][container]["edges"][occurrence.index]
 }
 
+/// The brain edge a bundle coordinate's `member` location names.
+fn located_edge<'a>(
+    graph: &'a serde_json::Value,
+    coordinate: &serde_json::Value,
+) -> &'a serde_json::Value {
+    let at = &coordinate["member"];
+    assert_eq!(at["surface"], "sink", "{coordinate}");
+    let container = at["container"].as_u64().expect("a container") as usize;
+    let edge = at["edge"].as_u64().expect("an edge") as usize;
+    &graph["output_sinks"][container]["edges"][edge]
+}
+
 /// The learning entry of `occurrence` in the learning entry `entry`.
 fn learning_edge(
     entry: &serde_json::Value,
@@ -2718,10 +2730,16 @@ async fn get_creature_brain_resolves_ring_members_and_their_bundle() {
         );
         assert_eq!(record["scale"], 0.5);
         assert!(record.get("learned_scale").is_none());
-        let coordinates: Vec<_> = (0..8)
-            .map(|c| serde_json::json!({"field": c, "site": {"Direction": c}, "present": true}))
-            .collect();
-        assert_eq!(record["coordinates"], serde_json::json!(coordinates));
+        let coordinates = record["coordinates"].as_array().expect("coordinates");
+        assert_eq!(coordinates.len(), 8);
+        for (c, coordinate) in coordinates.iter().enumerate() {
+            assert_eq!(coordinate["field"], c, "{coordinate}");
+            assert_eq!(coordinate["site"], serde_json::json!({"Direction": c}));
+            let member = &located_edge(graph, coordinate)["member"];
+            assert_eq!(member["bundle"], bundle, "{coordinate}");
+            assert_eq!(member["field"], c, "{coordinate}");
+            assert_eq!(member["site"], coordinate["site"], "{coordinate}");
+        }
         for (index, &member) in members.iter().enumerate() {
             let edge = brain_sink_edge(graph, member);
             let own = if index == 0 { 0.25 } else { 0.0 };
@@ -3106,7 +3124,10 @@ async fn get_creature_brain_lists_an_action_queue_bundle_at_the_configured_width
     let coordinates = |body: &serde_json::Value| {
         let gene = &brain_graph(body, node_id)["bundles"][bundle];
         let coordinates = gene["coordinates"].as_array().unwrap().clone();
-        let present = coordinates.iter().filter(|c| c["present"] == true).count();
+        let present = coordinates
+            .iter()
+            .filter(|c| c.get("member").is_some())
+            .count();
         (coordinates.len(), present)
     };
     let (status, body) = do_request(router(state.clone()), get_req(&uri)).await;
@@ -3130,9 +3151,97 @@ async fn get_creature_brain_lists_an_action_queue_bundle_at_the_configured_width
     );
 }
 
+/// `live_circuit`'s slot lists forward the genome's bus-slot read API
+/// (T30.F14 invariant 3): an unreachable node adds no slot, a Graph
+/// `CustomOutput` write joins the VM payload writes in one payload list, and
+/// an unwired sink writes nothing.
+#[tokio::test]
+async fn live_circuit_slot_lists_are_the_reachable_live_bus_slots() {
+    use v3_core::contracts::{InputReference, NodeId, RouteTarget};
+    use v3_core::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
+    use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
+
+    // Arrange: entry Graph node 1 reads upstream slot 2 into `CustomOutput(5)`
+    // (`CustomOutput(6)` unwired) and routes to VM node 3, which writes
+    // payload slot 4; VM node 2, routed to by no one, reads upstream slot 9
+    // into payload slot 11.
+    let vm = |id: u32, read: usize, write: u8| NodeGenome {
+        node_id: NodeId::new(id),
+        input_refs: vec![InputReference::UpstreamSlot(read)],
+        targets: Vec::new(),
+        backend_def: BackendDef::Vm(VmBackendDef {
+            register_count: 1,
+            constants: Vec::new(),
+            program: vec![
+                VmInstruction::ReadInput {
+                    dst: 0,
+                    ref_idx: 0,
+                    sub_idx: 0,
+                },
+                VmInstruction::WriteInternalPayload {
+                    slot_idx: write,
+                    src: 0,
+                },
+            ],
+        }),
+    };
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    let sink = def
+        .sink_surface(OutputSinkKind::CustomOutput(5))
+        .expect("the fixed catalog");
+    let leaf = GraphSource::InputLeaf {
+        ref_idx: 0,
+        sub_idx: 0,
+    };
+    def.push_edge(sink, GraphEdge::new(leaf, 1.0));
+    let entry = NodeGenome {
+        node_id: NodeId::new(1),
+        input_refs: vec![InputReference::UpstreamSlot(2)],
+        targets: vec![RouteTarget {
+            target_id: NodeId::new(3),
+            slot: 0,
+            gate_bias: 0.0,
+        }],
+        backend_def: BackendDef::Graph(def),
+    };
+    let genome = CreatureGenome {
+        entry_node_id: NodeId::new(1),
+        nodes: vec![entry, vm(2, 9, 11), vm(3, 0, 4)],
+    };
+    let state = test_state();
+    let creature_id = {
+        let mut handle = state.sim.lock().await;
+        let creature_id = handle.sim.creatures.keys().next().expect("a creature");
+        let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
+        rebuild_with(creature, |held| *held = genome);
+        creature_id
+    };
+    let uri = format!("/v3/simulation/creature/{}", creature_id.data().as_ffi());
+
+    // Act
+    let (status, body) = do_request(router(state), get_req(&uri)).await;
+
+    // Assert
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    let live_circuit = &body["diagnostics"]["live_circuit"];
+    assert_eq!(live_circuit["reachable_node_count"], 2, "{live_circuit}");
+    assert_eq!(
+        live_circuit["distinct_upstream_slots_read"],
+        serde_json::json!([0, 2])
+    );
+    assert_eq!(
+        live_circuit["distinct_payload_slots_written"],
+        serde_json::json!([4, 5])
+    );
+    assert!(live_circuit
+        .get("distinct_custom_output_slots_written")
+        .is_none());
+}
+
 /// Every creature fetch, a poll excluding the brain included, carries the
-/// sensor context the brain resolves under, so a client holding a brain
-/// sees a queue-width change and refetches it (T25.F11 invariant 11).
+/// identity of the sensor context the brain resolves under, so a client
+/// holding a brain sees a queue-width change and refetches it (T25.F11
+/// invariant 11, T30.F14 invariant 5).
 #[tokio::test]
 async fn a_brainless_poll_carries_the_brain_context_in_force() {
     let state = test_state();
@@ -3142,24 +3251,21 @@ async fn a_brainless_poll_carries_the_brain_context_in_force() {
     };
     let uri = format!("/v3/simulation/creature/{}", creature_id.data().as_ffi());
     let poll = format!("{uri}?exclude=brain");
-    let (food_types, slots) = {
-        let handle = state.sim.lock().await;
-        let config = &handle.sim.config;
-        (
-            config.world.food.types.len(),
-            config.runtime.max_actions_per_turn,
-        )
-    };
+    let slots = state
+        .sim
+        .lock()
+        .await
+        .sim
+        .config
+        .runtime
+        .max_actions_per_turn;
 
     let (status, full) = do_request(router(state.clone()), get_req(&uri)).await;
     assert_eq!(status, StatusCode::OK, "body: {full}");
     let (_, before) = do_request(router(state.clone()), get_req(&poll)).await;
     assert!(before.get("brain").is_none());
+    assert!(before["brain_context"].is_string(), "{before}");
     assert_eq!(before["brain_context"], full["brain_context"]);
-    assert_eq!(
-        before["brain_context"],
-        serde_json::json!({"food_type_count": food_types, "action_queue_slots": slots})
-    );
 
     state
         .sim
@@ -3169,11 +3275,19 @@ async fn a_brainless_poll_carries_the_brain_context_in_force() {
         .config
         .runtime
         .max_actions_per_turn = slots + 7;
-    let (_, after) = do_request(router(state), get_req(&poll)).await;
-    assert_eq!(
-        after["brain_context"]["action_queue_slots"],
-        serde_json::json!(slots + 7)
-    );
+    let (_, after) = do_request(router(state.clone()), get_req(&poll)).await;
+    assert_ne!(after["brain_context"], before["brain_context"]);
+
+    state
+        .sim
+        .lock()
+        .await
+        .sim
+        .config
+        .runtime
+        .max_actions_per_turn = slots;
+    let (_, restored) = do_request(router(state), get_req(&poll)).await;
+    assert_eq!(restored["brain_context"], before["brain_context"]);
 }
 
 /// `brain` for a `DirectionPair` bundle (T25.F11 invariants 3, 4 and 11):
@@ -3223,7 +3337,7 @@ async fn get_creature_brain_resolves_pair_coordinates_and_fact_members() {
     };
     let (status, body) = do_request(router(state), get_req(&uri)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    assert_eq!(body["protocol_version"], "v3alpha16");
+    assert_eq!(body["protocol_version"], "v3alpha17");
     let graph = brain_graph(&body, node_id);
 
     let gene = &graph["bundles"][bundle];
@@ -3237,14 +3351,22 @@ async fn get_creature_brain_resolves_pair_coordinates_and_fact_members() {
     );
     let coordinates = gene["coordinates"].as_array().unwrap();
     assert_eq!(coordinates.len(), 12 + 3, "twelve compass and three facts");
-    let present = coordinates.iter().filter(|c| c["present"] == true).count();
+    let present = coordinates
+        .iter()
+        .filter(|c| c.get("member").is_some())
+        .count();
     assert_eq!(present, 14, "one member removed");
+    assert!(coordinates
+        .iter()
+        .filter(|c| c.get("member").is_some())
+        .all(|c| located_edge(graph, c)["member"]["field"] == c["field"]
+            && located_edge(graph, c)["member"]["site"] == c["site"]));
     let drives: Vec<_> = coordinates
         .iter()
         .filter(|c| c["site"] == "Drive")
         .collect();
     assert_eq!(drives.len(), 3);
-    assert!(drives.iter().all(|c| c["present"] == true));
+    assert!(drives.iter().all(|c| c.get("member").is_some()));
 
     let edges: Vec<&serde_json::Value> = graph["output_sinks"]
         .as_array()

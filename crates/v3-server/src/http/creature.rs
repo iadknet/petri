@@ -4,16 +4,13 @@ use axum::Json;
 use slotmap::{Key, KeyData};
 use std::collections::{BTreeMap, BTreeSet};
 use v3_core::contracts::ActionOutcome;
-use v3_core::contracts::OUTPUT_SLOT_COUNT;
-use v3_core::contracts::{CreatureId, InputReference};
+use v3_core::contracts::CreatureId;
 use v3_core::creature::action_log::{ActionLogEntry, ActionType};
 use v3_core::creature::colour::channels_to_rgb;
-use v3_core::genome::cgp::{GraphSource, OutputSinkKind};
 use v3_core::genome::mesh_annotations::{
-    derive_mesh_annotations_with_reachable_indices, MeshNodeAnnotation, MeshReadClass,
-    MeshWriteClass,
+    derive_mesh_annotations_with_reachable_indices, node_bus_slots, MeshNodeAnnotation,
+    MeshReadClass, MeshWriteClass,
 };
-use v3_core::genome::{BackendDef, NodeGenome, VmInstruction};
 use v3_core::sensors::static_inputs::assemble_static_inputs;
 use v3_core::simulation::recording::ActiveTrace;
 
@@ -123,7 +120,6 @@ pub(crate) struct CreatureLiveCircuitDiagnostics {
     barrier_reader_without_decision_writer_reachable_node_count: usize,
     distinct_upstream_slots_read: Vec<usize>,
     distinct_payload_slots_written: Vec<usize>,
-    distinct_custom_output_slots_written: Vec<usize>,
     reachable_read_class_counts: BTreeMap<String, u32>,
     reachable_write_class_counts: BTreeMap<String, u32>,
 }
@@ -199,40 +195,6 @@ fn serialized_key<T: serde::Serialize>(value: T) -> String {
         .expect("fieldless enum serializes to its variant name")
 }
 
-/// The upstream bus slots `node` reads: each `UpstreamSlot` it declares,
-/// and the slot of every `UpstreamBus` field one of its input leaves or
-/// `ReadInput`s reads ([`InputReference::bus_slot`]).
-fn upstream_slots_read(node: &NodeGenome) -> BTreeSet<usize> {
-    let refs = &node.input_refs;
-    let read = |ref_idx: usize, sub_idx: u16| refs.get(ref_idx)?.bus_slot(sub_idx);
-    let declared = refs
-        .iter()
-        .filter(|reference| matches!(reference, InputReference::UpstreamSlot(_)))
-        .filter_map(|reference| reference.bus_slot(0));
-    let mut slots: BTreeSet<usize> = declared.collect();
-    match &node.backend_def {
-        BackendDef::Graph(def) => {
-            slots.extend(def.edges().filter_map(|edge| match edge.source() {
-                GraphSource::InputLeaf { ref_idx, sub_idx } => read(usize::from(ref_idx), sub_idx),
-                _ => None,
-            }))
-        }
-        BackendDef::Vm(vm) => {
-            slots.extend(
-                vm.program
-                    .iter()
-                    .filter_map(|instruction| match instruction {
-                        VmInstruction::ReadInput {
-                            ref_idx, sub_idx, ..
-                        } => read(usize::from(*ref_idx), *sub_idx),
-                        _ => None,
-                    }),
-            )
-        }
-    }
-    slots
-}
-
 fn build_creature_diagnostics(
     sim: &v3_core::simulation::Simulation,
     creature: &v3_core::creature::state::CreatureState,
@@ -290,41 +252,20 @@ fn build_creature_diagnostics(
         }
     }
 
-    let reachable_node_ids: BTreeSet<_> = mesh_annotations
-        .iter()
-        .filter(|annotation| annotation.reachable)
-        .map(|annotation| annotation.node_id)
-        .collect();
+    let mut reachable_node_count = 0usize;
     let mut upstream_slots: BTreeSet<usize> = BTreeSet::new();
     let mut payload_slots: BTreeSet<usize> = BTreeSet::new();
-    let mut custom_output_slots: BTreeSet<usize> = BTreeSet::new();
-    for node in &creature.genome().nodes {
-        if !reachable_node_ids.contains(&node.node_id) {
-            continue;
-        }
-        upstream_slots.extend(upstream_slots_read(node));
-        match &node.backend_def {
-            BackendDef::Vm(vm) => {
-                for instruction in &vm.program {
-                    if let VmInstruction::WriteInternalPayload { slot_idx, .. } = instruction {
-                        let slot_idx = *slot_idx as usize;
-                        if slot_idx < OUTPUT_SLOT_COUNT {
-                            payload_slots.insert(slot_idx);
-                        }
-                    }
-                }
-            }
-            BackendDef::Graph(graph) => {
-                for sink in graph.output_sinks() {
-                    if sink.inputs.is_empty() {
-                        continue;
-                    }
-                    if let OutputSinkKind::CustomOutput(slot) = sink.kind {
-                        custom_output_slots.insert(slot as usize);
-                    }
-                }
-            }
-        }
+    let reachable = creature
+        .genome()
+        .nodes
+        .iter()
+        .zip(mesh_annotations)
+        .filter(|(_, annotation)| annotation.reachable);
+    for (node, annotation) in reachable {
+        reachable_node_count += 1;
+        let slots = node_bus_slots(node, annotation);
+        upstream_slots.extend(slots.upstream_read);
+        payload_slots.extend(slots.payload_written);
     }
 
     let recent_window: Vec<_> = action_log_entries.iter().rev().take(32).copied().collect();
@@ -347,14 +288,13 @@ fn build_creature_diagnostics(
     CreatureDiagnosticsResponse {
         current_inputs,
         live_circuit: CreatureLiveCircuitDiagnostics {
-            reachable_node_count: reachable_node_ids.len(),
+            reachable_node_count,
             stateful_reachable_node_count,
             barrier_reader_reachable_node_count,
             barrier_decision_writer_reachable_node_count,
             barrier_reader_without_decision_writer_reachable_node_count,
             distinct_upstream_slots_read: upstream_slots.into_iter().collect(),
             distinct_payload_slots_written: payload_slots.into_iter().collect(),
-            distinct_custom_output_slots_written: custom_output_slots.into_iter().collect(),
             reachable_read_class_counts,
             reachable_write_class_counts,
         },
@@ -599,9 +539,6 @@ pub async fn get_sample(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use v3_core::contracts::NodeId;
-    use v3_core::genome::cgp::{CgpGraphBackendDef, GraphEdge};
-    use v3_core::genome::VmBackendDef;
 
     #[test]
     fn reachable_class_counts_serialize_in_sorted_key_order() {
@@ -631,7 +568,6 @@ mod tests {
             barrier_reader_without_decision_writer_reachable_node_count: 0,
             distinct_upstream_slots_read: Vec::new(),
             distinct_payload_slots_written: Vec::new(),
-            distinct_custom_output_slots_written: Vec::new(),
             reachable_read_class_counts: read_classes
                 .into_iter()
                 .zip(1u32..)
@@ -660,61 +596,6 @@ mod tests {
         );
         assert!(json.contains(expected_read), "{json}");
         assert!(json.contains(expected_write), "{json}");
-    }
-
-    fn graph_reading(reference: InputReference, sub_idx: u16) -> NodeGenome {
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        let surface = def
-            .sink_surface(OutputSinkKind::CustomOutput(0))
-            .expect("fixed catalog");
-        def.push_edge(
-            surface,
-            GraphEdge::new(
-                GraphSource::InputLeaf {
-                    ref_idx: 0,
-                    sub_idx,
-                },
-                1.0,
-            ),
-        );
-        NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![reference],
-            backend_def: BackendDef::Graph(def),
-            targets: Vec::new(),
-        }
-    }
-
-    fn vm_reading(reference: InputReference, sub_idx: u16) -> NodeGenome {
-        NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![reference],
-            backend_def: BackendDef::Vm(VmBackendDef {
-                register_count: 1,
-                constants: Vec::new(),
-                program: vec![VmInstruction::ReadInput {
-                    dst: 0,
-                    ref_idx: 0,
-                    sub_idx,
-                }],
-            }),
-            targets: Vec::new(),
-        }
-    }
-
-    /// A bus field read through `UpstreamBus[j]` is slot `j` read, as
-    /// `UpstreamSlot(j)` reads it, on either backend; a read past the bus
-    /// reads no slot.
-    #[test]
-    fn a_bus_field_read_is_the_slot_its_upstream_slot_twin_reads() {
-        for build in [graph_reading, vm_reading] {
-            let via_slot = upstream_slots_read(&build(InputReference::UpstreamSlot(3), 0));
-            let via_bus = upstream_slots_read(&build(InputReference::UpstreamBus, 3));
-            assert_eq!(via_slot, BTreeSet::from([3]));
-            assert_eq!(via_bus, via_slot);
-            let past = u16::try_from(OUTPUT_SLOT_COUNT).expect("a small bus");
-            assert!(upstream_slots_read(&build(InputReference::UpstreamBus, past)).is_empty());
-        }
     }
 
     #[test]

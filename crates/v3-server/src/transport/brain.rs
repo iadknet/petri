@@ -28,24 +28,26 @@ pub struct BrainView {
     pub nodes: Vec<BrainNode>,
 }
 
-/// The sensor context a brain view's bundle coordinates resolve under
-/// (T25.F11 invariant 11). Every creature fetch carries it, a poll that
-/// excludes the brain included, so a client holding a brain refetches the
-/// brain when the context moves (a `max_actions_per_turn` change widens the
-/// queue's coordinates).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+/// The identity of the sensor context a brain view's bundle coordinates
+/// resolve under (T25.F11 invariant 11, T30.F14 invariant 5). Every creature
+/// fetch carries it, a poll that excludes the brain included; equal contexts
+/// give equal identities and different contexts different ones, so a client
+/// holding a brain compares it whole and refetches the brain when it moves.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
-pub struct BrainContext {
-    pub food_type_count: u32,
-    pub action_queue_slots: u32,
-}
+pub struct BrainContext(String);
 
 impl From<&SensorContext> for BrainContext {
     fn from(context: &SensorContext) -> Self {
-        Self {
-            food_type_count: u32::try_from(context.food_type_count).unwrap_or(u32::MAX),
-            action_queue_slots: context.action_queue_slots,
-        }
+        // Exhaustive: a field added to `SensorContext` fails to compile here
+        // until the identity carries it.
+        let SensorContext {
+            food_type_count,
+            action_queue_slots,
+        } = *context;
+        Self(format!(
+            "food_type_count={food_type_count};action_queue_slots={action_queue_slots}"
+        ))
     }
 }
 
@@ -341,13 +343,40 @@ impl From<core_cgp::Wiring> for Wiring {
 }
 
 /// A birth coordinate: the field a member born with the bundle reads, its
-/// site, and whether a member sits there now.
+/// site, and the location of the member that sits there now.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct BundleCoordinate {
     pub field: u16,
     pub site: Site,
-    pub present: bool,
+    /// The member's location, the key `learning` uses; omitted for a hole.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub member: Option<EdgeLocation>,
+}
+
+/// An edge's location in a Graph node: its surface, the compute node or
+/// sink it feeds, and its index there.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct EdgeLocation {
+    pub surface: WeightSurface,
+    pub container: usize,
+    pub edge: usize,
+}
+
+impl From<EdgeOccurrence> for EdgeLocation {
+    fn from(occurrence: EdgeOccurrence) -> Self {
+        let (surface, container) = match occurrence.surface {
+            EdgeSurface::ComputeInput(index) => (WeightSurface::Compute, index),
+            EdgeSurface::SinkInput(index) => (WeightSurface::Sink, index),
+        };
+        Self {
+            surface,
+            container,
+            edge: occurrence.index,
+        }
+    }
 }
 
 // ── Learning ────────────────────────────────────────────────────────────────
@@ -434,13 +463,6 @@ fn walk_edges<'a>(
     })
 }
 
-fn surface_of(occurrence: EdgeOccurrence) -> (WeightSurface, usize) {
-    match occurrence.surface {
-        EdgeSurface::ComputeInput(index) => (WeightSurface::Compute, index),
-        EdgeSurface::SinkInput(index) => (WeightSurface::Sink, index),
-    }
-}
-
 /// The brain view of `genome`, its learned state `learned` and its mesh
 /// annotations (`derive_mesh_annotations_with_reachable_indices`, one per
 /// node in genome order), its bundle coordinates resolved under the run's
@@ -523,7 +545,7 @@ fn graph_brain(
                 .map(|coordinate| BundleCoordinate {
                     field: coordinate.field,
                     site: coordinate.site.into(),
-                    present: coordinate.present,
+                    member: coordinate.member.map(EdgeLocation::from),
                 })
                 .collect();
             BrainBundle {
@@ -607,11 +629,15 @@ pub fn learning_view(genome: &CreatureGenome, learned: &LearnedState) -> Option<
             let edges: Vec<LearningEdge> = walk_edges(def, learned, node_idx)
                 .filter_map(|walked| {
                     let applied = walked.dynamic?;
-                    let (surface, container) = surface_of(walked.occurrence);
+                    let EdgeLocation {
+                        surface,
+                        container,
+                        edge,
+                    } = walked.occurrence.into();
                     Some(LearningEdge {
                         surface,
                         container,
-                        edge: walked.occurrence.index,
+                        edge,
                         applied,
                         learned: walked.view.and_then(|view| view.learned),
                         trace: walked.view.and_then(|view| view.trace),
