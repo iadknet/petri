@@ -2468,6 +2468,8 @@ fn an_unresolvable_pair_has_no_coordinates() {
 /// per coordinate (quadratic at this width, about 2.15 billion comparisons).
 #[test]
 fn the_widest_queue_bundle_lists_every_coordinate_present() {
+    // WORKAROUND(T30.F11): ordered bulk construction through the owner
+    // operation (`add_bundle`), not a hand-written copy of its writes.
     // Arrange: one bundle over every queue field under the widest context,
     // its members appended in I10 order (the record and edges `add_bundle`
     // writes, without its per-member insertion search).

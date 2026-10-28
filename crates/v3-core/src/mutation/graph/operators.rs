@@ -33,6 +33,8 @@ pub(super) fn graph_def_mut(
 /// `input_refs`, for operators (`random_graph_source` callers) that need
 /// both: the clone is taken before the mutable borrow of `backend_def` so
 /// both are available together despite living on the same `NodeGenome`.
+// WORKAROUND(T30.F11): a split borrow of the node's declarations and graph
+// (as `mutation/graph/bundle.rs` `graph_node` does), not a clone of `input_refs`.
 #[inline]
 fn graph_def_mut_with_input_refs(
     genome: &mut CreatureGenome,

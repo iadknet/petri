@@ -37,6 +37,9 @@ type ClassifiedResult = Result<(TargetReachability, Option<BirthEdgeClass>), Mut
 /// domain accepted the attempt.
 struct SelectedEvent {
     operator: MutationOperator,
+    // WORKAROUND(T30.F11): operators return the node they added, not a
+    // whole-genome clone taken before the event (at each domain's draw) and
+    // diffed after it.
     tracked_before: Option<CreatureGenome>,
     /// The reachability and, for `AddGraphEdge` and `InputRef.Add`, the class
     /// of the vote-sink edge the event pushed (T11.F30).
