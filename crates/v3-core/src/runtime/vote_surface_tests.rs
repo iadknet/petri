@@ -151,7 +151,8 @@ fn costly_config() -> RuntimeConfig {
 fn run_with(genome: &CreatureGenome, energy: f32, config: RuntimeConfig) -> Run {
     let mut energy = energy;
     let mut memory = [0.0; 16];
-    let mut state = GraphRuntimeState::for_genome(genome, Vec::new());
+    let mut state =
+        GraphRuntimeState::for_genome(genome, &crate::genome::learning::Seeds::default());
     state.begin_tick(0);
     let (output, _, passes) = execute_creature_mesh_traced(
         genome,
@@ -503,9 +504,9 @@ fn the_three_execution_modes_agree_on_a_voting_genome() {
             let mut energies = [start; 3];
             let mut memories = [[0.0; 16]; 3];
             let mut states = [
-                GraphRuntimeState::for_genome(&genome, Vec::new()),
-                GraphRuntimeState::for_genome(&genome, Vec::new()),
-                GraphRuntimeState::for_genome(&genome, Vec::new()),
+                GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default()),
+                GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default()),
+                GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default()),
             ];
             for state in &mut states {
                 state.begin_tick(0);

@@ -49,7 +49,8 @@ fn run_both(
     let mut traced_memory = memory;
     let mut energy_plain = energy;
     let mut energy_traced = energy;
-    let mut state = GraphRuntimeState::for_genome(genome, Vec::new());
+    let mut state =
+        GraphRuntimeState::for_genome(genome, &crate::genome::learning::Seeds::default());
     state.begin_tick(0);
     let mut traced_state = state.clone();
     let output = super::execute_creature_mesh(

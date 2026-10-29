@@ -92,12 +92,8 @@ fn insert_test_creature(
     position: Position,
 ) -> CreatureId {
     creatures.insert_with_key(|id| {
-        CreatureState::new(
-            id,
+        crate::creature::birth::Zygote::founder(
             v3alpha1_founder_genome(),
-            position,
-            50.0,
-            0,
             HeritableBody {
                 phenotype: Phenotype::FOUNDER,
                 identity: CreatureIdentityState::default(),
@@ -105,7 +101,15 @@ fn insert_test_creature(
                 steal_share: 0.2,
                 give_share: 0.2,
             },
-            [0.0; 16],
         )
+        .finalize(
+            id,
+            crate::creature::birth::BirthPlace {
+                position: position,
+                heading: crate::contracts::Direction::N,
+                energy: 50.0,
+            },
+        )
+        .creature
     })
 }

@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 812c5eb86eb40dd229d15e114455814066019a9ec9e347d3a94b345efe24a2c6 # shrinks to energy = 0.0, reward = 5.464282e18
+cc 4bbf155bc81a64e94e812bdf91108851063c9cec7baf25d9a2308cc9a01fe247 # shrinks to energy = inf, reward = 0.0

@@ -1371,7 +1371,7 @@ proptest! {
             let mut energy = 1.0e9f32;
             let mut shared_memory = [0.0f32; 16];
             let prev_shared_memory = [0.0f32; 16];
-            let mut graph_runtime = GraphRuntimeState::for_genome(&genome, Vec::new());
+            let mut graph_runtime = GraphRuntimeState::for_genome(&genome, &v3_core::genome::learning::Seeds::default());
             graph_runtime.node_state.push(vec![0.0, state]);
             graph_runtime.begin_tick(0);
 

@@ -70,7 +70,8 @@ fn graph_genome(compute_nodes: Vec<ComputeNode>) -> CreatureGenome {
 /// canonical order, set to `learned` (the backend visited), or unvisited
 /// when `learned` is `None`.
 fn learned_state(genome: &CreatureGenome, learned: Option<&[f32]>) -> GraphRuntimeState {
-    let mut state = GraphRuntimeState::for_genome(genome, Vec::new());
+    let mut state =
+        GraphRuntimeState::for_genome(genome, &crate::genome::learning::Seeds::default());
     for (slot, &value) in learned.unwrap_or(&[]).iter().enumerate() {
         state.learned.set_slot(0, slot, value, 0.0);
     }
@@ -318,7 +319,8 @@ fn the_keyed_readers_carry_every_count_under_its_key() {
 fn member_learners_and_learned_scales_are_censused_by_source_and_scale() {
     use crate::contracts::votes::DirectedVoteKind;
     use crate::contracts::WorldInputKey;
-    use crate::genome::cgp::{BirthSeeds, EdgeSurface, LearningSlot};
+    use crate::genome::cgp::LearningSlot;
+    use crate::genome::learning::{LearnableId, LearnableKey, Seeds};
     use crate::genome::{HebbianRule, MemberPolicy};
 
     let lamarckian = Learning {
@@ -345,22 +347,15 @@ fn member_learners_and_learned_scales_are_censused_by_source_and_scale() {
         def.edge_mut(member).set_credits(true);
     }
     def.edge_mut(members[3]).set_credits(true);
-    let mut sinks: Vec<Vec<Option<f32>>> = def
-        .output_sinks()
-        .iter()
-        .map(|sink| vec![None; sink.inputs.len()])
-        .collect();
-    let EdgeSurface::SinkInput(sink) = members[0].surface else {
-        unreachable!()
-    };
     // The `Own` learner's seed is its genomic modifier; the scale is seeded
     // past its clamp.
-    sinks[sink][members[0].index] = Some(0.25);
-    let seeds = BirthSeeds::Rows {
-        compute: Vec::new(),
-        sinks,
-        bundles: vec![Some(4.0)],
-    };
+    let seeds: Seeds = [
+        (LearnableKey::Edge(members[0]), 0.25),
+        (LearnableKey::Scale(id), 4.0),
+    ]
+    .into_iter()
+    .map(|(key, value)| (LearnableId { node: 0, key }, value))
+    .collect();
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome::new(
@@ -372,7 +367,7 @@ fn member_learners_and_learned_scales_are_censused_by_source_and_scale() {
             vec![],
         )],
     };
-    let state = GraphRuntimeState::for_genome(&genome, vec![Some(seeds)]);
+    let state = GraphRuntimeState::for_genome(&genome, &seeds);
     let census = PlasticityCensus::observe([(&[0usize][..], state.learned())]);
 
     assert_eq!(census.edges_by_source, [0, 1, 2]);
@@ -415,7 +410,7 @@ fn a_scale_only_bundle_makes_a_carrier_without_edge_learners() {
             vec![],
         )],
     };
-    let state = GraphRuntimeState::for_genome(&genome, Vec::new());
+    let state = GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
     let census = PlasticityCensus::observe([(&[0usize][..], state.learned())]);
 
     assert_eq!(census.carriers, 1);
@@ -493,7 +488,8 @@ fn edges_and_scales_are_censused_by_retention_bin_with_birth_drift() {
                 vec![],
             )],
         };
-        let unvisited = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let unvisited =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         let census = PlasticityCensus::observe([(&[0usize][..], unvisited.learned())]);
         let mut expected = [RetentionCell::default(); 5];
         expected[bin] = RetentionCell {
@@ -504,7 +500,8 @@ fn edges_and_scales_are_censused_by_retention_bin_with_birth_drift() {
         expected[bin].count = 1;
         assert_eq!(census.scales_by_retention, expected, "{retention}");
 
-        let mut visited = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let mut visited =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         visited.learned.set_slot(0, 0, -2.0, 0.0);
         visited.learned.set_scale(0, 0, 1.25);
         let census = PlasticityCensus::observe([(&[0usize][..], visited.learned())]);

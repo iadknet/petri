@@ -286,12 +286,8 @@ fn build_simulation(food_here: f32) -> (Simulation, CreatureId, Position) {
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let genome = sample_vm_genome();
     let id = creatures.insert_with_key(|cid| {
-        CreatureState::new(
-            cid,
+        v3_core::creature::birth::Zygote::founder(
             genome.clone(),
-            pos,
-            100.0,
-            0,
             HeritableBody {
                 phenotype: Phenotype::FOUNDER,
                 identity: CreatureIdentityState::default(),
@@ -299,8 +295,16 @@ fn build_simulation(food_here: f32) -> (Simulation, CreatureId, Position) {
                 steal_share: 0.2,
                 give_share: 0.2,
             },
-            [0.0; 16],
         )
+        .finalize(
+            cid,
+            v3_core::creature::birth::BirthPlace {
+                position: pos,
+                heading: v3_core::contracts::Direction::N,
+                energy: 100.0,
+            },
+        )
+        .creature
     });
     world.place_creature(pos, id);
 

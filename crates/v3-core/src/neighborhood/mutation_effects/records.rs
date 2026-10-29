@@ -337,7 +337,10 @@ mod tests {
     }
 
     fn runtime(node_state: Vec<Vec<f32>>) -> GraphRuntimeState {
-        let mut runtime = GraphRuntimeState::for_genome(&genome(&[0]), Vec::new());
+        let mut runtime = GraphRuntimeState::for_genome(
+            &genome(&[0]),
+            &crate::genome::learning::Seeds::default(),
+        );
         runtime.node_state = node_state;
         runtime
     }

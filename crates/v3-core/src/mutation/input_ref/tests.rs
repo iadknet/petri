@@ -9,6 +9,7 @@ use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
     OutputSinkKind,
 };
+use crate::genome::learning::{LearnableId, LearnableKey, Seeds};
 use crate::genome::mesh_annotations::MeshReadClass;
 use crate::genome::{input_ref_kind, InputRefKind};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
@@ -906,8 +907,8 @@ fn add_sensor_on_a_graph_node_wires_the_whole_sensor() {
     }
 }
 
-/// A populated founder decision node with plasticity and birth seeds:
-/// every incumbent compute node, seed, sink edge and weight is kept, and the
+/// A populated founder decision node with plasticity and inherited values:
+/// every incumbent compute node, value, sink edge and weight is kept, and the
 /// new members follow each sink's incumbents.
 #[test]
 fn add_sensor_to_graph_node_leaves_existing_edges_untouched() {
@@ -928,27 +929,39 @@ fn add_sensor_to_graph_node_leaves_existing_edges_untouched() {
                 retention: 1.0,
             }),
         );
-        let rows = def
-            .compute_nodes()
-            .iter()
-            .map(|node| vec![Some(0.25); node.inputs.len()])
-            .collect();
-        def.seed_compute_rows(rows);
     }
+    // The parent's values: 0.25 on every compute edge of the decision node.
+    let parent: Seeds = {
+        let def = graph_def(&base.nodes[1]);
+        def.edge_sites()
+            .filter(|site| {
+                matches!(
+                    site.surface,
+                    crate::genome::cgp::EdgeSurface::ComputeInput(_)
+                )
+            })
+            .map(|site| {
+                (
+                    LearnableId {
+                        node: 1,
+                        key: LearnableKey::Edge(site),
+                    },
+                    0.25,
+                )
+            })
+            .collect()
+    };
     let before_def = graph_def(&base.nodes[1]).clone();
     assert_eq!(before_def.output_sinks().len(), 108, "a full sink catalog");
     for op in ADD_SENSOR {
         for seed in 0u64..32 {
             let mut genome = base.clone();
-            apply_add_to_node(&mut genome, op, 1, &mut rng(seed), 2).expect("a full catalog");
+            let report =
+                apply_add_to_node(&mut genome, op, 1, &mut rng(seed), 2).expect("a full catalog");
             assert_eq!(genome.nodes[0], base.nodes[0], "seed {seed}: other node");
             assert_whole_sensor(&base.nodes[1], &genome.nodes[1], op);
             let after_def = graph_def(&genome.nodes[1]);
-            assert_eq!(
-                after_def.birth_seeds().map(|seeds| seeds.compute_rows()),
-                before_def.birth_seeds().map(|seeds| seeds.compute_rows()),
-                "seed {seed}"
-            );
+            assert_eq!(report.inheritance.apply(&parent), parent, "seed {seed}");
             for (after_sink, before_sink) in after_def
                 .output_sinks()
                 .iter()

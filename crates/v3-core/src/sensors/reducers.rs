@@ -418,7 +418,6 @@ mod tests {
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::creature::identity::CreatureIdentityState;
     use crate::creature::phenotype::Phenotype;
-    use crate::creature::state::CreatureState;
     use crate::sensors::visibility::{compute_visible_cells, get_visibility_table};
     use slotmap::SlotMap;
 
@@ -433,12 +432,8 @@ mod tests {
         identity: CreatureIdentityState,
         phenotype: [u8; 6],
     ) -> BodyView {
-        CreatureState::new(
-            id,
+        crate::creature::birth::Zygote::founder(
             v3alpha1_founder_genome(),
-            pos,
-            energy,
-            0,
             HeritableBody {
                 phenotype: Phenotype {
                     channels: phenotype,
@@ -450,8 +445,16 @@ mod tests {
                 steal_share: 0.2,
                 give_share: 0.2,
             },
-            [0.0; 16],
         )
+        .finalize(
+            id,
+            crate::creature::birth::BirthPlace {
+                position: pos,
+                heading: crate::contracts::Direction::N,
+                energy: energy,
+            },
+        )
+        .creature
         .sensed_body(&EnergyCapacityConfig::default())
     }
 

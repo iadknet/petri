@@ -47,12 +47,8 @@ pub(crate) fn insert_creature(
     generation: u64,
 ) -> CreatureId {
     let id = creatures.insert_with_key(|id| {
-        CreatureState::new(
-            id,
+        let mut born = v3_core::creature::birth::Zygote::founder(
             genome,
-            position,
-            energy,
-            generation,
             HeritableBody {
                 phenotype: Phenotype::FOUNDER,
                 identity: CreatureIdentityState::default(),
@@ -60,8 +56,18 @@ pub(crate) fn insert_creature(
                 steal_share: 0.2,
                 give_share: 0.2,
             },
-            [0.0; 16],
         )
+        .finalize(
+            id,
+            v3_core::creature::birth::BirthPlace {
+                position: position,
+                heading: v3_core::contracts::Direction::N,
+                energy: energy,
+            },
+        )
+        .creature;
+        born.generation = generation;
+        born
     });
     world.place_creature(position, id);
     id

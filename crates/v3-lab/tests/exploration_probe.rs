@@ -691,7 +691,6 @@ fn eval_rule(
     rule: Rule,
 ) -> (f64, u32, bool, u32, u64, u64) {
     use slotmap::SlotMap;
-    use v3_core::contracts::SHARED_MEMORY_SLOTS;
     use v3_core::contracts::{CreatureId, OrdinaryFoodTypeId};
     use v3_core::creature::action_log::ActionType;
     use v3_core::creature::body::HeritableBody;
@@ -715,20 +714,24 @@ fn eval_rule(
     }
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let id = creatures.insert_with_key(|id| {
-        CreatureState::new(
-            id,
+        v3_core::creature::birth::Zygote::founder(
             expressed(genome),
-            scene.start,
-            rule.start(),
-            0,
             HeritableBody::founder(
                 0,
                 scene.seed,
                 config.energy.capacity.founder,
                 config.exchange.founder_share,
             ),
-            [0.0; SHARED_MEMORY_SLOTS],
         )
+        .finalize(
+            id,
+            v3_core::creature::birth::BirthPlace {
+                position: scene.start,
+                heading: v3_core::contracts::Direction::N,
+                energy: rule.start(),
+            },
+        )
+        .creature
     });
     let mut sim = Simulation::new(world, creatures, setup.start_tick, config, scene.seed);
     sim.world.place_creature(scene.start, id);

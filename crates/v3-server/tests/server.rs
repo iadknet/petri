@@ -26,9 +26,6 @@ fn test_state() -> AppState {
     AppState::from_config(test_config(), 0)
 }
 
-/// Rebuild `creature` from its genome after `edit`, under the same id,
-/// position, energy, generation, body, shared memory, age and heading, so
-/// its derived state and brain runtime follow the edited genome.
 /// Rebuild `node` declaring `reference` after its declarations (a fixture,
 /// through `NodeGenome::new`).
 fn declare(node: &mut v3_core::genome::NodeGenome, reference: v3_core::contracts::InputReference) {
@@ -42,24 +39,39 @@ fn declare(node: &mut v3_core::genome::NodeGenome, reference: v3_core::contracts
     );
 }
 
+/// Rebuild `creature` from its genome after `edit`, under the same id,
+/// position, energy, generation, body, shared memory, age and heading, so
+/// its derived state and brain runtime follow the edited genome.
 fn rebuild_with<R>(
     creature: &mut v3_core::creature::state::CreatureState,
     edit: impl FnOnce(&mut v3_core::genome::CreatureGenome) -> R,
 ) -> R {
+    rebuild_seeded(creature, |genome| {
+        (edit(genome), v3_core::genome::learning::Seeds::default())
+    })
+}
+
+/// [`rebuild_with`], the rebuilt creature also inheriting the learned values
+/// `edit` returns beside its result (a fixture's birth payload).
+fn rebuild_seeded<R>(
+    creature: &mut v3_core::creature::state::CreatureState,
+    edit: impl FnOnce(&mut v3_core::genome::CreatureGenome) -> (R, v3_core::genome::learning::Seeds),
+) -> R {
+    use v3_core::creature::birth::{BirthPayload, BirthPlace, Zygote};
     let mut genome = creature.genome().clone();
-    let result = edit(&mut genome);
-    let (age, heading) = (creature.age, creature.heading);
-    *creature = v3_core::creature::state::CreatureState::new(
-        creature.id,
-        genome,
-        creature.position,
-        creature.energy,
-        creature.generation,
-        creature.body,
-        creature.shared_memory,
-    );
+    let (result, seeds) = edit(&mut genome);
+    let place = BirthPlace {
+        position: creature.position,
+        heading: creature.heading,
+        energy: creature.energy,
+    };
+    let (age, generation) = (creature.age, creature.generation);
+    *creature = Zygote::founder(genome, creature.body)
+        .with_payload(BirthPayload::new(seeds, creature.shared_memory))
+        .finalize(creature.id, place)
+        .creature;
     creature.age = age;
-    creature.heading = heading;
+    creature.generation = generation;
     result
 }
 
@@ -2790,8 +2802,9 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
     use v3_core::contracts::votes::{DirectedVoteKind, VoteSink};
     use v3_core::contracts::{InputReference, WorldInputKey};
     use v3_core::genome::cgp::{
-        BirthSeeds, EdgeOccurrence, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind,
+        EdgeOccurrence, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind,
     };
+    use v3_core::genome::learning::{LearnableId, LearnableKey, Seeds};
     use v3_core::genome::{BackendDef, HebbianRule, Learning};
 
     let state = test_state();
@@ -2812,7 +2825,7 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
     let (node_id, vote, members) = {
         let mut handle = state.sim.lock().await;
         let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
-        rebuild_with(creature, |genome| {
+        rebuild_seeded(creature, |genome| {
             let node_idx = genome
                 .nodes
                 .iter()
@@ -2847,26 +2860,15 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
             def.edge_mut(vote).set_learning(Some(config));
             def.edge_mut(compute).set_weight(3.0);
             def.edge_mut(compute).set_learning(Some(config));
-            let mut sinks: Vec<Vec<Option<f32>>> = def
-                .output_sinks()
-                .iter()
-                .map(|sink| vec![None; sink.inputs.len()])
-                .collect();
-            let EdgeSurface::SinkInput(sink) = vote.surface else {
-                unreachable!()
-            };
-            sinks[sink][vote.index] = Some(1.25);
-            let seeds = BirthSeeds::Rows {
-                compute: def
-                    .compute_nodes()
-                    .iter()
-                    .map(|node| vec![None; node.inputs.len()])
-                    .collect(),
-                sinks,
-                bundles: vec![None; def.bundles().len()],
-            };
-            def.seed_birth(seeds);
-            (node_id, vote, members)
+            let seeds: Seeds = std::iter::once((
+                LearnableId {
+                    node: node_idx,
+                    key: LearnableKey::Edge(vote),
+                },
+                1.25,
+            ))
+            .collect();
+            ((node_id, vote, members), seeds)
         })
     };
 
@@ -2948,7 +2950,8 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
     use v3_core::contracts::votes::DirectedVoteKind;
     use v3_core::contracts::OutcomeChannel;
     use v3_core::contracts::{InputReference, WorldInputKey};
-    use v3_core::genome::cgp::{BirthSeeds, EdgeOccurrence, EdgeSurface, LearningSlot};
+    use v3_core::genome::cgp::{EdgeOccurrence, LearningSlot};
+    use v3_core::genome::learning::{LearnableId, LearnableKey, Seeds};
     use v3_core::genome::{
         BackendDef, HebbianRule, Learning, MemberPolicy, RewardModulationConfig,
     };
@@ -2981,7 +2984,7 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
     let (node_id, bundle, members) = {
         let mut handle = state.sim.lock().await;
         let creature = handle.sim.creatures.get_mut(creature_id).unwrap();
-        rebuild_with(creature, |genome| {
+        rebuild_seeded(creature, |genome| {
             let node_idx = genome
                 .nodes
                 .iter()
@@ -3010,28 +3013,22 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
             def.edge_mut(members[1]).set_policy(MemberPolicy::Inherit);
             def.edge_mut(members[1]).set_credits(true);
             def.edge_mut(members[3]).set_credits(true);
-            let mut sinks: Vec<Vec<Option<f32>>> = def
-                .output_sinks()
-                .iter()
-                .map(|sink| vec![None; sink.inputs.len()])
-                .collect();
-            let EdgeSurface::SinkInput(sink) = members[0].surface else {
-                unreachable!()
-            };
-            sinks[sink][members[0].index] = Some(0.75);
-            let mut bundles = vec![None; def.bundles().len()];
-            bundles[id.index()] = Some(1.5);
-            let seeds = BirthSeeds::Rows {
-                compute: def
-                    .compute_nodes()
-                    .iter()
-                    .map(|node| vec![None; node.inputs.len()])
-                    .collect(),
-                sinks,
-                bundles,
-            };
-            def.seed_birth(seeds);
-            (node_id, id.index(), members)
+            let seeds: Seeds = [
+                (LearnableKey::Edge(members[0]), 0.75),
+                (LearnableKey::Scale(id), 1.5),
+            ]
+            .into_iter()
+            .map(|(key, value)| {
+                (
+                    LearnableId {
+                        node: node_idx,
+                        key,
+                    },
+                    value,
+                )
+            })
+            .collect();
+            ((node_id, id.index(), members), seeds)
         })
     };
 

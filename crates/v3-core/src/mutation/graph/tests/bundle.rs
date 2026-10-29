@@ -11,11 +11,10 @@ use crate::contracts::{FieldSet, InputReference, NodeId, SensorDescriptor, World
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::genome::cgp::test_support::{add_bundle_on, edit_sinks};
 use crate::genome::cgp::{
-    compose, detach, validate_graph, BirthSeeds, BundleBirth, BundleId, BundleSource,
-    CgpGraphBackendDef, EdgeOccurrence, EdgeSurface, GraphSource, LearningSlot, OutputSinkKind,
-    Site, Wiring,
+    compose, detach, validate_graph, BundleBirth, BundleId, BundleSource, CgpGraphBackendDef,
+    EdgeOccurrence, GraphSource, LearningSlot, OutputSinkKind, Site, Wiring,
 };
-use crate::genome::learning::GraphMapping;
+use crate::genome::learning::{GraphMapping, LearnableKey, NodeSeeds};
 use crate::genome::{
     BackendDef, CreatureGenome, HebbianRule, Learning, MemberPolicy, NodeGenome,
     RewardModulationConfig, VmBackendDef,
@@ -880,7 +879,7 @@ fn a_nearby_creature_sensor_wires_four_pair_bundles() {
 /// A one-ring-bundle node at scale 0.5 whose first member (canonical order)
 /// is a Lamarckian learner at own weight 0.25 with an edge seed of 9.0; the
 /// other seven are static and unseeded, and the bundle carries no seed.
-fn detach_fixture() -> (NodeGenome, EdgeOccurrence) {
+fn detach_fixture() -> (NodeGenome, EdgeOccurrence, NodeSeeds) {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     let bundle = def.add_ring_bundle(0, DirectedVoteKind::Move, 3);
     def.bundle_mut(bundle).set_scale(0.5);
@@ -896,26 +895,9 @@ fn detach_fixture() -> (NodeGenome, EdgeOccurrence) {
     def.edge_mut(first).set_policy(MemberPolicy::Own(config));
     def.edge_mut(first).set_credits(true);
     def.edge_mut(first).set_weight(0.25);
-    let compute = def
-        .compute_nodes()
-        .iter()
-        .map(|node| vec![None; node.inputs.len()])
-        .collect();
-    let mut sinks: Vec<Vec<Option<f32>>> = def
-        .output_sinks()
-        .iter()
-        .map(|sink| vec![None; sink.inputs.len()])
-        .collect();
-    let EdgeSurface::SinkInput(sink) = first.surface else {
-        panic!("a member is a sink edge")
-    };
-    sinks[sink][first.index] = Some(9.0);
-    def.seed_birth(BirthSeeds::Rows {
-        compute,
-        sinks,
-        bundles: vec![None],
-    });
-    (graph_node(refs(), def), first)
+    // The parent's values: the Lamarckian member's 9.0.
+    let parent = std::iter::once((LearnableKey::Edge(first), 9.0)).collect();
+    (graph_node(refs(), def), first, parent)
 }
 
 proptest::proptest! {
@@ -928,10 +910,10 @@ proptest::proptest! {
     fn detach_draws_one_member_and_keeps_its_composed_weight_plasticity_and_seed(
         seed in proptest::prelude::any::<u64>(),
     ) {
-        let (original, learner) = detach_fixture();
+        let (original, learner, parent) = detach_fixture();
         let mut node = original.clone();
         let mut rng = SmallRng::seed_from_u64(seed);
-        bundle::detach_member(&mut node, &mut rng).unwrap();
+        let (_, map) = bundle::detach_member(&mut node, &mut rng).unwrap();
         let mut expected = SmallRng::seed_from_u64(seed);
         let def = graph(&original);
         let members: Vec<_> = def.members(id(0)).collect();
@@ -951,7 +933,7 @@ proptest::proptest! {
         );
         proptest::prop_assert_eq!(after.membership(), None);
         proptest::prop_assert_eq!(after.stored_learning(), before.stored_learning());
-        let seed_value = graph(&node).birth_seeds().unwrap().value(at);
+        let seed_value = map.apply(&parent).get(&LearnableKey::Edge(at)).copied();
         if picked == learner {
             proptest::prop_assert_eq!(seed_value, Some(compose(9.0, 0.5, pattern)));
         } else {

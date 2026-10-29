@@ -27,15 +27,19 @@ fn sim_with(creatures_at: &[(Position, f32)]) -> (Simulation, Vec<CreatureId>) {
     let mut ids = Vec::new();
     for &(position, energy) in creatures_at {
         let id = creatures.insert_with_key(|id| {
-            CreatureState::new(
-                id,
+            crate::creature::birth::Zygote::founder(
                 v3alpha1_founder_genome(),
-                position,
-                energy,
-                0,
                 HeritableBody::founder(3, 77, 200.0, 0.2),
-                [0.0; 16],
             )
+            .finalize(
+                id,
+                crate::creature::birth::BirthPlace {
+                    position: position,
+                    heading: crate::contracts::Direction::N,
+                    energy: energy,
+                },
+            )
+            .creature
         });
         world.place_creature(position, id);
         ids.push(id);

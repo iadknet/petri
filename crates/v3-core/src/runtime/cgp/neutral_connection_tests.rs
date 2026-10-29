@@ -461,8 +461,8 @@ fn active_native_visits_and_ticks_preserve_actions_temporal_plasticity_and_costs
         ..RuntimeConfig::default()
     };
     let mut states = [
-        GraphRuntimeState::for_genome(&genomes[0], Vec::new()),
-        GraphRuntimeState::for_genome(&genomes[1], Vec::new()),
+        GraphRuntimeState::for_genome(&genomes[0], &crate::genome::learning::Seeds::default()),
+        GraphRuntimeState::for_genome(&genomes[1], &crate::genome::learning::Seeds::default()),
     ];
     for state in &mut states {
         state.node_state = vec![vec![0.25, 0.75]];

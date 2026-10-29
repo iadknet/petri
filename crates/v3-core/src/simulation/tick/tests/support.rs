@@ -154,28 +154,40 @@ pub(super) fn make_sim_two_with_genomes(
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
 
     let a_id = creatures.insert_with_key(|id| {
-        CreatureState::new(
-            id,
-            genome_a,
-            Position::new(5, 5),
-            energy_a,
-            0,
-            founder_body(),
-            [0.0; 16],
-        )
+        {
+            let mut founder = crate::creature::birth::Zygote::founder(genome_a, founder_body())
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: Position::new(5, 5),
+                        heading: crate::contracts::Direction::N,
+                        energy: energy_a,
+                    },
+                )
+                .creature;
+            // A fixture keeps its requested energy past the body cap.
+            founder.energy = energy_a;
+            founder
+        }
     });
     world.place_creature(Position::new(5, 5), a_id);
 
     let b_id = creatures.insert_with_key(|id| {
-        CreatureState::new(
-            id,
-            genome_b,
-            Position::new(5, 4),
-            energy_b,
-            0,
-            founder_body(),
-            [0.0; 16],
-        )
+        {
+            let mut founder = crate::creature::birth::Zygote::founder(genome_b, founder_body())
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: Position::new(5, 4),
+                        heading: crate::contracts::Direction::N,
+                        energy: energy_b,
+                    },
+                )
+                .creature;
+            // A fixture keeps its requested energy past the body cap.
+            founder.energy = energy_b;
+            founder
+        }
     });
     world.place_creature(Position::new(5, 4), b_id);
 
@@ -201,15 +213,22 @@ pub(super) fn make_sim_with_one_creature(energy: f32) -> (Simulation, CreatureId
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let pos = Position::new(5, 5);
     let id = creatures.insert_with_key(|id| {
-        CreatureState::new(
-            id,
-            v3alpha1_founder_genome(),
-            pos,
-            energy,
-            0,
-            founder_body(),
-            [0.0; 16],
-        )
+        {
+            let mut founder =
+                crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+                    .finalize(
+                        id,
+                        crate::creature::birth::BirthPlace {
+                            position: pos,
+                            heading: crate::contracts::Direction::N,
+                            energy: energy,
+                        },
+                    )
+                    .creature;
+            // A fixture keeps its requested energy past the body cap.
+            founder.energy = energy;
+            founder
+        }
     });
     world.place_creature(pos, id);
 
@@ -238,7 +257,21 @@ pub(super) fn make_sim_with_custom_genome(
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let pos = Position::new(5, 5);
     let id = creatures.insert_with_key(|id| {
-        CreatureState::new(id, genome, pos, energy, 0, founder_body(), [0.0; 16])
+        {
+            let mut founder = crate::creature::birth::Zygote::founder(genome, founder_body())
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: pos,
+                        heading: crate::contracts::Direction::N,
+                        energy: energy,
+                    },
+                )
+                .creature;
+            // A fixture keeps its requested energy past the body cap.
+            founder.energy = energy;
+            founder
+        }
     });
     world.place_creature(pos, id);
 

@@ -20,7 +20,7 @@ use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use slotmap::SlotMap;
 use v3_core::config::{OrdinaryFoodTypeId, SimulationConfig};
-use v3_core::contracts::{ActionOutcome, CreatureId, Direction, Position, SHARED_MEMORY_SLOTS};
+use v3_core::contracts::{ActionOutcome, CreatureId, Direction, Position};
 use v3_core::creature::body::HeritableBody;
 use v3_core::creature::state::CreatureState;
 use v3_core::genome::CreatureGenome;
@@ -115,20 +115,24 @@ impl Setup {
         seed: u64,
         position: Position,
     ) -> CreatureState {
-        CreatureState::new(
-            id,
+        v3_core::creature::birth::Zygote::founder(
             genome,
-            position,
-            self.start_energy,
-            0,
             HeritableBody::founder(
                 0,
                 seed,
                 self.config.energy.capacity.founder,
                 self.config.exchange.founder_share,
             ),
-            [0.0; SHARED_MEMORY_SLOTS],
         )
+        .finalize(
+            id,
+            v3_core::creature::birth::BirthPlace {
+                position: position,
+                heading: v3_core::contracts::Direction::N,
+                energy: self.start_energy,
+            },
+        )
+        .creature
     }
 }
 

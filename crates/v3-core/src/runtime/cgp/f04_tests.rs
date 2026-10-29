@@ -160,7 +160,8 @@ fn run_mesh(
         entry_node_id: nodes[0].node_id,
         nodes,
     };
-    let mut state = GraphRuntimeState::for_genome(&genome, Vec::new());
+    let mut state =
+        GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
     state.begin_tick(0);
     execute_creature_mesh(
         &genome,
@@ -380,7 +381,8 @@ fn stateful_module_and_blank_neighbor_each_step_once_per_visit() {
                 graph_node(1, blank_def, &[]),
             ],
         };
-        let mut state = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let mut state =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         let mut memory_in = [0.0; 16];
         let mut energy = 100.0;
         for expected in [1.5, 2.25] {

@@ -1398,11 +1398,12 @@ fn an_extinct_snapshot_keeps_every_sensor_series_at_zero() {
 #[test]
 fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
     use v3_core::contracts::OutcomeChannel;
+    use v3_core::creature::birth::{BirthPayload, BirthPlace, Zygote};
     use v3_core::genome::analysis::mesh_reachable_nodes;
     use v3_core::genome::cgp::{
-        BirthSeeds, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
-        GraphSource,
+        ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge, GraphSource,
     };
+    use v3_core::genome::learning::{LearnableId, LearnableKey, Seeds};
     use v3_core::genome::{BackendDef, HebbianRule, Learning, RewardModulationConfig};
 
     let receiver = Receiver::start();
@@ -1410,9 +1411,9 @@ fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
     let config = small_config();
     // Give one founder's entry node, which is reachable, a compute node with
     // two Lamarckian plastic edges whose inherited weights have moved: one to
-    // its clamp, one by 0.25 (T25.F06: seeded slots are initialized), as birth
-    // seeds the constructor builds them from. The second decays (T25.F09).
-    let sim = v3_core::simulation::seeding::seed_simulation_with_founder_genomes(
+    // its clamp, one by 0.25 (T25.F06: seeded slots are initialized), as a
+    // birth payload the founder is rebuilt from. The second decays (T25.F09).
+    let mut sim = v3_core::simulation::seeding::seed_simulation_with_founder_genomes(
         config.clone(),
         7,
         |founder_index, genome| {
@@ -1454,24 +1455,42 @@ fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
                     retention: [1.0, 0.5][index],
                 }));
             }
-            let mut rows = BirthSeeds::Rows {
-                compute: def
-                    .compute_nodes()
-                    .iter()
-                    .map(|node| vec![None; node.inputs.len()])
-                    .collect(),
-                sinks: def
-                    .output_sinks()
-                    .iter()
-                    .map(|sink| vec![None; sink.inputs.len()])
-                    .collect(),
-                bundles: vec![None; def.bundles().len()],
-            };
-            let BirthSeeds::Rows { compute: seeds, .. } = &mut rows;
-            seeds[compute] = vec![Some(1.0), Some(0.25)];
-            def.seed_birth(rows);
         },
     );
+    // Founder 0 is the first creature placed; rebuild it carrying the
+    // inherited values on its new compute node's two edges.
+    let id = sim.creatures.keys().next().unwrap();
+    let founder = &sim.creatures[id];
+    let entry = mesh_reachable_nodes(founder.genome())[0];
+    let BackendDef::Graph(def) = founder.genome().nodes[entry].backend_def() else {
+        panic!("the default founder's entry node is a Graph node");
+    };
+    let compute = def.compute_nodes().len() - 1;
+    let seeds: Seeds = [(0, 1.0), (1, 0.25)]
+        .into_iter()
+        .map(|(index, value)| {
+            (
+                LearnableId {
+                    node: entry,
+                    key: LearnableKey::Edge(EdgeOccurrence::new(
+                        EdgeSurface::ComputeInput(compute),
+                        index,
+                    )),
+                },
+                value,
+            )
+        })
+        .collect();
+    let place = BirthPlace {
+        position: founder.position,
+        heading: founder.heading,
+        energy: founder.energy,
+    };
+    let rebuilt = Zygote::founder(founder.genome().clone(), founder.body)
+        .with_payload(BirthPayload::new(seeds, founder.shared_memory))
+        .finalize(id, place)
+        .creature;
+    sim.creatures[id] = rebuilt;
     let mut run = telemetry.begin_run(start(&config)).unwrap();
     assert!(telemetry.snapshot(&mut run, &sim, Trigger::RunEnd));
     telemetry.end_run(run, EndStatus::Completed, sim.tick, Flush::Wait);

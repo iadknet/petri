@@ -473,7 +473,6 @@ fn slot_address_wraps_via_rem_euclid() {
 fn vm_eats_when_food_here() {
     use crate::config::{SimulationConfig, WorldEdgeMode};
     use crate::contracts::{CreatureId, NodeId, Position, WorldInputKey};
-    use crate::creature::state::CreatureState;
     use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
     use crate::kernel::WorldState;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
@@ -526,12 +525,8 @@ fn vm_eats_when_food_here() {
             vec![],
         )],
     };
-    let creature = CreatureState::new(
-        id,
+    let creature = crate::creature::birth::Zygote::founder(
         genome,
-        pos,
-        30.0,
-        0,
         HeritableBody {
             phenotype: Phenotype {
                 channels: [0; 6],
@@ -543,8 +538,16 @@ fn vm_eats_when_food_here() {
             steal_share: 0.2,
             give_share: 0.2,
         },
-        [0.0; 16],
-    );
+    )
+    .finalize(
+        id,
+        crate::creature::birth::BirthPlace {
+            position: pos,
+            heading: crate::contracts::Direction::N,
+            energy: 30.0,
+        },
+    )
+    .creature;
 
     let local = assemble_static_inputs(
         &world,
@@ -568,7 +571,10 @@ fn vm_eats_when_food_here() {
         &mut energy,
         &mut [0.0f32; 16],
         &[0.0f32; 16],
-        &mut crate::runtime::state::GraphRuntimeState::for_genome(creature.genome(), Vec::new()),
+        &mut crate::runtime::state::GraphRuntimeState::for_genome(
+            creature.genome(),
+            &crate::genome::learning::Seeds::default(),
+        ),
         &config(),
         crate::contracts::Direction::N,
     )
@@ -586,7 +592,6 @@ fn vm_eats_when_food_here() {
 fn vm_noop_when_no_food() {
     use crate::config::WorldEdgeMode;
     use crate::contracts::{CreatureId, NodeId, Position, WorldInputKey};
-    use crate::creature::state::CreatureState;
     use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
     use crate::kernel::WorldState;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
@@ -628,12 +633,8 @@ fn vm_noop_when_no_food() {
             vec![],
         )],
     };
-    let creature = CreatureState::new(
-        id,
+    let creature = crate::creature::birth::Zygote::founder(
         genome,
-        pos,
-        30.0,
-        0,
         HeritableBody {
             phenotype: Phenotype {
                 channels: [0; 6],
@@ -645,8 +646,16 @@ fn vm_noop_when_no_food() {
             steal_share: 0.2,
             give_share: 0.2,
         },
-        [0.0; 16],
-    );
+    )
+    .finalize(
+        id,
+        crate::creature::birth::BirthPlace {
+            position: pos,
+            heading: crate::contracts::Direction::N,
+            energy: 30.0,
+        },
+    )
+    .creature;
     let local = assemble_static_inputs(
         &world,
         &creature.sensed_body(&EnergyConfig::default().capacity),
@@ -668,7 +677,10 @@ fn vm_noop_when_no_food() {
         &mut energy,
         &mut [0.0f32; 16],
         &[0.0f32; 16],
-        &mut crate::runtime::state::GraphRuntimeState::for_genome(creature.genome(), Vec::new()),
+        &mut crate::runtime::state::GraphRuntimeState::for_genome(
+            creature.genome(),
+            &crate::genome::learning::Seeds::default(),
+        ),
         &config(),
         crate::contracts::Direction::N,
     )

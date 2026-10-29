@@ -25,7 +25,8 @@ fn fixture() -> CreatureGenome {
 fn native_run(genome: &CreatureGenome) {
     let node = &genome.nodes[0];
     let mut energy = 10.0;
-    let mut state = GraphRuntimeState::for_genome(genome, Vec::new());
+    let mut state =
+        GraphRuntimeState::for_genome(genome, &crate::genome::learning::Seeds::default());
     let mut side = MeshSideOutputs::new(8);
     let mut memory = [0.0; 16];
     let snapshot = sensors();

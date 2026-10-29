@@ -426,7 +426,8 @@ mod tests {
             },
             perception: PerceptionSnapshot::zeroed(1),
         };
-        let mut runtime = GraphRuntimeState::for_genome(genome, Vec::new());
+        let mut runtime =
+            GraphRuntimeState::for_genome(genome, &crate::genome::learning::Seeds::default());
         runtime.begin_tick(age);
         let config = RuntimeConfig {
             max_actions_per_turn: limit,

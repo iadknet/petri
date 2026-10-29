@@ -161,7 +161,8 @@ fn genome_emits_positive_priority_bid_with_real_action(genome: &CreatureGenome) 
         let mut energy = case.energy;
         let mut shared_memory = [0.0; 16];
         let prev_shared_memory = [0.0; 16];
-        let mut graph_runtime = GraphRuntimeState::for_genome(genome, Vec::new());
+        let mut graph_runtime =
+            GraphRuntimeState::for_genome(genome, &v3_core::genome::learning::Seeds::default());
         let output = execute_creature_mesh(
             genome,
             &case.sensors,

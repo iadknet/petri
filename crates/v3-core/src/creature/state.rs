@@ -9,8 +9,8 @@ use crate::contracts::{
 use crate::creature::action_log::{ActionType, ACTION_TYPE_COUNT};
 use crate::creature::body::HeritableBody;
 use crate::creature::colour::unit_rgb;
-use crate::creature::newborn::take_birth_seeds;
 use crate::genome::analysis::mesh_reachable_nodes;
+use crate::genome::learning::Seeds;
 use crate::genome::sensor_analysis::{
     declared_world_keys, has_barrier_reader, live_vm_world_reads, perception_requirements,
     sensor_census,
@@ -49,7 +49,8 @@ pub struct PendingBirth {
 pub struct CreatureState {
     pub id: CreatureId,
     /// Immutable after construction: set with its derived state and runtime
-    /// by [`Self::new`] and read through [`Self::genome`].
+    /// at birth ([`crate::creature::birth::Zygote::finalize`]) and read
+    /// through [`Self::genome`].
     genome: CreatureGenome,
     pub position: Position,
     pub energy: f32,
@@ -170,22 +171,20 @@ impl CreatureState {
         applied_debit(before, self.energy)
     }
 
-    /// The only constructor: a creature with zeroed `prev_shared_memory`
-    /// whose derived state and brain runtime are built from `genome`. It
-    /// takes the birth seeds out of `genome` (`creature::newborn`; none for a
-    /// seedless genome), derives every analysis from the seedless genome it
-    /// stores (no analysis reads a seed) and builds the learned state from
-    /// the genome and the seeds.
-    pub fn new(
+    /// The only constructor, called only by the birth's finalization
+    /// ([`crate::creature::birth::Zygote::finalize`]): a generation-0
+    /// creature with every per-life state zeroed, whose derived state and
+    /// brain runtime are built from `genome`, the learned state from the
+    /// genome and the inherited `seeds` (T30.F08: rebuilt on every birth).
+    pub(in crate::creature) fn new(
         id: CreatureId,
-        mut genome: CreatureGenome,
+        genome: CreatureGenome,
         position: Position,
         energy: f32,
-        generation: u64,
         body: HeritableBody,
         shared_memory: [f32; SHARED_MEMORY_SLOTS],
+        seeds: &Seeds,
     ) -> Self {
-        let seeds = take_birth_seeds(&mut genome);
         let derived = GenomeDerived::of(&genome);
         let graph_runtime = GraphRuntimeState::for_genome(&genome, seeds);
         Self {
@@ -195,7 +194,7 @@ impl CreatureState {
             energy,
             pending_death_cause: None,
             age: 0,
-            generation,
+            generation: 0,
             shared_memory,
             prev_shared_memory: [0.0; SHARED_MEMORY_SLOTS],
             graph_runtime,
@@ -456,15 +455,19 @@ mod tests {
     fn new_creature_has_zero_age_and_zeroed_shared_memory() {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let id = sm.insert(());
-        let state = CreatureState::new(
-            id,
+        let state = crate::creature::birth::Zygote::founder(
             minimal_genome(),
-            Position::new(5, 5),
-            20.0,
-            0,
             body([128, 64, 32, 10, 20, 30]),
-            [0.0; SHARED_MEMORY_SLOTS],
-        );
+        )
+        .finalize(
+            id,
+            crate::creature::birth::BirthPlace {
+                position: Position::new(5, 5),
+                heading: crate::contracts::Direction::N,
+                energy: 20.0,
+            },
+        )
+        .creature;
         assert_eq!(state.age, 0);
         assert_eq!(state.shared_memory, [0.0; SHARED_MEMORY_SLOTS]);
         assert_eq!(state.prev_shared_memory, [0.0; SHARED_MEMORY_SLOTS]);
@@ -485,15 +488,20 @@ mod tests {
         let mut mem = [0.0f32; SHARED_MEMORY_SLOTS];
         mem[3] = 1.5;
         mem[7] = -2.0;
-        let state = CreatureState::new(
-            id,
-            minimal_genome(),
-            Position::new(5, 5),
-            20.0,
-            0,
-            body([0; 6]),
-            mem,
-        );
+        let state = crate::creature::birth::Zygote::founder(minimal_genome(), body([0; 6]))
+            .with_payload(crate::creature::birth::BirthPayload::new(
+                crate::genome::learning::Seeds::default(),
+                mem,
+            ))
+            .finalize(
+                id,
+                crate::creature::birth::BirthPlace {
+                    position: Position::new(5, 5),
+                    heading: crate::contracts::Direction::N,
+                    energy: 20.0,
+                },
+            )
+            .creature;
         assert!((state.shared_memory[3] - 1.5).abs() < f32::EPSILON);
         assert!((state.shared_memory[7] - -2.0).abs() < f32::EPSILON);
         // prev is always zeroed for new creatures
@@ -504,15 +512,16 @@ mod tests {
     fn new_creature_starts_with_an_empty_dispatch_record() {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let id = sm.insert(());
-        let state = CreatureState::new(
-            id,
-            minimal_genome(),
-            Position::new(0, 0),
-            20.0,
-            0,
-            body([0; 6]),
-            [0.0; SHARED_MEMORY_SLOTS],
-        );
+        let state = crate::creature::birth::Zygote::founder(minimal_genome(), body([0; 6]))
+            .finalize(
+                id,
+                crate::creature::birth::BirthPlace {
+                    position: Position::new(0, 0),
+                    heading: crate::contracts::Direction::N,
+                    energy: 20.0,
+                },
+            )
+            .creature;
         assert!(state.graph_runtime().dispatch_record.is_empty());
         assert!(state
             .graph_runtime()
@@ -526,15 +535,16 @@ mod tests {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let id = sm.insert(());
         // minimal_genome has 1 node (the entry), which is reachable
-        let state = CreatureState::new(
-            id,
-            minimal_genome(),
-            Position::new(0, 0),
-            20.0,
-            0,
-            body([0; 6]),
-            [0.0; SHARED_MEMORY_SLOTS],
-        );
+        let state = crate::creature::birth::Zygote::founder(minimal_genome(), body([0; 6]))
+            .finalize(
+                id,
+                crate::creature::birth::BirthPlace {
+                    position: Position::new(0, 0),
+                    heading: crate::contracts::Direction::N,
+                    energy: 20.0,
+                },
+            )
+            .creature;
         assert_eq!(state.reachable_nodes(), &[0]);
     }
 
@@ -569,15 +579,16 @@ mod tests {
                 ),
             ],
         };
-        let state = CreatureState::new(
-            id,
-            genome,
-            Position::new(0, 0),
-            20.0,
-            0,
-            body([0; 6]),
-            [0.0; SHARED_MEMORY_SLOTS],
-        );
+        let state = crate::creature::birth::Zygote::founder(genome, body([0; 6]))
+            .finalize(
+                id,
+                crate::creature::birth::BirthPlace {
+                    position: Position::new(0, 0),
+                    heading: crate::contracts::Direction::N,
+                    energy: 20.0,
+                },
+            )
+            .creature;
         // Only node 0 should be reachable
         assert_eq!(state.reachable_nodes(), &[0]);
     }
@@ -632,18 +643,9 @@ mod tests {
             genome in mutated_genome(),
         ) {
             let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
-            let state = CreatureState::new(
-                sm.insert(()),
-                genome,
-                Position::new(0, 0),
-                20.0,
-                0,
-                body([0; 6]),
-                [0.0; SHARED_MEMORY_SLOTS],
-            );
+            let state = crate::creature::birth::Zygote::founder(genome, body([0; 6])).finalize(sm.insert(()), crate::creature::birth::BirthPlace { position: Position::new(0, 0), heading: crate::contracts::Direction::N, energy: 20.0 }).creature;
             let genome = state.genome();
             let reachable = mesh_reachable_nodes(genome);
-            prop_assert!(take_birth_seeds(&mut genome.clone()).is_empty());
             prop_assert_eq!(state.complexity(), genome.complexity());
             prop_assert_eq!(state.genome_size(), genome.genome_size());
             prop_assert_eq!(state.reachable_nodes(), reachable.as_slice());
@@ -678,15 +680,16 @@ mod tests {
     fn typed_attempts_and_eats_grow_their_own_slots() {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let id = sm.insert(());
-        let mut state = CreatureState::new(
-            id,
-            minimal_genome(),
-            Position::new(0, 0),
-            20.0,
-            0,
-            body([0; 6]),
-            [0.0; SHARED_MEMORY_SLOTS],
-        );
+        let mut state = crate::creature::birth::Zygote::founder(minimal_genome(), body([0; 6]))
+            .finalize(
+                id,
+                crate::creature::birth::BirthPlace {
+                    position: Position::new(0, 0),
+                    heading: crate::contracts::Direction::N,
+                    energy: 20.0,
+                },
+            )
+            .creature;
         state.record_action_attempt(ActionType::StealEnergy);
         state.record_action_attempt(ActionType::Eat);
         state.record_action_attempt(ActionType::Eat);
@@ -716,15 +719,16 @@ mod tests {
             let id = sm.insert(());
             let expected = genome.genome_size();
             assert!(expected > 0, "every fixture genome has a nonzero size");
-            let state = CreatureState::new(
-                id,
-                genome,
-                Position::new(0, 0),
-                20.0,
-                0,
-                body([0; 6]),
-                [0.0; SHARED_MEMORY_SLOTS],
-            );
+            let state = crate::creature::birth::Zygote::founder(genome, body([0; 6]))
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: Position::new(0, 0),
+                        heading: crate::contracts::Direction::N,
+                        energy: 20.0,
+                    },
+                )
+                .creature;
             assert_eq!(state.genome_size(), expected);
             assert_eq!(state.genome_size(), state.genome().genome_size());
         }
@@ -773,15 +777,20 @@ mod tests {
     fn creature_state_position_stored() {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let id = sm.insert(());
-        let state = CreatureState::new(
-            id,
-            minimal_genome(),
-            Position::new(3, 7),
-            50.0,
-            2,
-            body([0; 6]),
-            [0.0; SHARED_MEMORY_SLOTS],
-        );
+        let state = {
+            let mut born = crate::creature::birth::Zygote::founder(minimal_genome(), body([0; 6]))
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: Position::new(3, 7),
+                        heading: crate::contracts::Direction::N,
+                        energy: 50.0,
+                    },
+                )
+                .creature;
+            born.generation = 2;
+            born
+        };
         assert_eq!(state.position, Position::new(3, 7));
         assert_eq!(state.generation, 2);
     }
@@ -794,15 +803,19 @@ mod tests {
     fn the_sensed_body_resolves_colour_and_energy_scale() {
         use crate::config::SensorScale;
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
-        let mut state = CreatureState::new(
-            sm.insert(()),
+        let mut state = crate::creature::birth::Zygote::founder(
             minimal_genome(),
-            Position::new(3, 7),
-            50.0,
-            0,
             body([150, 0, 200, 200, 60, 60]),
-            [0.0; SHARED_MEMORY_SLOTS],
-        );
+        )
+        .finalize(
+            sm.insert(()),
+            crate::creature::birth::BirthPlace {
+                position: Position::new(3, 7),
+                heading: crate::contracts::Direction::N,
+                energy: 50.0,
+            },
+        )
+        .creature;
         state.age = 9;
         state.body.capacity = 50.0;
         state.body.identity.kin_tag = 0xABCD;
@@ -905,15 +918,16 @@ mod tests {
             ],
         };
 
-        let state = CreatureState::new(
-            id,
-            genome,
-            Position::new(0, 0),
-            10.0,
-            0,
-            body([0; 6]),
-            [0.0; SHARED_MEMORY_SLOTS],
-        );
+        let state = crate::creature::birth::Zygote::founder(genome, body([0; 6]))
+            .finalize(
+                id,
+                crate::creature::birth::BirthPlace {
+                    position: Position::new(0, 0),
+                    heading: crate::contracts::Direction::N,
+                    energy: 10.0,
+                },
+            )
+            .creature;
 
         let counts: std::collections::HashMap<_, _> =
             state.live_vm_world_inputs().iter().cloned().collect();

@@ -629,7 +629,10 @@ mod tests {
                 &mut energy,
                 &mut [0.0; 16],
                 &[0.0; 16],
-                &mut GraphRuntimeState::for_genome(genome, Vec::new()),
+                &mut GraphRuntimeState::for_genome(
+                    genome,
+                    &crate::genome::learning::Seeds::default(),
+                ),
                 &config,
                 Direction::N,
                 ObservedMeshExecution::default(),
@@ -724,7 +727,10 @@ mod tests {
                 &mut energy,
                 &mut [0.0; 16],
                 &[0.0; 16],
-                &mut GraphRuntimeState::for_genome(&genome, Vec::new()),
+                &mut GraphRuntimeState::for_genome(
+                    &genome,
+                    &crate::genome::learning::Seeds::default(),
+                ),
                 &config,
                 Direction::N,
             );
@@ -734,7 +740,10 @@ mod tests {
                 &mut { start },
                 &mut [0.0; 16],
                 &[0.0; 16],
-                &mut GraphRuntimeState::for_genome(&genome, Vec::new()),
+                &mut GraphRuntimeState::for_genome(
+                    &genome,
+                    &crate::genome::learning::Seeds::default(),
+                ),
                 &config,
                 Direction::N,
                 ObservedMeshExecution::default(),
@@ -745,7 +754,10 @@ mod tests {
                 &mut { start },
                 &mut [0.0; 16],
                 &[0.0; 16],
-                &mut GraphRuntimeState::for_genome(&genome, Vec::new()),
+                &mut GraphRuntimeState::for_genome(
+                    &genome,
+                    &crate::genome::learning::Seeds::default(),
+                ),
                 &config,
                 Direction::N,
             );
@@ -821,7 +833,8 @@ mod tests {
             let mut observed_memory = memory;
             let mut traced_memory = memory;
             let previous = [0.25; 16];
-            let mut state = GraphRuntimeState::for_genome(&genome, Vec::new());
+            let mut state =
+                GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
             let mut observed_state = state.clone();
             let mut traced_state = state.clone();
             let config = RuntimeConfig {
@@ -1017,7 +1030,8 @@ mod tests {
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let mut gr =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1042,7 +1056,7 @@ mod tests {
             energy,
             &mut [0.0; 16],
             &[0.0; 16],
-            &mut GraphRuntimeState::for_genome(genome, Vec::new()),
+            &mut GraphRuntimeState::for_genome(genome, &crate::genome::learning::Seeds::default()),
             config,
             Direction::N,
         )
@@ -1116,7 +1130,8 @@ mod tests {
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let mut gr =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1156,7 +1171,8 @@ mod tests {
         let mut energy = 0.01f32; // way below the Noop cost of 0.05
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let mut gr =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1186,7 +1202,8 @@ mod tests {
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let mut gr =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1236,7 +1253,8 @@ mod tests {
         let mut energy = 1000.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let mut gr =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1283,7 +1301,8 @@ mod tests {
         let mut energy = 1000.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let mut gr =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1319,7 +1338,8 @@ mod tests {
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let mut gr =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1371,7 +1391,8 @@ mod tests {
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let mut gr =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1598,7 +1619,8 @@ mod tests {
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let mut gr =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1632,7 +1654,8 @@ mod tests {
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let mut gr =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1704,7 +1727,8 @@ mod tests {
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let mut gr =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1733,7 +1757,8 @@ mod tests {
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
         let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let mut gr =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         let config = default_config();
 
         let output = execute_creature_mesh(
@@ -1783,7 +1808,7 @@ mod tests {
             energy,
             &mut [0.0; 16],
             &[0.0; 16],
-            &mut GraphRuntimeState::for_genome(genome, Vec::new()),
+            &mut GraphRuntimeState::for_genome(genome, &crate::genome::learning::Seeds::default()),
             config,
             Direction::N,
         )
@@ -1931,7 +1956,10 @@ mod tests {
                 &mut energy,
                 &mut shared_mem,
                 &[0.0; 16],
-                &mut GraphRuntimeState::for_genome(&genome, Vec::new()),
+                &mut GraphRuntimeState::for_genome(
+                    &genome,
+                    &crate::genome::learning::Seeds::default(),
+                ),
                 &config,
                 Direction::N,
             );
@@ -1963,7 +1991,8 @@ mod tests {
         };
         let mut energy = 5.0f32;
         let mut memory = [0.5f32; 16];
-        let mut state = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let mut state =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         let output = execute_creature_mesh(
             &genome,
             &empty_sensor_snapshot(),
@@ -2018,7 +2047,10 @@ mod tests {
                 &mut observed_energy,
                 &mut [0.0; 16],
                 &[0.0; 16],
-                &mut GraphRuntimeState::for_genome(&genome, Vec::new()),
+                &mut GraphRuntimeState::for_genome(
+                    &genome,
+                    &crate::genome::learning::Seeds::default(),
+                ),
                 &config,
                 Direction::N,
                 ObservedMeshExecution::default(),
@@ -2029,7 +2061,10 @@ mod tests {
                 &mut traced_energy,
                 &mut [0.0; 16],
                 &[0.0; 16],
-                &mut GraphRuntimeState::for_genome(&genome, Vec::new()),
+                &mut GraphRuntimeState::for_genome(
+                    &genome,
+                    &crate::genome::learning::Seeds::default(),
+                ),
                 &config,
                 Direction::N,
             );
@@ -2058,7 +2093,7 @@ mod tests {
             &mut 100.0,
             &mut [0.0; 16],
             &[0.0; 16],
-            &mut GraphRuntimeState::for_genome(genome, Vec::new()),
+            &mut GraphRuntimeState::for_genome(genome, &crate::genome::learning::Seeds::default()),
             &default_config(),
             Direction::N,
         );

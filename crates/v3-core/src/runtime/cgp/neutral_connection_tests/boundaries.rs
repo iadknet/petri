@@ -345,7 +345,8 @@ fn dormant_activation_changes_a_later_live_energy_read() {
     for genome in [base, silent] {
         let mut energy = 10.0;
         let mut memory = ramp(0.5);
-        let mut state = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let mut state =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         state.begin_tick(0);
         let result = execute_creature_mesh(
             &genome,

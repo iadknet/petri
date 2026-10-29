@@ -19,10 +19,10 @@
 use super::rules::{activity, hebbian_delta, relax, three_factor};
 use super::OutcomeSignalBank;
 use crate::contracts::InputReference;
-use crate::genome::cgp::{
-    compose, BirthSeeds, BundleId, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface,
+use crate::genome::cgp::{compose, BundleId, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface};
+use crate::genome::learning::{
+    LearnableId, LearnableKey, LearnerSource, LearningLayout, MemberTerm, NodeSeeds, Seeds,
 };
-use crate::genome::learning::{LearnerSource, LearningLayout, MemberTerm};
 use crate::genome::{retention_decays, BackendDef, CreatureGenome, Learning};
 
 /// Where a member's bundle term reads its scale.
@@ -166,10 +166,12 @@ impl BackendLearning {
     fn from_layout(
         def: &CgpGraphBackendDef,
         layout: LearningLayout,
-        seeds: Option<&BirthSeeds>,
+        seeds: Option<&NodeSeeds>,
     ) -> Self {
-        let seed_if = |lamarckian: bool, read: &dyn Fn(&BirthSeeds) -> Option<f32>| {
-            seeds.filter(|_| lamarckian).and_then(read)
+        let seed_if = |lamarckian: bool, key: LearnableKey| {
+            seeds
+                .filter(|_| lamarckian)
+                .and_then(|seeds| seeds.get(&key).copied())
         };
         let term = |member: MemberTerm| Term {
             pattern: member.pattern,
@@ -217,9 +219,10 @@ impl BackendLearning {
             .iter()
             .map(|learner| {
                 let genomic = def.edge_at(learner.occurrence).own_weight();
-                let seed = seed_if(learner.learning.lamarckian, &|seeds| {
-                    seeds.value(learner.occurrence)
-                });
+                let seed = seed_if(
+                    learner.learning.lamarckian,
+                    LearnableKey::Edge(learner.occurrence),
+                );
                 let birth = bounded(seed.unwrap_or(genomic), &learner.learning);
                 EdgeLearner {
                     occurrence: learner.occurrence,
@@ -240,9 +243,7 @@ impl BackendLearning {
             .iter()
             .map(|scale| {
                 let genomic = def.bundles()[scale.bundle.index()].scale();
-                let seed = seed_if(scale.learning.lamarckian, &|seeds| {
-                    seeds.bundle_value(scale.bundle)
-                });
+                let seed = seed_if(scale.learning.lamarckian, LearnableKey::Scale(scale.bundle));
                 let birth = bounded(seed.unwrap_or(genomic), &scale.learning);
                 ScaleLearner {
                     bundle: scale.bundle,
@@ -441,53 +442,33 @@ impl BackendLearning {
         counts
     }
 
-    /// The seeds this backend hands a child: `None` when no learner is
-    /// initialized, else one row per compute node and per sink of `def`
-    /// with each initialized edge learner's value, and one bundle slot per
-    /// bundle record with each initialized scale's value.
-    fn capture(&self, def: &CgpGraphBackendDef) -> Option<BirthSeeds> {
-        let any_edge = self
-            .edges
-            .iter()
-            .any(|learner| self.initialized(learner.seeded));
-        let any_scale = self
-            .scales
-            .iter()
-            .any(|scale| self.initialized(scale.seeded));
-        if !any_edge && !any_scale {
-            return None;
-        }
-        let mut compute: Vec<Vec<Option<f32>>> = def
-            .compute_nodes()
-            .iter()
-            .map(|node| vec![None; node.inputs.len()])
-            .collect();
-        let mut sinks: Vec<Vec<Option<f32>>> = def
-            .output_sinks()
-            .iter()
-            .map(|sink| vec![None; sink.inputs.len()])
-            .collect();
-        for learner in self.edges.iter() {
-            if !self.initialized(learner.seeded) {
-                continue;
+    /// The values this backend, mesh node `node`, hands a child (T25.F06
+    /// invariant 8): each initialized edge learner's and scale learner's
+    /// value, keyed by its learnable identity; nothing when none is
+    /// initialized.
+    fn capture(&self, node: usize, seeds: &mut Seeds) {
+        for learner in &self.edges {
+            if self.initialized(learner.seeded) {
+                seeds.insert(
+                    LearnableId {
+                        node,
+                        key: LearnableKey::Edge(learner.occurrence),
+                    },
+                    learner.value,
+                );
             }
-            let row = match learner.occurrence.surface {
-                EdgeSurface::ComputeInput(i) => &mut compute[i],
-                EdgeSurface::SinkInput(i) => &mut sinks[i],
-            };
-            row[learner.occurrence.index] = Some(learner.value);
         }
-        let mut bundles = vec![None; def.bundles().len()];
-        for scale in self.scales.iter() {
+        for scale in &self.scales {
             if self.initialized(scale.seeded) {
-                bundles[scale.bundle.index()] = Some(scale.value);
+                seeds.insert(
+                    LearnableId {
+                        node,
+                        key: LearnableKey::Scale(scale.bundle),
+                    },
+                    scale.value,
+                );
             }
         }
-        Some(BirthSeeds::Rows {
-            compute,
-            sinks,
-            bundles,
-        })
     }
 
     /// The view of edge learner `index`.
@@ -574,10 +555,11 @@ pub struct LearnedScale {
 
 impl LearnedState {
     /// The learners and initial state of `genome`, built from each graph
-    /// node's learning layout once, the seeds of mesh node `i` at
-    /// `seeds[i]` (absent or `None`: no inheritance).
+    /// node's learning layout once, mesh node `i` reading the seeds `seeds`
+    /// holds for node `i` (T25.F12 invariants 5, 7: a learner consumes a seed
+    /// only when it is Lamarckian).
     #[must_use]
-    pub(crate) fn for_genome(genome: &CreatureGenome, seeds: &[Option<BirthSeeds>]) -> Self {
+    pub(crate) fn for_genome(genome: &CreatureGenome, seeds: &Seeds) -> Self {
         let backends: Vec<BackendLearning> = genome
             .nodes
             .iter()
@@ -586,7 +568,7 @@ impl LearnedState {
                 BackendDef::Graph(def) => BackendLearning::from_layout(
                     def,
                     LearningLayout::of(def, node.input_refs()),
-                    seeds.get(idx).and_then(Option::as_ref),
+                    seeds.node(idx),
                 ),
                 BackendDef::Vm(_) => BackendLearning::default(),
             })
@@ -639,13 +621,16 @@ impl LearnedState {
         counts
     }
 
-    /// Mesh node `node_idx`'s seeds for a child before mutation (`def` is
-    /// that node's graph): `None` when nothing there is initialized.
+    /// The seeds a child inherits, captured before mutation: every
+    /// initialized learner's value keyed by learnable identity, none when
+    /// nothing is initialized.
     #[must_use]
-    pub(crate) fn capture(&self, node_idx: usize, def: &CgpGraphBackendDef) -> Option<BirthSeeds> {
-        self.backends
-            .get(node_idx)
-            .and_then(|backend| backend.capture(def))
+    pub(crate) fn capture(&self) -> Seeds {
+        let mut seeds = Seeds::default();
+        for (node, backend) in self.backends.iter().enumerate() {
+            backend.capture(node, &mut seeds);
+        }
+        seeds
     }
 
     /// The learner of mesh node `node_idx`'s visit, `None` for a backend

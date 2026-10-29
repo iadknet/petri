@@ -1,16 +1,13 @@
 use crate::creature::action_log::ActionType;
 use rand::Rng;
 
-use super::cgp_reproduction;
 use super::{ActionInputs, Conception};
 use crate::contracts::{ActionOutcome, ActionResult, CreatureId, Direction, Position};
 use crate::creature::action_log::ActionLog;
-use crate::creature::body::HeritableBody;
+use crate::creature::birth::{BirthPlace, Zygote};
 use crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS;
-use crate::creature::state::{CreatureState, PendingBirth};
+use crate::creature::state::PendingBirth;
 use crate::ledger::DeathCause;
-use crate::mutation::reachability::ParentExecuted;
-use crate::mutation::MutationEngine;
 use crate::runtime::action_decode::clamp_unit_interval;
 use crate::simulation::birth_age::BirthOrder;
 use crate::simulation::simulation::Simulation;
@@ -323,7 +320,6 @@ pub(crate) fn deliver_pending_birth(
         sim.stats.gestations_lost_no_cell_total += 1;
         return BirthDelivery::LostNoCell;
     };
-    // WORKAROUND(G4): the birth transaction of T29.F01 takes world context, not the simulation
     spawn_child(
         parent_id,
         sim,
@@ -335,15 +331,11 @@ pub(crate) fn deliver_pending_birth(
     BirthDelivery::Delivered(target)
 }
 
-/// Steps 9 to 14: clone and mutate the parent's genome and state at this
-/// moment and place the child on `target` with `litter_energy`. `direction`
-/// is the step from the parent's cell to `target`, the child's heading
-/// (T11.F30).
-#[allow(
-    clippy::too_many_lines,
-    reason = "Steps 9 to 14 of the unified reproduction sequence in \
-              v3-reproduction-spec.md Section 6 are ordered end to end"
-)]
+/// Steps 9 to 14: conceive the child of `parent_id` at this moment and
+/// finalize it on `target` with `transfer`. `direction` is the step from the
+/// parent's cell to `target`, the child's heading (T11.F30). The simulation
+/// folds the birth's mutation summary into its stats, books the capacity
+/// overflow and the child's credit, and places the child.
 pub(crate) fn spawn_child(
     parent_id: CreatureId,
     sim: &mut Simulation,
@@ -352,181 +344,24 @@ pub(crate) fn spawn_child(
     transfer: f32,
     rng: &mut impl Rng,
 ) {
-    // Step 9: Build offspring draft (clone parent genome + state).
-    let parent = &sim.creatures[parent_id];
-    let mut child_genome = parent.genome().clone();
-    let child_shared_memory = parent.shared_memory;
-    let child_generation = parent.generation + 1;
-    // T11.F17: the parent's own recent dispatches bias the offspring's targets.
-    // Passed unresolved, so a zero-event birth derives nothing.
-    let executed_within = |window| {
-        parent
-            .graph_runtime()
-            .dispatch_record
-            .executed_indices(parent.age, window)
-    };
-    let parent_executed = ParentExecuted::Query(&executed_within);
-
-    // Step 10: Apply genome mutations to the draft, which carries the
-    // parent's learned weights as birth seeds (T25.F01).
-    cgp_reproduction::capture_birth_seeds(&mut child_genome, parent.graph_runtime().learned());
-    let summary = MutationEngine::apply_mutations_in(
-        &mut child_genome,
-        &sim.config.mutation,
-        parent.reachable_nodes(),
-        parent_executed,
-        rng,
-        &sim.config.sensor_context(sim.config.world.food.types.len()),
-    )
-    .0;
-
-    // Update mutation stats.
-    sim.stats.mutation_events_attempted_total += summary.attempted_events as u64;
-    sim.stats.mutation_events_applied_total += summary.applied_events as u64;
-    sim.stats.mutation_events_skipped_total += summary.skipped_events as u64;
-    for (domain, count) in &summary.attempted_by_domain {
-        *sim.stats
-            .mutation_events_attempted_total_by_domain
-            .entry(*domain)
-            .or_insert(0) += *count as u64;
-    }
-    for (domain, count) in &summary.applied_by_domain {
-        *sim.stats
-            .mutation_events_applied_total_by_domain
-            .entry(*domain)
-            .or_insert(0) += *count as u64;
-    }
-    for (operator, count) in &summary.attempted_by_operator {
-        *sim.stats
-            .mutation_events_attempted_total_by_operator
-            .entry(*operator)
-            .or_insert(0) += *count as u64;
-    }
-    for (operator, count) in &summary.applied_by_operator {
-        *sim.stats
-            .mutation_events_applied_total_by_operator
-            .entry(*operator)
-            .or_insert(0) += *count as u64;
-    }
-    for (reason, count) in &summary.skip_reasons {
-        *sim.stats
-            .mutation_events_skipped_by_reason
-            .entry(*reason)
-            .or_insert(0) += *count as u64;
-    }
-    for (operator, count) in &summary.skipped_by_operator {
-        *sim.stats
-            .mutation_events_skipped_total_by_operator
-            .entry(*operator)
-            .or_insert(0) += *count as u64;
-    }
-    for (operator, funnel) in &summary.operator_funnel_by_operator {
-        let entry = sim
-            .stats
-            .mutation_operator_funnel_total_by_operator
-            .entry(*operator)
-            .or_default();
-        entry.attempted += funnel.attempted;
-        entry.applicable += funnel.applicable;
-        entry.structurally_valid += funnel.structurally_valid;
-        entry.applied += funnel.applied;
-        entry.skipped += funnel.skipped;
-    }
-    for (operator, by_reason) in &summary.skip_reasons_by_operator {
-        let entry = sim
-            .stats
-            .mutation_skip_reasons_total_by_operator
-            .entry(*operator)
-            .or_default();
-        for (reason, count) in by_reason {
-            *entry.entry(*reason).or_insert(0) += *count as u64;
-        }
-    }
-    for (operator, by_class) in &summary.added_node_input_classes_by_operator {
-        let entry = sim
-            .stats
-            .mutation_added_node_input_classes_total_by_operator
-            .entry(*operator)
-            .or_default();
-        for (class, count) in by_class {
-            *entry.entry(*class).or_insert(0) += *count as u64;
-        }
-    }
-    for (operator, by_key) in &summary.added_node_world_inputs_by_operator {
-        let entry = sim
-            .stats
-            .mutation_added_node_world_inputs_total_by_operator
-            .entry(*operator)
-            .or_default();
-        for (key, count) in by_key {
-            *entry.entry(*key).or_insert(0) += *count as u64;
-        }
-    }
-    sim.stats.mutation_reachable_target_total += summary.reachable_target_events as u64;
-    sim.stats.mutation_executed_target_total += summary.executed_target_events as u64;
-    sim.stats.mutation_unreachable_target_total += summary.unreachable_target_events as u64;
-    sim.stats.mutation_not_applicable_target_total += summary.not_applicable_events as u64;
-    sim.stats.graph_edges_detached_total += u64::from(summary.graph_edges_detached);
-    sim.stats.bundles_removed_total += u64::from(summary.bundles_removed);
-    for (&operator, created) in &summary.bundles_created_by_operator {
-        let total = sim.stats.bundles_created_total.entry(operator).or_default();
-        for (row, add) in total.iter_mut().zip(created) {
-            for (count, add) in row.iter_mut().zip(add) {
-                *count += u64::from(*add);
-            }
-        }
-    }
-    for (total, count) in sim
-        .stats
-        .mutation_attribute_changes_total_by_broadcast
-        .iter_mut()
-        .zip(summary.attribute_changes_by_broadcast)
-    {
-        *total += u64::from(count);
-    }
-    let mut child_birth_mutation_operators: Vec<_> =
-        summary.applied_by_operator.keys().copied().collect();
-    child_birth_mutation_operators.sort_by_key(|operator| operator.as_key());
-    let child_birth_mutation_operators = child_birth_mutation_operators.into_boxed_slice();
-    let child_birth_edge_class = summary.birth_edge_class();
-
-    // Step 11: Body inheritance — phenotype then kin-tag mutation, drawn only
-    // when at least one genome event was applied, then the capacity, the
-    // steal share and the give share draws on every birth.
-    let child_body = HeritableBody::inherit(
-        &sim.creatures[parent_id].body,
-        summary.applied_events > 0,
-        &sim.config.mutation,
-        &sim.config.energy,
-        &sim.config.exchange,
-        rng,
-    );
-
-    // Step 12: Lamarckian inheritance happens in the constructor below,
-    // which builds the newborn's weights from the draft's seeds.
-
-    // Step 13–14: Spawn child in slotmap + world. The constructor derives the
-    // child's analyses from the genome it stores, whether or not an event
-    // applied.
-    let child_id = sim.creatures.insert_with_key(move |id| {
-        let mut child = CreatureState::new(
+    let (zygote, summary) = Zygote::conceive(&sim.creatures[parent_id], &sim.config, rng);
+    sim.stats.fold_mutation_summary(&summary);
+    let mut overflow = 0.0;
+    let child_id = sim.creatures.insert_with_key(|id| {
+        let born = zygote.finalize(
             id,
-            child_genome,
-            target,
-            transfer,
-            child_generation,
-            child_body,
-            child_shared_memory,
+            BirthPlace {
+                position: target,
+                heading: direction,
+                energy: transfer,
+            },
         );
-        child.birth_mutation_operators = child_birth_mutation_operators;
-        child.birth_edge_class = child_birth_edge_class;
-        child.heading = direction;
-        child
+        overflow = born.overflow;
+        born.creature
     });
-    // The child is built with the whole litter; its body caps it here, and
-    // the excess is the parent's transfer the child cannot store.
-    sim.stats.energy_flows.offspring_capacity_overflow +=
-        super::cap_energy(&mut sim.creatures[child_id]);
+    // The child is given the whole litter; its body caps it, and the excess
+    // is the parent's transfer the child cannot store.
+    sim.stats.energy_flows.offspring_capacity_overflow += overflow;
     sim.stats.energy_flows.offspring_energy_credit += f64::from(sim.creatures[child_id].energy);
     sim.action_logs
         .insert(child_id, ActionLog::new(sim.config.action_log.capacity));
@@ -550,6 +385,7 @@ mod tests {
     use crate::genome::cgp::{
         ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge, GraphSource,
     };
+    use crate::genome::learning::InheritanceMapping;
     use crate::genome::{BackendDef, CreatureGenome};
     use crate::genome::{HebbianRule, Learning};
     use crate::simulation::tick::reproduce_now;
@@ -560,7 +396,10 @@ mod tests {
         genome: &CreatureGenome,
         parent: &[Vec<f32>],
     ) -> crate::runtime::state::GraphRuntimeState {
-        let mut state = crate::runtime::state::GraphRuntimeState::for_genome(genome, Vec::new());
+        let mut state = crate::runtime::state::GraphRuntimeState::for_genome(
+            genome,
+            &crate::genome::learning::Seeds::default(),
+        );
         for (node, values) in parent.iter().enumerate() {
             for (slot, &value) in values.iter().enumerate() {
                 state.learned.set_slot(node, slot, value, 0.0);
@@ -570,19 +409,19 @@ mod tests {
     }
 
     /// The child of a parent on `genome` holding `parent` (see
-    /// [`parent_state`]) after `mutate` edits the seeded draft: each mesh
-    /// node's learned values per plastic slot, `None` where uninitialized.
+    /// [`parent_state`]) after `mutate` edits the draft and returns the
+    /// edit's inheritance mapping: each mesh node's learned values per
+    /// plastic slot, `None` where uninitialized.
     fn birth_learned(
         genome: &CreatureGenome,
         parent: &[Vec<f32>],
-        mutate: impl FnOnce(&mut CreatureGenome),
+        mutate: impl FnOnce(&mut CreatureGenome) -> InheritanceMapping,
     ) -> (CreatureGenome, Vec<Vec<Option<f32>>>) {
         let state = parent_state(genome, parent);
         let mut child = genome.clone();
-        cgp_reproduction::capture_birth_seeds(&mut child, state.learned());
-        mutate(&mut child);
-        let seeds = crate::creature::newborn::take_birth_seeds(&mut child);
-        let built = crate::runtime::state::GraphRuntimeState::for_genome(&child, seeds);
+        let captured = state.learned().capture();
+        let seeds = mutate(&mut child).apply(&captured);
+        let built = crate::runtime::state::GraphRuntimeState::for_genome(&child, &seeds);
         let learned = (0..child.nodes.len())
             .map(|node| {
                 built
@@ -596,7 +435,7 @@ mod tests {
     }
 
     fn build_child_learned(genome: &CreatureGenome, parent: &[Vec<f32>]) -> Vec<Vec<Option<f32>>> {
-        birth_learned(genome, parent, |_| {}).1
+        birth_learned(genome, parent, |_| InheritanceMapping::Identity).1
     }
 
     /// Helper: builds a genome with a single Graph mesh node containing the given compute nodes.
@@ -933,23 +772,30 @@ mod tests {
                 vm(1, vec![]),
             ],
         };
-        let parent = crate::runtime::state::GraphRuntimeState::for_genome(&child, Vec::new());
-        cgp_reproduction::capture_birth_seeds(&mut child, parent.learned());
-        TopologyMutator::apply(
+        let parent = crate::runtime::state::GraphRuntimeState::for_genome(
+            &child,
+            &crate::genome::learning::Seeds::default(),
+        );
+        let captured = parent.learned().capture();
+        let (_, report) = TopologyMutator::apply_in(
             &mut child,
             TopologyOperator::SwapNodeBackend,
             &mut TargetSelector::reachable_only(&[0, 1], 0.0),
             &mut rand::rngs::SmallRng::seed_from_u64(5),
             &MutationConfig::default(),
+            &crate::config::SimulationConfig::default().sensor_context(1),
         )
         .unwrap();
-        let BackendDef::Graph(created) = child.nodes[2].backend_def() else {
-            panic!("a swapped VM copy is a Graph node");
-        };
-        assert!(created.birth_seeds().is_none());
-        assert!(crate::creature::newborn::take_birth_seeds(&mut child).is_empty());
+        assert!(matches!(child.nodes[2].backend_def(), BackendDef::Graph(_)));
+        assert_eq!(
+            report.inheritance.node(2),
+            crate::genome::learning::NodeInheritance::Fresh,
+            "a swapped backend inherits nothing"
+        );
+        let seeds = report.inheritance.apply(&captured);
+        assert!(seeds.is_empty());
         assert!(
-            !crate::runtime::state::GraphRuntimeState::for_genome(&child, Vec::new())
+            !crate::runtime::state::GraphRuntimeState::for_genome(&child, &seeds)
                 .learned()
                 .has_learning()
         );
@@ -1003,14 +849,17 @@ mod tests {
             TopologyOperator::RemoveNode,
         ] {
             let (child, result) = birth_learned(&original, &parent, |child| {
-                TopologyMutator::apply(
+                TopologyMutator::apply_in(
                     child,
                     op,
                     &mut TargetSelector::reachable_only(&[0, 1, 2], 0.0),
                     &mut rand::rngs::SmallRng::seed_from_u64(73),
                     &MutationConfig::default(),
+                    &crate::config::SimulationConfig::default().sensor_context(1),
                 )
-                .unwrap();
+                .unwrap()
+                .1
+                .inheritance
             });
             for (idx, node) in child.nodes.iter().enumerate() {
                 let BackendDef::Graph(def) = node.backend_def() else {
@@ -1020,15 +869,8 @@ mod tests {
                     result[idx][0],
                     Some(def.compute_nodes()[0].inputs[0].own_weight() + 1.0)
                 );
-                assert!(def.birth_seeds().is_none());
             }
         }
-        // Replacing a backend at the same mesh index/ID gives it no correspondence.
-        let (_, result) = birth_learned(&original, &parent, |child| {
-            *child.nodes[0].backend_edit().1 = original.nodes[0].backend_def().clone();
-        });
-        assert_eq!(result[0][0], None);
-        assert_eq!(result[1][0], Some(3.0));
     }
 
     /// One live reproduction of a single Lamarckian parent holding `learned`
@@ -1122,8 +964,8 @@ mod tests {
         (sim, parent_id, genome, child_id, applied)
     }
 
-    /// The newborn holds the inherited value in its own storage, carries no
-    /// seeds, starts with empty temporal state, and the parent is unchanged.
+    /// The newborn holds the inherited value in its own storage, starts with
+    /// empty temporal state, and the parent is unchanged.
     fn assert_seeded_birth(
         sim: &Simulation,
         parent_id: crate::contracts::CreatureId,
@@ -1138,11 +980,6 @@ mod tests {
         assert!(child.graph_runtime().node_state.is_empty());
         assert!(child.graph_runtime().node_outputs.is_empty());
         assert!(child.graph_runtime().dispatch_record.is_empty());
-        for node in &child.genome().nodes {
-            if let BackendDef::Graph(def) = node.backend_def() {
-                assert!(def.birth_seeds().is_none());
-            }
-        }
         let parent = &sim.creatures[parent_id];
         assert_eq!(parent.genome(), genome);
         let edge = parent.graph_runtime().learned().edges(0).next().unwrap();

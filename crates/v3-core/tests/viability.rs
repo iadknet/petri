@@ -361,15 +361,16 @@ fn creatures_can_eat_food() {
     let start_energy = cfg.energy.lifecycle.initial_energy;
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let creature_id = creatures.insert_with_key(|id| {
-        CreatureState::new(
-            id,
-            v3alpha1_founder_genome(),
-            pos,
-            start_energy,
-            0,
-            founder_body(),
-            [0.0; 16],
-        )
+        v3_core::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+            .finalize(
+                id,
+                v3_core::creature::birth::BirthPlace {
+                    position: pos,
+                    heading: v3_core::contracts::Direction::N,
+                    energy: start_energy,
+                },
+            )
+            .creature
     });
     world.place_creature(pos, creature_id);
     let energy_before = creatures[creature_id].energy;
@@ -422,15 +423,16 @@ fn founder_eats_primary_type_and_preserves_other_food() {
 
     let mut creatures: slotmap::SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let id = creatures.insert_with_key(|id| {
-        CreatureState::new(
-            id,
-            v3alpha1_founder_genome(),
-            pos,
-            cfg.energy.lifecycle.initial_energy,
-            0,
-            founder_body(),
-            [0.0; 16],
-        )
+        v3_core::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+            .finalize(
+                id,
+                v3_core::creature::birth::BirthPlace {
+                    position: pos,
+                    heading: v3_core::contracts::Direction::N,
+                    energy: cfg.energy.lifecycle.initial_energy,
+                },
+            )
+            .creature
     });
     world.place_creature(pos, id);
 
@@ -467,15 +469,16 @@ fn founder_reproduces_when_energy_allows_and_target_is_open() {
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let parent_id = creatures.insert_with_key(|id| {
-        CreatureState::new(
-            id,
-            v3alpha1_founder_genome(),
-            pos,
-            FOUNDER_SCENARIO_ENERGY,
-            0,
-            founder_body(),
-            [0.0; 16],
-        )
+        v3_core::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+            .finalize(
+                id,
+                v3_core::creature::birth::BirthPlace {
+                    position: pos,
+                    heading: v3_core::contracts::Direction::N,
+                    energy: FOUNDER_SCENARIO_ENERGY,
+                },
+            )
+            .creature
     });
     // Phase 0 increments age before action selection, so age=19 here means the
     // founder acts at age 20 on this tick.
@@ -529,15 +532,16 @@ fn founder_does_not_attempt_reproduce_when_below_min_reproduce_age() {
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let founder_id = creatures.insert_with_key(|id| {
-        CreatureState::new(
-            id,
-            v3alpha1_founder_genome(),
-            start,
-            FOUNDER_SCENARIO_ENERGY,
-            0,
-            founder_body(),
-            [0.0; 16],
-        )
+        v3_core::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+            .finalize(
+                id,
+                v3_core::creature::birth::BirthPlace {
+                    position: start,
+                    heading: v3_core::contracts::Direction::N,
+                    energy: FOUNDER_SCENARIO_ENERGY,
+                },
+            )
+            .creature
     });
     world.place_creature(start, founder_id);
 
@@ -576,15 +580,16 @@ fn founder_moves_when_no_food_and_below_reproduce_threshold() {
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let creature_id = creatures.insert_with_key(|id| {
-        CreatureState::new(
-            id,
-            v3alpha1_founder_genome(),
-            start,
-            cfg.energy.lifecycle.initial_energy,
-            0,
-            founder_body(),
-            [0.0; 16],
-        )
+        v3_core::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+            .finalize(
+                id,
+                v3_core::creature::birth::BirthPlace {
+                    position: start,
+                    heading: v3_core::contracts::Direction::N,
+                    energy: cfg.energy.lifecycle.initial_energy,
+                },
+            )
+            .creature
     });
     world.place_creature(start, creature_id);
 
@@ -750,15 +755,16 @@ fn phenotype_inherits_unchanged_when_no_genome_mutation() {
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let parent_id = creatures.insert_with_key(|id| {
-        CreatureState::new(
-            id,
-            v3alpha1_founder_genome(),
-            pos,
-            FOUNDER_SCENARIO_ENERGY,
-            0,
-            founder_body(),
-            [0.0; 16],
-        )
+        v3_core::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+            .finalize(
+                id,
+                v3_core::creature::birth::BirthPlace {
+                    position: pos,
+                    heading: v3_core::contracts::Direction::N,
+                    energy: FOUNDER_SCENARIO_ENERGY,
+                },
+            )
+            .creature
     });
     world.place_creature(pos, parent_id);
 
@@ -801,12 +807,8 @@ fn identity_inherits_unchanged_when_no_genome_mutation() {
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let parent_id = creatures.insert_with_key(|id| {
-        CreatureState::new(
-            id,
+        v3_core::creature::birth::Zygote::founder(
             v3alpha1_founder_genome(),
-            pos,
-            FOUNDER_SCENARIO_ENERGY,
-            0,
             HeritableBody {
                 phenotype: Phenotype::FOUNDER,
                 identity: parent_identity,
@@ -814,8 +816,16 @@ fn identity_inherits_unchanged_when_no_genome_mutation() {
                 steal_share: 0.2,
                 give_share: 0.2,
             },
-            [0.0; 16],
         )
+        .finalize(
+            id,
+            v3_core::creature::birth::BirthPlace {
+                position: pos,
+                heading: v3_core::contracts::Direction::N,
+                energy: FOUNDER_SCENARIO_ENERGY,
+            },
+        )
+        .creature
     });
     world.place_creature(pos, parent_id);
 

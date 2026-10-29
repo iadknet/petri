@@ -1,4 +1,3 @@
-pub(crate) mod cgp_reproduction;
 mod giving;
 mod predation;
 mod reproduction;
@@ -335,7 +334,16 @@ mod tests {
         world.reconfigure_food(cfg.world.food.clone());
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
         let id = creatures.insert_with_key(|id| {
-            CreatureState::new(id, genome, pos, energy, 0, founder_body(), [0.0; 16])
+            crate::creature::birth::Zygote::founder(genome, founder_body())
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: pos,
+                        heading: crate::contracts::Direction::N,
+                        energy: energy,
+                    },
+                )
+                .creature
         });
         world.place_creature(pos, id);
         let sim = Simulation {
@@ -527,26 +535,28 @@ mod tests {
         let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
         let id1 = creatures.insert_with_key(|id| {
-            CreatureState::new(
-                id,
-                v3alpha1_founder_genome(),
-                pos1,
-                50.0,
-                0,
-                founder_body(),
-                [0.0; 16],
-            )
+            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: pos1,
+                        heading: crate::contracts::Direction::N,
+                        energy: 50.0,
+                    },
+                )
+                .creature
         });
         let id2 = creatures.insert_with_key(|id| {
-            CreatureState::new(
-                id,
-                v3alpha1_founder_genome(),
-                pos2,
-                50.0,
-                0,
-                founder_body(),
-                [0.0; 16],
-            )
+            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: pos2,
+                        heading: crate::contracts::Direction::N,
+                        energy: 50.0,
+                    },
+                )
+                .creature
         });
         world.place_creature(pos1, id1);
         world.place_creature(pos2, id2);
@@ -705,26 +715,28 @@ mod tests {
         let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
         let parent = creatures.insert_with_key(|id| {
-            CreatureState::new(
-                id,
-                v3alpha1_founder_genome(),
-                pos,
-                80.0,
-                0,
-                founder_body(),
-                [0.0; 16],
-            )
+            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: pos,
+                        heading: crate::contracts::Direction::N,
+                        energy: 80.0,
+                    },
+                )
+                .creature
         });
         let blocker = creatures.insert_with_key(|id| {
-            CreatureState::new(
-                id,
-                v3alpha1_founder_genome(),
-                north,
-                80.0,
-                0,
-                founder_body(),
-                [0.0; 16],
-            )
+            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: north,
+                        heading: crate::contracts::Direction::N,
+                        energy: 80.0,
+                    },
+                )
+                .creature
         });
         world.place_creature(pos, parent);
         world.place_creature(north, blocker);
@@ -1380,26 +1392,28 @@ mod tests {
         let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
         let id1 = creatures.insert_with_key(|id| {
-            CreatureState::new(
-                id,
-                v3alpha1_founder_genome(),
-                pos1,
-                50.0,
-                0,
-                founder_body(),
-                [0.0; 16],
-            )
+            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: pos1,
+                        heading: crate::contracts::Direction::N,
+                        energy: 50.0,
+                    },
+                )
+                .creature
         });
         let _id2 = creatures.insert_with_key(|id| {
-            CreatureState::new(
-                id,
-                v3alpha1_founder_genome(),
-                pos2,
-                50.0,
-                0,
-                founder_body(),
-                [0.0; 16],
-            )
+            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: pos2,
+                        heading: crate::contracts::Direction::N,
+                        energy: 50.0,
+                    },
+                )
+                .creature
         });
         world.place_creature(pos1, id1);
         world.place_creature(pos2, _id2);
@@ -1530,7 +1544,16 @@ mod tests {
         let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
         let id = creatures.insert_with_key(|id| {
-            CreatureState::new(id, genome, pos, energy, 0, founder_body(), [0.0; 16])
+            crate::creature::birth::Zygote::founder(genome, founder_body())
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: pos,
+                        heading: crate::contracts::Direction::N,
+                        energy: energy,
+                    },
+                )
+                .creature
         });
         world.place_creature(pos, id);
         let sim = Simulation {
@@ -1709,15 +1732,16 @@ mod tests {
         // Add a victim to the north
         let victim_pos = Position::new(5, 4);
         let victim_id_low = sim_low.creatures.insert_with_key(|id| {
-            CreatureState::new(
-                id,
-                v3alpha1_founder_genome(),
-                victim_pos,
-                50.0,
-                0,
-                founder_body(),
-                [0.0; 16],
-            )
+            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: victim_pos,
+                        heading: crate::contracts::Direction::N,
+                        energy: 50.0,
+                    },
+                )
+                .creature
         });
         sim_low.world.place_creature(victim_pos, victim_id_low);
         let energy_before_low = sim_low.creatures[attacker_low].energy;
@@ -1728,15 +1752,16 @@ mod tests {
         let (mut sim_high, attacker_high) =
             make_sim_with_genome(Position::new(5, 5), 100.0, high_genome);
         let victim_id_high = sim_high.creatures.insert_with_key(|id| {
-            CreatureState::new(
-                id,
-                v3alpha1_founder_genome(),
-                victim_pos,
-                50.0,
-                0,
-                founder_body(),
-                [0.0; 16],
-            )
+            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: victim_pos,
+                        heading: crate::contracts::Direction::N,
+                        energy: 50.0,
+                    },
+                )
+                .creature
         });
         sim_high.world.place_creature(victim_pos, victim_id_high);
         let energy_before_high = sim_high.creatures[attacker_high].energy;
@@ -1903,15 +1928,16 @@ mod tests {
         // Young attacker
         let (mut sim_young, attacker_young) = make_sim_one_creature(Position::new(5, 5), 100.0);
         let victim_young = sim_young.creatures.insert_with_key(|id| {
-            CreatureState::new(
-                id,
-                v3alpha1_founder_genome(),
-                victim_pos,
-                50.0,
-                0,
-                founder_body(),
-                [0.0; 16],
-            )
+            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: victim_pos,
+                        heading: crate::contracts::Direction::N,
+                        energy: 50.0,
+                    },
+                )
+                .creature
         });
         sim_young.world.place_creature(victim_pos, victim_young);
         let energy_before_young = sim_young.creatures[attacker_young].energy;
@@ -1922,15 +1948,16 @@ mod tests {
         let (mut sim_old, attacker_old) = make_sim_one_creature(Position::new(5, 5), 100.0);
         sim_old.creatures[attacker_old].age = 400;
         let victim_old = sim_old.creatures.insert_with_key(|id| {
-            CreatureState::new(
-                id,
-                v3alpha1_founder_genome(),
-                victim_pos,
-                50.0,
-                0,
-                founder_body(),
-                [0.0; 16],
-            )
+            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: victim_pos,
+                        heading: crate::contracts::Direction::N,
+                        energy: 50.0,
+                    },
+                )
+                .creature
         });
         sim_old.world.place_creature(victim_pos, victim_old);
         let energy_before_old = sim_old.creatures[attacker_old].energy;

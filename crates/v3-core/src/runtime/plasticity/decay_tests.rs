@@ -2,6 +2,7 @@
 //! `x ← b + ρ·(x − b)` toward each stored quantity's birth value, and its
 //! bounds.
 
+use crate::genome::learning::Seeds;
 use proptest::prelude::*;
 
 use super::rules::relax;
@@ -10,8 +11,8 @@ use crate::contracts::votes::DirectedVoteKind;
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::genome::cgp::test_support::plastic_node;
 use crate::genome::cgp::{
-    BirthSeeds, BundleId, CgpGraphBackendDef, ComputeNodeKind, EdgeOccurrence, EdgeSurface,
-    GraphEdge, GraphSource, LearningSlot,
+    BundleId, CgpGraphBackendDef, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
+    GraphSource, LearningSlot,
 };
 use crate::genome::{BackendDef, CreatureGenome, HebbianRule, Learning, MemberPolicy, NodeGenome};
 
@@ -44,8 +45,8 @@ fn genome(def: &CgpGraphBackendDef) -> CreatureGenome {
     }
 }
 
-fn state(def: &CgpGraphBackendDef, seeds: Option<BirthSeeds>) -> LearnedState {
-    LearnedState::for_genome(&genome(def), &[seeds])
+fn state(def: &CgpGraphBackendDef, seeds: Option<Seeds>) -> LearnedState {
+    LearnedState::for_genome(&genome(def), &seeds.unwrap_or_default())
 }
 
 /// One compute node whose single input edge has genomic weight `weight`
@@ -128,20 +129,14 @@ fn drive(state: &mut LearnedState, def: &CgpGraphBackendDef, pre: f32, post: f32
     learner.commit();
 }
 
-fn compute_seed(def: &CgpGraphBackendDef, value: f32) -> BirthSeeds {
-    BirthSeeds::Rows {
-        compute: def
-            .compute_nodes()
-            .iter()
-            .map(|node| vec![Some(value); node.inputs.len()])
-            .collect(),
-        sinks: def
-            .output_sinks()
-            .iter()
-            .map(|sink| vec![None; sink.inputs.len()])
-            .collect(),
-        bundles: vec![None; def.bundles().len()],
+fn compute_seed(def: &CgpGraphBackendDef, value: f32) -> Seeds {
+    let mut seeds = Seeds::default();
+    for site in def.edge_sites() {
+        if matches!(site.surface, EdgeSurface::ComputeInput(_)) {
+            seeds.set_edge(0, site, value);
+        }
     }
+    seeds
 }
 
 // ── Birth value (invariant 2) ───────────────────────────────────────────────
@@ -258,8 +253,7 @@ fn a_seeded_scale_relaxes_toward_its_clamped_seed_not_its_genomic_scale() {
         },
     );
     let mut seeds = compute_seed(&def, 0.0);
-    let BirthSeeds::Rows { bundles, .. } = &mut seeds;
-    bundles[0] = Some(-5.0);
+    seeds.set_scale(0, BundleId::new(0), -5.0);
     let mut learned = state(&def, Some(seeds));
     let view = scale(&learned);
     assert_eq!((view.genomic, view.birth), (0.5, -2.0));

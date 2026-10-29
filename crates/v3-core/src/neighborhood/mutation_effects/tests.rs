@@ -5,8 +5,7 @@ use crate::contracts::votes::ActionParamField;
 use crate::creature::founder::founder_genome;
 use crate::genome::cgp::test_support::set_sink_inputs;
 use crate::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource,
-    OutputSinkKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
 use crate::genome::BackendDef;
 use proptest::prelude::*;
@@ -212,22 +211,13 @@ fn an_entry_change_marks_both_entries_edited() {
 }
 
 #[test]
-fn genome_identity_distinguishes_negative_zero_and_ignores_nan_payloads_and_birth_seeds() {
+fn genome_identity_distinguishes_negative_zero_and_ignores_nan_payloads() {
     let with = |value: f32| graph_genome(Vec::new(), vec![constant(value)], Vec::new());
     assert_ne!(genome_identity(&with(0.0)), genome_identity(&with(-0.0)));
     assert_eq!(
         genome_identity(&with(f32::NAN)),
         genome_identity(&with(f32::from_bits(0x7fc0_0001)))
     );
-    let mut learned = with(1.0);
-    let def = graph_def(&mut learned, 0);
-    def.push_edge(
-        EdgeSurface::ComputeInput(0),
-        GraphEdge::new(GraphSource::ComputeNode(0), 0.25),
-    );
-    let mut seeded = learned.clone();
-    graph_def(&mut seeded, 0).seed_compute_rows(vec![vec![Some(0.5)]]);
-    assert_eq!(genome_identity(&seeded), genome_identity(&learned));
 }
 
 #[test]

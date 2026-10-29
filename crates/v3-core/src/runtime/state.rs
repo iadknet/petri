@@ -1,7 +1,7 @@
 //! A creature brain's execution state: what the mesh loop reads and writes
 //! across ticks, and the record of which mesh nodes it dispatched.
 
-use crate::genome::cgp::BirthSeeds;
+use crate::genome::learning::Seeds;
 use crate::genome::{BackendDef, CreatureGenome};
 use crate::runtime::plasticity::LearnedState;
 
@@ -104,10 +104,10 @@ impl GraphRuntimeState {
 
     /// The only constructor (T25.F03, T25.F06): the runtime state of
     /// `genome`, with the sink weight table and the learned state built from
-    /// the genome and `seeds` (mesh node `i`'s birth seeds at `seeds[i]`;
-    /// empty for a genome without inheritance).
+    /// the genome and the inherited `seeds` (empty for a genome without
+    /// inheritance).
     #[must_use]
-    pub fn for_genome(genome: &CreatureGenome, seeds: Vec<Option<BirthSeeds>>) -> Self {
+    pub fn for_genome(genome: &CreatureGenome, seeds: &Seeds) -> Self {
         let sink_weights = genome
             .nodes
             .iter()
@@ -119,7 +119,7 @@ impl GraphRuntimeState {
         Self {
             node_state: Vec::new(),
             node_outputs: Vec::new(),
-            learned: LearnedState::for_genome(genome, &seeds),
+            learned: LearnedState::for_genome(genome, seeds),
             sink_weights,
 
             scratch_prev: Vec::new(),

@@ -379,7 +379,8 @@ mod work_counter_tests {
         let mut energy = 100.0f32;
         let mut smem = [0.0f32; 16];
         let prev_smem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let mut gr =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
 
         let output = execute_creature_mesh(
             &genome,
@@ -447,7 +448,8 @@ mod work_counter_tests {
         let mut energy = 100.0f32;
         let mut smem = [0.0f32; 16];
         let prev_smem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::for_genome(&genome, Vec::new());
+        let mut gr =
+            GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
 
         let output = execute_creature_mesh(
             &genome,

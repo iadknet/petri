@@ -603,6 +603,47 @@ impl Seeds {
     }
 }
 
+#[cfg(test)]
+impl Seeds {
+    /// Node `node`'s value of edge `at` (a test read).
+    pub(crate) fn edge_at(&self, node: usize, at: EdgeOccurrence) -> Option<f32> {
+        self.get(LearnableId {
+            node,
+            key: LearnableKey::Edge(at),
+        })
+    }
+
+    /// Node `node`'s value of bundle `bundle`'s scale (a test read).
+    pub(crate) fn scale_at(&self, node: usize, bundle: BundleId) -> Option<f32> {
+        self.get(LearnableId {
+            node,
+            key: LearnableKey::Scale(bundle),
+        })
+    }
+
+    /// Record node `node`'s value of edge `at` (a fixture).
+    pub(crate) fn set_edge(&mut self, node: usize, at: EdgeOccurrence, value: f32) {
+        self.insert(
+            LearnableId {
+                node,
+                key: LearnableKey::Edge(at),
+            },
+            value,
+        );
+    }
+
+    /// Record node `node`'s value of bundle `bundle`'s scale (a fixture).
+    pub(crate) fn set_scale(&mut self, node: usize, bundle: BundleId, value: f32) {
+        self.insert(
+            LearnableId {
+                node,
+                key: LearnableKey::Scale(bundle),
+            },
+            value,
+        );
+    }
+}
+
 impl FromIterator<(LearnableId, f32)> for Seeds {
     fn from_iter<I: IntoIterator<Item = (LearnableId, f32)>>(iter: I) -> Self {
         let mut seeds = Self::default();

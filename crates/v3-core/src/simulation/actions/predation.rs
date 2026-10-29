@@ -193,28 +193,30 @@ mod tests {
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
 
         let attacker_id = creatures.insert_with_key(|id| {
-            CreatureState::new(
-                id,
-                v3alpha1_founder_genome(),
-                pos_a,
-                energy_a,
-                0,
-                founder_body(),
-                [0.0; 16],
-            )
+            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: pos_a,
+                        heading: crate::contracts::Direction::N,
+                        energy: energy_a,
+                    },
+                )
+                .creature
         });
         world.place_creature(pos_a, attacker_id);
 
         let victim_id = creatures.insert_with_key(|id| {
-            CreatureState::new(
-                id,
-                v3alpha1_founder_genome(),
-                pos_v,
-                energy_v,
-                0,
-                founder_body(),
-                [0.0; 16],
-            )
+            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: pos_v,
+                        heading: crate::contracts::Direction::N,
+                        energy: energy_v,
+                    },
+                )
+                .creature
         });
         world.place_creature(pos_v, victim_id);
 
@@ -242,15 +244,16 @@ mod tests {
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
 
         let id = creatures.insert_with_key(|id| {
-            CreatureState::new(
-                id,
-                v3alpha1_founder_genome(),
-                pos,
-                energy,
-                0,
-                founder_body(),
-                [0.0; 16],
-            )
+            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
+                .finalize(
+                    id,
+                    crate::creature::birth::BirthPlace {
+                        position: pos,
+                        heading: crate::contracts::Direction::N,
+                        energy: energy,
+                    },
+                )
+                .creature
         });
         world.place_creature(pos, id);
 

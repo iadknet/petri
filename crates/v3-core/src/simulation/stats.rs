@@ -505,6 +505,112 @@ const OUTCOME_SCORE_STD_DEV_FLOOR: f64 = 0.05;
 const OUTCOME_SCORE_Z_THRESHOLD: f64 = 0.25;
 
 impl SimStats {
+    /// Fold one birth's mutation summary into the cumulative mutation
+    /// counters (T29.F01 A3): attempts, applications and skips by domain,
+    /// operator and reason, the operator funnels, the added-node input
+    /// classes and world inputs, the target classes, the bundle edits and
+    /// the broadcast attribute changes.
+    pub(crate) fn fold_mutation_summary(&mut self, summary: &crate::mutation::MutationSummary) {
+        self.mutation_events_attempted_total += summary.attempted_events as u64;
+        self.mutation_events_applied_total += summary.applied_events as u64;
+        self.mutation_events_skipped_total += summary.skipped_events as u64;
+        for (domain, count) in &summary.attempted_by_domain {
+            *self
+                .mutation_events_attempted_total_by_domain
+                .entry(*domain)
+                .or_insert(0) += *count as u64;
+        }
+        for (domain, count) in &summary.applied_by_domain {
+            *self
+                .mutation_events_applied_total_by_domain
+                .entry(*domain)
+                .or_insert(0) += *count as u64;
+        }
+        for (operator, count) in &summary.attempted_by_operator {
+            *self
+                .mutation_events_attempted_total_by_operator
+                .entry(*operator)
+                .or_insert(0) += *count as u64;
+        }
+        for (operator, count) in &summary.applied_by_operator {
+            *self
+                .mutation_events_applied_total_by_operator
+                .entry(*operator)
+                .or_insert(0) += *count as u64;
+        }
+        for (reason, count) in &summary.skip_reasons {
+            *self
+                .mutation_events_skipped_by_reason
+                .entry(*reason)
+                .or_insert(0) += *count as u64;
+        }
+        for (operator, count) in &summary.skipped_by_operator {
+            *self
+                .mutation_events_skipped_total_by_operator
+                .entry(*operator)
+                .or_insert(0) += *count as u64;
+        }
+        for (operator, funnel) in &summary.operator_funnel_by_operator {
+            let entry = self
+                .mutation_operator_funnel_total_by_operator
+                .entry(*operator)
+                .or_default();
+            entry.attempted += funnel.attempted;
+            entry.applicable += funnel.applicable;
+            entry.structurally_valid += funnel.structurally_valid;
+            entry.applied += funnel.applied;
+            entry.skipped += funnel.skipped;
+        }
+        for (operator, by_reason) in &summary.skip_reasons_by_operator {
+            let entry = self
+                .mutation_skip_reasons_total_by_operator
+                .entry(*operator)
+                .or_default();
+            for (reason, count) in by_reason {
+                *entry.entry(*reason).or_insert(0) += *count as u64;
+            }
+        }
+        for (operator, by_class) in &summary.added_node_input_classes_by_operator {
+            let entry = self
+                .mutation_added_node_input_classes_total_by_operator
+                .entry(*operator)
+                .or_default();
+            for (class, count) in by_class {
+                *entry.entry(*class).or_insert(0) += *count as u64;
+            }
+        }
+        for (operator, by_key) in &summary.added_node_world_inputs_by_operator {
+            let entry = self
+                .mutation_added_node_world_inputs_total_by_operator
+                .entry(*operator)
+                .or_default();
+            for (key, count) in by_key {
+                *entry.entry(*key).or_insert(0) += *count as u64;
+            }
+        }
+        self.mutation_reachable_target_total += summary.reachable_target_events as u64;
+        self.mutation_executed_target_total += summary.executed_target_events as u64;
+        self.mutation_unreachable_target_total += summary.unreachable_target_events as u64;
+        self.mutation_not_applicable_target_total += summary.not_applicable_events as u64;
+        self.graph_edges_detached_total += u64::from(summary.graph_edges_detached);
+        self.bundles_removed_total += u64::from(summary.bundles_removed);
+        for (&operator, created) in &summary.bundles_created_by_operator {
+            let total = self.bundles_created_total.entry(operator).or_default();
+            for (row, add) in total.iter_mut().zip(created) {
+                for (count, add) in row.iter_mut().zip(add) {
+                    *count += u64::from(*add);
+                }
+            }
+        }
+        for (total, count) in self
+            .mutation_attribute_changes_total_by_broadcast
+            .iter_mut()
+            .zip(summary.attribute_changes_by_broadcast)
+        {
+            *total += u64::from(count);
+        }
+    }
+
     /// Clear the per-tick (`last_tick_*`) counters at the start of a tick.
     ///
     /// Cumulative totals and the `*_by_*` breakdown maps are untouched.

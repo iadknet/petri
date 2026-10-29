@@ -145,7 +145,7 @@ pub(crate) fn runtime_for_defs(defs: &[&CgpGraphBackendDef]) -> GraphRuntimeStat
             })
             .collect(),
     };
-    GraphRuntimeState::for_genome(&genome, Vec::new())
+    GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default())
 }
 
 /// [`runtime_for_defs`] for one graph at mesh node 0.

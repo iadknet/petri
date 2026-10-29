@@ -6,6 +6,7 @@ use slotmap::{SecondaryMap, SlotMap};
 use crate::config::{OrdinaryFoodTypeId, PatternBounds, SimulationConfig};
 use crate::contracts::{CreatureId, Direction, InputReference, Position, WorldInputKey};
 use crate::creature::action_log::ActionLog;
+use crate::creature::birth::{BirthPlace, Zygote};
 use crate::creature::body::HeritableBody;
 use crate::creature::founder::founder_genome_with_age_gate;
 use crate::creature::state::CreatureState;
@@ -101,23 +102,28 @@ pub fn seed_simulation_with_founder_genomes(
         // One draw per founder, in placement order (T11.F30).
         let heading = Direction::ALL[rng.gen_range(0..Direction::ALL.len())];
         // Insert into slotmap to get an id, then fill with actual state.
+        let zygote = Zygote::founder(
+            genome,
+            HeritableBody::founder(
+                founder_index,
+                seed,
+                config.energy.capacity.founder,
+                config.exchange.founder_share,
+            ),
+        );
+        // A normalized founder's energy is within its capacity
+        // (`config/simulation.rs` clamps it), so seeding books nothing.
         let id = creatures.insert_with_key(|id| {
-            let mut founder = CreatureState::new(
-                id,
-                genome,
-                pos,
-                energy,
-                0,
-                HeritableBody::founder(
-                    founder_index,
-                    seed,
-                    config.energy.capacity.founder,
-                    config.exchange.founder_share,
-                ),
-                [0.0; crate::contracts::SHARED_MEMORY_SLOTS],
-            );
-            founder.heading = heading;
-            founder
+            zygote
+                .finalize(
+                    id,
+                    BirthPlace {
+                        position: pos,
+                        heading,
+                        energy,
+                    },
+                )
+                .creature
         });
         action_logs.insert(id, ActionLog::new(log_capacity));
         world.place_creature(pos, id);
@@ -403,7 +409,8 @@ mod tests {
             assert_eq!(creature.wired_world_inputs(), &wired);
             assert_eq!(
                 creature.graph_runtime().sink_weights,
-                GraphRuntimeState::for_genome(genome, Vec::new()).sink_weights
+                GraphRuntimeState::for_genome(genome, &crate::genome::learning::Seeds::default())
+                    .sink_weights
             );
         }
     }

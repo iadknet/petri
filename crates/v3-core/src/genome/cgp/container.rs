@@ -1,11 +1,11 @@
 //! The graph genome's edge container (T25.F01).
 //!
-//! The only code that edits a graph's compute nodes and edges, and the only
-//! code that keeps the birth payload ([`BirthSeeds`]) aligned with them. The
+//! The only code that edits a graph's compute nodes and edges. The
 //! compute-node list, the sink list and both `inputs` lists are newtypes that
 //! read as slices and cannot be written from outside this module: every edit
-//! goes through a primitive below, which applies the seed rule of the write
-//! it replaces. The container draws no random numbers.
+//! goes through a primitive below, which returns the edit's inheritance
+//! mapping ([`GraphMapping`], T29.F01) when it moves, copies, composes, drops
+//! or invalidates a learnable. The container draws no random numbers.
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -178,98 +178,12 @@ impl EdgeEdit {
     }
 }
 
-// ── Birth seeds ─────────────────────────────────────────────────────────────
-
-/// The birth payload a reproduction draft carries (T25.F01, design note D1,
-/// T25.F06, T25.F07): the parent's learned own quantity per initialized
-/// ungrouped or edge-scope learner on either surface and its learned scale
-/// per initialized scale slot, captured before mutation
-/// (`LearnedState::capture`) and consumed by the newborn's constructor. A parent backend with nothing
-/// initialized carries no payload at all. Outside genome identity,
-/// serialization and equality.
-#[derive(Debug, Clone, PartialEq)]
-pub enum BirthSeeds {
-    /// One row per compute node and one per sink, each sized to that
-    /// container's `inputs`, and one bundle slot per bundle record (I11);
-    /// `None` where the edge or the bundle has no inherited value.
-    Rows {
-        compute: Vec<Vec<Option<f32>>>,
-        sinks: Vec<Vec<Option<f32>>>,
-        bundles: Vec<Option<f32>>,
-    },
-}
-
-impl BirthSeeds {
-    /// The row of `surface`, empty when the payload has none.
-    #[must_use]
-    pub fn row(&self, surface: EdgeSurface) -> &[Option<f32>] {
-        let Self::Rows { compute, sinks, .. } = self;
-        let rows = match surface {
-            EdgeSurface::ComputeInput(i) => compute.get(i),
-            EdgeSurface::SinkInput(i) => sinks.get(i),
-        };
-        rows.map_or(&[], Vec::as_slice)
-    }
-
-    /// The inherited value of the edge at `occurrence`, if any.
-    #[must_use]
-    pub fn value(&self, occurrence: EdgeOccurrence) -> Option<f32> {
-        self.row(occurrence.surface)
-            .get(occurrence.index)
-            .copied()
-            .flatten()
-    }
-
-    /// The inherited scale of `bundle`, if any.
-    #[must_use]
-    pub fn bundle_value(&self, bundle: BundleId) -> Option<f32> {
-        self.bundle_slots().get(bundle.index()).copied().flatten()
-    }
-
-    /// One slot per bundle record.
-    #[must_use]
-    pub fn bundle_slots(&self) -> &[Option<f32>] {
-        let Self::Rows { bundles, .. } = self;
-        bundles
-    }
-
-    /// One row per compute node.
-    #[must_use]
-    pub fn compute_rows(&self) -> &[Vec<Option<f32>>] {
-        let Self::Rows { compute, .. } = self;
-        compute
-    }
-
-    /// One row per sink.
-    #[must_use]
-    pub fn sink_rows(&self) -> &[Vec<Option<f32>>] {
-        let Self::Rows { sinks, .. } = self;
-        sinks
-    }
-
-    fn row_mut(&mut self, surface: EdgeSurface) -> &mut Vec<Option<f32>> {
-        let Self::Rows { compute, sinks, .. } = self;
-        match surface {
-            EdgeSurface::ComputeInput(i) => &mut compute[i],
-            EdgeSurface::SinkInput(i) => &mut sinks[i],
-        }
-    }
-
-    fn bundles_mut(&mut self) -> &mut Vec<Option<f32>> {
-        let Self::Rows { bundles, .. } = self;
-        bundles
-    }
-}
-
 // ── The definition ──────────────────────────────────────────────────────────
 
 /// CGP-style graph backend definition.
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CgpGraphBackendDef {
-    /// Birth-only payload; see [`BirthSeeds`].
-    #[serde(skip)]
-    birth_seeds: Option<BirthSeeds>,
     compute_nodes: ComputeNodes,
     /// Fixed set — structurally immutable. Only edges are evolvable.
     output_sinks: OutputSinks,
@@ -277,26 +191,6 @@ pub struct CgpGraphBackendDef {
     /// when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     bundles: Vec<Bundle>,
-}
-
-// Keep the birth payload out of diagnostic genome identity as well as
-// serialization and equality. Existing state fingerprints use this format.
-impl fmt::Debug for CgpGraphBackendDef {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut debug = f.debug_struct("CgpGraphBackendDef");
-        debug
-            .field("compute_nodes", &self.compute_nodes)
-            .field("output_sinks", &self.output_sinks);
-        debug.field("bundles", &self.bundles).finish()
-    }
-}
-
-impl PartialEq for CgpGraphBackendDef {
-    fn eq(&self, other: &Self) -> bool {
-        self.compute_nodes == other.compute_nodes
-            && self.output_sinks == other.output_sinks
-            && self.bundles == other.bundles
-    }
 }
 
 /// A handle on one edge through which its weight and learning change with
@@ -319,10 +213,8 @@ impl EdgeMut<'_> {
         let occurrence = self.occurrence;
         self.def
             .mapped(|def, map| {
-                def.clear_seed(occurrence);
                 map.row_mut(occurrence.surface)[occurrence.index] = Origin::Fresh;
                 def.edge_slot(occurrence).own_weight = weight;
-                def.debug_assert_seed_shape();
             })
             .1
     }
@@ -396,9 +288,6 @@ impl BundleMut<'_> {
         let index = self.bundle.index();
         self.def
             .mapped(|def, map| {
-                if let Some(seeds) = &mut def.birth_seeds {
-                    seeds.bundles_mut()[index] = None;
-                }
                 map.bundles[index] = Origin::Fresh;
                 def.bundles[index].scale = scale;
             })
@@ -557,18 +446,15 @@ impl CgpGraphBackendDef {
             push(OutputSinkKind::ActionParam(field));
         }
         Self {
-            birth_seeds: None,
             compute_nodes: ComputeNodes::default(),
             output_sinks: OutputSinks(output_sinks),
             bundles: Vec::new(),
         }
     }
 
-    /// Replace the compute nodes with `compute_nodes`, exactly as given. A
-    /// seedless builder: any birth payload is dropped.
+    /// Replace the compute nodes with `compute_nodes`, exactly as given.
     #[must_use = "the builder returns the modified def"]
     pub fn with_compute_nodes(mut self, compute_nodes: Vec<ComputeNode>) -> Self {
-        self.birth_seeds = None;
         self.compute_nodes = ComputeNodes(compute_nodes);
         self
     }
@@ -577,7 +463,6 @@ impl CgpGraphBackendDef {
     /// filling, sorting, deduplication or kind validation.
     #[must_use = "the builder returns the modified def"]
     pub fn with_output_sinks(mut self, output_sinks: Vec<OutputSink>) -> Self {
-        self.birth_seeds = None;
         self.output_sinks = OutputSinks(output_sinks);
         self
     }
@@ -804,13 +689,6 @@ impl CgpGraphBackendDef {
             .collect()
     }
 
-    /// The birth payload, when this def belongs to a reproduction draft.
-    #[inline]
-    #[must_use]
-    pub fn birth_seeds(&self) -> Option<&BirthSeeds> {
-        self.birth_seeds.as_ref()
-    }
-
     /// Whether a visit to this graph enters evaluation and the effects pass.
     ///
     /// True with at least one compute node, and true for a zero-compute graph
@@ -821,20 +699,6 @@ impl CgpGraphBackendDef {
     pub fn enters_visit(&self) -> bool {
         !self.compute_nodes.is_empty()
             || self.output_sinks.iter().any(|sink| !sink.inputs.is_empty())
-    }
-
-    // ── Seeds ───────────────────────────────────────────────────────────────
-
-    /// Attach a reproduction draft's payload. Rows must match the compute
-    /// nodes, the sinks and their inputs (I11).
-    pub fn seed_birth(&mut self, seeds: BirthSeeds) {
-        self.birth_seeds = Some(seeds);
-        self.debug_assert_seed_shape();
-    }
-
-    /// Remove and return the payload, leaving the def seedless.
-    pub fn take_birth_seeds(&mut self) -> Option<BirthSeeds> {
-        self.birth_seeds.take()
     }
 
     /// Run `edit` beside an inheritance mapping that starts with every
@@ -859,12 +723,8 @@ impl CgpGraphBackendDef {
     }
 
     fn append_compute_node_in(&mut self, node: ComputeNode, map: &mut OriginRows) {
-        if let Some(rows) = self.compute_seed_rows_mut() {
-            rows.push(vec![None; node.inputs.len()]);
-        }
         map.compute.push(vec![Origin::Fresh; node.inputs.len()]);
         self.compute_nodes.0.push(node);
-        self.debug_assert_seed_shape();
     }
 
     /// Remove the compute node at `idx`, dropping its edges' learnables.
@@ -903,21 +763,6 @@ impl CgpGraphBackendDef {
                 }
             }
         }
-        if let Some(BirthSeeds::Rows { compute, sinks, .. }) = &mut self.birth_seeds {
-            compute.remove(idx);
-            let containers = self
-                .compute_nodes
-                .iter()
-                .map(|node| &node.inputs)
-                .chain(self.output_sinks.iter().map(|sink| &sink.inputs));
-            for (inputs, values) in containers.zip(compute.iter_mut().chain(sinks.iter_mut())) {
-                for (edge, inherited) in inputs.iter().zip(values) {
-                    if edge.source == read_removed {
-                        *inherited = None;
-                    }
-                }
-            }
-        }
         let removed = idx as u16;
         self.remap_compute_sources(|src_idx| {
             if src_idx == removed {
@@ -928,7 +773,6 @@ impl CgpGraphBackendDef {
                 src_idx
             }
         });
-        self.debug_assert_seed_shape();
     }
 
     /// Insert `node` at compute index `idx`, the inverse of
@@ -961,13 +805,9 @@ impl CgpGraphBackendDef {
                 src_idx
             }
         });
-        if let Some(rows) = self.compute_seed_rows_mut() {
-            rows.insert(idx, vec![None; node.inputs.len()]);
-        }
         map.compute
             .insert(idx, vec![Origin::Fresh; node.inputs.len()]);
         self.compute_nodes.0.insert(idx, node);
-        self.debug_assert_seed_shape();
     }
 
     /// Duplicate the compute nodes at `sources`, inserting each copy directly
@@ -1013,11 +853,6 @@ impl CgpGraphBackendDef {
                 src_idx + sources.partition_point(|&c| c < src_idx as usize) as u16
             }
         };
-        if let Some(rows) = self.compute_seed_rows_mut() {
-            for &source in sources.iter().rev() {
-                rows.insert(source + 1, rows[source].clone());
-            }
-        }
         for &source in sources.iter().rev() {
             let copy = map.compute[source]
                 .iter()
@@ -1038,7 +873,6 @@ impl CgpGraphBackendDef {
             }
             self.compute_nodes.0.insert(sources[i] + 1, copy);
         }
-        self.debug_assert_seed_shape();
     }
 
     /// Set the kind of compute node `idx`. No learnable moves.
@@ -1059,9 +893,6 @@ impl CgpGraphBackendDef {
         match surface {
             EdgeSurface::ComputeInput(i) => {
                 self.compute_nodes.0[i].inputs.0.push(edge);
-                if let Some(seeds) = &mut self.birth_seeds {
-                    seeds.row_mut(surface).push(None);
-                }
                 map.row_mut(surface).push(Origin::Fresh);
             }
             EdgeSurface::SinkInput(i) => {
@@ -1076,13 +907,9 @@ impl CgpGraphBackendDef {
                 );
                 let at = self.first_member(i);
                 self.output_sinks.0[i].inputs.0.insert(at, edge);
-                if let Some(seeds) = &mut self.birth_seeds {
-                    seeds.row_mut(surface).insert(at, None);
-                }
                 map.row_mut(surface).insert(at, Origin::Fresh);
             }
         }
-        self.debug_assert_seed_shape();
         self.debug_assert_bundles();
     }
 
@@ -1092,9 +919,6 @@ impl CgpGraphBackendDef {
         self.mapped(|def, map| {
             let EdgeOccurrence { surface, index } = occurrence;
             let mut record_removed = false;
-            if let Some(seeds) = &mut def.birth_seeds {
-                seeds.row_mut(surface).remove(index);
-            }
             map.row_mut(surface).remove(index);
             match surface {
                 EdgeSurface::ComputeInput(i) => {
@@ -1110,7 +934,6 @@ impl CgpGraphBackendDef {
                     }
                 }
             }
-            def.debug_assert_seed_shape();
             def.debug_assert_bundles();
             record_removed
         })
@@ -1122,17 +945,12 @@ impl CgpGraphBackendDef {
         self.mapped(|def, map| {
             let copied = def.compute_nodes[from].inputs.0.clone();
             def.compute_nodes.0[to].inputs.0.extend(copied);
-            if let Some(rows) = def.compute_seed_rows_mut() {
-                let copied = rows[from].clone();
-                rows[to].extend(copied);
-            }
             let copied: Vec<Origin> = map.compute[from]
                 .iter()
                 .cloned()
                 .map(Origin::copied)
                 .collect();
             map.compute[to].extend(copied);
-            def.debug_assert_seed_shape();
         })
         .1
     }
@@ -1185,7 +1003,6 @@ impl CgpGraphBackendDef {
                         GraphSource::ComputeNode(new_idx);
                 }
             }
-            def.debug_assert_seed_shape();
             edit
         })
     }
@@ -1207,9 +1024,7 @@ impl CgpGraphBackendDef {
         self.mapped(|def, map| {
             let edit = def.detach_member(occurrence, input_refs, map);
             def.edge_slot(edit.occurrence).source = source;
-            def.clear_seed(edit.occurrence);
             map.row_mut(edit.occurrence.surface)[edit.occurrence.index] = Origin::Fresh;
-            def.debug_assert_seed_shape();
             edit
         })
     }
@@ -1380,15 +1195,12 @@ impl CgpGraphBackendDef {
             let mut record = Bundle::new(source, birth.wiring);
             record.scale = birth.scale;
             def.bundles.push(record);
-            if let Some(seeds) = &mut def.birth_seeds {
-                seeds.bundles_mut().push(None);
-            }
             map.bundles.push(Origin::Fresh);
             for (field, site) in birth.wiring.coordinates(&set) {
                 def.insert_member(
                     Self::new_member(id, source, field),
                     site,
-                    (None, Origin::Fresh),
+                    Origin::Fresh,
                     map,
                 );
             }
@@ -1505,29 +1317,14 @@ impl CgpGraphBackendDef {
             panic!("detach_at: only a sink edge is a member");
         };
         let mut edge = self.output_sinks.0[sink].inputs.0.remove(occurrence.index);
-        let seed = self
-            .birth_seeds
-            .as_mut()
-            .and_then(|seeds| seeds.row_mut(occurrence.surface).remove(occurrence.index));
         let modifier = map.row_mut(occurrence.surface).remove(occurrence.index);
         let Membership { bundle, policy, .. } =
             edge.membership().expect("detach_at: the edge is a member");
         let scale = self.bundles[bundle.index()].scale;
-        // The composed seed (T25.F07 invariant 6): what the detached edge
-        // weighed at the parent, from the edge's and the bundle's seeds, each
-        // falling back to its genomic value; no flag read and no clamp
-        // (`from_seeds` clamps at construction).
-        let bundle_seed = self
-            .birth_seeds
-            .as_ref()
-            .and_then(|seeds| seeds.bundle_value(bundle));
-        let seed = (seed.is_some() || bundle_seed.is_some()).then(|| {
-            compose(
-                seed.unwrap_or(edge.own_weight),
-                bundle_seed.unwrap_or(scale),
-                pattern,
-            )
-        });
+        // The composed origin (T25.F07 invariant 6): what the detached edge
+        // weighed at the parent, from the edge's and the bundle's inherited
+        // values, each falling back to its genomic value; no flag read and no
+        // clamp (the learned state clamps at construction).
         let scale_origin = map.bundles[bundle.index()].clone();
         let inherited = if modifier == Origin::Fresh && scale_origin == Origin::Fresh {
             Origin::Fresh
@@ -1546,9 +1343,6 @@ impl CgpGraphBackendDef {
         edge.role = EdgeRole::Lone(policy.effective(self.bundles[bundle.index()].member_default));
         let at = self.first_member(sink);
         self.output_sinks.0[sink].inputs.0.insert(at, edge);
-        if let Some(seeds) = &mut self.birth_seeds {
-            seeds.row_mut(occurrence.surface).insert(at, seed);
-        }
         map.row_mut(occurrence.surface).insert(at, inherited);
         let removed = self.members(bundle).next().is_none();
         if removed {
@@ -1597,15 +1391,9 @@ impl CgpGraphBackendDef {
         Some((bundle, member_field(edge.source).unwrap_or(u16::MAX)))
     }
 
-    /// Insert member `edge` with its seed and origin on the sink `site` names
-    /// under its bundle's wiring, in the I10 position.
-    fn insert_member(
-        &mut self,
-        edge: GraphEdge,
-        site: Site,
-        (seed, origin): (Option<f32>, Origin),
-        map: &mut OriginRows,
-    ) {
+    /// Insert member `edge` with its origin on the sink `site` names under
+    /// its bundle's wiring, in the I10 position.
+    fn insert_member(&mut self, edge: GraphEdge, site: Site, origin: Origin, map: &mut OriginRows) {
         let key = Self::member_key(&edge);
         let (bundle, _) = key.expect("a member");
         let sink = self
@@ -1617,20 +1405,16 @@ impl CgpGraphBackendDef {
             .position(|other| other.membership().is_some() && Self::member_key(other) > key)
             .unwrap_or(inputs.len());
         inputs.insert(at, edge);
-        if let Some(seeds) = &mut self.birth_seeds {
-            seeds.row_mut(EdgeSurface::SinkInput(sink)).insert(at, seed);
-        }
         map.row_mut(EdgeSurface::SinkInput(sink)).insert(at, origin);
     }
 
     /// Remove every member of `bundle` from its sink, in canonical order,
-    /// each with its site, its seed and its origin.
-    #[allow(clippy::type_complexity, reason = "step-1 rows beside the mapping")]
+    /// each with its site and its origin.
     fn take_members(
         &mut self,
         bundle: BundleId,
         map: &mut OriginRows,
-    ) -> Vec<(GraphEdge, Site, (Option<f32>, Origin))> {
+    ) -> Vec<(GraphEdge, Site, Origin)> {
         let wiring = self.bundles[bundle.index()].wiring;
         let mut taken = Vec::new();
         for (sink_idx, sink) in self.output_sinks.0.iter_mut().enumerate() {
@@ -1641,17 +1425,12 @@ impl CgpGraphBackendDef {
                 );
                 continue;
             };
-            let mut seeds = self
-                .birth_seeds
-                .as_mut()
-                .map(|seeds| seeds.row_mut(EdgeSurface::SinkInput(sink_idx)));
             let mut index = 0;
             while index < sink.inputs.len() {
                 if sink.inputs[index].is_member_of(bundle) {
                     let edge = sink.inputs.0.remove(index);
-                    let seed = seeds.as_mut().and_then(|row| row.remove(index));
                     let origin = map.sinks[sink_idx].remove(index);
-                    taken.push((edge, site, (seed, origin)));
+                    taken.push((edge, site, origin));
                 } else {
                     index += 1;
                 }
@@ -1664,9 +1443,6 @@ impl CgpGraphBackendDef {
     fn drop_bundle_record(&mut self, bundle: BundleId, map: &mut OriginRows) {
         self.bundles.remove(bundle.index());
         map.bundles.remove(bundle.index());
-        if let Some(seeds) = &mut self.birth_seeds {
-            seeds.bundles_mut().remove(bundle.index());
-        }
         for sink in &mut self.output_sinks.0 {
             for edge in &mut sink.inputs.0 {
                 if let EdgeRole::Member(Membership { bundle: id, .. }) = &mut edge.role {
@@ -1783,61 +1559,10 @@ impl CgpGraphBackendDef {
 
     // ── Internal helpers ────────────────────────────────────────────────────
 
-    fn compute_seed_rows_mut(&mut self) -> Option<&mut Vec<Vec<Option<f32>>>> {
-        self.birth_seeds
-            .as_mut()
-            .map(|BirthSeeds::Rows { compute, .. }| compute)
-    }
-
-    fn clear_seed(&mut self, occurrence: EdgeOccurrence) {
-        if let Some(seeds) = &mut self.birth_seeds {
-            seeds.row_mut(occurrence.surface)[occurrence.index] = None;
-        }
-    }
-
     fn edge_slot(&mut self, occurrence: EdgeOccurrence) -> &mut GraphEdge {
         match occurrence.surface {
             EdgeSurface::ComputeInput(i) => &mut self.compute_nodes.0[i].inputs.0[occurrence.index],
             EdgeSurface::SinkInput(i) => &mut self.output_sinks.0[i].inputs.0[occurrence.index],
-        }
-    }
-
-    /// I11: when rows are present there is one per compute node and one per
-    /// sink, each sized to that container's inputs, and one bundle slot per
-    /// bundle record.
-    fn debug_assert_seed_shape(&self) {
-        if let Some(BirthSeeds::Rows {
-            compute,
-            sinks,
-            bundles,
-        }) = &self.birth_seeds
-        {
-            debug_assert_eq!(
-                bundles.len(),
-                self.bundles.len(),
-                "one seed slot per bundle record"
-            );
-            debug_assert_eq!(
-                compute.len(),
-                self.compute_nodes.len(),
-                "one seed row per compute node"
-            );
-            debug_assert_eq!(
-                sinks.len(),
-                self.output_sinks.len(),
-                "one seed row per sink"
-            );
-            debug_assert!(
-                compute
-                    .iter()
-                    .zip(self.compute_nodes.iter())
-                    .all(|(row, node)| row.len() == node.inputs.len())
-                    && sinks
-                        .iter()
-                        .zip(self.output_sinks.iter())
-                        .all(|(row, sink)| row.len() == sink.inputs.len()),
-                "each seed row sized to its container's inputs"
-            );
         }
     }
 
@@ -1864,22 +1589,6 @@ impl CgpGraphBackendDef {
 
 #[cfg(test)]
 impl CgpGraphBackendDef {
-    /// Seed the compute rows `compute` and an empty row per sink, each
-    /// sized to its sink's inputs (a fixture).
-    pub(crate) fn seed_compute_rows(&mut self, compute: Vec<Vec<Option<f32>>>) {
-        let sinks = self
-            .output_sinks
-            .iter()
-            .map(|sink| vec![None; sink.inputs.len()])
-            .collect();
-        let bundles = vec![None; self.bundles.len()];
-        self.seed_birth(BirthSeeds::Rows {
-            compute,
-            sinks,
-            bundles,
-        });
-    }
-
     /// Fill the bundle table to its `u16::MAX`-record limit with memberless
     /// records, so `add_bundle` and `add_sensor` refuse a further record on
     /// an otherwise full sink catalog (a preflight fixture; such a def fails

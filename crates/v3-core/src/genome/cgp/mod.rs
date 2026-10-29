@@ -21,9 +21,8 @@ pub use bundle::{
 };
 pub(crate) use container::bundle_capacity_admits;
 pub use container::{
-    validate_graph, BirthSeeds, BundleMut, CgpGraphBackendDef, ComputeNode, ComputeNodes, EdgeEdit,
-    EdgeList, EdgeMut, EdgeOccurrence, EdgeSurface, GraphInvariantViolation, OutputSink,
-    OutputSinks,
+    validate_graph, BundleMut, CgpGraphBackendDef, ComputeNode, ComputeNodes, EdgeEdit, EdgeList,
+    EdgeMut, EdgeOccurrence, EdgeSurface, GraphInvariantViolation, OutputSink, OutputSinks,
 };
 pub use edge::{EdgeRole, GraphEdge, GraphSource, Membership};
 

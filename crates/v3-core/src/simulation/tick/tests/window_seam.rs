@@ -14,7 +14,6 @@ use crate::creature::action_log::{ActionLog, ActionType};
 use crate::creature::body::HeritableBody;
 use crate::creature::founder::{v3alpha1_founder_genome, vm_decision_founder_genome};
 use crate::creature::phenotype::Phenotype;
-use crate::creature::state::CreatureState;
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use crate::ledger::DeathCause;
 use crate::runtime::traced_mesh::TruncationReason;
@@ -41,21 +40,33 @@ fn with_vm_founders(mut sim: Simulation) -> Simulation {
     let ids: Vec<CreatureId> = sim.creatures.keys().collect();
     for id in ids {
         let old = &sim.creatures[id];
-        let rebuilt = CreatureState::new(
-            id,
-            vm_decision_founder_genome(),
-            old.position,
-            old.energy,
-            old.generation,
-            HeritableBody {
-                phenotype: Phenotype::FOUNDER,
-                identity: old.body.identity,
-                capacity: 200.0,
-                steal_share: 0.2,
-                give_share: 0.2,
-            },
-            old.shared_memory,
-        );
+        let rebuilt = {
+            let mut born = crate::creature::birth::Zygote::founder(
+                vm_decision_founder_genome(),
+                HeritableBody {
+                    phenotype: Phenotype::FOUNDER,
+                    identity: old.body.identity,
+                    capacity: 200.0,
+                    steal_share: 0.2,
+                    give_share: 0.2,
+                },
+            )
+            .with_payload(crate::creature::birth::BirthPayload::new(
+                crate::genome::learning::Seeds::default(),
+                old.shared_memory,
+            ))
+            .finalize(
+                id,
+                crate::creature::birth::BirthPlace {
+                    position: old.position,
+                    heading: crate::contracts::Direction::N,
+                    energy: old.energy,
+                },
+            )
+            .creature;
+            born.generation = old.generation;
+            born
+        };
         sim.creatures[id] = rebuilt;
     }
     sim

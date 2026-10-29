@@ -241,8 +241,9 @@ pub(crate) fn run_tick_heading(
     let sensors = senses.snapshot();
     let mut energies = [energy; 3];
     let mut memories = [memory; 3];
-    let mut states: [GraphRuntimeState; 3] =
-        std::array::from_fn(|_| GraphRuntimeState::for_genome(genome, Vec::new()));
+    let mut states: [GraphRuntimeState; 3] = std::array::from_fn(|_| {
+        GraphRuntimeState::for_genome(genome, &crate::genome::learning::Seeds::default())
+    });
     for state in &mut states {
         state.begin_tick(0);
     }

@@ -547,6 +547,3 @@ mod bundle_tests;
 
 #[cfg(test)]
 mod draw_stream_tests;
-
-#[cfg(test)]
-mod inheritance_tests;

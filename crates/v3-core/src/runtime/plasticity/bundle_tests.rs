@@ -10,10 +10,11 @@ use crate::contracts::OutcomeChannel;
 use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::genome::cgp::{
-    BirthSeeds, BundleId, CgpGraphBackendDef, ComputeNodeKind, EdgeOccurrence, EdgeSurface,
-    GraphEdge, GraphSource, LearningSlot, OutputSinkKind,
+    BundleId, CgpGraphBackendDef, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
+    GraphSource, LearningSlot, OutputSinkKind,
 };
 use crate::genome::learning::LearnerSource;
+use crate::genome::learning::Seeds;
 use crate::genome::{
     BackendDef, CreatureGenome, HebbianRule, Learning, MemberPolicy, NodeGenome,
     RewardModulationConfig,
@@ -127,41 +128,23 @@ fn genome(def: &CgpGraphBackendDef) -> CreatureGenome {
     }
 }
 
-fn state(def: &CgpGraphBackendDef, seeds: Option<BirthSeeds>) -> LearnedState {
-    LearnedState::for_genome(&genome(def), &[seeds])
+fn state(def: &CgpGraphBackendDef, seeds: Option<Seeds>) -> LearnedState {
+    LearnedState::for_genome(&genome(def), &seeds.unwrap_or_default())
 }
 
-/// Seeds for `def`: every row empty, `edits` applied.
-fn seeds(def: &CgpGraphBackendDef, edit: impl FnOnce(&mut BirthSeeds)) -> BirthSeeds {
-    let mut seeds = BirthSeeds::Rows {
-        compute: def
-            .compute_nodes()
-            .iter()
-            .map(|node| vec![None; node.inputs.len()])
-            .collect(),
-        sinks: def
-            .output_sinks()
-            .iter()
-            .map(|sink| vec![None; sink.inputs.len()])
-            .collect(),
-        bundles: vec![None; def.bundles().len()],
-    };
+/// Seeds for `def`'s node: none, `edit` applied.
+fn seeds(_def: &CgpGraphBackendDef, edit: impl FnOnce(&mut Seeds)) -> Seeds {
+    let mut seeds = Seeds::default();
     edit(&mut seeds);
     seeds
 }
 
-fn seed_edge(seeds: &mut BirthSeeds, at: EdgeOccurrence, value: f32) {
-    let BirthSeeds::Rows { compute, sinks, .. } = seeds;
-    let row = match at.surface {
-        EdgeSurface::ComputeInput(i) => &mut compute[i],
-        EdgeSurface::SinkInput(i) => &mut sinks[i],
-    };
-    row[at.index] = Some(value);
+fn seed_edge(seeds: &mut Seeds, at: EdgeOccurrence, value: f32) {
+    seeds.set_edge(0, at, value);
 }
 
-fn seed_bundle(seeds: &mut BirthSeeds, bundle: BundleId, value: f32) {
-    let BirthSeeds::Rows { bundles, .. } = seeds;
-    bundles[bundle.index()] = Some(value);
+fn seed_bundle(seeds: &mut Seeds, bundle: BundleId, value: f32) {
+    seeds.set_scale(0, bundle, value);
 }
 
 /// One committed visit driven through the learner in canonical order: each
@@ -553,8 +536,8 @@ fn a_scale_without_contributors_keeps_decays_and_passes_on() {
     child.set_scale(0, 0, 3.5);
     child.begin_tick();
     assert_eq!(scale(&child).learned, Some(2.5 + 0.5 * (3.5 - 2.5)));
-    let captured = child.capture(0, &def).expect("an initialized scale");
-    assert_eq!(captured.bundle_value(id), Some(3.0));
+    let captured = child.capture();
+    assert_eq!(captured.scale_at(0, id), Some(3.0));
 }
 
 /// Lamarckian seeding of a scale and a modifier: each seeds by its own
@@ -586,9 +569,9 @@ fn a_scale_and_a_modifier_seed_by_their_own_lamarckian() {
     let edge = view_edge(&child, all[0]);
     assert_eq!((edge.learned, edge.learning.lamarckian), (Some(0.75), true));
     assert_eq!(edge.applied, 0.75 + 0.5);
-    let captured = child.capture(0, &def).expect("a seeded modifier");
-    assert_eq!(captured.value(all[0]), Some(0.75));
-    assert_eq!(captured.bundle_value(id), None);
+    let captured = child.capture();
+    assert_eq!(captured.edge_at(0, all[0]), Some(0.75));
+    assert_eq!(captured.scale_at(0, id), None);
 }
 
 /// Reward: one `three_factor` per initialized modulated learner at its own
@@ -678,9 +661,9 @@ fn initialization_is_per_learner_across_edges_and_scales() {
     assert!(scale_seeded
         .edges(0)
         .all(|edge| edge.learned.is_none() && edge.trace.is_none() && !edge.initialized));
-    let captured = scale_seeded.capture(0, &def).expect("a seeded scale");
-    assert_eq!(captured.bundle_value(id), Some(1.25));
-    assert_eq!(captured.value(all[1]), None);
+    let captured = scale_seeded.capture();
+    assert_eq!(captured.scale_at(0, id), Some(1.25));
+    assert_eq!(captured.edge_at(0, all[1]), None);
 
     let edge_seeded = state(
         &def,
@@ -695,11 +678,11 @@ fn initialization_is_per_learner_across_edges_and_scales() {
     assert_eq!(scale(&rewarded).learned, None);
 
     let mut failed = state(&def, None);
-    assert!(failed.capture(0, &def).is_none());
+    assert!(failed.capture().is_empty());
     failed.learner(0).expect("a learning backend").enter();
     assert_eq!(scale(&failed).learned, Some(0.5));
     assert_eq!(view_edge(&failed, all[1]).learned, Some(0.0));
-    assert!(failed.capture(0, &def).is_some());
+    assert!(!failed.capture().is_empty());
 }
 
 /// Records each sink's weighted inputs.
@@ -782,7 +765,7 @@ fn applied_weight_agrees_with_the_executor_and_the_view() {
         seed_edge(seeds, all[0], 0.5);
         seed_edge(seeds, lone, -1.5);
     });
-    let mut runtime = GraphRuntimeState::for_genome(&genome(&def), vec![Some(birth)]);
+    let mut runtime = GraphRuntimeState::for_genome(&genome(&def), &birth);
     let refs = refs();
     let expected = [
         (all[0], 0.5 + 1.25),

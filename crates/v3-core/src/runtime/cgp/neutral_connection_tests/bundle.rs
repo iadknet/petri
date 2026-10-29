@@ -375,7 +375,8 @@ fn visit(def: &CgpGraphBackendDef, energy: f32, traced: bool) -> (MeshSideOutput
             Vec::new(),
         )],
     };
-    let mut state = GraphRuntimeState::for_genome(&genome, Vec::new());
+    let mut state =
+        GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
     let mut side = side();
     let mut memory = ramp(0.0);
     let config = RuntimeConfig {
@@ -514,12 +515,8 @@ mod pair {
     }
 
     fn creature(id: CreatureId, position: Position) -> CreatureState {
-        CreatureState::new(
-            id,
+        crate::creature::birth::Zygote::founder(
             v3alpha1_founder_genome(),
-            position,
-            50.0,
-            0,
             HeritableBody {
                 phenotype: Phenotype {
                     channels: [0; 6],
@@ -531,8 +528,16 @@ mod pair {
                 steal_share: 0.2,
                 give_share: 0.2,
             },
-            [0.0; 16],
         )
+        .finalize(
+            id,
+            crate::creature::birth::BirthPlace {
+                position: position,
+                heading: crate::contracts::Direction::N,
+                energy: 50.0,
+            },
+        )
+        .creature
     }
 
     /// The perception of an observer at `ORIGIN` on a 20×20 wrapped world

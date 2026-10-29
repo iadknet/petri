@@ -1,10 +1,10 @@
 pub mod action_log;
+pub mod birth;
 pub mod body;
 pub(crate) mod cgp_founder;
 pub mod colour;
 pub mod founder;
 pub mod identity;
-pub(crate) mod newborn;
 pub mod parseability;
 pub mod phenotype;
 pub mod state;

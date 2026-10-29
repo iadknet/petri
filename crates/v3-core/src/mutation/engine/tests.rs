@@ -1872,15 +1872,16 @@ proptest::proptest! {
     }
 }
 
+/// A rejected event restores the draft and reports nothing, so its
+/// inheritance mapping never reaches the birth's (T29.F01 invariant 5).
 #[test]
-fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
+fn a_rejected_event_restores_the_draft_and_reports_no_mapping() {
     use crate::genome::cgp::{ComputeNode, ComputeNodeKind};
-    use rand::RngCore;
     let mut original = single_graph_genome_with_inputs(vec![]);
     let BackendDef::Graph(def) = original.nodes[0].backend_edit().1 else {
         unreachable!()
     };
-    def.append_compute_node(ComputeNode::new(
+    let _ = def.append_compute_node(ComputeNode::new(
         ComputeNodeKind::Add,
         vec![GraphEdge::new(
             GraphSource::SharedMemory {
@@ -1892,45 +1893,8 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
     ));
     let mut config = SimulationConfig::default().mutation;
     config.per_unit_rate = 1.0;
-    for seed in 0..32 {
-        let mut plain = original.clone();
-        let mut tracked = original.clone();
-        let BackendDef::Graph(def) = tracked.nodes[0].backend_edit().1 else {
-            unreachable!()
-        };
-        def.seed_compute_rows(vec![vec![Some(0.75)]]);
-        let mut plain_rng = rng(seed);
-        let mut tracked_rng = rng(seed);
-        let plain_summary = apply_events(&mut plain, &config, &[0], &mut plain_rng, 6);
-        let tracked_summary = apply_events(&mut tracked, &config, &[0], &mut tracked_rng, 6);
-        assert_eq!(plain, tracked);
-        assert_eq!(plain_summary.events, tracked_summary.events);
-        assert_eq!(plain_summary.applied_events, tracked_summary.applied_events);
-        assert_eq!(
-            plain_summary.operator_funnel_by_operator,
-            tracked_summary.operator_funnel_by_operator
-        );
-        assert_eq!(plain_rng.next_u64(), tracked_rng.next_u64());
-        for node in &tracked.nodes {
-            if let BackendDef::Graph(def) = node.backend_def() {
-                if let Some(seeds) = def.birth_seeds() {
-                    assert_eq!(seeds.compute_rows().len(), def.compute_nodes().len());
-                    for (row, node) in seeds.compute_rows().iter().zip(def.compute_nodes()) {
-                        assert_eq!(row.len(), node.inputs.len());
-                    }
-                    assert_eq!(seeds.sink_rows().len(), def.output_sinks().len());
-                    for (row, sink) in seeds.sink_rows().iter().zip(def.output_sinks()) {
-                        assert_eq!(row.len(), sink.inputs.len());
-                    }
-                }
-            }
-        }
-    }
+    // A duplicate node id fails the parseability gate after the edit.
     original.nodes.push(original.nodes[0].clone());
-    let BackendDef::Graph(def) = original.nodes[0].backend_edit().1 else {
-        unreachable!()
-    };
-    def.seed_compute_rows(vec![vec![Some(0.75)]]);
     let before = original.clone();
     assert_eq!(
         apply_event(
@@ -1944,11 +1908,4 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
         Err(MutationSkipReason::ParseabilityViolation)
     );
     assert_eq!(original, before);
-    let BackendDef::Graph(def) = original.nodes[0].backend_def() else {
-        unreachable!()
-    };
-    assert_eq!(
-        def.birth_seeds().map(|seeds| seeds.compute_rows().to_vec()),
-        Some(vec![vec![Some(0.75)]])
-    );
 }

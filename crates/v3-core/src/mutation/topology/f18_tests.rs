@@ -167,8 +167,14 @@ fn both_detours_preserve_nonzero_bus_queue_local_metadata_and_temporal_state() {
                 let mut runtime = crate::config::RuntimeConfig::default();
                 runtime.vm.opcode_cost_multiplier = 1.0;
                 let mut states = [
-                    GraphRuntimeState::for_genome(&base, Vec::new()),
-                    GraphRuntimeState::for_genome(&grown, Vec::new()),
+                    GraphRuntimeState::for_genome(
+                        &base,
+                        &crate::genome::learning::Seeds::default(),
+                    ),
+                    GraphRuntimeState::for_genome(
+                        &grown,
+                        &crate::genome::learning::Seeds::default(),
+                    ),
                 ];
                 let mut memory = [[3.0; 16]; 2];
                 for (tick, input) in [0.0, 1.0, 2.0, 0.0].into_iter().enumerate() {

@@ -6,7 +6,7 @@
 //! The parent's cached reachable set is used to bias mutations on the offspring.
 //! After mutations, the offspring's actual reachable set may differ. This is
 //! intentional — mutations are biased toward what was functional in the parent.
-//! The offspring gets a fresh BFS via `CreatureState::new()`. Within a birth,
+//! The offspring gets a fresh BFS at its birth's finalization. Within a birth,
 //! [`BirthMembership`] maps the parent's sets onto the child's current nodes,
 //! so earlier removals and additions never move membership between nodes.
 
