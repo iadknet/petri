@@ -2970,7 +2970,10 @@ fn any_other_sink_list_is_rejected_at_deserialization() {
             .expect_err(name)
             .to_string();
         assert!(
-            error.contains("fixed 108-sink catalog in catalog order"),
+            error.contains(&format!(
+                "fixed {}-sink catalog in catalog order",
+                crate::genome::cgp::FIXED_SINK_COUNT
+            )),
             "{name}: {error}"
         );
     }

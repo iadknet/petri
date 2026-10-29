@@ -1,7 +1,7 @@
 //! Fixture editing for tests (T25.F01): a def's lists are read-only outside
-//! the container, so a fixture that reshapes a catalog or rewires nodes
+//! the container, so a fixture that rewires sink inputs or compute nodes
 //! freely edits plain drafts and rebuilds the def through the seedless
-//! builder.
+//! builders; the sink catalog itself stays fixed.
 
 use super::{
     BundleBirth, BundleId, BundleSource, CgpGraphBackendDef, ComputeNode, ComputeNodeKind,
