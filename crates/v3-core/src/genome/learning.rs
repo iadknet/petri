@@ -2,6 +2,8 @@
 //! learnable number runs, a member's policy, and the learning layout, the
 //! one genome-owned analysis of what learns in a graph.
 
+use std::collections::BTreeMap;
+
 use super::cgp::{BundleId, CgpGraphBackendDef, EdgeOccurrence, EdgeRole, EdgeSurface};
 use crate::contracts::{InputReference, OutcomeChannel};
 
@@ -555,13 +557,13 @@ impl GraphMapping {
 }
 
 /// One Graph node's inherited values, keyed by learnable key.
-pub type NodeSeeds = std::collections::BTreeMap<LearnableKey, f32>;
+pub type NodeSeeds = BTreeMap<LearnableKey, f32>;
 
 /// The inherited learned values a birth carries (T29.F01 invariant 2):
 /// each initialized learner's value keyed by learnable identity.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Seeds {
-    nodes: std::collections::BTreeMap<usize, NodeSeeds>,
+    nodes: BTreeMap<usize, NodeSeeds>,
 }
 
 impl Seeds {

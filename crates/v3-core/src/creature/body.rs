@@ -113,9 +113,8 @@ impl HeritableBody {
 /// One heritable scalar trait's inheritance (T26.F02, T27.F03): the parent's
 /// value clamped to `[min, max]`, the range in force at this birth, so a
 /// live patch of the bounds reaches the next generation without a draw;
-/// then one `f32` draw against `config.chance` and, when it fires, a uniform
-/// log-space step `δ ∈ [-log_step, log_step]` with the child
-/// `(parent × e^δ)` clamped to the same range.
+/// with a sampled log-space step `δ`, the child `(parent × e^δ)` clamped to
+/// the same range.
 fn inherit_scalar(parent: f32, log_step: Option<f32>, min: f32, max: f32) -> f32 {
     match log_step {
         Some(delta) => (parent * delta.exp()).clamp(min, max),
