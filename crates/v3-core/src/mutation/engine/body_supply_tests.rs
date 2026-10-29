@@ -169,7 +169,6 @@ fn a_body_operator_is_neutral_and_outside_the_brain_catalog() {
             .contains(&operator));
         assert!(!operator.complexity_effect().is_decreasing());
         assert!(operator.as_key().starts_with("Body."));
-        assert_eq!(MutationDomain::Body.brain(), None);
     }
 }
 

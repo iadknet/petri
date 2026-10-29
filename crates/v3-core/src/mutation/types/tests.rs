@@ -515,24 +515,40 @@ fn the_nested_catalog_derives_every_operator_fact() {
         )
         .collect();
     assert_eq!(MutationOperator::ALL.to_vec(), expected);
-    let catalog: Vec<MutationOperator> = MutationDomain::all()
+    // Each brain domain's catalog is its slice of the brain operators, which
+    // lead the catalog; the body's operators follow.
+    let catalog: Vec<MutationOperator> = BrainDomain::ALL
         .into_iter()
-        .flat_map(|domain| domain.catalog().iter().copied())
+        .flat_map(|domain| {
+            domain.catalog().iter().map(move |&op| {
+                assert_eq!(MutationOperator::from(op).domain(), domain.into());
+                MutationOperator::from(op)
+            })
+        })
+        .chain(
+            crate::mutation::body::BodyOperator::ALL
+                .into_iter()
+                .map(MutationOperator::from),
+        )
         .collect();
     assert_eq!(catalog, expected);
+    let brain: Vec<MutationOperator> = BrainOperator::ALL
+        .into_iter()
+        .map(MutationOperator::from)
+        .collect();
+    assert_eq!(brain, MutationOperator::ALL[..BrainOperator::COUNT]);
 
     let config = MutationConfig {
         large_copy_weight_percent: 30,
         ..MutationConfig::default()
     };
-    for domain in MutationDomain::all() {
-        for &op in domain.catalog() {
-            assert_eq!(op.domain(), domain);
-            assert!(op.as_key().starts_with(&format!("{}.", domain.as_key())));
-            let json = serde_json::to_string(&op).unwrap();
-            assert_eq!(json, format!("\"{}\"", op.as_key()));
-            assert_eq!(serde_json::from_str::<MutationOperator>(&json).unwrap(), op);
-        }
+    for op in MutationOperator::ALL {
+        assert!(op
+            .as_key()
+            .starts_with(&format!("{}.", op.domain().as_key())));
+        let json = serde_json::to_string(&op).unwrap();
+        assert_eq!(json, format!("\"{}\"", op.as_key()));
+        assert_eq!(serde_json::from_str::<MutationOperator>(&json).unwrap(), op);
     }
     for &op in &MutationOperator::ALL {
         let effect = match op {
@@ -545,23 +561,7 @@ fn the_nested_catalog_derives_every_operator_fact() {
         assert_eq!(op.complexity_effect(), effect, "{op:?}");
     }
 
-    // The brain operators are the catalog's leading run, each brain domain's
-    // catalog its slice of them, and only they carry a weight.
-    let brain: Vec<MutationOperator> = BrainOperator::ALL
-        .into_iter()
-        .map(MutationOperator::from)
-        .collect();
-    assert_eq!(brain, MutationOperator::ALL[..BrainOperator::COUNT]);
-    let brain_catalogs: Vec<BrainOperator> = BrainDomain::ALL
-        .into_iter()
-        .flat_map(|domain| domain.catalog().iter().copied())
-        .collect();
-    assert_eq!(brain_catalogs, BrainOperator::ALL);
-    for domain in BrainDomain::ALL {
-        for &op in domain.catalog() {
-            assert_eq!(MutationOperator::from(op).domain(), domain.into());
-        }
-    }
+    // Only brain operators carry a weight.
     for op in BrainOperator::ALL {
         let weight = match op {
             BrainOperator::Topology(o) => o.tuned_weight(30),

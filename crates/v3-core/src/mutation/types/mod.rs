@@ -280,36 +280,6 @@ impl MutationDomain {
             Self::Body,
         ]
     }
-
-    /// The brain domain this is, `None` for the body.
-    #[must_use]
-    pub const fn brain(self) -> Option<BrainDomain> {
-        match self {
-            Self::Topology => Some(BrainDomain::Topology),
-            Self::Vm => Some(BrainDomain::Vm),
-            Self::Graph => Some(BrainDomain::Graph),
-            Self::InputRef => Some(BrainDomain::InputRef),
-            Self::Body => None,
-        }
-    }
-
-    /// This domain's operators: its slice of [`MutationOperator::ALL`], in
-    /// the domain enum's `ALL` order.
-    #[must_use]
-    pub fn catalog(self) -> &'static [MutationOperator] {
-        const TOPOLOGY: usize = TopologyOperator::ALL.len();
-        const VM: usize = TOPOLOGY + VmOperator::ALL.len();
-        const GRAPH: usize = VM + GraphOperator::ALL.len();
-        const INPUT_REF: usize = GRAPH + InputRefOperator::ALL.len();
-        let all = &MutationOperator::ALL;
-        match self {
-            Self::Topology => &all[..TOPOLOGY],
-            Self::Vm => &all[TOPOLOGY..VM],
-            Self::Graph => &all[VM..GRAPH],
-            Self::InputRef => &all[GRAPH..INPUT_REF],
-            Self::Body => &all[INPUT_REF..],
-        }
-    }
 }
 
 /// Mutation operator selected for one attempted mutation event: one of the
