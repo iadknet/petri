@@ -492,6 +492,19 @@ The reviewer does not audit the benchmark reports: the benchmark gate runs
 after this review, so there is nothing final to audit yet. **The orchestrator
 audits them at the closure gate instead.**
 
+### Sync with main before verification
+
+After the review and any post-review remediation, and before the first
+benchmark profile or `make check` runs, bring the feature branch up to date
+so verification runs once. If `main` gained commits since the branch was cut
+(`git merge-base --is-ancestor main HEAD` fails in the worktree), rebase the
+feature branch onto `main` there, resolving conflicts as Close step 2 does,
+and confirm the rebased tree with `cargo check --workspace --all-targets` and
+the tests of the crates the conflicts touched. When `main`'s new commits
+change simulation behavior, the spec owner rechecks the spec's predeclared
+pins and re-pins against them before any profile runs. The rebase in Close
+step 2 is then needed only when `main` moves again during verification.
+
 ### Benchmark gate
 
 #### Verification plan
@@ -789,8 +802,8 @@ the full suite was just run on the same code), and commit. Then:
 1. `ExitWorktree` with `action: "keep"` — the session returns to the main
    checkout. While inside a worktree, Claude Code blocks every git command
    aimed at the main checkout, so the merge cannot happen before this step.
-2. `git merge --ff-only worktree-<tnn-fnn>`. If it fails because `main` moved,
-   rebase `worktree-<tnn-fnn>` onto `main` without asking, resolve the
+2. `git merge --ff-only worktree-<tnn-fnn>`. If it fails because `main` moved
+   after the sync before verification, rebase `worktree-<tnn-fnn>` onto `main` without asking, resolve the
    conflicts, and re-verify: `make check` on the rebased content only when the
    commits `main` gained touch code, `make check-docs` when they touch only
    documentation. When those commits change simulation behavior, re-run every
