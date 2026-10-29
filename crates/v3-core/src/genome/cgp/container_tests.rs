@@ -7,7 +7,6 @@ use crate::genome::cgp::test_support::store_learning;
 use crate::genome::cgp::test_support::{plastic_node, set_surface_plasticity};
 use crate::genome::cgp::{
     compose, detach, BundleId, BundleSource, LearningSlot, Membership, Site, Wiring,
-    FIRST_ACTION_VOTE_SINK,
 };
 use crate::genome::learning::{GraphMapping, LearnableKey, LearningLayout, NodeSeeds};
 use crate::genome::{HebbianRule, MemberPolicy};
@@ -699,7 +698,7 @@ fn ring_wiring(kind: DirectedVoteKind, offset: u8) -> Wiring {
 }
 
 fn vote_sink(kind: DirectedVoteKind, d: u8) -> usize {
-    FIRST_ACTION_VOTE_SINK + kind.sink(d).index()
+    OutputSinkKind::ActionVote(kind.sink(d)).catalog_index()
 }
 
 fn sink_occurrence(sink: usize, index: usize) -> EdgeOccurrence {
@@ -1993,7 +1992,7 @@ fn model_sinks() -> [usize; 6] {
     [
         0,
         1,
-        CUSTOM_OUTPUT_COUNT as usize + MAX_GATE_SLOTS,
+        OutputSinkKind::WriteSlot(0).catalog_index(),
         vote_sink(DirectedVoteKind::Move, 0),
         vote_sink(DirectedVoteKind::Move, 5),
         vote_sink(DirectedVoteKind::Reproduce, 3),

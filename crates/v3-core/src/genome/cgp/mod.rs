@@ -5,7 +5,8 @@
 //! which includes the action-vote and parameter sinks (T19.F03, T19.F04).
 
 use crate::contracts::votes::{
-    ActionParamField, DirectedVoteKind, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT,
+    ActionParamField, DirectedVoteKind, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_DIRECTION_COUNT,
+    VOTE_SINK_COUNT,
 };
 use crate::contracts::MAX_GATE_SLOTS;
 
@@ -132,24 +133,165 @@ impl OutputSinkKind {
 pub const CUSTOM_OUTPUT_COUNT: u8 = crate::contracts::OUTPUT_SLOT_COUNT as u8;
 /// Number of shared memory slots (WriteSlot + ClearSlot each).
 pub const SHARED_MEMORY_SLOTS: u8 = crate::contracts::SHARED_MEMORY_SLOTS as u8;
+
+// The catalog order, written once as each family's first catalog index:
+// CustomOutput, RouterGate, WriteSlot, ClearSlot, ActionVote (in `VoteSink`
+// index order), ActionParam (in `ActionParamField::ALL` order).
+// `OutputSinkKind::catalog_index` and `at_catalog_index` are its two
+// directions.
+const FIRST_ROUTER_GATE_SINK: usize = CUSTOM_OUTPUT_COUNT as usize;
+const FIRST_WRITE_SLOT_SINK: usize = FIRST_ROUTER_GATE_SINK + MAX_GATE_SLOTS;
+const FIRST_CLEAR_SLOT_SINK: usize = FIRST_WRITE_SLOT_SINK + SHARED_MEMORY_SLOTS as usize;
 /// Catalog index of the first `ActionVote` sink, which is also the count of
 /// the sinks before it: N CustomOutput + 8 RouterGate + 16 WriteSlot +
-/// 16 ClearSlot. The vote sinks run from here in `VoteSink` index order, and
-/// the `ActionParam` sinks follow in `ActionParamField::ALL` order.
-pub const FIRST_ACTION_VOTE_SINK: usize = CUSTOM_OUTPUT_COUNT as usize // 24 CustomOutput slots
-    + MAX_GATE_SLOTS               // 8 RouterGate sinks
-    + SHARED_MEMORY_SLOTS as usize // 16 WriteSlot sinks
-    + SHARED_MEMORY_SLOTS as usize; // 16 ClearSlot sinks
+/// 16 ClearSlot.
+pub const FIRST_ACTION_VOTE_SINK: usize = FIRST_CLEAR_SLOT_SINK + SHARED_MEMORY_SLOTS as usize;
 const _: () = assert!(FIRST_ACTION_VOTE_SINK == 64);
+const FIRST_ACTION_PARAM_SINK: usize = FIRST_ACTION_VOTE_SINK + VOTE_SINK_COUNT;
 /// Total fixed sink count: the sinks before the vote catalog + 39 ActionVote +
 /// 5 ActionParam (T11.F27, T02.F08, T27.F03).
-pub const FIXED_SINK_COUNT: usize =
-    FIRST_ACTION_VOTE_SINK + VOTE_SINK_COUNT + ACTION_PARAM_FIELD_COUNT;
+pub const FIXED_SINK_COUNT: usize = FIRST_ACTION_PARAM_SINK + ACTION_PARAM_FIELD_COUNT;
 const _: () = assert!(FIXED_SINK_COUNT == 108);
+// The constants agree with the map at both ends of the vote and parameter
+// families.
+const _: () = assert!(
+    OutputSinkKind::ActionVote(VoteSink::Eat).catalog_index() == FIRST_ACTION_VOTE_SINK
+        && OutputSinkKind::ActionParam(ActionParamField::ALL[ACTION_PARAM_FIELD_COUNT - 1])
+            .catalog_index()
+            == FIXED_SINK_COUNT - 1
+);
+
+impl OutputSinkKind {
+    /// The sink's index in the fixed catalog, which [`Self::at_catalog_index`]
+    /// inverts.
+    ///
+    /// # Panics
+    ///
+    /// For a kind outside the catalog (a slot past its family's count, a
+    /// directed vote past direction 7): such a kind has no sink and never
+    /// aliases another.
+    #[must_use]
+    pub const fn catalog_index(self) -> usize {
+        match self {
+            Self::CustomOutput(slot) => {
+                assert!(
+                    slot < CUSTOM_OUTPUT_COUNT,
+                    "CustomOutput slot outside the catalog"
+                );
+                slot as usize
+            }
+            Self::RouterGate(slot) => {
+                assert!(
+                    (slot as usize) < MAX_GATE_SLOTS,
+                    "RouterGate slot outside the catalog"
+                );
+                FIRST_ROUTER_GATE_SINK + slot as usize
+            }
+            Self::WriteSlot(slot) => {
+                assert!(
+                    slot < SHARED_MEMORY_SLOTS,
+                    "WriteSlot slot outside the catalog"
+                );
+                FIRST_WRITE_SLOT_SINK + slot as usize
+            }
+            Self::ClearSlot(slot) => {
+                assert!(
+                    slot < SHARED_MEMORY_SLOTS,
+                    "ClearSlot slot outside the catalog"
+                );
+                FIRST_CLEAR_SLOT_SINK + slot as usize
+            }
+            Self::ActionVote(vote) => {
+                if let VoteSink::Directed(_, d) = vote {
+                    assert!(
+                        d < VOTE_DIRECTION_COUNT,
+                        "directed vote sink outside the catalog"
+                    );
+                }
+                FIRST_ACTION_VOTE_SINK + vote.index()
+            }
+            Self::ActionParam(field) => FIRST_ACTION_PARAM_SINK + field.index(),
+        }
+    }
+
+    /// The kind of the sink at catalog `index`; `None` at or above
+    /// [`FIXED_SINK_COUNT`].
+    #[must_use]
+    pub fn at_catalog_index(index: usize) -> Option<Self> {
+        // Every family holds fewer than 256 slots.
+        let slot = |first: usize| u8::try_from(index - first).expect("a family slot fits u8");
+        Some(if index < FIRST_ROUTER_GATE_SINK {
+            Self::CustomOutput(slot(0))
+        } else if index < FIRST_WRITE_SLOT_SINK {
+            Self::RouterGate(slot(FIRST_ROUTER_GATE_SINK))
+        } else if index < FIRST_CLEAR_SLOT_SINK {
+            Self::WriteSlot(slot(FIRST_WRITE_SLOT_SINK))
+        } else if index < FIRST_ACTION_VOTE_SINK {
+            Self::ClearSlot(slot(FIRST_CLEAR_SLOT_SINK))
+        } else if index < FIRST_ACTION_PARAM_SINK {
+            Self::ActionVote(VoteSink::from_index(index - FIRST_ACTION_VOTE_SINK)?)
+        } else {
+            Self::ActionParam(*ActionParamField::ALL.get(index - FIRST_ACTION_PARAM_SINK)?)
+        })
+    }
+
+    /// Every catalog kind, in catalog order.
+    pub fn catalog() -> impl Iterator<Item = Self> {
+        (0..FIXED_SINK_COUNT).map(|index| {
+            Self::at_catalog_index(index).expect("every index below FIXED_SINK_COUNT has a kind")
+        })
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+
+    // ── Catalog map ─────────────────────────────────────────────────────────
+
+    proptest! {
+        /// Every catalog index maps to a kind whose catalog index is that
+        /// index, and nothing at or above the catalog's end has a kind.
+        #[test]
+        fn catalog_map_round_trips(index in 0..2 * FIXED_SINK_COUNT) {
+            match OutputSinkKind::at_catalog_index(index) {
+                Some(kind) => {
+                    prop_assert!(index < FIXED_SINK_COUNT);
+                    prop_assert_eq!(kind.catalog_index(), index);
+                }
+                None => prop_assert!(index >= FIXED_SINK_COUNT),
+            }
+        }
+    }
+
+    #[test]
+    fn the_constructor_builds_the_map_order() {
+        let def = CgpGraphBackendDef::new_with_fixed_outputs();
+        let kinds: Vec<OutputSinkKind> = def.output_sinks().iter().map(|sink| sink.kind).collect();
+        assert_eq!(kinds, OutputSinkKind::catalog().collect::<Vec<_>>());
+        for (index, kind) in kinds.into_iter().enumerate() {
+            assert_eq!(kind.catalog_index(), index);
+        }
+    }
+
+    #[test]
+    fn a_kind_outside_the_catalog_has_no_index() {
+        let outside = [
+            OutputSinkKind::CustomOutput(CUSTOM_OUTPUT_COUNT),
+            OutputSinkKind::RouterGate(MAX_GATE_SLOTS as u8),
+            OutputSinkKind::WriteSlot(SHARED_MEMORY_SLOTS),
+            OutputSinkKind::ClearSlot(SHARED_MEMORY_SLOTS),
+            OutputSinkKind::ActionVote(VoteSink::Directed(
+                DirectedVoteKind::Move,
+                VOTE_DIRECTION_COUNT,
+            )),
+        ];
+        for kind in outside {
+            let panicked = std::panic::catch_unwind(|| kind.catalog_index()).is_err();
+            assert!(panicked, "{kind:?} must not alias a catalog sink");
+        }
+    }
 
     // ── Construction tests ──────────────────────────────────────────────────
 

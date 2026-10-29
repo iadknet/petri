@@ -17,11 +17,8 @@ use super::bundle::{
 };
 use super::edge::{EdgeRole, Membership};
 use super::edge::{GraphEdge, GraphSource};
-use super::{
-    ComputeNodeKind, OutputSinkKind, CUSTOM_OUTPUT_COUNT, FIXED_SINK_COUNT, SHARED_MEMORY_SLOTS,
-};
-use crate::contracts::votes::{ActionParamField, VoteSink, VOTE_DIRECTION_COUNT};
-use crate::contracts::MAX_GATE_SLOTS;
+use super::{ComputeNodeKind, OutputSinkKind};
+use crate::contracts::votes::VOTE_DIRECTION_COUNT;
 use crate::contracts::{FieldSet, InputReference, SensorContext};
 use crate::genome::learning::{Composed, GraphMapping, Origin, OriginRows};
 use crate::genome::{BackendDef, Learning, MemberPolicy, NodeEditError, NodeGenome};
@@ -423,28 +420,9 @@ impl CgpGraphBackendDef {
     /// All sinks start with empty edges (inert).
     #[must_use]
     pub fn new_with_fixed_outputs() -> Self {
-        let mut output_sinks = Vec::with_capacity(FIXED_SINK_COUNT);
-        let mut push = |kind| output_sinks.push(OutputSink::new(kind, Vec::new()));
-        for slot in 0..CUSTOM_OUTPUT_COUNT {
-            push(OutputSinkKind::CustomOutput(slot));
-        }
-        for slot in 0..MAX_GATE_SLOTS as u8 {
-            push(OutputSinkKind::RouterGate(slot));
-        }
-        for slot in 0..SHARED_MEMORY_SLOTS {
-            push(OutputSinkKind::WriteSlot(slot));
-        }
-        for slot in 0..SHARED_MEMORY_SLOTS {
-            push(OutputSinkKind::ClearSlot(slot));
-        }
-        // ActionVote sinks in `VoteSink` index order (T19.F03).
-        for sink in VoteSink::all() {
-            push(OutputSinkKind::ActionVote(sink));
-        }
-        // ActionParam sinks in `ActionParamField::ALL` order (T11.F27, T02.F08).
-        for field in ActionParamField::ALL {
-            push(OutputSinkKind::ActionParam(field));
-        }
+        let output_sinks = OutputSinkKind::catalog()
+            .map(|kind| OutputSink::new(kind, Vec::new()))
+            .collect();
         Self {
             compute_nodes: ComputeNodes::default(),
             output_sinks: OutputSinks(output_sinks),
@@ -1600,7 +1578,7 @@ impl CgpGraphBackendDef {
         let record = Bundle::new(
             BundleSource::Memory { previous: false },
             Wiring::Plain {
-                sink: VoteSink::Eat,
+                sink: crate::contracts::votes::VoteSink::Eat,
             },
         );
         self.bundles = vec![record; usize::from(u16::MAX)];
