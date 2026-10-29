@@ -1,6 +1,6 @@
 # T29.F02 — Body Genes
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-29
 **Feature**: T29.F02
 **Track**: [T29 — Heredity](../../roadmaps/t29-heredity.md)
@@ -134,7 +134,7 @@ collapsed distribution in the goal-long run shows it wrong.
 - [x] Viability first: `cargo test -p v3-core --test viability` -> 30 passed on macOS aarch64 after re-pinning the three founder-only digests and raising the colour-divergence fixture's rate to 0.2. GNU/Linux x86_64: the same test binary cross-built for `x86_64-unknown-linux-gnu` and run under emulated Ubuntu 24.04 (glibc 2.39) -> 30 passed with the re-measured pins at the same births (98, 94, 89); the method reproduces the three pins of the commit before T29.F02 (transcript in the readings).
 - [x] Focused tests: brain operators are the catalog's leading run, carry the weights and are all `dispatch` takes, body operators outside them; founder supply 0.485 and size 85; body-supply draw pin; gene operations and the conception clamp against today's arithmetic; repeated scalar events at extreme normalized `share_min` and `log_step` stay finite and in range; an instrument's mutated genome equals conception's for the same draws; genome serde with the body and a rejected out-of-range active channel; body events recorded as applied `NotApplicable`; a zero-brain-event birth still draws body supply; the one-event screen draws no body event; size pressure leaves body events; `lineage_id` provenance; body census against brute-force pairs.
 - [x] Build: `cargo check --workspace --all-targets`, `cargo fmt --all --check`, `make rust-clippy`, `node scripts/architecture-check.mjs` -> exit 0; `cargo test -p v3-core` (2,256 unit tests and every integration target), `-p v3-cli -p v3-lab`, `-p v3-telemetry -p v3-server` -> all pass; frontend `npm test` -> 680 passed, `npm run lint` -> no new finding.
-- [ ] `make check` -> exit 0; `make rust-test-slow` -> exit 0.
+- [x] `make check` -> exit 0; `make rust-test-slow` -> exit 0 (6 passed), on tested commit 3ec6b1156.
 - [x] Gate, goal and goal-long run once each (`make bench PROFILE=<p> FEATURE=t29-f02-body-genes`); summaries at `docs/progress/features/t29-f02-body-genes.json`, `-goal.json`, `-goal-long.json`; outer exits 0, 2, 2 and CLI exits 0, 3, 3 (3 is the severe exit); raw hashes, byte counts and times in the readings; series `closed` entries point to them; no full report staged. Goal and goal-long are `severe` (below).
 
 ## Performance and Goal Impact
@@ -188,10 +188,10 @@ re-pins are not made.
 
 ## Success Criteria
 
-- [ ] Colour, kin tag, capacity, steal share and give share are body genes in `CreatureGenome`, one unit each, mutated at the brain's per-unit rate with no gate on brain mutation.
-- [ ] `lineage_id` is observation-only provenance.
-- [ ] The founder is 85 units, its supply is 0.485 events per birth, and the replication and gestation anchors are 85.
-- [ ] The declared profiles and slow tests ran and their readings are recorded; G5 is deleted from `docs/architecture.md`.
+- [x] Colour, kin tag, capacity, steal share and give share are body genes in `CreatureGenome`, one unit each, mutated at the brain's per-unit rate with no gate on brain mutation.
+- [x] `lineage_id` is observation-only provenance.
+- [x] The founder is 85 units, its supply is 0.485 events per birth, and the replication and gestation anchors are 85.
+- [x] The declared profiles and slow tests ran and their readings are recorded; G5 is deleted from `docs/architecture.md`.
 
 ## Notes for AI Agents
 
@@ -201,3 +201,5 @@ re-pins are not made.
 - Deferred: the engine's whole-genome clone taken before an event and diffed after it (`crates/v3-core/src/mutation/engine/mod.rs:62`, `WORKAROUND(T30.F11)`) is paid by T30.F11 (Operators Report Their Own Edits).
 - Deferred: review P3, `undo_t29_f02` in `crates/v3-cli/tests/bench_artifacts.rs:216` extends the historical schema replay by restoring the retired `chance` fields and the old rate; removing the reverse-schema chain while keeping the current-digest and repeated-resolution assertions is left as advisory test cruft.
 - Decision: the frontend Vite upgrade in `frontend/package-lock.json` (vite 6.4.4, GHSA-8g5g-mxqh-grgj) lands with this feature as its own `chore(deps)` commit `22bbe5b1c` (lockfile only): the pre-commit OSV hook blocks every commit while main carries 6.4.4; reported to the user at closure.
+- Exception: user, 2026-10-29: accepted the goal and goal-long severes (`decided_passes`, `plasticity_updates`) and the goal persistence deviation as consequences of the one-law body-gene change; gate and goal epochs re-pinned to `t29-f02-body-genes.json` and `t29-f02-body-genes-goal.json`.
+- Cost: `/usage` not recorded; implementer passes 3 (build, remediation and simplify, rebase) with advisor consults 3, 2, 1; spec-owner resumes after Plan 4; Codex challenge rounds 2, final verdict ready; review findings: lens 1 one P1 (accepted at triage), lens 2 none, lens 3 one P2 and one P3; run under the user's 2026-10-29 no-Fable override (spec owner Opus 5.5 high).

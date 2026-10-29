@@ -161,7 +161,6 @@ field access through another type. Design notes:
 | Debt | Today | Paid by |
 | --- | --- | --- |
 | G2 | Route resolution and jump targets imported from runtime (`mutation::topology::routing`, `mutation::vm::operators`) | T30.F05 |
-| G5 | Body outside the genome (`creature::body`), per-birth trait chances, colour and kin tag gated on brain mutation (`mutation::body`), `lineage_id` in the body (`creature::identity`) | T29.F02 |
 | G6 | Every memory slot passes to the child (`creature::birth`) | T29.F03 |
 | G12 | The genome validity gate lives in `creature::parseability`, imported by `mutation::engine` | T30.F05 |
 | G15 | Genome analysis draws randomness (`genome::analysis`, called by `mutation::vm::operators`) | T30.F05 |

@@ -1,7 +1,7 @@
 # T29 — Heredity
 
 **Status**: In Progress
-**Last updated**: 2026-10-28
+**Last updated**: 2026-10-29
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -23,7 +23,7 @@ user decisions and review:
 
 - [x] **T29.F01 — One Birth Transaction** — Depends on: T25.F12
   - Goal: An egg is a nucleus and its cytoplasm, assembled once: every creature, founder or child, is built by one birth transaction from its genome, a payload of what the parent passes on, and its provenance, with no behavior change.
-- [ ] **T29.F02 — Body Genes** — Depends on: T29.F01
+- [x] **T29.F02 — Body Genes** — Depends on: T29.F01
   - Goal: One genome encodes both the body plan and the nervous system: colour, kin markings, fat reserves and how much a creature gives or takes are genes that cost what any gene costs and mutate as often.
 - [ ] **T29.F03 — Heritable Memory Inheritance** — Depends on: T29.F02
   - Goal: Maternal effects whose strength is itself heritable: parents evolve which remembered values they pass and children which they take up, so a lineage evolves what a child starts with and what it learns afresh.
