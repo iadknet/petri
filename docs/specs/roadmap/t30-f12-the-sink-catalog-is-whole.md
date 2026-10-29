@@ -193,11 +193,14 @@ regression past its threshold would show it wrong.
       `a_kind_outside_the_catalog_has_no_index`) and deserialization tests
       (`any_other_sink_list_is_rejected_at_deserialization`,
       `a_founder_def_round_trips_byte_identically`) exist.
-- [x] Rows 9, 10 on `b9e4071c6`: `cargo test -p v3-core --test viability`
-      (30 passed) and `cargo test -p v3-core -p v3-server` -> pass;
+- [x] On `4591d0776` (the simplify pass, v3-core only):
+      `cargo test -p v3-core --test viability` (30 passed) and
+      `cargo test -p v3-core` (2,346 passed) -> pass;
       `cargo check --workspace --all-targets`, `cargo fmt --all --check`
-      and `make rust-clippy` -> clean; in `frontend/`, `npx tsc -b`,
-      `npx biome check src/` and `npx vitest run` (680 passed) -> pass.
+      and `make rust-clippy` -> clean. `cargo test -p v3-server` and, in
+      `frontend/`, `npx tsc -b`, `npx biome check src/` and
+      `npx vitest run` (680 passed) -> pass on `b9e4071c6`; the pass after
+      it touches neither.
 - [ ] `make check` -> exit 0, reproducibility and draw-stream pins unchanged.
 - [x] Invariant 7's grep -> no match; output in readings.
 - [x] Lab comparator hashes, T30.F09 invariant 2's method: the SHA-256 of
