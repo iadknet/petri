@@ -1,6 +1,6 @@
 # T30.F16 — World-Input Keys Name Their Food Type
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-28
 **Feature**: T30.F16
 **Track**: [T30 — Core Boundaries](../../roadmaps/t30-core-boundaries.md)
@@ -176,12 +176,12 @@ flag). As predeclared.
 
 ## Success Criteria
 
-- [ ] With two food types, the server's two world-input maps and the
+- [x] With two food types, the server's two world-input maps and the
       telemetry mutation family hold one entry per food type with its own
       count.
-- [ ] `WorldInputKey::as_key` is the only definition of a world input
+- [x] `WorldInputKey::as_key` is the only definition of a world input
       key's string key, and every count leaving core uses it.
-- [ ] Trajectories, draw streams, benchmark blocks and every pin outside
+- [x] Trajectories, draw streams, benchmark blocks and every pin outside
       the readings' pin table are unchanged.
 
 ## Notes for AI Agents
@@ -190,3 +190,9 @@ flag). As predeclared.
   every other key type's `as_key` is its transport key, and `family_name`
   is the family-only key; three outputs collided by calling `as_key` under
   that convention (readings A1).
+- Decision: Fable was unavailable for this run (user override); the spec
+  owner and the implementers' advisor roles ran on Opus 5.5 at effort high.
+- Cost: /usage totals not collected (user command); implementer passes 2
+  (advisor consults 2 and 2); spec-owner resumes 1; Codex challenge rounds
+  2, final verdict ready; Codex review findings 0 in each of lens1, lens2
+  and lens3.
