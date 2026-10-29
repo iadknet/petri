@@ -1441,11 +1441,81 @@ mod tests {
         assert!(!any_target(&mixed_def(), can_clear_override));
     }
 
+    /// The slot learning operator `name` writes from `before`, `rng` at its
+    /// value draws: only the operator's field changes, every other field is
+    /// `before`'s.
+    fn expected_slot_learning(
+        name: &str,
+        before: Option<Learning>,
+        rng: &mut SmallRng,
+    ) -> Option<Learning> {
+        if name == "enable" {
+            return Some(draw_hebbian_config(rng));
+        }
+        if name == "disable" {
+            return None;
+        }
+        let before = before.expect("a present slot");
+        let modulation = before.modulation;
+        let modulated =
+            |edit: &dyn Fn(RewardModulationConfig) -> RewardModulationConfig| Learning {
+                modulation: modulation.map(edit),
+                ..before
+            };
+        Some(match name {
+            "rule" => Learning {
+                rule: draw_other(&HebbianRule::ALL, Some(before.rule), rng),
+                ..before
+            },
+            "rate" => Learning {
+                learning_rate: perturb(before.learning_rate, draw_u(None, rng)),
+                ..before
+            },
+            "lamarckian" => Learning {
+                lamarckian: !before.lamarckian,
+                ..before
+            },
+            "enable_modulation" => Learning {
+                modulation: Some(draw_modulation(rng)),
+                ..before
+            },
+            "disable_modulation" => Learning {
+                modulation: None,
+                ..before
+            },
+            "source" => {
+                let current = modulation.map(|m| m.reward_source);
+                let reward_source = draw_other(&OutcomeChannel::ALL, current, rng);
+                modulated(&|m| RewardModulationConfig { reward_source, ..m })
+            }
+            "decay" => {
+                let u = draw_u(None, rng);
+                modulated(&|m| RewardModulationConfig {
+                    trace_decay: perturb(m.trace_decay, u),
+                    ..m
+                })
+            }
+            "enable_retention" => Learning {
+                retention: draw_retention(rng),
+                ..before
+            },
+            "disable_retention" => Learning {
+                retention: 1.0,
+                ..before
+            },
+            "retention" => Learning {
+                retention: step_retention(before.retention, draw_u(None, rng)),
+                ..before
+            },
+            other => panic!("no slot law for {other}"),
+        })
+    }
+
     /// The track guard (T25.F12): every learning-edit operator reaches its
     /// lone-edge, member and both slot targets; an edit picked on a slot
-    /// changes that slot alone (the other slot, the record's scale and every
-    /// member unchanged) and draws no coin; an edit on a member changes no
-    /// slot.
+    /// writes the operator's law to that slot alone (its other fields, the
+    /// other slot, the record's scale and every member unchanged) and draws
+    /// no coin; an edit on a member changes no slot.
     #[test]
     fn every_learning_operator_reaches_lone_edges_members_and_both_slots() {
         let decaying = with(modulated(), |c| c.retention = 0.5);
@@ -1483,6 +1553,7 @@ mod tests {
                     let Ok(_) = select_eligible(&base, predicate, &mut expected) else {
                         break;
                     };
+                    // On a slot, `expected` now sits at the value draws.
                     let (picked, coin) = replay_pick(&base, predicate, &mut rng(seed));
                     let mut def = base.clone();
                     let reach = operator(&mut def, &mut rng(seed)).unwrap();
@@ -1493,6 +1564,11 @@ mod tests {
                             assert_eq!(coin, None);
                             assert_eq!(reach, Broadcast::One, "{name}");
                             assert!(changed.iter().all(|&t| t == picked), "{name} {changed:?}");
+                            assert_eq!(
+                                stored(&def, picked),
+                                expected_slot_learning(name, stored(&base, picked), &mut expected),
+                                "{name}"
+                            );
                             assert_eq!(def.bundles()[0].scale(), base.bundles()[0].scale());
                         }
                         Target::Edge(at) if at == lone => {

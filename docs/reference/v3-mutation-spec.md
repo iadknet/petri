@@ -525,9 +525,11 @@ added/removed/retyped — only their edges are evolvable.
   | `DisableRetention` | 1 | a stored learning below retention 1 | retention 1; no value draw |
   | `MutateRetention` | 4 | as `DisableRetention` | one `u = gen_range(-1.0..=1.0)`; each target's deficit `d = 1 − retention` becomes `(d · (1 + 0.3u)).clamp(10⁻⁴, 1)` |
 
-  `ClearLearningOverride` and `ToggleCredits` are Neutral; the enables are
-  Increasing, the disables Decreasing (`DisableRetention` Neutral), the
-  rest Neutral; every one has `Δgenome_size` 0 and only the decreasing ones
+  `EnableHebbian` and `EnableRewardModulation` are Increasing,
+  `DisableHebbian` and `DisableRewardModulation` Decreasing; the three
+  retention operators (`EnableRetention`, `DisableRetention`,
+  `MutateRetention`), `ClearLearningOverride`, `ToggleCredits` and the
+  rest are Neutral; every one has `Δgenome_size` 0 and only the decreasing ones
   pass restricted size pressure. **Retention** (T25.F09) sets how far a
   learned value relaxes toward its birth value each tick (graph backend
   spec Section 13); `EnableHebbian` and the birth draws write 1.

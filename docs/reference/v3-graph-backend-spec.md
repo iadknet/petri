@@ -640,13 +640,15 @@ genomic weight), `applied_weights(node)` (every dynamic edge in canonical
 order) and the view agree; the applied weight is never clamped. The
 executor hands the learner each edge's occurrence and value and the learner
 decides whether the edge is dynamic. Readers use the read-only views: per
-edge learner `(occurrence, genomic, birth, retention, learned, applied,
-trace, bound, kind, learning, source, initialized, inherits)`, where
-`genomic` is the genomic own weight (a member's modifier), `birth` its birth
-value, `learned` present once initialized, `trace` present only for an
-initialized modulated learner and `inherits` the effective `lamarckian`;
-and per scale learner `(bundle, genomic, birth, retention, learned, bound,
-lamarckian)`, `learned` present once initialized.
+edge learner `(occurrence, genomic, birth, learned, applied, trace,
+learning, source, initialized)`, where `genomic` is the genomic own weight
+(a member's modifier), `birth` its birth value, `learned` present once
+initialized, `trace` present only for an initialized modulated learner,
+`learning` the effective learning it runs and `source` where that learning
+is stored; and per scale learner `(bundle, genomic, birth, learned,
+learning)`, `learned` present once initialized and `learning` its
+`scale_learning`. Retention, bound and inheritance are read from
+`learning`.
 
 - A learner is initialized when its backend has been visited (the flag is
   set at visit entry, a failed visit included) or when it was seeded at

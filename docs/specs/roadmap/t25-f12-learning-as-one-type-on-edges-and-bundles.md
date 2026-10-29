@@ -200,3 +200,5 @@ The epochs re-pin at closure with commit 2's cause.
 - Decision: the model is the user's (2026-10-22): bake in as few assumptions as possible and allow evolution maximum flexibility within clean layers; both slots at once, the explicit `Static` policy and contributor-independent scale state are assistant proposals under that rule (track Notes).
 - Deferred: mutation decides when a member detaches before a source change or a split (`mutation/graph/operators.rs:366`, audit R7); T30.F11 pays.
 - Deferred: the long-run selection of learning policies, slots and `credits` is read by T27.F02's goal-long run, naming every feature closed in between.
+- Deferred: review P2 (code health), crates/v3-core/src/simulation/tick/tests/gestation.rs:301 — the gestation fixture searches for a seed meeting incidental population conditions (re-chosen 3485→4274 here); arranging the gestation and overflow conditions explicitly with the fixture helpers belongs to T29.F01, which extends this birth path.
+- Decision: final review raised no P1; lens1 P2×2 and P3×2 and lens3 P3 were remediated in-feature; lens2 raised none.

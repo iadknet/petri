@@ -390,6 +390,41 @@ fn member_learners_and_learned_scales_are_censused_by_source_and_scale() {
     assert_eq!(lamarckian_scales.at_bound, 1);
 }
 
+/// T25.F12 invariant 11: a reachable bundle whose only learner is its scale
+/// makes its creature a carrier, with one learned scale and no edge
+/// learner.
+#[test]
+fn a_scale_only_bundle_makes_a_carrier_without_edge_learners() {
+    use crate::contracts::votes::DirectedVoteKind;
+    use crate::contracts::{InputReference, WorldInputKey};
+    use crate::genome::cgp::LearningSlot;
+
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    let id = def.add_ring_bundle(0, DirectedVoteKind::Move, 0);
+    def.bundle_mut(id).set_scale(0.5);
+    def.bundle_mut(id).set_slot(
+        LearningSlot::Scale,
+        Some(plastic(HebbianRule::Classic, false, false)),
+    );
+    let genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
+            backend_def: BackendDef::Graph(def),
+            targets: vec![],
+        }],
+    };
+    let state = GraphRuntimeState::for_genome(&genome, Vec::new());
+    let census = PlasticityCensus::observe([(&[0usize][..], state.learned())]);
+
+    assert_eq!(census.carriers, 1);
+    let scales: u64 = census.scales.iter().map(|cell| cell.scales).sum();
+    assert_eq!(scales, 1);
+    assert_eq!(census.edges_by_source, [0, 0, 0]);
+    assert!(census.edges.iter().flatten().all(|cell| cell.edges == 0));
+}
+
 /// The retention bins (T25.F09 invariant 7) are exhaustive over `[0, 1]`:
 /// exactly 1 is `none`, the largest f32 below 1 is in `1e-3`, 0 in `1`, and
 /// each decade boundary's two f32 neighbors fall on either side by their
