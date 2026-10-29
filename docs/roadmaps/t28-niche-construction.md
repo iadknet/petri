@@ -20,7 +20,7 @@ review: [T26–T28 design review](../progress/readings/t26-t28-design-review.md)
 
 ## Executable Features
 
-- [ ] **T28.F01 — Carrying and Food Caching** — Depends on: T26.F02, T27.F03, T29.F03, T30.F05, T30.F09
+- [ ] **T28.F01 — Carrying and Food Caching** — Depends on: T26.F02, T27.F03, T29.F03, T30.F05, T30.F09, T30.F17
   - Goal: Caching and seed dispersal: a creature picks food into one of four slots, carries it at a cost and sets it down elsewhere, where it can be eaten later or grow.
 - [ ] **T28.F02 — Digging and Building** — Depends on: T28.F01
   - Goal: Burrows and walls: a creature digs a barrier out of the ground into a slot and builds it elsewhere, so walls outlast their makers and shape who comes after.

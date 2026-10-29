@@ -52,6 +52,8 @@ behavior.
   - Goal: Mean energy, clade entropy and mean capacity each have one definition in core's readers, so the benchmark report, the server, the NDJSON stream and telemetry never disagree on the same quantity, with no simulation behavior change.
 - [x] **T30.F16 — World-Input Keys Name Their Food Type** — Depends on: T30.F13
   - Goal: Every world-input count that leaves core is keyed by its food type as well as its family, so two food types' counts never share a key or overwrite each other, with no simulation behavior change.
+- [ ] **T30.F17 — The Genome Owns Its Nodes** — Depends on: None
+  - Goal: Offspring inherit, mutate and run exactly as before, with a genome's brain nodes changed only through the genome's own operations, so no reader, lab probe or test can add, remove, reorder or rewrite a node behind the inheritance mapping, with no behavior change.
 
 ## Notes for AI Agents
 
@@ -61,7 +63,7 @@ behavior.
   [design review](../progress/readings/t30-design-review.md) records the
   challenges. Debts each row pays: F01 G17, G22 (paint); F02 G7, G8, G16;
   F03 G9, G14 (sensor caches), G20; F04 G10, G11; F05 G2 (routes and jumps),
-  G12, G15, G23; F06 G18, G19, G22 (action log); F07 G24, G25, G26; F08 G27. Every row is
+  G12, G15, G23; F06 G18, G19, G22 (action log); F07 G24, G25, G26; F08 G27; F17 G28. Every row is
   behavior-preserving in the T25.F01 shape. On 2026-10-25 an architecture
   review added G22–G25 and F07 (user decisions: F07 moves the genome; paint's
   wire types join F01; F06 stays one row in two halves), and on 2026-10-26
@@ -383,6 +385,24 @@ behavior.
   string-keyed. F11 also edits how the engine collects the added node's world
   inputs; concurrent sessions reconcile `simulation/stats.rs` at
   integration.
+- F17: placed 2026-10-29 at the user's direction at T29.F02's closure
+  ("Unpaid workaround: `CreatureGenome.nodes` is still public under a
+  T29.F01 workaround note that no roadmap row pays for. A future row should
+  make it private"). It pays the `WORKAROUND(T29.F01)` marker on
+  `CreatureGenome.nodes` (`genome/mod.rs`), T29.F01's audit row A11: the
+  inheritance mapping's node indices hold only while node count and order
+  change through genome operations, yet the field is writable (G28). Since
+  T29.F02 explicit construction goes through `CreatureGenome::new`;
+  deserialization (`GenomeFile::load`) is the other construction route. What
+  remains is field access across core and the outer crates, and the writers
+  outside genome, among them `neighborhood/mesh_execution.rs`, core census
+  and input-use probes, and the lab's controllers and ablation
+  (`v3-lab/src/controllers.rs`, `readings.rs`; `eval.rs`'s plasticity writer
+  is test-only); the list is not exhaustive. The field becomes private
+  behind genome operations and read accessors, readers keep their own probe
+  and ablation policy, and the marker is deleted. F05 (G23 mutation edits)
+  and F11 (engine snapshots) also touch the engine's genome handling;
+  concurrent sessions reconcile at integration.
 - The master order puts F03 first (user, 2026-10-25), F01 and F07 before
   T25.F11, F08 after F07 (assistant proposal), F02 and F06 before T28, and
   F09 after F06 (assistant proposal), as preferences, not prerequisites.

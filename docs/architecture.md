@@ -162,6 +162,7 @@ field access through another type. Design notes:
 | --- | --- | --- |
 | G2 | Route resolution and jump targets imported from runtime (`mutation::topology::routing`, `mutation::vm::operators`) | T30.F05 |
 | G6 | Every memory slot passes to the child (`creature::birth`) | T29.F03 |
+| G28 | `CreatureGenome.nodes` is a public vector (`genome`), so readers, the lab and tests add, remove, reorder or rewrite nodes outside the genome's operations, behind the inheritance mapping's positional node indices | T30.F17 |
 | G12 | The genome validity gate lives in `creature::parseability`, imported by `mutation::engine` | T30.F05 |
 | G15 | Genome analysis draws randomness (`genome::analysis`, called by `mutation::vm::operators`) | T30.F05 |
 | G23 | Program edits applied in mutation: splice and insertion with jump-reference repair (`mutation::vm::operators::splice_program_with_reference_repair`, also used by `mutation::topology::routing`) the register-count resize with its width predicate (`register_count_moves`, `apply_register_count_mutation`), the dormant-tail copy with its terminal classification and conditional `Halt` (`copy_span_to_dormant_tail`), and route composition through gate writes (`mutation::topology::routing`: `add_gate_write`, `apply_add_route_target`, `apply_add_feedback_route`) | T30.F05 |
