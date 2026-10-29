@@ -80,10 +80,13 @@ pub(super) fn observe_world(sim: &v3_core::simulation::Simulation) -> Drives {
             .values()
             .map(|creature| (creature.genome(), creature.reachable_nodes())),
     );
+    // Founder 0's body under the run's config; the reading keeps no run
+    // seed and reads no body gene, so its body takes startup seed 0
+    // (T29.F02).
     let founder = founder_genome_with_age_gate(
         sim.config.population.founder_profile,
         &sim.config.energy.lifecycle,
-        v3_core::creature::founder::default_founder_body(),
+        v3_core::creature::founder::founder_body(0, 0, &sim.config),
     );
     let reachable = mesh_reachable_nodes(&founder);
     Drives::new(

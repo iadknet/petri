@@ -453,9 +453,10 @@ pub(super) fn observe_world(
     observation: WorldObservation<'_>,
 ) -> MutationEffects {
     let parents = selected_cohort(seed, sim, observation.read_sample, observation.sizes);
+    // Founder 0's body under this world's seed and config (T29.F02).
     let founder = v3_core::creature::founder::founder_genome(
         v3_core::config::FounderProfile::V3Alpha1,
-        v3_core::creature::founder::default_founder_body(),
+        v3_core::creature::founder::founder_body(0, seed, observation.config),
     );
     let context = v3_core::neighborhood::EvalContext::from_config(observation.config);
     let reading = effects::observe(

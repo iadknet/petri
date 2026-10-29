@@ -361,10 +361,13 @@ fn genome_record(
 }
 
 fn load_genomes(params: &RunParams, reference: &SimulationConfig) -> Result<Genomes, LabError> {
+    // Founder 0's body under the reference config at startup seed 0; every
+    // assay runs the config founder body whatever the genome carries
+    // (T29.F02 invariant 11).
     let production_founder = founder_genome_with_age_gate(
         reference.population.founder_profile,
         &reference.energy.lifecycle,
-        v3_core::creature::founder::default_founder_body(),
+        v3_core::creature::founder::founder_body(0, 0, reference),
     );
     let start = match &params.genome {
         Some(path) => GenomeFile::load(path)?,
