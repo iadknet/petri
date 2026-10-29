@@ -98,6 +98,7 @@ today's for a valid genome would show it wrong.
 ## Verification
 
 - [x] Core slot and coordinate tests: `cargo test -p v3-core mesh_annotations` and `cargo test -p v3-core bundle` -> result recorded in the readings.
+- [x] Core bus-slot properties (final review lens1 P2): the `bus_slot_tests` proptests `a_live_upstream_slot_read_and_its_bus_field_twin_read_one_slot`, `a_live_bus_field_read_past_the_bus_reads_no_slot` and `a_live_payload_write_reaches_only_on_bus_slots` under `cargo test -p v3-core mesh_annotations` -> pass (25 tests).
 - [x] Server: `cargo test -p v3-server` (wire-type test without `PETRI_WRITE_TS_TYPES`) -> pass.
 - [x] Frontend: `npm test`, `npm run lint` and `npx tsc -b` in `frontend/` -> pass (lint warnings only in files F14 does not touch).
 - [x] `cargo fmt --all -- --check` and `make rust-clippy` -> pass.
@@ -121,3 +122,4 @@ compute cost, indicator or threshold applies; no profile runs.
 
 - Decision: the slot sets are a read API over a node and its annotation, not fields of `MeshNodeAnnotation`, because the annotations are derived at every birth (`GenomeDerived::of` through `has_barrier_reader`) and only the inspector reads the slot sets (row: "the slot sets become genome annotations under the annotations' liveness rule").
 - Decision: the slot-set changes in invariant 3 are inspector-diagnostic corrections (T30 Notes, F14; design review finding 6), not behavior changes.
+- Deferred: the hand-built bundle arrangement of `the_widest_queue_bundle_lists_every_coordinate_present` (`container_tests.rs`, marked `WORKAROUND(T30.F11)`) retires when T30.F11 gives the owner ordered bulk construction; T30.F11 pays it (final review lens3 P2).
