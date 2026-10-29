@@ -181,7 +181,7 @@ regression past its threshold would show it wrong.
       empty-def and generated-sink-list cases of
       `pick_random_surface_matches_the_reference`) are deleted or reduced
       to the full catalog.
-- [ ] Runtime guards and trace flag (rows 9, 10): invariant 6's last two
+- [x] Runtime guards and trace flag (rows 9, 10): invariant 6's last two
       sentences; the trace and sample-assembler tests read `wired` where
       they read `applied`; the generated frontend type is regenerated.
 
@@ -193,6 +193,11 @@ regression past its threshold would show it wrong.
       `a_kind_outside_the_catalog_has_no_index`) and deserialization tests
       (`any_other_sink_list_is_rejected_at_deserialization`,
       `a_founder_def_round_trips_byte_identically`) exist.
+- [x] Rows 9, 10 on `b9e4071c6`: `cargo test -p v3-core --test viability`
+      (30 passed) and `cargo test -p v3-core -p v3-server` -> pass;
+      `cargo check --workspace --all-targets`, `cargo fmt --all --check`
+      and `make rust-clippy` -> clean; in `frontend/`, `npx tsc -b`,
+      `npx biome check src/` and `npx vitest run` (680 passed) -> pass.
 - [ ] `make check` -> exit 0, reproducibility and draw-stream pins unchanged.
 - [x] Invariant 7's grep -> no match; output in readings.
 - [x] Lab comparator hashes, T30.F09 invariant 2's method: the SHA-256 of
