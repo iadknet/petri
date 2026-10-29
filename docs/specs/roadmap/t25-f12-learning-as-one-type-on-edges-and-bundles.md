@@ -183,7 +183,7 @@ counter move with the draw stream with no predeclared direction; a `severe`
 there blocks closure until the user accepts it or remediation removes it.
 The epochs re-pin at closure with commit 2's cause.
 
-**Measured verdict (2026-10-28, HEAD `da63b8e23`).** Both profiles: CLI exit
+**Measured verdict (2026-10-28, HEAD `da63b8e23`, pre-rebase; rebased as `09373dd72` with no trajectory change).** Both profiles: CLI exit
 0, outer `make` exit observed 0, `severe=false` against their references, no
 threshold crossed; both epochs re-pinned to this feature's summaries
 (predeclared, commit 2's draw-stream change).
