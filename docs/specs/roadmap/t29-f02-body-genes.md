@@ -119,20 +119,21 @@ collapsed distribution in the goal-long run shows it wrong.
 
 ## Implementation Tasks
 
-- [ ] B8, B9: the colour gene and its step type in `genome/body.rs`, fields private, active channel validated.
-- [ ] B1, B2: `BodyGenome` (invariant 1) and `CreatureGenome::new` with the private body; every literal migrated; `genome_size()` and `brain_units()` (invariant 2).
-- [ ] B5: `lineage_id` into `Provenance` and the creature record; `CreatureIdentityState`, `HeritableBody` and `Zygote`'s body deleted (invariant 6).
-- [ ] B7 and the rate: founder bodies, `FOUNDER_GENOME_SIZE_UNITS = 85`, `0.485 / 85` (invariants 7, 8); run `cargo test -p v3-core --test viability` first.
-- [ ] B3, B6, B10, B11: per-chromosome supply, bounded body operators with `BodyRanges` at every engine caller, reporting, gate deleted (invariants 3, 4).
-- [ ] Conception's clamp (invariant 5); body readers and fixtures (invariant 10); lab (invariant 11).
-- [ ] B4: `chance` deleted across config, frontend, telemetry, CLI; `PROTOCOL_VERSION` (invariant 9).
-- [ ] Body census and bench `body` block (invariant 12).
-- [ ] Reference specs updated; re-pins with their cause (invariant 13).
+- [x] B8, B9: the colour gene and its step type in `genome/body.rs`, fields private, active channel validated.
+- [x] B1, B2: `BodyGenome` (invariant 1) and `CreatureGenome::new` with the private body; every literal migrated; `genome_size()` and `brain_units()` (invariant 2).
+- [x] B5: `lineage_id` into `Provenance` and the creature record; `CreatureIdentityState`, `HeritableBody` and `Zygote`'s body deleted (invariant 6).
+- [x] B7 and the rate: founder bodies, `FOUNDER_GENOME_SIZE_UNITS = 85`, `0.485 / 85` (invariants 7, 8); run `cargo test -p v3-core --test viability` first.
+- [x] B3, B6, B10, B11: per-chromosome supply, bounded body operators with `BodyRanges` at every engine caller, reporting, gate deleted (invariants 3, 4).
+- [x] Conception's clamp (invariant 5); body readers and fixtures (invariant 10); lab (invariant 11).
+- [x] B4: `chance` deleted across config, frontend, telemetry, CLI; `PROTOCOL_VERSION` (invariant 9).
+- [x] Body census and bench `body` block (invariant 12).
+- [x] Reference specs updated; re-pins with their cause (invariant 13).
 
 ## Verification
 
-- [ ] Viability first: `cargo test -p v3-core --test viability` -> pass with its re-pinned digests.
-- [ ] Focused tests: founder supply 0.485 and size 85; body-supply draw pin; gene operations and the conception clamp against today's arithmetic; repeated scalar events at extreme normalized `share_min` and `log_step` stay finite and in range; an instrument's mutated genome equals conception's for the same draws; genome serde with the body and a rejected out-of-range active channel; body events recorded as applied `NotApplicable`; a zero-brain-event birth still draws body supply; the one-event screen draws no body event; size pressure leaves body events; `lineage_id` provenance; body census against brute-force pairs.
+- [x] Viability first: `cargo test -p v3-core --test viability` -> 30 passed after re-pinning the three founder-only digests (macOS aarch64; the GNU/Linux x86_64 pins are not re-measured) and raising the colour-divergence fixture's rate to 0.2.
+- [x] Focused tests: founder supply 0.485 and size 85; body-supply draw pin; gene operations and the conception clamp against today's arithmetic; repeated scalar events at extreme normalized `share_min` and `log_step` stay finite and in range; an instrument's mutated genome equals conception's for the same draws; genome serde with the body and a rejected out-of-range active channel; body events recorded as applied `NotApplicable`; a zero-brain-event birth still draws body supply; the one-event screen draws no body event; size pressure leaves body events; `lineage_id` provenance; body census against brute-force pairs.
+- [x] Build: `cargo check --workspace --all-targets` (also `--all-features`), `cargo fmt --all --check`, `make rust-clippy`, `node scripts/architecture-check.mjs` -> exit 0; `make -k rust-test-all` -> every subset passes; frontend `npm test` -> 680 passed, `npm run lint` -> no new finding.
 - [ ] `make check` -> exit 0; `make rust-test-slow` -> exit 0.
 - [ ] Gate, goal and goal-long summaries stored at `docs/progress/features/t29-f02.json`, `t29-f02-goal.json`, `t29-f02-goal-long.json`; local raw hash, byte count and time checked; series entries point to them; no full report staged.
 
