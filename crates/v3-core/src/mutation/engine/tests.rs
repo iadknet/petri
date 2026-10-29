@@ -1404,8 +1404,7 @@ fn an_all_executed_eligible_set_reproduces_the_pre_feature_draw_byte_for_byte() 
                 ParentExecuted::NONE,
                 &mut plain_rng,
                 &crate::config::test_sensor_context(1),
-            )
-            .0;
+            );
             // Same offspring *and* the same position in the RNG stream.
             let identical =
                 with_layer == without_layer && layer_rng.gen::<u64>() == plain_rng.gen::<u64>();
@@ -1495,8 +1494,7 @@ fn size_pressure_restriction_disables_the_executed_layer() {
             ParentExecuted::Indices(&[0, 1]),
             &mut rng(seed),
             &crate::config::test_sensor_context(1),
-        )
-        .0;
+        );
         differed_without_pressure += u32::from(unpressured != restricted_child);
     }
     assert!(

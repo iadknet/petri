@@ -451,7 +451,7 @@ mod tests {
             crate::creature::birth::BirthPlace {
                 position: pos,
                 heading: crate::contracts::Direction::N,
-                energy: energy,
+                energy,
             },
         )
         .creature

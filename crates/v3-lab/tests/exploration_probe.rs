@@ -355,8 +355,7 @@ fn child_of(setup: &Setup, parent: &CreatureGenome, frozen: &Frozen, seed: u64) 
         &setup
             .config
             .sensor_context(setup.config.world.food.types.len()),
-    )
-    .0;
+    );
     child
 }
 

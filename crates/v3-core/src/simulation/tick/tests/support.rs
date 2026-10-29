@@ -221,7 +221,7 @@ pub(super) fn make_sim_with_one_creature(energy: f32) -> (Simulation, CreatureId
                         crate::creature::birth::BirthPlace {
                             position: pos,
                             heading: crate::contracts::Direction::N,
-                            energy: energy,
+                            energy,
                         },
                     )
                     .creature;
@@ -264,7 +264,7 @@ pub(super) fn make_sim_with_custom_genome(
                     crate::creature::birth::BirthPlace {
                         position: pos,
                         heading: crate::contracts::Direction::N,
-                        energy: energy,
+                        energy,
                     },
                 )
                 .creature;

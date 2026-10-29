@@ -127,7 +127,7 @@ impl Setup {
         .finalize(
             id,
             v3_core::creature::birth::BirthPlace {
-                position: position,
+                position,
                 heading: v3_core::contracts::Direction::N,
                 energy: self.start_energy,
             },

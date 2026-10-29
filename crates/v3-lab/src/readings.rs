@@ -772,8 +772,7 @@ fn mutants(
                 ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                 &mut seed.rng(k),
                 &config.sensor_context(config.world.food.types.len()),
-            )
-            .0;
+            );
             child
         })
         .collect();

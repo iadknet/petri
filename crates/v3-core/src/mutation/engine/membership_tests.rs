@@ -459,8 +459,7 @@ fn grown_parent(seed: u64, growth: u8) -> CreatureGenome {
             ParentExecuted::NONE,
             &mut random,
             &crate::config::test_sensor_context(1),
-        )
-        .0;
+        );
     }
     genome
 }

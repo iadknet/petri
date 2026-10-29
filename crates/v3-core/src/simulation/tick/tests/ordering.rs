@@ -105,7 +105,7 @@ fn insert_test_creature(
         .finalize(
             id,
             crate::creature::birth::BirthPlace {
-                position: position,
+                position,
                 heading: crate::contracts::Direction::N,
                 energy: 50.0,
             },

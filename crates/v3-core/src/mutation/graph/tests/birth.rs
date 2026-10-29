@@ -149,7 +149,7 @@ fn edge_operators_report_their_bundle_edits() {
         wiring,
         scale: 0.5,
     };
-    node.add_bundle(source, birth, &context).unwrap().0;
+    node.add_bundle(source, birth, &context).unwrap();
     let refs = node.input_refs().to_vec();
     let BackendDef::Graph(def) = node.backend_edit().1 else {
         unreachable!()

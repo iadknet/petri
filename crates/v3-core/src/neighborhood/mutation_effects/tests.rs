@@ -628,8 +628,7 @@ fn exhausted_domains_count_as_skips_and_pairs_are_the_first_qualifying_proposals
                 ParentExecuted::Indices(&executed),
                 &mut SmallRng::seed_from_u64(seed + proposal as u64),
                 &context.sensors,
-            )
-            .0;
+            );
             child
         })
         .collect();

@@ -48,9 +48,9 @@ fn sim_with(creatures_at: &[(Position, f32)]) -> (Simulation, Vec<CreatureId>) {
                 .finalize(
                     id,
                     crate::creature::birth::BirthPlace {
-                        position: position,
+                        position,
                         heading: crate::contracts::Direction::N,
-                        energy: energy,
+                        energy,
                     },
                 )
                 .creature;

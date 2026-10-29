@@ -417,7 +417,7 @@ fn the_parameter_surface_takes_the_last_visit_s_value_and_an_unwired_sink_leaves
         let mut state =
             crate::genome::cgp::test_support::runtime_for_defs(&vec![def; node_idx + 1]);
         let _ = crate::runtime::cgp::execute_graph_node(
-            &def,
+            def,
             &[],
             &[0.0; crate::contracts::OUTPUT_SLOT_COUNT],
             &mut energy,

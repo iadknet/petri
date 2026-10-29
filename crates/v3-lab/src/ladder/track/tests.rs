@@ -414,7 +414,7 @@ proptest! {
             ParentExecuted::NONE,
             &mut SmallRng::seed_from_u64(seed),
             &config.sensor_context(config.world.food.types.len()),
-        ).0;
+        );
         let change = Change::between(&parent, &child);
         prop_assert!(change.carried_by(&child));
         let empty = change == Change::default();

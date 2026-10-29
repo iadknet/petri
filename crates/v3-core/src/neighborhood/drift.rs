@@ -483,8 +483,7 @@ mod tests {
                     ParentExecuted::Indices(&next_executed),
                     &mut rng_before.clone(),
                     &context.sensors,
-                )
-                .0;
+                );
                 MutationEngine::apply_mutations_on_units(
                     &mut with,
                     FOUNDER_GENOME_SIZE_UNITS,
@@ -493,8 +492,7 @@ mod tests {
                     ParentExecuted::Indices(&next_executed),
                     &mut rng.clone(),
                     &context.sensors,
-                )
-                .0;
+                );
                 assert_eq!(with, without);
             }
         }
@@ -630,8 +628,7 @@ mod tests {
                             ParentExecuted::Indices(&executed),
                             &mut rng,
                             &context.sensors,
-                        )
-                        .0;
+                        );
                     }
                     genome
                 })
@@ -695,8 +692,7 @@ mod tests {
                     ParentExecuted::Indices(&executed),
                     &mut rng,
                     &context.sensors,
-                )
-                .0;
+                );
             }
             replayed.push(genome);
         }

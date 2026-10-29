@@ -201,8 +201,7 @@ fn lineage_match_exists(predicate: impl Fn(&CreatureGenome) -> bool) -> bool {
                 ParentExecuted::NONE,
                 &mut rng,
                 &v3_core::config::SimulationConfig::default().sensor_context(1),
-            )
-            .0;
+            );
 
             if predicate(&genome) {
                 return true;

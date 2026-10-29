@@ -498,20 +498,15 @@ impl OriginRows {
 /// One Graph node's inheritance mapping across an edit: where every
 /// learnable of the node after the edit inherits from, among the learnables
 /// of the node before it.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum GraphMapping {
     /// Every learnable keeps its identity: the edit moved none.
+    #[default]
     Identity,
     /// Every learnable copies the same key of its source (a whole-node copy).
     Copied,
     /// An explicit origin per learnable.
     Rows(OriginRows),
-}
-
-impl Default for GraphMapping {
-    fn default() -> Self {
-        Self::Identity
-    }
 }
 
 impl GraphMapping {

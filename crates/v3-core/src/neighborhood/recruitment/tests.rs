@@ -937,7 +937,7 @@ fn a_copy_names_its_first_matching_source_and_flags_ambiguity() {
     assert_eq!(module(&tracker, 2, 0).copy_source, None);
     assert_eq!(
         module(&tracker, 3, 1).birth_payload_hash,
-        payload_hash(&vm_node(3, 3).backend_def())
+        payload_hash(vm_node(3, 3).backend_def())
     );
     assert_eq!(
         tracker.birth_payload(module(&tracker, 4, 2)),
@@ -974,11 +974,11 @@ fn the_birth_payload_is_the_creation_content_not_the_current_one() {
     );
     assert_eq!(
         created.birth_payload_hash,
-        payload_hash(&vm_node(1, 2).backend_def())
+        payload_hash(vm_node(1, 2).backend_def())
     );
     assert_ne!(
         created.birth_payload_hash,
-        payload_hash(&vm_node(1, 9).backend_def())
+        payload_hash(vm_node(1, 9).backend_def())
     );
     let mut foreign = created.clone();
     foreign.lineage = 4;
@@ -1006,7 +1006,7 @@ fn rebasing_birth_payloads_moves_the_live_modules_only() {
     );
     assert_eq!(
         live.birth_payload_hash,
-        payload_hash(&vm_node(0, 9).backend_def())
+        payload_hash(vm_node(0, 9).backend_def())
     );
     let gone = module(&tracker, 1, 0);
     assert_eq!(
@@ -1015,7 +1015,7 @@ fn rebasing_birth_payloads_moves_the_live_modules_only() {
     );
     assert_eq!(
         gone.birth_payload_hash,
-        payload_hash(&vm_node(1, 1).backend_def())
+        payload_hash(vm_node(1, 1).backend_def())
     );
 }
 

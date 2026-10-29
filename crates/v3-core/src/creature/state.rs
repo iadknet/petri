@@ -626,8 +626,7 @@ mod tests {
                     ParentExecuted::Indices(&reachable),
                     &mut rng,
                     &crate::config::test_sensor_context(1),
-                )
-                .0;
+                );
             }
             genome
         })

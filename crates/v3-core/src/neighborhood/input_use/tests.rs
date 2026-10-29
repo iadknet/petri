@@ -603,8 +603,7 @@ fn mutated_founder(seed: u64, events: u32) -> CreatureGenome {
             crate::mutation::reachability::ParentExecuted::Indices(&reachable),
             &mut rng,
             &config.sensor_context(config.world.food.types.len()),
-        )
-        .0;
+        );
     }
     genome
 }
