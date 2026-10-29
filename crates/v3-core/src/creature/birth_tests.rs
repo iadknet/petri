@@ -4,7 +4,6 @@
 //! inherited-value cases the deleted seed rows pinned, now against the
 //! mapping contract.
 
-use std::collections::BTreeSet;
 use std::ops::RangeInclusive;
 
 use proptest::prelude::*;
@@ -253,11 +252,6 @@ fn fresh_bound(operator: MutationOperator) -> Option<RangeInclusive<usize>> {
     }
 }
 
-/// The learnables `seeds` carries a value for.
-fn keys(seeds: &Seeds) -> BTreeSet<LearnableId> {
-    seeds.iter().map(|(id, _)| id).collect()
-}
-
 /// Every value `carried` holds is `child`'s genomic own value at that
 /// learnable, bitwise; returns how many of the child's learnables it leaves
 /// without one.
@@ -276,14 +270,7 @@ fn assert_carried(
             id
         );
     }
-    Ok(keys(&child_values).len() - keys(carried).len())
-}
-
-/// A grown parent and the target sets over all its nodes.
-fn catalog_case(seed: u64, growth: u8) -> (CreatureGenome, Vec<usize>) {
-    let parent = grown(seed, growth);
-    let reachable = (0..parent.nodes.len()).collect();
-    (parent, reachable)
+    Ok(child_values.iter().count() - carried.iter().count())
 }
 
 proptest! {
@@ -294,14 +281,14 @@ proptest! {
     /// child's genomic own value at that learnable, bitwise (a kept or
     /// copied learnable keeps its own value, a detach composes to the
     /// member's new own weight), and the learnables it leaves without a
-    /// value are exactly as many as the operator's writes and fresh edges
-    /// ([`fresh_bound`]). A rejected event restores the genome.
+    /// value are within the operator's [`fresh_bound`]. A rejected event restores the genome.
     #[test]
     fn every_carried_value_is_the_childs_genomic_value_through_every_catalog(
         seed in any::<u64>(),
         growth in 0u8..6,
     ) {
-        let (parent, reachable) = catalog_case(seed, growth);
+        let parent = grown(seed, growth);
+        let reachable: Vec<usize> = (0..parent.nodes.len()).collect();
         let parent_seeds = genomic(&parent);
         let config = MutationConfig::default();
         let context = crate::config::test_sensor_context(2);
@@ -333,7 +320,7 @@ proptest! {
         seed in any::<u64>(),
         growth in 0u8..6,
     ) {
-        let (mut parent, _) = catalog_case(seed, growth);
+        let mut parent = grown(seed, growth);
         let duplicate = parent.nodes[0].clone();
         parent.nodes.extend([duplicate.clone(), duplicate]);
         let reachable: Vec<usize> = (0..parent.nodes.len()).collect();
@@ -341,17 +328,17 @@ proptest! {
         let config = MutationConfig::default();
         let context = crate::config::test_sensor_context(2);
         let sets = TargetSets::new(&reachable, &[]);
-        let mut rejected = 0;
+        let mut gated = false;
         for (index, &operator) in MutationOperator::ALL.iter().enumerate() {
             let mut child = parent.clone();
             let mut rng = SmallRng::seed_from_u64(seed ^ index as u64);
             let mut targets = sets.selector(0.5, 0.0);
             let result = apply_event(&mut child, operator, &mut targets, &mut rng, &config, &context);
             prop_assert!(result.is_err(), "{:?} committed on an unparseable draft", operator);
-            rejected += usize::from(result == Err(MutationSkipReason::ParseabilityViolation));
+            gated |= result == Err(MutationSkipReason::ParseabilityViolation);
             prop_assert_eq!(&child, &parent, "{:?} rolled back", operator);
         }
-        prop_assert!(rejected > 0, "the gate rejected no applied event");
+        prop_assert!(gated, "the gate rejected no applied event");
         let mut child = parent.clone();
         let birth = MutationConfig { per_unit_rate: 1.0, ..config };
         let (summary, inheritance) = MutationEngine::apply_mutations_in(
