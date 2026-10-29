@@ -1099,7 +1099,12 @@ fn founder_only_trajectory_digest_is_pinned() {
     // per-birth chances): default 87 -> 98 births (old digest 53890c1d...),
     // rate 0.0 94 -> 94 (old digest e6616f37...), carrying cost off 95 -> 89
     // (old digest 094c1347...). Measured on macOS aarch64; the GNU/Linux
-    // x86_64 pins are not re-measured.
+    // x86_64 pins (old 787559b6..., 23c5e4b0..., 32b19ad4...) were
+    // re-measured at the same births the same way as T27.F03's, a binary
+    // cross-built for x86_64-unknown-linux-gnu (in a native arm64 Ubuntu
+    // 24.04 container with gcc-x86-64-linux-gnu) run under emulated Ubuntu
+    // 24.04 (glibc 2.39), which reproduced the three pins of the commit
+    // before T29.F02. The default x86_64 digest now equals the macOS one.
     assert_eq!(
         founder_only_trajectory(None),
         (
@@ -1107,7 +1112,7 @@ fn founder_only_trajectory_digest_is_pinned() {
             0,
             platform_digest(
                 "b5a5cd1f5016164f1fd179e231ff14fd44f81f049ec85a67b00681e5b93ed221",
-                "787559b66c042542208c1602e16e74ec43836f738dd83ec0ad2db6728381ca1e"
+                "b5a5cd1f5016164f1fd179e231ff14fd44f81f049ec85a67b00681e5b93ed221"
             )
         )
     );
@@ -1124,7 +1129,7 @@ fn founder_only_trajectory_without_gestation_is_pinned() {
             0,
             platform_digest(
                 "5a77e0e598a85c441e598b557efe7c0a3d857785185444ad2b091cda9e968bf9",
-                "23c5e4b0ce2e85544d89a0a551970e7cf4026251b8a80eb9d43676ae72b57bf5"
+                "a34d174bdaff45bfbb2fb6583d90ec2208899b2d3a4b730b8a571af2c47993d8"
             )
         )
     );
@@ -1162,7 +1167,7 @@ fn founder_only_trajectory_without_carrying_cost_is_pinned() {
             0,
             platform_digest(
                 "361f913dd917ab505098a7305dcaaaf665590bc20cff3fbd0a1f3ee1b26ea65f",
-                "32b19ad41f360bd43ec3876af1c427a889f5c7162576b7613a929d513e7f5771"
+                "73f3ae652d91a994ac10470e6134353087df26173e1192aa6c9e16f5848fe604"
             )
         )
     );
