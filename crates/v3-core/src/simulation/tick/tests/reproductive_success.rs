@@ -2,7 +2,7 @@ use super::support::*;
 use crate::contracts::{Direction, NodeId};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource};
-use crate::genome::{BackendDef, CreatureGenome, HebbianRule, PlasticityConfig, VmInstruction};
+use crate::genome::{BackendDef, CreatureGenome, HebbianRule, Learning, VmInstruction};
 use crate::ledger::DeathCause;
 use crate::mutation::topology::TopologyOperator;
 use crate::mutation::MutationOperator;
@@ -35,7 +35,7 @@ fn genome_for(class: CognitiveClass) -> CreatureGenome {
                     },
                     1.0,
                 )],
-                (class == CognitiveClass::Plasticity).then_some(PlasticityConfig {
+                (class == CognitiveClass::Plasticity).then_some(Learning {
                     rule: HebbianRule::Classic,
                     learning_rate: 0.1,
                     weight_clamp: 1.0,

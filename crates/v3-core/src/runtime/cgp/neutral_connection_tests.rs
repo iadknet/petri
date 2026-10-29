@@ -16,7 +16,7 @@ use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
 use crate::genome::{
-    BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
+    BackendDef, CreatureGenome, HebbianRule, Learning, NodeGenome, RewardModulationConfig,
 };
 use crate::runtime::inputs::ResolveCtx;
 use crate::runtime::mesh::execute_creature_mesh;
@@ -366,7 +366,7 @@ fn active_graph() -> CgpGraphBackendDef {
         def.append_compute_node(crate::genome::cgp::test_support::plastic_node(
             ComputeNodeKind::DecayIntegrator(0.5),
             vec![edge(memory(0, false), 0.5)],
-            Some(PlasticityConfig {
+            Some(Learning {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.125,
                 weight_clamp: 2.0,

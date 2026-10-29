@@ -136,11 +136,11 @@ compute cost outside the predeclaration.
 
 ## Implementation Tasks
 
-- [ ] Viability first (`cargo test -p v3-core --test viability`) before and after each commit.
-- [ ] Commit 1: the genome learning module and layout, `clear_learning`, the runtime's one update-law owner over today's semantics, every "carries learning" site reading the layout (audit R1, R2); preservation cases first: a randomized bundle whose contributors differ in rule, rate, source and trace; mixed reward sources on one scale; group-scope members with nonzero corrections. Pins hold.
+- [x] Viability first (`cargo test -p v3-core --test viability`) before and after each commit.
+- [x] Commit 1: the genome learning module and layout, `clear_learning`, the runtime's one update-law owner over today's semantics, every "carries learning" site reading the layout (audit R1, R2); preservation cases first: a randomized bundle whose contributors differ in rule, rate, source and trace; mixed reward sources on one scale; group-scope members with nonzero corrections. Pins hold.
 - [ ] Commit 2: invariants 1–11: `Learning`, storage, slots, policies and `credits`; `Scope`, `inherit_scale`, bundle retention and their setters deleted (R4); `Broadcast` (R3); the catalog table; birth draws (R5); detach table; the update law without commit 1's semantics; readers, view, wire, inspector, telemetry, bench, lab (R6); reference specs; predeclared re-pins.
-- [ ] Acceptance cases written first (Verification).
-- [ ] Write `WORKAROUND(T30.F11): source changes and splits detach inside the container's owner operations` at `detached` (`mutation/graph/operators.rs:366`).
+- [x] Acceptance cases written first (Verification).
+- [x] Write `WORKAROUND(T30.F11): source changes and splits detach inside the container's owner operations` at `detached` (`mutation/graph/operators.rs:366`).
 
 ## Verification
 

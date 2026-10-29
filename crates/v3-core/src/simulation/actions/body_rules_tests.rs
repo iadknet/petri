@@ -562,7 +562,12 @@ fn child_body(per_unit_rate: f64, seed: u64) -> HeritableBody {
 /// InputRef 12) and every birth draws whole field sets, which changes the
 /// genome mutation's draws (channels `[0, 0, 91, 92, 138, 138]` ->
 /// `[1, 0, 92, 92, 138, 138]`, active 2 -> 0, polarity all adding, kin tag
-/// 3_756_156_052 -> 3_756_156_044).
+/// 3_756_156_052 -> 3_756_156_044). Re-pinned by T25.F12 commit 2: the
+/// learning catalog (Graph weight 78 -> 73), the target draw over edges and
+/// slots and the bundle birth draws change the genome mutation's draws
+/// (channels `[1, 0, 92, 92, 138, 138]` -> `[0, 0, 92, 92, 137, 138]`,
+/// active 0 -> 4, the fifth polarity subtracting, kin tag 3_756_156_044 ->
+/// 3_756_156_061).
 #[test]
 fn a_mutated_birth_draws_phenotype_then_kin_tag() {
     let parent = parent_body();
@@ -576,13 +581,13 @@ fn a_mutated_birth_draws_phenotype_then_kin_tag() {
         child,
         HeritableBody {
             phenotype: Phenotype {
-                channels: [1, 0, 92, 92, 138, 138],
-                active_channel: 0,
-                polarity: [true; 6],
+                channels: [0, 0, 92, 92, 137, 138],
+                active_channel: 4,
+                polarity: [true, true, true, true, false, true],
             },
             identity: CreatureIdentityState {
                 lineage_id: 3,
-                kin_tag: 3_756_156_044,
+                kin_tag: 3_756_156_061,
             },
             capacity: 200.0,
             steal_share: 0.2,

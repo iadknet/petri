@@ -1188,7 +1188,7 @@ mod final_action_observation_tests {
             crate::genome::cgp::test_support::set_surface_plasticity(
                 def,
                 crate::genome::cgp::EdgeSurface::ComputeInput(0),
-                Some(crate::genome::PlasticityConfig {
+                Some(crate::genome::Learning {
                     rule: crate::genome::HebbianRule::Classic,
                     learning_rate: 0.5,
                     weight_clamp: 2.0,

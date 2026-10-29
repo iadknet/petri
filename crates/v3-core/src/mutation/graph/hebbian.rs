@@ -1,115 +1,156 @@
-//! Plasticity mutation operators on graph edges (T25.F06).
+//! Learning mutation operators (T25.F06, T25.F09, T25.F12).
 //!
-//! Nine operators that evolve per-edge learning attributes on either
-//! surface. Each picks one edge uniformly among the edges matching its
-//! predicate, in `edge_sites` order over both surfaces (count-then-select,
-//! one draw); a picked member then draws the scope coin, which lands the
-//! change on it alone or on every member of its bundle the predicate admits
-//! (T25.F07); the value is drawn once and each target applies its law:
-//! - EnableHebbian: add learning attributes to a static, eligible edge
-//! - DisableHebbian: remove them from a plastic edge
-//! - MutateHebbianRule: change the learning rule variant
-//! - MutateHebbianRate: perturb the learning rate
-//! - ToggleHebbianLamarckian: flip the inheritance flag
-//! - EnableRewardModulation: add reward modulation to a pure Hebbian edge
-//! - DisableRewardModulation: remove reward modulation from a modulated edge
-//! - MutateRewardSource: change the outcome channel a modulated edge listens to
-//! - MutateTraceDecay: perturb the trace decay rate on a modulated edge
-//!
-//!
-//! Three retention operators (T25.F09) move an edge's learned-weight
-//! retention `ρ` on and off 1 and step its deficit `1 − ρ`, through the same
-//! pick and coin:
-//! - EnableRetention: a plastic edge with `ρ = 1` decays, `1 − ρ` drawn
-//!   log-uniform over `[10⁻⁴, 1]`
-//! - DisableRetention: a decaying edge's `ρ` returns to 1
-//! - MutateRetention: a decaying edge's deficit steps multiplicatively
-//!
-//! `SetScope` flips a member's scope through the same coin.
+//! Every operator draws one target uniformly among the node's eligible
+//! targets ([`Target`]): edges in `edge_sites` order over both surfaces,
+//! then bundle slots in `BundleId` order, `scale_learning` before
+//! `member_default` (count-then-select, one draw). A picked member then
+//! draws the broadcast coin `gen_bool(0.5)`: true lands the edit on every
+//! member of its bundle the same predicate admits, in canonical order;
+//! lone edges and slots draw none. A value is drawn once after the coin
+//! from the picked target's stored learning and every target applies its
+//! law to its own:
+//! - EnableHebbian: a fresh learning on a lone edge without one, a member
+//!   not `Own` (it becomes `Own`) or an absent slot
+//! - DisableHebbian: a lone edge or a slot loses its learning; a member not
+//!   `Static` becomes `Static`
+//! - ClearLearningOverride: a member not `Inherit` becomes `Inherit`
+//! - MutateHebbianRule, MutateHebbianRate, ToggleHebbianLamarckian,
+//!   EnableRewardModulation, DisableRewardModulation, MutateRewardSource,
+//!   MutateTraceDecay: change a stored learning (lone, `Own`, present slot)
+//! - EnableRetention, DisableRetention, MutateRetention (T25.F09): move a
+//!   stored learning's retention `ρ` on and off 1 and step its deficit
+//!   `1 − ρ`
+//! - ToggleCredits: the other of the picked member's `credits`
 
 use rand::{Rng, RngCore};
 
 use crate::contracts::OutcomeChannel;
-use crate::genome::cgp::{CgpGraphBackendDef, EdgeOccurrence, Scope};
-use crate::genome::{retention_decays, HebbianRule, PlasticityConfig, RewardModulationConfig};
-use crate::mutation::event::MutationSkipReason;
+use crate::genome::cgp::{BundleId, CgpGraphBackendDef, EdgeOccurrence, EdgeRole, LearningSlot};
+use crate::genome::{
+    retention_decays, HebbianRule, Learning, MemberPolicy, RewardModulationConfig,
+};
+use crate::mutation::event::{Broadcast, MutationSkipReason};
 
-// ─── Applicability predicates ───────────────────────────────────────────────
+// ─── Targets and applicability predicates ───────────────────────────────────
 //
-// The per-edge predicates the plasticity operators draw their target from.
-// `GraphMutator::apply_classified` filters Graph-backend nodes by [`any_edge`] over the
-// same predicate, so an operator is never selected onto a module with no
-// edge it can touch. A `ClearSlot` edge never matches
-// (`CgpGraphBackendDef::can_learn`); a member does (T25.F07).
+// `GraphMutator::applies_to` filters Graph-backend nodes by [`any_target`]
+// over the operator's predicate, so an operator is never selected onto a
+// module with no target it can touch. A `ClearSlot` edge never matches
+// (`CgpGraphBackendDef::can_learn`).
 
-/// The edge's learning attributes.
-fn plasticity_of(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> Option<PlasticityConfig> {
-    def.edge_at(occurrence).plasticity()
+/// What a learning edit lands on (T25.F12 invariant 9): an edge (lone or a
+/// member) or one of a bundle's two slots.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Target {
+    Edge(EdgeOccurrence),
+    Slot(BundleId, LearningSlot),
 }
 
-/// `EnableHebbian`: a static edge that may learn.
-pub(super) fn can_enable_hebbian(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> bool {
-    plasticity_of(def, occurrence).is_none() && def.can_learn(occurrence)
+/// Every target of `def` in draw order: edges, then slots.
+fn targets(def: &CgpGraphBackendDef) -> impl Iterator<Item = Target> + '_ {
+    def.edge_sites().map(Target::Edge).chain(
+        def.indexed_bundles()
+            .flat_map(|(id, _)| LearningSlot::ALL.map(|slot| Target::Slot(id, slot))),
+    )
 }
 
-/// `DisableHebbian`, `MutateHebbianRule`, `MutateHebbianRate`,
-/// `ToggleHebbianLamarckian`: an edge that already carries plasticity.
-pub(super) fn is_plastic(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> bool {
-    plasticity_of(def, occurrence).is_some()
+/// The learning `target` stores: a lone edge's, an `Own` member's override,
+/// a slot's.
+fn stored(def: &CgpGraphBackendDef, target: Target) -> Option<Learning> {
+    match target {
+        Target::Edge(occurrence) => def.edge_at(occurrence).stored_learning(),
+        Target::Slot(id, slot) => def.bundles()[id.index()].slot(slot),
+    }
 }
 
-/// `EnableRewardModulation`: a plastic edge without modulation.
-pub(super) fn can_enable_reward_modulation(
-    def: &CgpGraphBackendDef,
-    occurrence: EdgeOccurrence,
-) -> bool {
-    plasticity_of(def, occurrence).is_some_and(|p| p.modulation.is_none())
+/// The member policy at `target`, `None` for a lone edge or a slot.
+fn policy(def: &CgpGraphBackendDef, target: Target) -> Option<MemberPolicy> {
+    match target {
+        Target::Edge(occurrence) => def
+            .edge_at(occurrence)
+            .membership()
+            .map(|membership| membership.policy),
+        Target::Slot(..) => None,
+    }
+}
+
+/// `EnableHebbian`: a lone edge without learning that may learn, a member
+/// not `Own`, an absent slot.
+pub(super) fn can_enable_hebbian(def: &CgpGraphBackendDef, target: Target) -> bool {
+    match target {
+        Target::Edge(occurrence) => match def.edge_at(occurrence).role() {
+            EdgeRole::Lone(learning) => learning.is_none() && def.can_learn(occurrence),
+            EdgeRole::Member(membership) => !matches!(membership.policy, MemberPolicy::Own(_)),
+        },
+        Target::Slot(..) => stored(def, target).is_none(),
+    }
+}
+
+/// `DisableHebbian`: a lone edge with learning, a member not `Static`, a
+/// present slot.
+pub(super) fn can_disable_hebbian(def: &CgpGraphBackendDef, target: Target) -> bool {
+    match policy(def, target) {
+        Some(policy) => policy != MemberPolicy::Static,
+        None => stored(def, target).is_some(),
+    }
+}
+
+/// `ClearLearningOverride`: a member not `Inherit`.
+pub(super) fn can_clear_override(def: &CgpGraphBackendDef, target: Target) -> bool {
+    policy(def, target).is_some_and(|policy| policy != MemberPolicy::Inherit)
+}
+
+/// `MutateHebbianRule`, `MutateHebbianRate`, `ToggleHebbianLamarckian`: a
+/// stored learning.
+pub(super) fn stores_learning(def: &CgpGraphBackendDef, target: Target) -> bool {
+    stored(def, target).is_some()
+}
+
+/// `EnableRewardModulation`: a stored learning without modulation.
+pub(super) fn can_enable_reward_modulation(def: &CgpGraphBackendDef, target: Target) -> bool {
+    stored(def, target).is_some_and(|learning| learning.modulation.is_none())
 }
 
 /// `DisableRewardModulation`, `MutateRewardSource`, `MutateTraceDecay`: a
-/// plastic edge that carries modulation.
-pub(super) fn is_reward_modulated(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> bool {
-    plasticity_of(def, occurrence).is_some_and(|p| p.modulation.is_some())
+/// stored learning with modulation.
+pub(super) fn is_reward_modulated(def: &CgpGraphBackendDef, target: Target) -> bool {
+    stored(def, target).is_some_and(|learning| learning.modulation.is_some())
 }
 
-/// `EnableRetention`: a plastic edge whose retention is exactly 1.
-pub(super) fn can_enable_retention(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> bool {
-    plasticity_of(def, occurrence).is_some_and(|p| !retention_decays(p.retention))
+/// `EnableRetention`: a stored learning whose retention is exactly 1.
+pub(super) fn can_enable_retention(def: &CgpGraphBackendDef, target: Target) -> bool {
+    stored(def, target).is_some_and(|learning| !retention_decays(learning.retention))
 }
 
-/// `DisableRetention`, `MutateRetention`: a plastic edge whose retention is
-/// below 1.
-pub(super) fn is_decaying(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> bool {
-    plasticity_of(def, occurrence).is_some_and(|p| retention_decays(p.retention))
+/// `DisableRetention`, `MutateRetention`: a stored learning whose retention
+/// is below 1.
+pub(super) fn is_decaying(def: &CgpGraphBackendDef, target: Target) -> bool {
+    stored(def, target).is_some_and(|learning| retention_decays(learning.retention))
 }
 
-/// `SetScope`: a bundle member.
-pub(super) fn is_member(def: &CgpGraphBackendDef, occurrence: EdgeOccurrence) -> bool {
-    def.edge_at(occurrence).membership().is_some()
+/// `ToggleCredits`, `DetachGraphEdge`: a bundle member.
+pub(super) fn is_member(def: &CgpGraphBackendDef, target: Target) -> bool {
+    policy(def, target).is_some()
 }
 
-/// An edge predicate of this module.
-pub(super) type EdgePredicate = fn(&CgpGraphBackendDef, EdgeOccurrence) -> bool;
+/// A target predicate of this module.
+pub(super) type TargetPredicate = fn(&CgpGraphBackendDef, Target) -> bool;
 
-/// Whether any edge in `def` matches `predicate`: what an operator's
+/// Whether any target of `def` matches `predicate`: what an operator's
 /// `applies_to` and [`select_eligible`] need to succeed.
-pub(super) fn any_edge(def: &CgpGraphBackendDef, predicate: EdgePredicate) -> bool {
-    def.edge_sites()
-        .any(|occurrence| predicate(def, occurrence))
+pub(super) fn any_target(def: &CgpGraphBackendDef, predicate: TargetPredicate) -> bool {
+    targets(def).any(|target| predicate(def, target))
 }
 
-/// Pick a random edge matching `predicate`, in `edge_sites` order over both
-/// surfaces, or `NoApplicableTarget` if none match. Two-pass
-/// count-then-select with one draw avoids allocating the eligible list.
+/// Pick a random target matching `predicate` in draw order, or
+/// `NoApplicableTarget` if none match. Two-pass count-then-select with one
+/// draw avoids allocating the eligible list.
 pub(super) fn select_eligible(
     def: &CgpGraphBackendDef,
-    predicate: EdgePredicate,
+    predicate: TargetPredicate,
     rng: &mut impl Rng,
-) -> Result<EdgeOccurrence, MutationSkipReason> {
-    let matching = || {
-        def.edge_sites()
-            .filter(|&occurrence| predicate(def, occurrence))
-    };
+) -> Result<Target, MutationSkipReason> {
+    let matching = || targets(def).filter(|&target| predicate(def, target));
     let count = matching().count();
     if count == 0 {
         return Err(MutationSkipReason::NoApplicableTarget);
@@ -120,60 +161,83 @@ pub(super) fn select_eligible(
         .ok_or(MutationSkipReason::NoApplicableTarget)
 }
 
-/// The scope coin (T25.F07 invariant 7): the scope a change picked at
-/// `picked` lands on and its targets (T25.F08 invariant 8). A non-member
-/// draws no coin and is the only target, at `Edge`; a member draws
-/// `gen_bool(0.5)`: false, itself at `Edge`; true, every member of its bundle
-/// that `admits` accepts, in canonical order, at `Bundle`.
-pub(super) fn scope_targets(
+/// The broadcast coin (T25.F12 invariant 9): the reach of an edit picked at
+/// `picked` and its targets. A lone edge or a slot draws no coin and is the
+/// only target; a member draws `gen_bool(0.5)`: false, itself alone; true,
+/// every member of its bundle that `admits` accepts, in canonical order.
+pub(super) fn broadcast_targets(
     def: &CgpGraphBackendDef,
-    picked: EdgeOccurrence,
-    admits: EdgePredicate,
+    picked: Target,
+    admits: TargetPredicate,
     rng: &mut impl Rng,
-) -> (Scope, Vec<EdgeOccurrence>) {
-    match def.edge_at(picked).membership() {
-        Some(membership) if rng.gen_bool(0.5) => (
-            Scope::Group,
-            def.members(membership.bundle)
+) -> (Broadcast, Vec<Target>) {
+    let bundle = match picked {
+        Target::Edge(occurrence) => def
+            .edge_at(occurrence)
+            .membership()
+            .map(|membership| membership.bundle),
+        Target::Slot(..) => None,
+    };
+    match bundle {
+        Some(bundle) if rng.gen_bool(0.5) => (
+            Broadcast::Members,
+            def.members(bundle)
+                .map(Target::Edge)
                 .filter(|&member| admits(def, member))
                 .collect(),
         ),
-        _ => (Scope::Edge, vec![picked]),
+        _ => (Broadcast::One, vec![picked]),
     }
 }
 
-/// A plasticity law split into its draws and its per-config apply (R3):
-/// the value is drawn once, after the scope coin, from the picked edge's
-/// config, and every target applies it to its own config.
-struct Law<V> {
-    draw: fn(Option<PlasticityConfig>, &mut dyn RngCore) -> V,
-    apply: fn(Option<PlasticityConfig>, &V) -> Option<PlasticityConfig>,
+/// Write `learning` as `target`'s stored learning: a lone edge's or a
+/// slot's; on a member, `Some` an `Own` override and `None` `Static`.
+fn write(def: &mut CgpGraphBackendDef, target: Target, learning: Option<Learning>) {
+    match target {
+        Target::Edge(occurrence) => {
+            let is_member = def.edge_at(occurrence).membership().is_some();
+            let mut edge = def.edge_mut(occurrence);
+            if is_member {
+                edge.set_policy(learning.map_or(MemberPolicy::Static, MemberPolicy::Own));
+            } else {
+                edge.set_learning(learning);
+            }
+        }
+        Target::Slot(id, slot) => def.bundle_mut(id).set_slot(slot, learning),
+    }
 }
 
-/// Pick one edge matching `predicate`, draw the scope coin, draw the law's
-/// value once and apply it to every target's config; returns the scope the
-/// change landed on.
-fn mutate_scoped<V, R: Rng>(
+/// A learning law split into its draws and its per-target apply: the value
+/// is drawn once, after the broadcast coin, from the picked target's stored
+/// learning, and every target applies it to its own.
+struct Law<V> {
+    draw: fn(Option<Learning>, &mut dyn RngCore) -> V,
+    apply: fn(Option<Learning>, &V) -> Option<Learning>,
+}
+
+/// Pick one target matching `predicate`, draw the broadcast coin, draw the
+/// law's value once and write it to every target; returns the reach.
+fn mutate_broadcast<V, R: Rng>(
     def: &mut CgpGraphBackendDef,
-    predicate: EdgePredicate,
+    predicate: TargetPredicate,
     rng: &mut R,
     law: Law<V>,
-) -> Result<Scope, MutationSkipReason> {
+) -> Result<Broadcast, MutationSkipReason> {
     let picked = select_eligible(def, predicate, rng)?;
-    let (scope, targets) = scope_targets(def, picked, predicate, rng);
-    let value = (law.draw)(plasticity_of(def, picked), rng);
+    let (broadcast, targets) = broadcast_targets(def, picked, predicate, rng);
+    let value = (law.draw)(stored(def, picked), rng);
     for target in targets {
-        let config = (law.apply)(plasticity_of(def, target), &value);
-        def.edge_mut(target).set_plasticity(config);
+        let learning = (law.apply)(stored(def, target), &value);
+        write(def, target, learning);
     }
-    Ok(scope)
+    Ok(broadcast)
 }
 
-/// `EnableHebbian`'s value law: a fresh pure-Hebbian config, in draw order
-/// rule, rate, clamp, inheritance.
-pub(super) fn draw_hebbian_config(rng: &mut dyn RngCore) -> PlasticityConfig {
+/// `EnableHebbian`'s value law: a fresh pure-Hebbian learning, in draw
+/// order rule, rate, clamp, inheritance.
+pub(super) fn draw_hebbian_config(rng: &mut dyn RngCore) -> Learning {
     let rule = HebbianRule::ALL[rng.gen_range(0..HebbianRule::ALL.len())];
-    PlasticityConfig {
+    Learning {
         rule,
         learning_rate: rng.gen_range(0.01f32..0.2),
         weight_clamp: rng.gen_range(1.0f32..5.0),
@@ -216,7 +280,7 @@ fn draw_other<T: Copy + PartialEq>(all: &[T], current: Option<T>, rng: &mut dyn 
     others[rng.gen_range(0..others.len())]
 }
 
-fn draw_u(_: Option<PlasticityConfig>, rng: &mut dyn RngCore) -> f32 {
+fn draw_u(_: Option<Learning>, rng: &mut dyn RngCore) -> f32 {
     rng.gen_range(-1.0f32..=1.0)
 }
 
@@ -239,31 +303,31 @@ pub(super) fn step_retention(retention: f32, u: f32) -> f32 {
     1.0 - (deficit * (1.0 + 0.3 * u)).clamp(RETENTION_DEFICIT_MIN, 1.0)
 }
 
-/// Add learning attributes to a random static, eligible edge (one config,
-/// written to every admitted static member).
+/// `EnableHebbian`: one fresh learning, written to every admitted target.
 pub(crate) fn enable_hebbian_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    mutate_scoped(
+) -> Result<Broadcast, MutationSkipReason> {
+    mutate_broadcast(
         def,
         can_enable_hebbian,
         rng,
         Law {
             draw: |_, rng| draw_hebbian_config(rng),
-            apply: |_, &config| Some(config),
+            apply: |_, &learning| Some(learning),
         },
     )
 }
 
-/// Remove the learning attributes of a random plastic edge.
+/// `DisableHebbian`: every target loses its stored learning; a member
+/// becomes `Static`.
 pub(crate) fn disable_hebbian_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    mutate_scoped(
+) -> Result<Broadcast, MutationSkipReason> {
+    mutate_broadcast(
         def,
-        is_plastic,
+        can_disable_hebbian,
         rng,
         Law {
             draw: |_, _| (),
@@ -272,121 +336,160 @@ pub(crate) fn disable_hebbian_in_def(
     )
 }
 
-/// Change the HebbianRule variant on a random plastic edge: one of the
-/// others of the picked edge's rule, written to every target.
+/// `ClearLearningOverride` (T25.F12): every target member becomes
+/// `Inherit`; no value draw.
+pub(crate) fn clear_learning_override_in_def(
+    def: &mut CgpGraphBackendDef,
+    rng: &mut impl Rng,
+) -> Result<Broadcast, MutationSkipReason> {
+    let picked = select_eligible(def, can_clear_override, rng)?;
+    let (broadcast, targets) = broadcast_targets(def, picked, can_clear_override, rng);
+    for target in targets {
+        if let Target::Edge(occurrence) = target {
+            def.edge_mut(occurrence).set_policy(MemberPolicy::Inherit);
+        }
+    }
+    Ok(broadcast)
+}
+
+/// `ToggleCredits` (T25.F12): the other of the picked member's `credits`,
+/// written to every target; no value draw.
+pub(crate) fn toggle_credits_in_def(
+    def: &mut CgpGraphBackendDef,
+    rng: &mut impl Rng,
+) -> Result<Broadcast, MutationSkipReason> {
+    let picked = select_eligible(def, is_member, rng)?;
+    let Target::Edge(at) = picked else {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    };
+    let credits = !def
+        .edge_at(at)
+        .membership()
+        .ok_or(MutationSkipReason::NoApplicableTarget)?
+        .credits;
+    let (broadcast, targets) = broadcast_targets(def, picked, is_member, rng);
+    for target in targets {
+        if let Target::Edge(occurrence) = target {
+            def.edge_mut(occurrence).set_credits(credits);
+        }
+    }
+    Ok(broadcast)
+}
+
+/// Change the rule of a stored learning: one of the others of the picked
+/// target's rule, written to every target.
 pub(crate) fn mutate_hebbian_rule_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    mutate_scoped(
+) -> Result<Broadcast, MutationSkipReason> {
+    mutate_broadcast(
         def,
-        is_plastic,
+        stores_learning,
         rng,
         Law {
             draw: |picked, rng| {
                 draw_other(&HebbianRule::ALL, picked.map(|picked| picked.rule), rng)
             },
-            apply: |config, &rule| config.map(|config| PlasticityConfig { rule, ..config }),
+            apply: |learning, &rule| learning.map(|learning| Learning { rule, ..learning }),
         },
     )
 }
 
-/// Perturb the learning_rate on a random plastic edge: one `u`, each target
-/// stepping its own rate by its branch.
+/// Perturb a stored learning's rate: one `u`, each target stepping its own
+/// rate by its branch.
 pub(crate) fn mutate_hebbian_rate_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    mutate_scoped(
+) -> Result<Broadcast, MutationSkipReason> {
+    mutate_broadcast(
         def,
-        is_plastic,
+        stores_learning,
         rng,
         Law {
             draw: draw_u,
-            apply: |config, &u| {
-                config.map(|config| PlasticityConfig {
-                    learning_rate: perturb(config.learning_rate, u),
-                    ..config
+            apply: |learning, &u| {
+                learning.map(|learning| Learning {
+                    learning_rate: perturb(learning.learning_rate, u),
+                    ..learning
                 })
             },
         },
     )
 }
 
-/// Flip the `lamarckian` flag on a random plastic edge: every target takes
-/// the picked edge's flipped value.
+/// Flip a stored learning's `lamarckian` flag: every target takes the
+/// picked target's flipped value.
 pub(crate) fn toggle_hebbian_lamarckian_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    mutate_scoped(
+) -> Result<Broadcast, MutationSkipReason> {
+    mutate_broadcast(
         def,
-        is_plastic,
+        stores_learning,
         rng,
         Law {
             draw: |picked, _| !picked.is_some_and(|picked| picked.lamarckian),
-            apply: |config, &lamarckian| {
-                config.map(|config| PlasticityConfig {
+            apply: |learning, &lamarckian| {
+                learning.map(|learning| Learning {
                     lamarckian,
-                    ..config
+                    ..learning
                 })
             },
         },
     )
 }
 
-/// Add reward modulation to a random plastic edge that has `modulation=None`:
-/// one modulation, set on every target, which keeps its rule, rate, clamp
-/// and flag.
+/// Add reward modulation to a stored learning without it: one modulation,
+/// set on every target, which keeps its rule, rate, clamp and flag.
 pub(crate) fn enable_reward_modulation_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    mutate_scoped(
+) -> Result<Broadcast, MutationSkipReason> {
+    mutate_broadcast(
         def,
         can_enable_reward_modulation,
         rng,
         Law {
             draw: |_, rng| draw_modulation(rng),
-            apply: |config, &modulation| {
-                config.map(|config| PlasticityConfig {
+            apply: |learning, &modulation| {
+                learning.map(|learning| Learning {
                     modulation: Some(modulation),
-                    ..config
+                    ..learning
                 })
             },
         },
     )
 }
 
-/// Remove reward modulation from a random reward-modulated edge, keeping
-/// each target's config.
+/// Remove reward modulation from a modulated stored learning, keeping the
+/// rest of each target's learning.
 pub(crate) fn disable_reward_modulation_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    mutate_scoped(
+) -> Result<Broadcast, MutationSkipReason> {
+    mutate_broadcast(
         def,
         is_reward_modulated,
         rng,
         Law {
             draw: |_, _| (),
-            apply: |config, ()| {
-                config.map(|config| PlasticityConfig {
+            apply: |learning, ()| {
+                learning.map(|learning| Learning {
                     modulation: None,
-                    ..config
+                    ..learning
                 })
             },
         },
     )
 }
 
-/// Switch the `reward_source` channel on a random reward-modulated edge:
-/// one of the others of the picked edge's channel, written to every target.
+/// Switch a modulated stored learning's reward source: one of the others
+/// of the picked target's channel, written to every target.
 pub(crate) fn mutate_reward_source_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    mutate_scoped(
+) -> Result<Broadcast, MutationSkipReason> {
+    mutate_broadcast(
         def,
         is_reward_modulated,
         rng,
@@ -397,60 +500,64 @@ pub(crate) fn mutate_reward_source_in_def(
                     .map(|m| m.reward_source);
                 draw_other(&OutcomeChannel::ALL, current, rng)
             },
-            apply: |config, &reward_source| {
-                config.map(|config| PlasticityConfig {
-                    modulation: config.modulation.map(|modulation| RewardModulationConfig {
-                        reward_source,
-                        ..modulation
-                    }),
-                    ..config
+            apply: |learning, &reward_source| {
+                learning.map(|learning| Learning {
+                    modulation: learning
+                        .modulation
+                        .map(|modulation| RewardModulationConfig {
+                            reward_source,
+                            ..modulation
+                        }),
+                    ..learning
                 })
             },
         },
     )
 }
 
-/// Perturb the `trace_decay` on a random reward-modulated edge: one `u`,
-/// each target stepping its own decay by its branch.
+/// Perturb a modulated stored learning's trace decay: one `u`, each target
+/// stepping its own decay by its branch.
 pub(crate) fn mutate_trace_decay_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    mutate_scoped(
+) -> Result<Broadcast, MutationSkipReason> {
+    mutate_broadcast(
         def,
         is_reward_modulated,
         rng,
         Law {
             draw: draw_u,
-            apply: |config, &u| {
-                config.map(|config| PlasticityConfig {
-                    modulation: config.modulation.map(|modulation| RewardModulationConfig {
-                        trace_decay: perturb(modulation.trace_decay, u),
-                        ..modulation
-                    }),
-                    ..config
+            apply: |learning, &u| {
+                learning.map(|learning| Learning {
+                    modulation: learning
+                        .modulation
+                        .map(|modulation| RewardModulationConfig {
+                            trace_decay: perturb(modulation.trace_decay, u),
+                            ..modulation
+                        }),
+                    ..learning
                 })
             },
         },
     )
 }
 
-/// `EnableRetention` (T25.F09): one retention, drawn once after the scope
-/// coin, written to every admitted target.
+/// `EnableRetention` (T25.F09): one retention, drawn once after the coin,
+/// written to every admitted target.
 pub(crate) fn enable_retention_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    mutate_scoped(
+) -> Result<Broadcast, MutationSkipReason> {
+    mutate_broadcast(
         def,
         can_enable_retention,
         rng,
         Law {
             draw: |_, rng| draw_retention(rng),
-            apply: |config, &retention| {
-                config.map(|config| PlasticityConfig {
+            apply: |learning, &retention| {
+                learning.map(|learning| Learning {
                     retention,
-                    ..config
+                    ..learning
                 })
             },
         },
@@ -462,17 +569,17 @@ pub(crate) fn enable_retention_in_def(
 pub(crate) fn disable_retention_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    mutate_scoped(
+) -> Result<Broadcast, MutationSkipReason> {
+    mutate_broadcast(
         def,
         is_decaying,
         rng,
         Law {
             draw: |_, _| (),
-            apply: |config, ()| {
-                config.map(|config| PlasticityConfig {
+            apply: |learning, ()| {
+                learning.map(|learning| Learning {
                     retention: 1.0,
-                    ..config
+                    ..learning
                 })
             },
         },
@@ -484,43 +591,21 @@ pub(crate) fn disable_retention_in_def(
 pub(crate) fn mutate_retention_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    mutate_scoped(
+) -> Result<Broadcast, MutationSkipReason> {
+    mutate_broadcast(
         def,
         is_decaying,
         rng,
         Law {
             draw: draw_u,
-            apply: |config, &u| {
-                config.map(|config| PlasticityConfig {
-                    retention: step_retention(config.retention, u),
-                    ..config
+            apply: |learning, &u| {
+                learning.map(|learning| Learning {
+                    retention: step_retention(learning.retention, u),
+                    ..learning
                 })
             },
         },
     )
-}
-
-/// `SetScope` (T25.F07): one member uniformly in canonical order, the scope
-/// coin, then the other of the picked member's scope written to it alone or
-/// to every member of its bundle; no value draw. Returns the scope the
-/// change landed on (the coin's), not the scope it wrote.
-pub(crate) fn set_scope_in_def(
-    def: &mut CgpGraphBackendDef,
-    rng: &mut impl Rng,
-) -> Result<Scope, MutationSkipReason> {
-    let picked = select_eligible(def, is_member, rng)?;
-    let scope = def
-        .edge_at(picked)
-        .membership()
-        .ok_or(MutationSkipReason::NoApplicableTarget)?
-        .scope
-        .other();
-    let (landed, targets) = scope_targets(def, picked, is_member, rng);
-    for target in targets {
-        def.edge_mut(target).set_scope(scope);
-    }
-    Ok(landed)
 }
 
 #[cfg(test)]
@@ -546,8 +631,8 @@ mod tests {
             .with_output_sinks(Vec::new())
     }
 
-    fn hebbian() -> PlasticityConfig {
-        PlasticityConfig {
+    fn hebbian() -> Learning {
+        Learning {
             rule: HebbianRule::Classic,
             learning_rate: 0.1,
             weight_clamp: 5.0,
@@ -557,8 +642,8 @@ mod tests {
         }
     }
 
-    fn modulated() -> PlasticityConfig {
-        PlasticityConfig {
+    fn modulated() -> Learning {
+        Learning {
             modulation: Some(RewardModulationConfig {
                 reward_source: OutcomeChannel::EnergyDelta,
                 trace_decay: 0.9,
@@ -567,7 +652,7 @@ mod tests {
         }
     }
 
-    fn node(config: Option<PlasticityConfig>) -> ComputeNode {
+    fn node(config: Option<Learning>) -> ComputeNode {
         plastic_node(
             ComputeNodeKind::Add,
             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
@@ -588,8 +673,8 @@ mod tests {
     }
 
     /// The learning attributes of the first edge of compute node 0.
-    fn first(def: &CgpGraphBackendDef) -> Option<PlasticityConfig> {
-        def.compute_nodes()[0].inputs[0].plasticity()
+    fn first(def: &CgpGraphBackendDef) -> Option<Learning> {
+        def.compute_nodes()[0].inputs[0].stored_learning()
     }
 
     #[test]
@@ -631,7 +716,7 @@ mod tests {
             OutputSinkKind::ClearSlot(3),
             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
         )]);
-        assert!(!any_edge(&def, can_enable_hebbian));
+        assert!(!any_target(&def, can_enable_hebbian));
         assert_eq!(
             enable_hebbian_in_def(&mut def, &mut rng(42)),
             Err(MutationSkipReason::NoApplicableTarget)
@@ -798,7 +883,8 @@ mod tests {
         );
     }
 
-    type Operator = fn(&mut CgpGraphBackendDef, &mut SmallRng) -> Result<Scope, MutationSkipReason>;
+    type Operator =
+        fn(&mut CgpGraphBackendDef, &mut SmallRng) -> Result<Broadcast, MutationSkipReason>;
 
     /// A graph with static, pure-Hebbian and reward-modulated edges on both
     /// surfaces, and a static `ClearSlot` edge that never matches.
@@ -824,52 +910,82 @@ mod tests {
             if config.is_some() {
                 let index = def.surface_edges(surface).len() - 1;
                 def.edge_mut(EdgeOccurrence::new(surface, index))
-                    .set_plasticity(config);
+                    .set_learning(config);
             }
         }
         def
     }
 
-    /// Invariant 9: each operator picks one edge uniformly among the edges
-    /// matching its predicate, in `edge_sites` order over both surfaces, with
-    /// one draw, and edits that edge alone; across seeds it reaches both
-    /// surfaces.
+    /// The learning operators over their predicates.
+    const OPERATORS: [(&str, Operator, TargetPredicate); 12] = [
+        ("enable", enable_hebbian_in_def, can_enable_hebbian),
+        ("disable", disable_hebbian_in_def, can_disable_hebbian),
+        ("rule", mutate_hebbian_rule_in_def, stores_learning),
+        ("rate", mutate_hebbian_rate_in_def, stores_learning),
+        (
+            "lamarckian",
+            toggle_hebbian_lamarckian_in_def,
+            stores_learning,
+        ),
+        (
+            "enable_modulation",
+            enable_reward_modulation_in_def,
+            can_enable_reward_modulation,
+        ),
+        (
+            "disable_modulation",
+            disable_reward_modulation_in_def,
+            is_reward_modulated,
+        ),
+        ("source", mutate_reward_source_in_def, is_reward_modulated),
+        ("decay", mutate_trace_decay_in_def, is_reward_modulated),
+        (
+            "enable_retention",
+            enable_retention_in_def,
+            can_enable_retention,
+        ),
+        ("disable_retention", disable_retention_in_def, is_decaying),
+        ("retention", mutate_retention_in_def, is_decaying),
+    ];
+
+    /// Invariant 9: each operator picks one lone edge uniformly among the
+    /// edges matching its predicate, in `edge_sites` order over both
+    /// surfaces, with one draw, and edits that edge alone; across seeds it
+    /// reaches both surfaces.
     #[test]
     fn every_operator_draws_one_matching_edge_over_both_surfaces() {
-        let operators: [(&str, Operator, EdgePredicate); 9] = [
-            ("enable", enable_hebbian_in_def, can_enable_hebbian),
-            ("disable", disable_hebbian_in_def, is_plastic),
-            ("rule", mutate_hebbian_rule_in_def, is_plastic),
-            ("rate", mutate_hebbian_rate_in_def, is_plastic),
-            ("lamarckian", toggle_hebbian_lamarckian_in_def, is_plastic),
-            (
-                "enable_modulation",
-                enable_reward_modulation_in_def,
-                can_enable_reward_modulation,
+        let mut original = mixed_def();
+        // A decaying edge per surface for the retention steps.
+        for target in [
+            EdgeOccurrence::new(EdgeSurface::ComputeInput(1), 0),
+            EdgeOccurrence::new(
+                original
+                    .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
+                    .unwrap(),
+                0,
             ),
-            (
-                "disable_modulation",
-                disable_reward_modulation_in_def,
-                is_reward_modulated,
-            ),
-            ("source", mutate_reward_source_in_def, is_reward_modulated),
-            ("decay", mutate_trace_decay_in_def, is_reward_modulated),
-        ];
-        let original = mixed_def();
-        for (name, operator, predicate) in operators {
-            let matching: Vec<EdgeOccurrence> = original
-                .edge_sites()
-                .filter(|&occurrence| predicate(&original, occurrence))
+        ] {
+            let learning = original.edge_at(target).stored_learning().unwrap();
+            original.edge_mut(target).set_learning(Some(Learning {
+                retention: 0.5,
+                ..learning
+            }));
+        }
+        for (name, operator, predicate) in OPERATORS {
+            let matching: Vec<Target> = targets(&original)
+                .filter(|&target| predicate(&original, target))
                 .collect();
             assert!(!matching.is_empty(), "{name}");
             let mut surfaces = [false; 2];
             for seed in 0..64 {
                 let expected = matching[rng(seed).gen_range(0..matching.len())];
                 let mut def = original.clone();
-                operator(&mut def, &mut rng(seed)).unwrap();
-                let edited: Vec<EdgeOccurrence> = def
+                let reach = operator(&mut def, &mut rng(seed)).unwrap();
+                assert_eq!(reach, Broadcast::One, "{name}: a lone edge reaches one");
+                let edited: Vec<Target> = def
                     .edge_sites()
                     .filter(|&occurrence| def.edge_at(occurrence) != original.edge_at(occurrence))
+                    .map(Target::Edge)
                     .collect();
                 // A rule or source redraw always changes; a perturbation can
                 // round to the same value, which edits nothing.
@@ -877,7 +993,7 @@ mod tests {
                     edited.is_empty() || edited == vec![expected],
                     "{name} seed {seed}"
                 );
-                if let Some(&occurrence) = edited.first() {
+                if let Some(&Target::Edge(occurrence)) = edited.first() {
                     surfaces
                         [usize::from(matches!(occurrence.surface, EdgeSurface::SinkInput(_)))] =
                         true;
@@ -897,57 +1013,67 @@ mod tests {
         }
     }
 
-    // ── The scope coin (T25.F07 invariant 7) ────────────────────────────────
+    // ── Members, slots and the broadcast coin (T25.F12 invariant 9) ─────────
 
     use crate::contracts::votes::DirectedVoteKind;
-    use crate::genome::cgp::{BundleId, Scope};
+    use crate::genome::cgp::test_support::store_learning;
+    use crate::genome::cgp::BundleId;
 
     /// A full catalog with one ring bundle of eight members on `Move`, member
-    /// `k` carrying `configs[k]` (static past the list's end).
-    fn bundle_def(
-        configs: &[Option<PlasticityConfig>],
-    ) -> (CgpGraphBackendDef, Vec<EdgeOccurrence>) {
+    /// `k` an `Own` member of `configs[k]` (`Static` for `None` and past the
+    /// list's end), both slots absent.
+    fn bundle_def(configs: &[Option<Learning>]) -> (CgpGraphBackendDef, Vec<EdgeOccurrence>) {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         let id = def.add_ring_bundle(1, DirectedVoteKind::Move, 0);
         let members: Vec<EdgeOccurrence> = def.members(id).collect();
         for (&member, &config) in members.iter().zip(configs) {
-            def.edge_mut(member).set_plasticity(config);
+            store_learning(&mut def, member, config);
         }
         (def, members)
     }
 
     /// The selection draws of an operator over `predicate` on `def`: the
-    /// picked edge and, for a member, the coin. `rng` continues at the value
-    /// draws.
+    /// picked target and, for a member, the coin. `rng` continues at the
+    /// value draws.
     fn replay_pick(
         def: &CgpGraphBackendDef,
-        predicate: EdgePredicate,
+        predicate: TargetPredicate,
         rng: &mut SmallRng,
-    ) -> (EdgeOccurrence, Option<bool>) {
-        let matching: Vec<EdgeOccurrence> = def
-            .edge_sites()
-            .filter(|&occurrence| predicate(def, occurrence))
+    ) -> (Target, Option<bool>) {
+        let matching: Vec<Target> = targets(def)
+            .filter(|&target| predicate(def, target))
             .collect();
         let picked = matching[rng.gen_range(0..matching.len())];
-        let coin = def.edge_at(picked).membership().map(|_| rng.gen_bool(0.5));
+        let coin = match picked {
+            Target::Edge(at) => def.edge_at(at).membership().map(|_| rng.gen_bool(0.5)),
+            Target::Slot(..) => None,
+        };
         (picked, coin)
     }
 
-    /// The edges whose learning attributes or scope `op` changed.
-    fn edited(before: &CgpGraphBackendDef, after: &CgpGraphBackendDef) -> Vec<EdgeOccurrence> {
-        before
+    /// Every target `op` changed: edges, then slots.
+    fn edited(before: &CgpGraphBackendDef, after: &CgpGraphBackendDef) -> Vec<Target> {
+        let edges = before
             .edge_sites()
             .filter(|&occurrence| before.edge_at(occurrence) != after.edge_at(occurrence))
-            .collect()
+            .map(Target::Edge);
+        let slots = targets(before).filter(|&target| {
+            matches!(target, Target::Slot(..)) && stored(before, target) != stored(after, target)
+        });
+        edges.chain(slots).collect()
     }
 
-    fn with(
-        config: PlasticityConfig,
-        edit: impl FnOnce(&mut PlasticityConfig),
-    ) -> PlasticityConfig {
+    fn with(config: Learning, edit: impl FnOnce(&mut Learning)) -> Learning {
         let mut config = config;
         edit(&mut config);
         config
+    }
+
+    fn the_member(target: Target) -> EdgeOccurrence {
+        match target {
+            Target::Edge(at) => at,
+            Target::Slot(..) => panic!("a member"),
+        }
     }
 
     /// A non-member draws no coin: the operator's draws are the pick and the
@@ -963,48 +1089,61 @@ mod tests {
             let mut actual = rng(seed);
             enable_hebbian_in_def(&mut def, &mut actual).unwrap();
             assert_eq!(actual.gen::<u64>(), expected.gen::<u64>(), "seed {seed}");
-            assert!(def.edges().any(|edge| edge.plasticity() == Some(config)));
+            assert!(def
+                .edges()
+                .any(|edge| edge.stored_learning() == Some(config)));
         }
     }
 
-    /// `EnableHebbian` on a bundle with a modulated member: the coin lands
-    /// one config on the picked member or on every static member; the
-    /// member the predicate rejects is untouched and consumes no draw.
+    /// `EnableHebbian` on a bundle with an `Own` member: the coin lands one
+    /// config on the picked member or on every member not `Own`, each
+    /// becoming `Own`; the rejected member is untouched; a picked slot
+    /// draws no coin and the other slot does not change.
     #[test]
-    fn enable_hebbian_lands_one_config_on_the_admitted_members() {
+    fn enable_hebbian_lands_one_config_on_the_admitted_targets() {
         let (original, members) = bundle_def(&[None, None, None, Some(modulated())]);
-        let mut tails = [false; 2];
-        for seed in 0..64 {
+        let mut seen = [false; 3];
+        for seed in 0..96 {
             let mut expected = rng(seed);
             let (picked, coin) = replay_pick(&original, can_enable_hebbian, &mut expected);
-            let coin = coin.expect("a member draws the coin");
             let config = draw_hebbian_config(&mut expected);
             let mut def = original.clone();
             let mut actual = rng(seed);
-            enable_hebbian_in_def(&mut def, &mut actual).unwrap();
+            let reach = enable_hebbian_in_def(&mut def, &mut actual).unwrap();
             assert_eq!(actual.gen::<u64>(), expected.gen::<u64>(), "seed {seed}");
-            let want: Vec<EdgeOccurrence> = if coin {
-                members
+            let want: Vec<Target> = match coin {
+                Some(true) => members
                     .iter()
                     .copied()
                     .filter(|&m| m != members[3])
-                    .collect()
-            } else {
-                vec![picked]
+                    .map(Target::Edge)
+                    .collect(),
+                _ => vec![picked],
             };
             assert_eq!(edited(&original, &def), want, "seed {seed}");
             assert!(want
                 .iter()
-                .all(|&m| def.edge_at(m).plasticity() == Some(config)));
+                .all(|&target| stored(&def, target) == Some(config)));
             assert_eq!(def.edge_at(members[3]), original.edge_at(members[3]));
-            tails[usize::from(coin)] = true;
+            assert_eq!(
+                reach,
+                if coin == Some(true) {
+                    Broadcast::Members
+                } else {
+                    Broadcast::One
+                }
+            );
+            seen[match coin {
+                None => 2,
+                Some(coin) => usize::from(coin),
+            }] = true;
         }
-        assert_eq!(tails, [true, true]);
+        assert_eq!(seen, [true; 3], "one, members and a slot");
     }
 
-    /// T25.F10 invariant 3: a `Bundle`-scope broadcast selected on a
-    /// direction member of a fact-bearing `DirectionPair` gene lands on the
-    /// gene's fact members as on its direction members.
+    /// T25.F10 invariant 3: a broadcast selected on a direction member of a
+    /// fact-bearing `DirectionPair` gene lands on the gene's fact members as
+    /// on its direction members.
     #[test]
     fn a_bundle_broadcast_from_a_direction_member_reaches_the_fact_members() {
         use crate::contracts::{InputReference, WorldInputKey};
@@ -1023,6 +1162,9 @@ mod tests {
         for seed in 0..128 {
             let mut expected = rng(seed);
             let (picked, coin) = replay_pick(&original, can_enable_hebbian, &mut expected);
+            let Target::Edge(picked) = picked else {
+                continue;
+            };
             if original.site_of(picked) == Some(crate::genome::cgp::Site::Drive)
                 || coin != Some(true)
             {
@@ -1030,18 +1172,18 @@ mod tests {
             }
             let config = draw_hebbian_config(&mut expected);
             let mut def = original.clone();
-            let scope = enable_hebbian_in_def(&mut def, &mut rng(seed)).unwrap();
-            assert_eq!(scope, Scope::Group, "seed {seed}");
+            let reach = enable_hebbian_in_def(&mut def, &mut rng(seed)).unwrap();
+            assert_eq!(reach, Broadcast::Members, "seed {seed}");
             for &member in facts.iter().chain(&directions) {
                 assert_eq!(
-                    def.edge_at(member).plasticity(),
+                    def.edge_at(member).stored_learning(),
                     Some(config),
                     "seed {seed} member {member:?}"
                 );
             }
             broadcasts += 1;
         }
-        assert!(broadcasts > 0, "a direction member's Bundle coin was drawn");
+        assert!(broadcasts > 0, "a direction member's broadcast was drawn");
     }
 
     /// `EnableRewardModulation` on a heterogeneous bundle sets one modulation
@@ -1075,16 +1217,22 @@ mod tests {
             all = true;
             for (k, config) in configs.iter().enumerate() {
                 let want = with(config.unwrap(), |c| c.modulation = Some(modulation));
-                assert_eq!(def.edge_at(members[k]).plasticity(), Some(want));
+                assert_eq!(def.edge_at(members[k]).stored_learning(), Some(want));
             }
             disable_reward_modulation_in_def(&mut def, &mut rng(seed)).unwrap();
             let cleared = members[..configs.len()]
                 .iter()
-                .filter(|&&m| def.edge_at(m).plasticity().unwrap().modulation.is_none())
+                .filter(|&&m| {
+                    def.edge_at(m)
+                        .stored_learning()
+                        .unwrap()
+                        .modulation
+                        .is_none()
+                })
                 .count();
             assert!(cleared == 1 || cleared == configs.len(), "{cleared}");
             for k in 0..configs.len() {
-                let config = def.edge_at(members[k]).plasticity().unwrap();
+                let config = def.edge_at(members[k]).stored_learning().unwrap();
                 if config.modulation.is_none() {
                     assert_eq!(Some(config), configs[k], "the config kept");
                 }
@@ -1112,22 +1260,22 @@ mod tests {
         let mut seen = [false; 3];
         for seed in 0..64 {
             let mut expected = rng(seed);
-            let (picked, coin) = replay_pick(&original, is_plastic, &mut expected);
+            let (picked, coin) = replay_pick(&original, stores_learning, &mut expected);
             let mut def = original.clone();
             toggle_hebbian_lamarckian_in_def(&mut def, &mut rng(seed)).unwrap();
-            let flag = !original.edge_at(picked).plasticity().unwrap().lamarckian;
+            let flag = !stored(&original, picked).unwrap().lamarckian;
             if coin == Some(true) {
                 seen[0] = true;
                 assert!(members[..2].iter().all(|&m| def
                     .edge_at(m)
-                    .plasticity()
+                    .stored_learning()
                     .unwrap()
                     .lamarckian
                     == flag));
             }
 
             let mut expected = rng(seed);
-            let (_, coin) = replay_pick(&original, is_plastic, &mut expected);
+            let (_, coin) = replay_pick(&original, stores_learning, &mut expected);
             let u: f32 = expected.gen_range(-1.0f32..=1.0);
             let mut def = original.clone();
             let mut actual = rng(seed);
@@ -1139,7 +1287,12 @@ mod tests {
             );
             if coin == Some(true) {
                 seen[1] = true;
-                let rate = |m: usize| def.edge_at(members[m]).plasticity().unwrap().learning_rate;
+                let rate = |m: usize| {
+                    def.edge_at(members[m])
+                        .stored_learning()
+                        .unwrap()
+                        .learning_rate
+                };
                 assert_eq!(rate(0), (0.005 + 0.05 * u).clamp(0.0, 1.0));
                 assert_eq!(rate(1), (0.5 * (1.0 + 0.3 * u)).clamp(0.0, 1.0));
             }
@@ -1153,7 +1306,7 @@ mod tests {
                 seen[2] = true;
                 let decay = |m: usize| {
                     def.edge_at(members[m])
-                        .plasticity()
+                        .stored_learning()
                         .unwrap()
                         .modulation
                         .unwrap()
@@ -1185,22 +1338,26 @@ mod tests {
         for seed in 0..64 {
             let mut def = original.clone();
             let mut expected = rng(seed);
-            let (picked, coin) = replay_pick(&original, is_plastic, &mut expected);
+            let (picked, coin) = replay_pick(&original, stores_learning, &mut expected);
+            let picked = the_member(picked);
             mutate_hebbian_rule_in_def(&mut def, &mut rng(seed)).unwrap();
-            let picked_rule = original.edge_at(picked).plasticity().unwrap().rule;
-            let rule = def.edge_at(picked).plasticity().unwrap().rule;
+            let picked_rule = original.edge_at(picked).stored_learning().unwrap().rule;
+            let rule = def.edge_at(picked).stored_learning().unwrap().rule;
             assert_ne!(rule, picked_rule);
             if coin == Some(true) {
                 seen = true;
-                assert!(members[..2]
-                    .iter()
-                    .all(|&m| def.edge_at(m).plasticity().unwrap().rule == rule));
+                assert!(members[..2].iter().all(|&m| def
+                    .edge_at(m)
+                    .stored_learning()
+                    .unwrap()
+                    .rule
+                    == rule));
             }
             let mut def = original.clone();
             mutate_reward_source_in_def(&mut def, &mut rng(seed)).unwrap();
             let source = |def: &CgpGraphBackendDef, m| {
                 def.edge_at(m)
-                    .plasticity()
+                    .stored_learning()
                     .unwrap()
                     .modulation
                     .unwrap()
@@ -1214,27 +1371,36 @@ mod tests {
         assert!(seen);
     }
 
-    /// `SetScope`: one member, the coin, then the other of the picked
-    /// member's scope on it alone or on every member; no value draw.
+    /// `ToggleCredits`: one member, the coin, then the other of the picked
+    /// member's `credits` on it alone or on every member; no value draw;
+    /// nothing else changes.
     #[test]
-    fn set_scope_flips_one_member_or_every_member() {
+    fn toggle_credits_flips_one_member_or_every_member() {
         let (mut original, members) = bundle_def(&[Some(hebbian())]);
-        original.edge_mut(members[2]).set_scope(Scope::Group);
+        original.edge_mut(members[2]).set_credits(true);
         let mut tails = [false; 2];
         for seed in 0..64 {
             let mut expected = rng(seed);
             let (picked, coin) = replay_pick(&original, is_member, &mut expected);
-            let coin = coin.expect("a member draws the coin");
+            let (picked, coin) = (the_member(picked), coin.expect("a member draws the coin"));
             let mut def = original.clone();
             let mut actual = rng(seed);
-            set_scope_in_def(&mut def, &mut actual).unwrap();
+            let reach = toggle_credits_in_def(&mut def, &mut actual).unwrap();
             assert_eq!(actual.gen::<u64>(), expected.gen::<u64>(), "no value draw");
-            let other = original.edge_at(picked).membership().unwrap().scope.other();
-            let scope = |m: EdgeOccurrence| def.edge_at(m).membership().unwrap().scope;
+            let other = !original.edge_at(picked).membership().unwrap().credits;
+            let credits = |m: EdgeOccurrence| def.edge_at(m).membership().unwrap().credits;
+            let policy = |d: &CgpGraphBackendDef, m: EdgeOccurrence| {
+                d.edge_at(m).membership().unwrap().policy
+            };
+            assert!(members
+                .iter()
+                .all(|&m| policy(&def, m) == policy(&original, m)));
             if coin {
-                assert!(members.iter().all(|&m| scope(m) == other));
+                assert_eq!(reach, Broadcast::Members);
+                assert!(members.iter().all(|&m| credits(m) == other));
             } else {
-                assert_eq!(scope(picked), other);
+                assert_eq!(reach, Broadcast::One);
+                assert_eq!(credits(picked), other);
                 assert!(members
                     .iter()
                     .filter(|&&m| m != picked)
@@ -1244,10 +1410,122 @@ mod tests {
             tails[usize::from(coin)] = true;
         }
         assert_eq!(tails, [true, true]);
-        let mut ungrouped = mixed_def();
+        let mut lone = mixed_def();
         assert_eq!(
-            set_scope_in_def(&mut ungrouped, &mut rng(0)),
+            toggle_credits_in_def(&mut lone, &mut rng(0)),
             Err(MutationSkipReason::NoApplicableTarget)
         );
+    }
+
+    /// `ClearLearningOverride`: a member not `Inherit` becomes `Inherit`, on
+    /// its own or across the bundle; an `Inherit` member, a lone edge and a
+    /// slot are never targets; no value draw.
+    #[test]
+    fn clear_learning_override_returns_members_to_inherit() {
+        let (mut original, members) = bundle_def(&[Some(hebbian()), None]);
+        original
+            .edge_mut(members[2])
+            .set_policy(MemberPolicy::Inherit);
+        let mut tails = [false; 2];
+        for seed in 0..64 {
+            let mut expected = rng(seed);
+            let (picked, coin) = replay_pick(&original, can_clear_override, &mut expected);
+            let (picked, coin) = (the_member(picked), coin.expect("a member"));
+            assert_ne!(picked, members[2]);
+            let mut def = original.clone();
+            let mut actual = rng(seed);
+            clear_learning_override_in_def(&mut def, &mut actual).unwrap();
+            assert_eq!(actual.gen::<u64>(), expected.gen::<u64>(), "no value draw");
+            let policy = |m: EdgeOccurrence| def.edge_at(m).membership().unwrap().policy;
+            if coin {
+                assert!(members.iter().all(|&m| policy(m) == MemberPolicy::Inherit));
+            } else {
+                assert_eq!(edited(&original, &def), vec![Target::Edge(picked)]);
+                assert_eq!(policy(picked), MemberPolicy::Inherit);
+            }
+            tails[usize::from(coin)] = true;
+        }
+        assert_eq!(tails, [true, true]);
+        assert!(!any_target(&mixed_def(), can_clear_override));
+    }
+
+    /// The track guard (T25.F12): every learning-edit operator reaches its
+    /// lone-edge, member and both slot targets; an edit picked on a slot
+    /// changes that slot alone (the other slot, the record's scale and every
+    /// member unchanged) and draws no coin; an edit on a member changes no
+    /// slot.
+    #[test]
+    fn every_learning_operator_reaches_lone_edges_members_and_both_slots() {
+        let decaying = with(modulated(), |c| c.retention = 0.5);
+        let (mut original, members) = bundle_def(&[Some(hebbian()), Some(decaying), None]);
+        let id = BundleId::new(0);
+        // A lone sink edge beside the bundle, and the slots: one present
+        // per operator family, or absent for the enables.
+        let surface = original
+            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
+            .unwrap();
+        original.push_edge(surface, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
+        let lone = EdgeOccurrence::new(surface, 0);
+        let slotted = |scale: Option<Learning>, default: Option<Learning>| {
+            let mut def = original.clone();
+            def.bundle_mut(id).set_slot(LearningSlot::Scale, scale);
+            def.bundle_mut(id)
+                .set_slot(LearningSlot::MemberDefault, default);
+            def
+        };
+        for (name, operator, predicate) in OPERATORS {
+            for (scale, default) in [
+                (None, None),
+                (Some(hebbian()), Some(decaying)),
+                (Some(decaying), Some(hebbian())),
+            ] {
+                let mut base = slotted(scale, default);
+                if name.starts_with("enable") {
+                    store_learning(&mut base, lone, None);
+                } else {
+                    store_learning(&mut base, lone, Some(decaying));
+                }
+                let mut reached = [false; 4];
+                for seed in 0..256 {
+                    let mut expected = rng(seed);
+                    let Ok(_) = select_eligible(&base, predicate, &mut expected) else {
+                        break;
+                    };
+                    let (picked, coin) = replay_pick(&base, predicate, &mut rng(seed));
+                    let mut def = base.clone();
+                    let reach = operator(&mut def, &mut rng(seed)).unwrap();
+                    let changed = edited(&base, &def);
+                    match picked {
+                        Target::Slot(_, slot) => {
+                            reached[2 + usize::from(slot == LearningSlot::MemberDefault)] = true;
+                            assert_eq!(coin, None);
+                            assert_eq!(reach, Broadcast::One, "{name}");
+                            assert!(changed.iter().all(|&t| t == picked), "{name} {changed:?}");
+                            assert_eq!(def.bundles()[0].scale(), base.bundles()[0].scale());
+                        }
+                        Target::Edge(at) if at == lone => {
+                            reached[0] = true;
+                            assert!(changed.iter().all(|&t| t == picked), "{name}");
+                        }
+                        Target::Edge(_) => {
+                            reached[1] = true;
+                            assert!(
+                                changed
+                                    .iter()
+                                    .all(|t| matches!(t, Target::Edge(m) if members.contains(m))),
+                                "{name} {changed:?}"
+                            );
+                        }
+                    }
+                }
+                let wanted = [
+                    targets(&base).any(|t| t == Target::Edge(lone) && predicate(&base, t)),
+                    members.iter().any(|&m| predicate(&base, Target::Edge(m))),
+                    predicate(&base, Target::Slot(id, LearningSlot::Scale)),
+                    predicate(&base, Target::Slot(id, LearningSlot::MemberDefault)),
+                ];
+                assert_eq!(reached, wanted, "{name} {scale:?} {default:?}");
+            }
+        }
     }
 }

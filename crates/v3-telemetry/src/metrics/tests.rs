@@ -229,7 +229,7 @@ fn populated() -> SimStats {
         s.mutation_value_totals_by_operator
             .insert(operator, MutationValueTotals::default());
     }
-    s.mutation_attribute_changes_total_by_scope = [3, 1];
+    s.mutation_attribute_changes_total_by_broadcast = [3, 1];
     for class in BirthEdgeClass::ALL {
         s.mutation_value_totals_by_birth_edge_class
             .insert(class, MutationValueTotals::default());
@@ -578,9 +578,12 @@ fn mutation_families(families: &mut Vec<Family>) {
         ],
     ));
     families.push((
-        "petri.run.mutation_attribute_changes_by_scope".to_owned(),
+        "petri.run.mutation_attribute_changes_by_broadcast".to_owned(),
         MonotonicSum,
-        vec![("petri.scope", strings(["Edge", "Group"], str::to_owned))],
+        vec![(
+            "petri.broadcast",
+            strings(["one", "members"], str::to_owned),
+        )],
     ));
     families.push((
         "petri.run.bundles_created".to_owned(),
@@ -825,13 +828,14 @@ fn tick_families(families: &mut Vec<Family>) {
     for field in ["plastic_edge_drift", "plastic_edges_at_clamp"] {
         families.push((format!("petri.tick.{field}"), Gauge, vec![surface()]));
     }
-    // T25.F07: learners by scope and the learned scales by inheritance.
+    // T25.F12: edge learners by source and the learned scales by
+    // inheritance.
     families.push((
-        "petri.tick.plastic_edges_by_scope".to_owned(),
+        "petri.tick.plastic_edges_by_source".to_owned(),
         Gauge,
         vec![(
-            "petri.plasticity_scope",
-            strings(["ungrouped", "edge", "group"], str::to_owned),
+            "petri.plasticity_source",
+            strings(["lone", "own", "member_default"], str::to_owned),
         )],
     ));
     // T25.F09: edges and learned scales by retention bin.
@@ -1027,11 +1031,11 @@ fn encoded_values_units_and_descriptions_follow_the_contract() {
         ),
         PointValue::Int(1)
     );
-    for (scope, count) in [("Edge", 3), ("Group", 1)] {
+    for (broadcast, count) in [("one", 3), ("members", 1)] {
         assert_eq!(
             value(
-                "petri.run.mutation_attribute_changes_by_scope",
-                &[("petri.scope", scope)]
+                "petri.run.mutation_attribute_changes_by_broadcast",
+                &[("petri.broadcast", broadcast)]
             ),
             PointValue::Int(count)
         );
@@ -1148,7 +1152,8 @@ fn the_tick_census_keeps_its_pre_move_values() {
     assert_eq!(empty, EMPTY_CENSUS_PIN);
 }
 
-/// T30.F15 re-pinned `mean_energy`: the field widened to `f64` and carries
-/// core's mean uncast (was the `f32` sum `0x41f60aa1`).
-const LIVING_CENSUS_PIN: &str = "population=93 mean_energy=0x403ec1541fad6b5b mean_capacity=0x40690d09791e4792 mean_genome_size=0x405404d1344d1345 mean_mesh_nodes=0x4000160581605816 mean_generation=0x3fe44d1344d1344d";
+/// T25.F12 commit 2 re-pinned every field: the learning catalog and birth
+/// draws move the living population. `mean_energy` is `f64` since T30.F15,
+/// core's mean uncast (it was the `f32` sum before).
+const LIVING_CENSUS_PIN: &str = "population=93 mean_energy=0x403eabebc5def7be mean_capacity=0x40690f7644791e48 mean_genome_size=0x4054042108421084 mean_mesh_nodes=0x40002c0b02c0b02c mean_generation=0x3fe44d1344d1344d";
 const EMPTY_CENSUS_PIN: &str = "population=0 mean_energy=0x0 mean_capacity=0x0 mean_genome_size=0x0 mean_mesh_nodes=0x0 mean_generation=0x0";

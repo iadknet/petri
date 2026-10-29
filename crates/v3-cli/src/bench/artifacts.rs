@@ -1302,12 +1302,14 @@ mod tests {
     /// each world's last checkpoint.
     #[test]
     fn bundles_keep_rows_only_on_the_last_sample() {
-        let aggregates = json!({"version": "bundles-v1", "creatures": 5, "carriers": 3,
+        let aggregates = json!({"version": "bundles-v2", "creatures": 5, "carriers": 3,
             "wirings": {"plain": {"bundles": 2, "genomic_nonzero": 1, "members": 30,
             "own_nonzero": 3, "unreachable": 0}},
             "created": {"Graph.AddBundleLive": {"plain": {"uniform": 1, "randomized": 0}}}});
         let mut block = aggregates.clone();
         block["rows"] = json!([{"wiring": "plain", "target": "Eat", "count": 2}]);
+        block["learning"] = json!({"plain": {"scale_learning": 1, "member_default": 0,
+            "members_by_policy": {"inherit": 4, "static": 20, "own": 6}, "crediting": 3}});
         block["unknown"] = json!(1);
         let persistence = json!({"per_seed": [
             {"seed": 1, "samples": [
@@ -1327,6 +1329,7 @@ mod tests {
         assert_eq!(first[1]["bundles"], Value::Null);
         let mut last = aggregates.clone();
         last["rows"] = block["rows"].clone();
+        last["learning"] = block["learning"].clone();
         assert_eq!(first[2]["bundles"], last);
         let extinct = &kept["per_seed"][1]["samples"];
         assert_eq!(extinct[0]["bundles"], aggregates);
@@ -1352,13 +1355,13 @@ mod tests {
     }
 
     /// T25.F04: `mutation_supply` rides whole through the case projection,
-    /// with T25.F08's scope totals and per-operator funnel.
+    /// with T25.F12's broadcast totals and T25.F08's per-operator funnel.
     #[test]
     fn mutation_supply_survives_summary_projection() {
         let case = json!({"case": "c", "mutation_supply": {
             "events_applied_total": 3,
             "bundles_removed_total": 2,
-            "attribute_changes_by_scope": {"edge": 5, "bundle": 1},
+            "attribute_changes_by_broadcast": {"one": 5, "members": 1},
             "operator_funnel_by_operator": {"Graph.DetachGraphEdge": {
                 "attempted": 2, "applicable": 2, "structurally_valid": 2,
                 "applied": 1, "skipped": 1

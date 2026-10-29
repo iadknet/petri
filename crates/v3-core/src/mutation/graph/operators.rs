@@ -363,6 +363,7 @@ pub(crate) fn add_compute_node(
 /// Detach the edge at `occurrence` when it is a bundle member (T25.F03), so
 /// an edit that changes its source keeps its genomic weight and leaves its
 /// bundle; returns the occurrence the edit continues on. No draw.
+// WORKAROUND(T30.F11): source changes and splits detach inside the container's owner operations
 fn detached(
     def: &mut CgpGraphBackendDef,
     occurrence: EdgeOccurrence,

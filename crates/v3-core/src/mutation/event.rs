@@ -3,7 +3,41 @@
 //! operator enums without an import cycle.
 
 use crate::contracts::votes::VoteSink;
-use crate::genome::cgp::{Scope, Wiring};
+use crate::genome::cgp::Wiring;
+
+/// How far a learning edit reached (T25.F12 invariant 9): its one picked
+/// target, or every member of the picked member's bundle the operator's
+/// predicate admits (the broadcast coin).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Broadcast {
+    One,
+    Members,
+}
+
+impl Broadcast {
+    /// Both reaches, in index order.
+    pub const ALL: [Self; 2] = [Self::One, Self::Members];
+
+    /// This reach's position in [`Self::ALL`].
+    #[inline]
+    #[must_use]
+    pub const fn index(self) -> usize {
+        match self {
+            Self::One => 0,
+            Self::Members => 1,
+        }
+    }
+
+    /// Stable string key used by telemetry and bench boundaries.
+    #[inline]
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::One => "one",
+            Self::Members => "members",
+        }
+    }
+}
 
 /// Whether a mutation operator increases, decreases, or preserves genome complexity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -145,16 +179,15 @@ impl BirthEdgeClass {
 
 /// What one committed event reports beside its reachability (T30.F10): the
 /// class of the vote-sink edge an `AddGraphEdge` or a creation pushed
-/// (T11.F30, T25.F11), the scope an attribute operator's change landed on
-/// (T25.F08, T25.F09) and what the event did to bundles (T25.F11).
+/// (T11.F30, T25.F11), how far a learning edit reached (T25.F12) and what
+/// the event did to bundles (T25.F11).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct EventReport {
     /// The class of the vote-sink edge the event pushed.
     pub class: Option<BirthEdgeClass>,
-    /// The scope the change of one of the thirteen attribute operators (the
-    /// nine plasticity operators, `SetScope` and the three edge retention
-    /// operators) landed on.
-    pub attribute_scope: Option<Scope>,
+    /// How far a learning edit (the fourteen operators of
+    /// `mutation::graph::hebbian`) reached.
+    pub broadcast: Option<Broadcast>,
     /// What the event did to bundles, from the container's return values.
     pub bundle_edits: BundleEdits,
 }

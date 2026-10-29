@@ -34,7 +34,7 @@ mod tests {
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
         GraphSource, FIRST_ACTION_VOTE_SINK, FIXED_SINK_COUNT,
     };
-    use crate::genome::{HebbianRule, NodeGenome, PlasticityConfig};
+    use crate::genome::{HebbianRule, Learning, NodeGenome};
     use crate::runtime::state::GraphRuntimeState;
 
     /// The compute seed rows a draft carries.
@@ -56,8 +56,8 @@ mod tests {
         }
     }
 
-    fn config(lamarckian: bool, rule: HebbianRule) -> PlasticityConfig {
-        PlasticityConfig {
+    fn config(lamarckian: bool, rule: HebbianRule) -> Learning {
+        Learning {
             rule,
             learning_rate: 0.1,
             weight_clamp: 10.0,
@@ -257,7 +257,7 @@ mod tests {
         let identity = birth.iter().position(|v| v == &[None]).unwrap();
         assert_eq!(def.compute_nodes()[identity].inputs[0].own_weight(), 1.0);
         assert!(def.compute_nodes()[identity].inputs[0]
-            .plasticity()
+            .stored_learning()
             .is_none());
         let retained: Vec<_> = birth.iter().flatten().filter_map(|v| *v).collect();
         assert_eq!(retained, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
@@ -378,7 +378,7 @@ mod tests {
                     1 => changed.push_edge(EdgeSurface::SinkInput(0), edge),
                     2 => changed.push_edge(EdgeSurface::SinkInput(FIRST_ACTION_VOTE_SINK), edge),
                     3 => changed.push_edge(EdgeSurface::SinkInput(FIXED_SINK_COUNT - 1), edge),
-                    _ => changed.edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0)).set_plasticity(None),
+                    _ => changed.edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0)).set_learning(None),
                 }
                 proptest::prop_assert_ne!(&original, &changed);
                 proptest::prop_assert_ne!(&changed, &original);

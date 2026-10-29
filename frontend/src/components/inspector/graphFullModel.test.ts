@@ -39,7 +39,8 @@ describe("buildFullGraphModel edge-bundle members", () => {
 							applied: 0.5,
 							member: {
 								bundle: 0,
-								scope: "Edge",
+								policy: "static",
+								credits: false,
 								site: { Direction: 0 },
 								field: 0,
 								pattern: 1,
@@ -89,7 +90,8 @@ describe("buildFullGraphModel edge-bundle members", () => {
 		expect(member?.genomic).toBe(0.5);
 		expect(member?.member).toEqual({
 			bundle: 0,
-			scope: "Edge",
+			policy: "static",
+			credits: false,
 			scale: 0.5,
 			pattern: 1,
 			applied: 0.5,

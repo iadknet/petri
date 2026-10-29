@@ -216,6 +216,13 @@
 //! gestation rate 0.0 d60fedee... -> bb733cc1...; state-only 68592232... ->
 //! 79a60101..., 70f49495... -> d78b8297...; guard 9d4e5755... ->
 //! 3ff27565..., rate 0.0 23ff7d5e... -> 65256033...).
+//! Re-pinned by T25.F12 commit 2 after two agreeing runs: the one learning
+//! type (genome JSON `learning`, `policy`, `credits`, both bundle slots),
+//! its catalog (Graph weight 78 -> 73), the target draw over edges and
+//! slots and the bundle birth draws move all six digests (sampled cac92d5f...
+//! -> 444fc05d..., gestation rate 0.0 bb733cc1... -> d4a4194f...; state-only
+//! 79a60101... -> e204e0f6..., d78b8297... -> 6438de4f...; guard 3ff27565...
+//! -> f13eb204..., rate 0.0 65256033... -> 9a01f495...).
 
 use sha2::{Digest, Sha256};
 use slotmap::Key;
@@ -227,19 +234,19 @@ use v3_core::simulation::{run_tick, seed_simulation};
 fn accounting_preserves_pre_feature_sampled_trajectories_and_actions() {
     assert_eq!(
         sampled_trajectory_digest(None, true),
-        "cac92d5fd191437ff03c48c2e4a3cfcefa93b06a56b5df9ee9be34cbed25037f"
+        "444fc05d6c52878872cd820351a9de0c56863b2a703d193e5ecf0497a670aab6"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0), true),
-        "bb733cc1146f35146165308c68e1cfc9496d528df55dd85a14453814cfb7a9ea"
+        "d4a4194f9e13db9c91f343bc6e1dcd2a5dedba559d70d68811bbc4c765bd7732"
     );
     assert_eq!(
         sampled_trajectory_digest(None, false),
-        "79a601013258b20fdb0739461af4681c7545fb9fddd963b16db77e63ede5492a"
+        "e204e0f68811e901fdafc07c57b15351e425bfb99732394871f96b5ec6934b87"
     );
     assert_eq!(
         sampled_trajectory_digest(Some(0.0), false),
-        "d78b829714c2f222956a0fd96c67ee5768b565870b83c3e647fedb203fafc1f4"
+        "6438de4f0bcc55e29cebb23367ef087aefd43e80373965049b8ace9765fc56c0"
     );
 }
 
@@ -315,11 +322,11 @@ fn sampled_trajectory_digest(gestation_rate: Option<f32>, with_log: bool) -> Str
 fn mutation_on_applied_trajectory_guard_is_pinned() {
     assert_eq!(
         applied_guard_digest(None),
-        "3ff27565caebac573c2e249e30035f3d2ceeb6b4314ef626fbe7c2ad5d65b814"
+        "f13eb20404025bdcc7166d683abf5ea58b49bda60fdc456718324bde69a6d275"
     );
     assert_eq!(
         applied_guard_digest(Some(0.0)),
-        "65256033e37360f1d7a2dc28f9293ac9f22e4724deca009d9da88c40d5c539b7"
+        "9a01f495ba989cf8d558a384bfe8a44e2daa1d0461c5f08a05fc1713d8ea5042"
     );
 }
 

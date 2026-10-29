@@ -12,12 +12,12 @@ use crate::creature::founder::v3alpha1_founder_genome;
 use crate::genome::cgp::test_support::{add_bundle_on, edit_sinks};
 use crate::genome::cgp::{
     compose, detach, validate_graph, BirthSeeds, BundleBirth, BundleId, BundleSource,
-    CgpGraphBackendDef, EdgeOccurrence, EdgeSurface, GraphSource, OutputSinkKind, Scope, Site,
-    Wiring,
+    CgpGraphBackendDef, EdgeOccurrence, EdgeSurface, GraphSource, LearningSlot, OutputSinkKind,
+    Site, Wiring,
 };
 use crate::genome::{
-    BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
-    VmBackendDef,
+    BackendDef, CreatureGenome, HebbianRule, Learning, MemberPolicy, NodeGenome,
+    RewardModulationConfig, VmBackendDef,
 };
 use crate::mutation::event::{ComplexityEffect, MutationSkipReason};
 use crate::mutation::graph::{bundle, GraphMutator, GraphOperator};
@@ -118,13 +118,12 @@ const CHANNELS: [OutcomeChannel; 4] = [
     OutcomeChannel::OffspringSuccess,
 ];
 
-/// One learning draw sequence, replayed from `rng` in its pinned order
-/// (T25.F07 invariant 7, T25.F08 invariant 2): a mode in `0..3`; for a
-/// learning mode the rule, rate, clamp and inheritance of `EnableHebbian`,
-/// then for mode 2 the channel and decay of `EnableRewardModulation`; then
-/// one scope coin. The uniform form draws it once per bundle, the
-/// randomized form once per member. Returns the mode, config and scope.
-fn replay_member(rng: &mut SmallRng) -> (u8, Option<PlasticityConfig>, Scope) {
+/// One `draw_mode` sequence, replayed from `rng` in its pinned order
+/// (T25.F07 invariant 7): a mode in `0..3`; for a learning mode the rule,
+/// rate, clamp and inheritance of `EnableHebbian`, then for mode 2 the
+/// channel and decay of `EnableRewardModulation`. Returns the mode and the
+/// learning.
+fn replay_mode(rng: &mut SmallRng) -> (u8, Option<Learning>) {
     let mode = rng.gen_range(0..3u8);
     let config = (mode > 0).then(|| {
         let rule = RULES[rng.gen_range(0..4)];
@@ -138,7 +137,7 @@ fn replay_member(rng: &mut SmallRng) -> (u8, Option<PlasticityConfig>, Scope) {
                 trace_decay: rng.gen_range(0.5f32..0.99),
             }
         });
-        PlasticityConfig {
+        Learning {
             rule,
             learning_rate,
             weight_clamp,
@@ -147,52 +146,56 @@ fn replay_member(rng: &mut SmallRng) -> (u8, Option<PlasticityConfig>, Scope) {
             retention: 1.0,
         }
     });
-    let scope = if rng.gen_bool(0.5) {
-        Scope::Group
+    (mode, config)
+}
+
+/// One member's draws (T25.F12 invariant 10): the policy (`gen_bool(0.5)`
+/// true `Inherit`, else a mode: absent `Static`, present `Own`), then the
+/// `credits` coin.
+fn replay_member(rng: &mut SmallRng) -> (MemberPolicy, bool) {
+    let policy = if rng.gen_bool(0.5) {
+        MemberPolicy::Inherit
     } else {
-        Scope::Edge
+        replay_mode(rng)
+            .1
+            .map_or(MemberPolicy::Static, MemberPolicy::Own)
     };
-    (mode, config, scope)
+    (policy, rng.gen_bool(0.5))
 }
 
-/// The uniform form's draws on bundle `bundle` of `want`: one
-/// [`replay_member`] sequence shared by every member, then one
-/// `inherit_scale` coin. Returns the mode.
-fn replay_learning(want: &mut CgpGraphBackendDef, bundle: BundleId, rng: &mut SmallRng) -> u8 {
-    let (mode, config, scope) = replay_member(rng);
-    let inherit_scale = rng.gen_bool(0.5);
+/// A bundle's learning draws on bundle `bundle` of `want` (T25.F12
+/// invariant 10): `scale_learning` then `member_default` by mode, then the
+/// uniform form's one member sequence for every member or the randomized
+/// form's one per member in canonical order.
+fn replay_learning(
+    want: &mut CgpGraphBackendDef,
+    bundle: BundleId,
+    randomized: bool,
+    rng: &mut SmallRng,
+) {
+    let (_, scale) = replay_mode(rng);
+    let (_, default) = replay_mode(rng);
+    want.bundle_mut(bundle).set_slot(LearningSlot::Scale, scale);
+    want.bundle_mut(bundle)
+        .set_slot(LearningSlot::MemberDefault, default);
+    let uniform = (!randomized).then(|| replay_member(rng));
     for member in want.members(bundle).collect::<Vec<_>>() {
+        let (policy, credits) = uniform.unwrap_or_else(|| replay_member(rng));
         let mut edge = want.edge_mut(member);
-        edge.set_plasticity(config);
-        edge.set_scope(scope);
+        edge.set_policy(policy);
+        edge.set_credits(credits);
     }
-    want.bundle_mut(bundle).set_inherit_scale(inherit_scale);
-    mode
-}
-
-/// The randomized form's learning draws on bundle `bundle` of `want`: one
-/// [`replay_member`] sequence per member in canonical order, then one
-/// `inherit_scale` coin.
-fn replay_randomized(want: &mut CgpGraphBackendDef, bundle: BundleId, rng: &mut SmallRng) {
-    for member in want.members(bundle).collect::<Vec<_>>() {
-        let (_, config, scope) = replay_member(rng);
-        let mut edge = want.edge_mut(member);
-        edge.set_plasticity(config);
-        edge.set_scope(scope);
-    }
-    let inherit_scale = rng.gen_bool(0.5);
-    want.bundle_mut(bundle).set_inherit_scale(inherit_scale);
 }
 
 #[test]
 fn the_catalog_places_the_bundle_operators_at_their_tiers() {
-    assert_eq!(GraphOperator::ALL.len(), 35);
-    assert_eq!(&GraphOperator::ALL[21..27], &BUNDLE_OPERATORS);
-    // T25.F07, T25.F08: `SetScope` and `DetachGraphEdge` follow
-    // `RemoveBundle`.
+    assert_eq!(GraphOperator::ALL.len(), 33);
+    assert_eq!(&GraphOperator::ALL[22..28], &BUNDLE_OPERATORS);
+    // T25.F12, T25.F08: `ToggleCredits` (in `SetScope`'s place) and
+    // `DetachGraphEdge` follow `RemoveBundle`.
     assert_eq!(
-        &GraphOperator::ALL[27..29],
-        &[GraphOperator::SetScope, GraphOperator::DetachGraphEdge]
+        &GraphOperator::ALL[28..30],
+        &[GraphOperator::ToggleCredits, GraphOperator::DetachGraphEdge]
     );
     assert_eq!(
         BUNDLE_OPERATORS.map(GraphOperator::weight),
@@ -203,8 +206,8 @@ fn the_catalog_places_the_bundle_operators_at_their_tiers() {
         .map(|op| u16::from(op.weight()))
         .sum();
     assert_eq!(
-        total, 78,
-        "the Graph catalog's weight (T25.F11 invariant 7)"
+        total, 73,
+        "the Graph catalog's weight (T25.F12 invariant 9)"
     );
     assert_eq!(
         BUNDLE_OPERATORS.map(|op| MutationOperator::from(op).as_key()),
@@ -218,7 +221,7 @@ fn the_catalog_places_the_bundle_operators_at_their_tiers() {
         ]
     );
     for (op, effect) in [
-        (GraphOperator::SetScope, ComplexityEffect::Neutral),
+        (GraphOperator::ToggleCredits, ComplexityEffect::Neutral),
         (GraphOperator::DetachGraphEdge, ComplexityEffect::Neutral),
     ] {
         assert_eq!(op.weight(), 2, "{op:?}");
@@ -397,11 +400,7 @@ fn replay_creation(op: GraphOperator, rng: &mut SmallRng) -> (CgpGraphBackendDef
     };
     let bundle = add_bundle_on(&mut want, &creation_refs(), source, birth);
     let randomized = rng.gen_bool(0.5);
-    if randomized {
-        replay_randomized(&mut want, bundle, rng);
-    } else {
-        replay_learning(&mut want, bundle, rng);
-    }
+    replay_learning(&mut want, bundle, randomized, rng);
     (want, randomized)
 }
 
@@ -479,8 +478,12 @@ fn creations_reach_every_source_mode_and_form() {
             let mut replay = SmallRng::seed_from_u64(seed);
             let (_, randomized) = replay_creation(op, &mut replay);
             forms[usize::from(randomized)] = true;
-            for member in def.members(id(0)) {
-                let mode = match def.edge_at(member).plasticity() {
+            let slots = LearningSlot::ALL.map(|slot| record.slot(slot));
+            let stored = def
+                .members(id(0))
+                .map(|member| def.edge_at(member).stored_learning());
+            for learning in slots.into_iter().chain(stored) {
+                let mode = match learning {
                     None => 0,
                     Some(config) if config.modulation.is_none() => 1,
                     Some(_) => 2,
@@ -496,8 +499,9 @@ fn creations_reach_every_source_mode_and_form() {
     assert_eq!((forms, modes, signs), ([true; 2], [true; 3], [true; 2]));
 }
 
-/// Randomized members draw their own attributes: some seed gives one bundle
-/// members both static and plastic, and members of both scopes.
+/// Randomized members draw their own policies and coins: some seed gives
+/// one bundle members of two policies and members on both sides of the
+/// `credits` coin.
 #[test]
 fn randomized_members_differ_within_one_bundle() {
     let mut mixed = [false; 2];
@@ -506,11 +510,11 @@ fn randomized_members_differ_within_one_bundle() {
             let (node, _) = create(op, seed);
             let def = graph(&node);
             let edges: Vec<_> = def.members(id(0)).map(|at| def.edge_at(at)).collect();
-            mixed[0] |= edges.iter().any(|e| e.plasticity().is_some())
-                && edges.iter().any(|e| e.plasticity().is_none());
-            let scope = |e: &&crate::genome::cgp::GraphEdge| e.membership().unwrap().scope;
-            mixed[1] |= edges.iter().any(|e| scope(e) == Scope::Group)
-                && edges.iter().any(|e| scope(e) == Scope::Edge);
+            let policy =
+                |e: &&crate::genome::cgp::GraphEdge| e.membership().unwrap().policy.as_key();
+            mixed[0] |= edges.iter().any(|e| policy(e) != policy(&edges[0]));
+            let credits = |e: &&crate::genome::cgp::GraphEdge| e.membership().unwrap().credits;
+            mixed[1] |= edges.iter().any(credits) && !edges.iter().all(credits);
         }
     }
     assert_eq!(mixed, [true; 2]);
@@ -881,7 +885,7 @@ fn detach_fixture() -> (NodeGenome, EdgeOccurrence) {
     let bundle = def.add_ring_bundle(0, DirectedVoteKind::Move, 3);
     def.bundle_mut(bundle).set_scale(0.5);
     let first = def.members(bundle).next().unwrap();
-    let config = PlasticityConfig {
+    let config = Learning {
         rule: HebbianRule::Oja,
         learning_rate: 0.1,
         weight_clamp: 2.0,
@@ -889,7 +893,8 @@ fn detach_fixture() -> (NodeGenome, EdgeOccurrence) {
         modulation: None,
         retention: 1.0,
     };
-    def.edge_mut(first).set_plasticity(Some(config));
+    def.edge_mut(first).set_policy(MemberPolicy::Own(config));
+    def.edge_mut(first).set_credits(true);
     def.edge_mut(first).set_weight(0.25);
     let compute = def
         .compute_nodes()
@@ -945,7 +950,7 @@ proptest::proptest! {
             compose(before.own_weight(), 0.5, pattern).to_bits()
         );
         proptest::prop_assert_eq!(after.membership(), None);
-        proptest::prop_assert_eq!(after.plasticity(), before.plasticity());
+        proptest::prop_assert_eq!(after.stored_learning(), before.stored_learning());
         let seed_value = graph(&node).birth_seeds().unwrap().value(at);
         if picked == learner {
             proptest::prop_assert_eq!(seed_value, Some(compose(9.0, 0.5, pattern)));

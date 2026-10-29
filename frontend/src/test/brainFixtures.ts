@@ -74,16 +74,16 @@ export function graphBrain(overrides: Partial<GraphBrain> = {}): GraphBrain {
 	return { compute_nodes: [], output_sinks: [], bundles: [], ...overrides };
 }
 
-/** A Hebbian ungrouped learner, uninitialized and Darwinian unless overridden. */
+/** A Hebbian lone learner, uninitialized and Darwinian unless overridden. */
 export function learner(overrides: Partial<EdgeLearner> = {}): EdgeLearner {
 	return {
 		rule: "Classic",
 		learning_rate: 0.1,
 		weight_clamp: 2,
+		lamarckian: false,
 		retention: 1,
-		scope: "ungrouped",
+		source: "lone",
 		initialized: false,
-		inherits: false,
 		...overrides,
 	};
 }
@@ -103,8 +103,6 @@ export function ringBundle(
 		source: { Sensor: { ref_idx: ringRef, field_set: 0 } },
 		wiring: { Ring: { kind, offset } },
 		scale: 0,
-		inherit_scale: false,
-		retention: 1,
 		coordinates: Array.from({ length: 8 }, (_, c) => ({
 			field: c,
 			site: { Direction: (c + offset) % 8 },

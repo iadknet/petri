@@ -54,12 +54,19 @@ describe("graph edge tooltips", () => {
 			weight: 1.5,
 			own: 0.25,
 			genomic: 0.75,
-			member: { bundle: 2, scale: 0.5, pattern: 1, scope: "Edge", applied: 1.5 },
+			member: {
+				bundle: 2,
+				scale: 0.5,
+				pattern: 1,
+				policy: "static",
+				credits: true,
+				applied: 1.5,
+			},
 		});
 		expect(tip).toHaveTextContent("bundle #2 member");
 		expect(tip).toHaveTextContent("scale × pattern + correction");
 		expect(tip).toHaveTextContent("0.500 × 1.00 + 0.250 = 0.750");
-		expect(tip).toHaveTextContent("applied 1.500 · scope Edge");
+		expect(tip).toHaveTextContent("applied 1.500 · static · credits");
 	});
 
 	it("shows a plastic edge's weights, rule, reward source, trace decay and inheritance", () => {
@@ -72,7 +79,7 @@ describe("graph edge tooltips", () => {
 				genomic: 1.5,
 				plastic: {
 					learner: learner({
-						inherits: true,
+						lamarckian: true,
 						modulation: { reward_source: "EnergyDelta", trace_decay: 0.5 },
 					}),
 					genomic: 1.5,
@@ -88,7 +95,7 @@ describe("graph edge tooltips", () => {
 		expect(tip).toHaveTextContent("Lamarckian");
 	});
 
-	it("shows an initialized bundle learner's scope and scale inheritance", () => {
+	it("shows an initialized member-default learner's source and inheritance", () => {
 		const graphDef: GraphBrain = graphBrain({
 			output_sinks: [
 				{
@@ -99,10 +106,11 @@ describe("graph edge tooltips", () => {
 							own: 0.25,
 							genomic: 0.75,
 							applied: 0.75,
-							learner: learner({ rule: "Oja", scope: "group", inherits: false }),
+							learner: learner({ rule: "Oja", source: "member_default" }),
 							member: {
 								bundle: 0,
-								scope: "Group",
+								policy: "inherit",
+								credits: true,
 								site: { Direction: 1 },
 								field: 0,
 								pattern: 1,
@@ -123,18 +131,27 @@ describe("graph edge tooltips", () => {
 			{
 				node_id: 0,
 				scales: [{ bundle: 0, learned: 0.8, initialized: true }],
-				edges: [{ surface: "sink", container: 0, edge: 0, applied: 1.05, initialized: true }],
+				edges: [
+					{
+						surface: "sink",
+						container: 0,
+						edge: 0,
+						applied: 1.05,
+						learned: 0.55,
+						initialized: true,
+					},
+				],
 			},
 		);
 		const edge = model.edges.find((candidate) => candidate.id === "sink:0:0");
 		expect(edge?.plastic?.initialized).toBe(true);
-		expect(edge?.plastic?.learned).toBeUndefined();
+		expect(edge?.plastic?.learned).toBe(0.55);
 		if (edge === undefined) throw new Error("the member is drawn");
 		const tip = hover({ ...edge, source: "OccRing.N", target: "Move[NE]" });
 		expect(tip).toHaveTextContent("genomic 0.750 · applied 1.050");
 		expect(tip).not.toHaveTextContent("not initialized");
-		expect(tip).toHaveTextContent(/shared scale/);
-		expect(tip).toHaveTextContent(/genomic scale/);
+		expect(tip).toHaveTextContent(/member default/);
+		expect(tip).toHaveTextContent(/genomic weight/);
 		expect(tip).not.toHaveTextContent(/inherit the learned weight/);
 	});
 

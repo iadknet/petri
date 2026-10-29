@@ -772,7 +772,7 @@ mod tests {
                 },
                 1.0,
             )],
-            Some(crate::genome::PlasticityConfig {
+            Some(crate::genome::Learning {
                 rule: crate::genome::HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 2.0,

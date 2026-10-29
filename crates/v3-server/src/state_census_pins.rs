@@ -1,9 +1,11 @@
 //! Census pins (T30.F13): the population values the status and health
 //! payloads carry, pinned on a living and an empty population against the
 //! code before the censuses moved into core's readers. Only the call
-//! expressions may change, never the literals. T30.F15 re-pinned none: the
-//! readers' mean energy and effective lineage count cast to `f32` render
-//! these populations' bits unchanged.
+//! expressions may change, never the literals, except under a predeclared
+//! re-pin. T25.F12 commit 2 (the learning catalog and birth draws move the
+//! living population) re-pinned `LIVING_PIN`; on that population T30.F15's
+//! readers (mean energy and effective lineage count as `f64`, cast to `f32`)
+//! round the mean energy's last bits apart from the old `f32` sum.
 
 use super::*;
 use crate::query::cache::build_food_fertility_u8;
@@ -113,5 +115,5 @@ fn the_payloads_cast_the_readers_mean_energy_and_effective_lineages() {
     assert_eq!(empty.health.lineages_effective.to_bits(), 0.0_f32.to_bits());
 }
 
-const LIVING_PIN: &str = "status.mean_energy=0x41f60aa1 health.mean_energy=0x41f60aa1 complexity=0x42745816/61/63 generation=0x3f22689a/1 genome_size=0x42a0268a lineages=45/0x42272ab5 world_inputs_read=0x40000000 population=93/93 vm_reads={}";
+const LIVING_PIN: &str = "status.mean_energy=0x41f55f5e health.mean_energy=0x41f55f5e complexity=0x42744d13/58/65 generation=0x3f22689a/1 genome_size=0x42a02108 lineages=45/0x42272ab5 world_inputs_read=0x40000000 population=93/93 vm_reads={}";
 const EMPTY_PIN: &str = "status.mean_energy=0x0 health.mean_energy=0x0 complexity=0x0/0/0 generation=0x0/0 genome_size=0x0 lineages=0/0x0 world_inputs_read=0x0 population=0/0 vm_reads={}";

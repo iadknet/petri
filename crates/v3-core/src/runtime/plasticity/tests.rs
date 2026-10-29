@@ -11,7 +11,7 @@ use crate::genome::cgp::{
     EdgeSurface, GraphEdge, GraphInvariantViolation, GraphSource, OutputSink, OutputSinkKind,
 };
 use crate::genome::{
-    BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
+    BackendDef, CreatureGenome, HebbianRule, Learning, NodeGenome, RewardModulationConfig,
 };
 use crate::runtime::cgp::execute::execute_graph_node;
 use crate::runtime::state::GraphRuntimeState;
@@ -61,8 +61,8 @@ fn applied_graph_accounting_charges_only_the_pass_under_hebbian_learning() {
     }
 }
 
-fn config(rule: HebbianRule, eta: f32, lambda: f32) -> PlasticityConfig {
-    PlasticityConfig {
+fn config(rule: HebbianRule, eta: f32, lambda: f32) -> Learning {
+    Learning {
         rule,
         learning_rate: eta,
         weight_clamp: 2.0,
@@ -93,16 +93,16 @@ fn graph(rule: HebbianRule, eta: f32, lambda: f32) -> CgpGraphBackendDef {
 
 /// Rewrite the learning attributes of every input edge of compute node
 /// `node` with `edit` (the former per-node config, now per edge).
-fn edit_config(def: &mut CgpGraphBackendDef, node: usize, edit: impl Fn(&mut PlasticityConfig)) {
+fn edit_config(def: &mut CgpGraphBackendDef, node: usize, edit: impl Fn(&mut Learning)) {
     let surface = EdgeSurface::ComputeInput(node);
     for index in 0..def.surface_edges(surface).len() {
         let occurrence = EdgeOccurrence::new(surface, index);
         let mut config = def
             .edge_at(occurrence)
-            .plasticity()
+            .stored_learning()
             .expect("a plastic edge");
         edit(&mut config);
-        def.edge_mut(occurrence).set_plasticity(Some(config));
+        def.edge_mut(occurrence).set_learning(Some(config));
     }
 }
 
@@ -257,7 +257,7 @@ fn recurrent_activity_uses_committed_self_and_higher_but_current_lower_sources()
 /// where the retired post-evaluation replay read this visit's output.
 #[test]
 fn a_recurrent_hebbian_edge_learns_from_the_value_its_evaluation_read() {
-    let hebbian = PlasticityConfig {
+    let hebbian = Learning {
         modulation: None,
         weight_clamp: 10.0,
         ..config(HebbianRule::Classic, 0.1, 0.0)
@@ -630,7 +630,7 @@ fn explicit_reward_clamp_bounds() {
 fn out_of_range_learning_attributes_are_rejected_at_the_load_boundary() {
     let edge = |plasticity: &str| {
         format!(
-            r#"{{"source":{{"SharedMemory":{{"slot":0,"previous":false}}}},"own_weight":0.5,"plasticity":{plasticity}}}"#
+            r#"{{"source":{{"SharedMemory":{{"slot":0,"previous":false}}}},"own_weight":0.5,"learning":{plasticity}}}"#
         )
     };
     let node = |plasticity: &str| {
@@ -684,11 +684,11 @@ fn out_of_range_learning_attributes_are_rejected_at_the_load_boundary() {
     }
 }
 
-/// `set_plasticity` debug-asserts I1.
+/// `set_learning` debug-asserts I1.
 #[test]
 #[cfg(debug_assertions)]
-#[should_panic(expected = "a config is in range (I1)")]
-fn set_plasticity_debug_asserts_the_range() {
+#[should_panic(expected = "a learning is in range (I1)")]
+fn set_learning_debug_asserts_the_range() {
     let mut def = graph(HebbianRule::Classic, 1.0, 0.5);
     edit_config(&mut def, 0, |config| config.weight_clamp = 50.0);
 }
@@ -750,7 +750,7 @@ fn inherited_weight_above_a_mutated_child_clamp_is_clamped() {
 /// first visit, then every slot (T25.F06 invariants 4, 8 and 12).
 #[test]
 fn a_mixed_seed_backend_initializes_only_its_seeded_slot() {
-    let lamarckian = PlasticityConfig {
+    let lamarckian = Learning {
         lamarckian: true,
         ..config(HebbianRule::Classic, 0.1, 0.5)
     };
@@ -856,8 +856,8 @@ fn learned_states_differ_once_a_visit_moves_a_learned_weight() {
 }
 
 /// A pure Hebbian sink edge with `learning_rate` `eta` and clamp 10.
-fn hebbian_sink(eta: f32) -> PlasticityConfig {
-    PlasticityConfig {
+fn hebbian_sink(eta: f32) -> Learning {
+    Learning {
         rule: HebbianRule::Classic,
         learning_rate: eta,
         weight_clamp: 10.0,
@@ -872,13 +872,13 @@ fn push_plastic_sink_edge(
     def: &mut CgpGraphBackendDef,
     kind: OutputSinkKind,
     edge: GraphEdge,
-    config: Option<PlasticityConfig>,
+    config: Option<Learning>,
 ) {
     let surface = def.sink_surface(kind).unwrap();
     def.push_edge(surface, edge);
     let index = def.surface_edges(surface).len() - 1;
     def.edge_mut(EdgeOccurrence::new(surface, index))
-        .set_plasticity(config);
+        .set_learning(config);
 }
 
 fn memory_edge(slot: u8, weight: f32) -> GraphEdge {
@@ -1094,7 +1094,7 @@ proptest! {
     ) {
         let mut def = graph(HebbianRule::Classic, eta, 0.0);
         let edge = def.compute_nodes()[0].inputs[0];
-        let plasticity = edge.plasticity();
+        let plasticity = edge.stored_learning();
         set_compute_inputs(&mut def, 0, weights.iter().map(|&weight| GraphEdge::new(edge.source(), weight)).collect());
         set_surface_plasticity(&mut def, EdgeSurface::ComputeInput(0), plasticity);
         if !modulated { edit_config(&mut def, 0, |config| config.modulation = None); }

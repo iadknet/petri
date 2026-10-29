@@ -3413,8 +3413,8 @@
     {
       "id": 57,
       "type": "timeseries",
-      "title": "Plastic edges by scope (sampled)",
-      "description": "Plastic edges in the living population, by what they learn.\n\nA **group** is a set of brain edges that share one weight, the group's scale (for example the eight edges from a sensor ring into the eight move directions).\n\n- **ungrouped**: the edge is in no group and learns its own weight.\n- **edge**: a group member that learns its own correction on top of the shared scale.\n- **group**: a group member that learns the group's shared scale, moving all members together.\n\nSampled at each snapshot.",
+      "title": "Edge learners by source (sampled)",
+      "description": "Edge learners in the living population, by where their learning is stored.\n\nA **bundle** is a set of brain edges that share one weight, the bundle's scale (for example the eight edges from a sensor ring into the eight move directions); each member adds its own modifier. The scale's own learning is counted in the learned-scale panels.\n\n- **lone**: an edge in no bundle, learning its own weight.\n- **own**: a member learning its modifier by its own override.\n- **member_default**: a member following its bundle's member default.\n\nSampled at each snapshot.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -3432,8 +3432,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (petri_plasticity_scope) (petri_tick_plastic_edges_by_scope{petri_run_id=\"$run_id\"})",
-          "legendFormat": "{{petri_plasticity_scope}}",
+          "expr": "sum by (petri_plasticity_source) (petri_tick_plastic_edges_by_source{petri_run_id=\"$run_id\"})",
+          "legendFormat": "{{petri_plasticity_source}}",
           "range": true,
           "instant": false,
           "format": "time_series"
@@ -3968,8 +3968,8 @@
     {
       "id": 75,
       "type": "timeseries",
-      "title": "Attribute changes, by scope (rate)",
-      "description": "Mutations to learning settings (rule, rate, retention, inheritance, scope and so on) per second, by how the edited edge learns.\n\nA **group** is a set of brain edges that share one weight, the group's scale (for example the eight edges from a sensor ring into the eight move directions).\n\n- **Edge**: the edge learns its own weight or correction.\n- **Group**: the edge learns its group's shared scale.",
+      "title": "Learning edits, by reach (rate)",
+      "description": "Mutations to learning settings (rule, rate, retention, inheritance, member policy, credits and so on) per second, by how far each edit reached.\n\nA **bundle** is a set of brain edges that share one weight, the bundle's scale. An edit picked on a bundle member may land on every member at once.\n\n- **one**: the edit changed its one target (a lone edge, one member or one of a bundle's learning slots).\n- **members**: the edit changed every member of the picked member's bundle it applies to.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -3987,8 +3987,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (petri_scope) (rate(petri_run_mutation_attribute_changes_by_scope_total{petri_run_id=\"$run_id\"}[1m]))",
-          "legendFormat": "{{petri_scope}}",
+          "expr": "sum by (petri_broadcast) (rate(petri_run_mutation_attribute_changes_by_broadcast_total{petri_run_id=\"$run_id\"}[1m]))",
+          "legendFormat": "{{petri_broadcast}}",
           "range": true,
           "instant": false,
           "format": "time_series"

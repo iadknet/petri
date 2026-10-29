@@ -220,7 +220,7 @@ pub(super) fn plasticity_def() -> CgpGraphBackendDef {
                     },
                     0.5,
                 )],
-                Some(crate::genome::PlasticityConfig {
+                Some(crate::genome::Learning {
                     rule: crate::genome::HebbianRule::Classic,
                     learning_rate: 0.1,
                     weight_clamp: 5.0,

@@ -5,19 +5,19 @@ import type { GraphSource } from "./GraphSource.ts";
 
 /**
  * One edge: its source, its own weight, its genomic (composed) weight, the
- * weight in force and, when a member, its bundle facts and, when plastic,
- * its learner.
+ * weight in force and, when a member, its bundle facts and, when an edge
+ * learner, its learner.
  */
 export type BrainEdge = {
 	source: GraphSource;
 	/**
-	 * The edge's own weight: its genomic weight when ungrouped, its
-	 * correction on top of the bundle term when a member.
+	 * The edge's own weight: its genomic weight when lone, its modifier on
+	 * top of the bundle term when a member.
 	 */
 	own: number;
 	/**
-	 * The genomic weight (`genomic_weight`): `own` when ungrouped, the
-	 * composed weight of a member.
+	 * The genomic weight (`genomic_weight`): `own` when lone, the composed
+	 * weight of a member.
 	 */
 	genomic: number;
 	/**

@@ -1,24 +1,25 @@
 //! The plasticity census: how many creatures carry plasticity, of which kind,
 //! and how far learning has moved those weights from the genome.
 //!
-//! Reachable Graph nodes only. A plastic edge is an edge on either surface
-//! with learning attributes (T25.F06), keyed by learning pathway (pure
+//! Reachable Graph nodes only. A carrier has a learner on a reachable node
+//! (T25.F12 invariant 11). An edge learner (a lone edge's weight or a
+//! member's modifier, T25.F06, T25.F12) is keyed by learning pathway (pure
 //! Hebbian or reward-modulated) and surface (compute or sink), and counted
-//! separately by rule and by inheritance (Lamarckian or Darwinian). The
-//! census reads the learned state's view: edge drift is `|learned - birth|`
-//! over initialized own quantities (an ungrouped edge's weight, an
-//! edge-scope member's correction; lifetime learning, T25.F09), and an
-//! initialized own quantity sits at its clamp when it reaches the edge's
-//! clamp, which every write saturates to exactly. A bundle learner has no
-//! own quantity and adds neither (T25.F07). Every learner counts by scope;
-//! each scale slot counts once per bundle, by its `inherit_scale`, with its
-//! drift `|learned - birth|` and whether it sits at its bound. Edges and
-//! scale slots also count by retention bin ([`RETENTION_KEYS`], T25.F09).
+//! separately by rule, by inheritance (its effective `lamarckian`) and by
+//! source (`lone`, `own`, `member_default`). The census reads the learned
+//! state's view: edge drift is `|learned - birth|` over initialized
+//! learners (lifetime learning, T25.F09), and an initialized learner sits
+//! at its clamp when it reaches the clamp, which every write saturates to
+//! exactly. Each scale learner counts once per bundle, by its
+//! `scale_learning`'s `lamarckian`, with its drift `|learned - birth|` and
+//! whether it sits at its clamp. Edges and scales also count by retention
+//! bin ([`RETENTION_KEYS`], T25.F09).
 //!
 //! Pure structure and state: it reads genomes, cached reachability and
 //! learned state and executes no brain.
 
-use crate::genome::cgp::{EdgeSurface, Scope};
+use crate::genome::cgp::EdgeSurface;
+use crate::genome::learning::LearnerSource;
 use crate::genome::HebbianRule;
 use crate::runtime::plasticity::{LearnedState, RULES};
 
@@ -41,13 +42,16 @@ pub const LEARNING_KEYS: [&str; 2] = ["hebbian", "reward_modulated"];
 pub const SURFACE_KEYS: [&str; 2] = ["compute", "sink"];
 
 /// The `petri.plasticity_inheritance` keys, by inheritance index (0
-/// Darwinian, 1 Lamarckian). A scale slot's inheritance is its bundle's
-/// `inherit_scale`.
+/// Darwinian, 1 Lamarckian). A scale's inheritance is its
+/// `scale_learning`'s `lamarckian`.
 pub const INHERITANCE_KEYS: [&str; 2] = ["darwinian", "lamarckian"];
 
-/// The `petri.plasticity_scope` keys, by scope index (0 ungrouped, 1 edge,
-/// 2 bundle).
-pub const SCOPE_KEYS: [&str; 3] = ["ungrouped", "edge", "group"];
+/// The `petri.plasticity_source` keys, by [`LearnerSource::index`].
+pub const SOURCE_KEYS: [&str; 3] = [
+    LearnerSource::Lone.as_key(),
+    LearnerSource::Own.as_key(),
+    LearnerSource::MemberDefault.as_key(),
+];
 
 /// The `petri.plasticity_retention` keys, by retention bin (T25.F09): `none`
 /// for a retention of exactly 1, else the bin's upper bound on the deficit
@@ -71,16 +75,6 @@ pub fn retention_index(retention: f32) -> usize {
         3
     } else {
         4
-    }
-}
-
-/// The scope index of a learner of scope `scope` ([`SCOPE_KEYS`]).
-#[must_use]
-pub const fn scope_index(scope: Option<Scope>) -> usize {
-    match scope {
-        None => 0,
-        Some(Scope::Edge) => 1,
-        Some(Scope::Group) => 2,
     }
 }
 
@@ -151,8 +145,8 @@ pub struct PlasticityCensus {
     pub edges_by_rule: [u64; 4],
     /// Edge counts per inheritance, in [`INHERITANCE_KEYS`] order.
     pub edges_by_inheritance: [u64; 2],
-    /// Edge counts per scope, in [`SCOPE_KEYS`] order.
-    pub edges_by_scope: [u64; 3],
+    /// Edge counts per source, in [`SOURCE_KEYS`] order.
+    pub edges_by_source: [u64; 3],
     /// Scale slots per inheritance, in [`INHERITANCE_KEYS`] order.
     pub scales: [LearnedScales; 2],
     /// Reachable plastic edges per retention bin, in [`RETENTION_KEYS`]
@@ -206,9 +200,9 @@ impl PlasticityCensus {
             .zip(self.edges_by_inheritance)
     }
 
-    /// Edge counts keyed by scope, in [`SCOPE_KEYS`] order.
-    pub fn scope_counts(&self) -> impl Iterator<Item = (&'static str, u64)> + '_ {
-        SCOPE_KEYS.iter().copied().zip(self.edges_by_scope)
+    /// Edge counts keyed by source, in [`SOURCE_KEYS`] order.
+    pub fn source_counts(&self) -> impl Iterator<Item = (&'static str, u64)> + '_ {
+        SOURCE_KEYS.iter().copied().zip(self.edges_by_source)
     }
 
     /// Scale cells keyed by inheritance, in [`INHERITANCE_KEYS`] order.
@@ -254,7 +248,7 @@ impl PlasticityCensus {
                 };
                 self.edges_by_rule[kind.rule_index()] += 1;
                 self.edges_by_inheritance[usize::from(kind.lamarckian)] += 1;
-                self.edges_by_scope[scope_index(edge.scope)] += 1;
+                self.edges_by_source[edge.source.index()] += 1;
                 self.edges_by_retention[retention_index(edge.retention)].add(
                     edge.learned,
                     edge.birth,
@@ -277,7 +271,7 @@ impl PlasticityCensus {
                     scale.birth,
                     scale.bound,
                 );
-                let cell = &mut self.scales[usize::from(scale.inherit_scale)];
+                let cell = &mut self.scales[usize::from(scale.lamarckian)];
                 cell.scales += 1;
                 let Some(value) = scale.learned else {
                     continue;

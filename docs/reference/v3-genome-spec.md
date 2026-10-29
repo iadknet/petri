@@ -70,21 +70,21 @@ membership and nothing for a sink itself, so unwired sinks add nothing to it
 (T25.F02), and one unit per bundle record with nothing for its members
 (T25.F03, T25.F10, T25.F11: a gene costs one unit, an explicit economic
 discount); the founder carries no bundle and is 80 units.
-A graph edge serializes as `{source, own_weight, plasticity?, membership?}`
-(T25.F06: learning attributes live on the edge; a compute node is `{kind,
-inputs}`, and a genome with a node-level `plasticity` key fails to
-deserialize, with no conversion path) and a graph
-backend with bundles carries `bundles: [{source, wiring, scale,
-inherit_scale, retention}]` (T25.F03, T25.F07, T25.F09, T25.F11), `source`
+A graph edge serializes as `{source, own_weight, learning?}` when lone or
+`{source, own_weight, membership}` when a member, never both (T25.F06,
+T25.F12: a compute node is `{kind, inputs}`, and a genome with a node-level
+or edge-level `plasticity` key fails to deserialize, with no conversion
+path) and a graph backend with bundles carries `bundles: [{source, wiring,
+scale, scale_learning?, member_default?}]` (T25.F03, T25.F11, T25.F12), `source`
 `{"Sensor": {ref_idx, field_set}}` or `{"Memory": {previous}}` and `wiring`
 `{"Plain": {sink}}`, `{"Ring": {kind, offset}}` or
 `{"DirectionPair": {kind, offset}}`; each member's `membership` is
-`{bundle, scope}` with `scope` `"Edge"` or `"Group"` (T25.F07, the learning
-scope T25.F12 replaces; both keys always written, so a genome from before
-T25.F11 fails to deserialize, with no conversion path); every `plasticity`
-config and every bundle carries `retention` in `[0, 1]`, always written
-(T25.F09, genome file
-format 6); the `cgp` genome types deny unknown fields, so a
+`{bundle, policy, credits}` with `policy` `"Inherit"`, `"Static"` or
+`{"Own": learning}` (T25.F12; every key always written, so a genome with
+`scope`, `inherit_scale` or a bundle `retention` fails to deserialize, with
+no conversion path); every `learning` carries `retention` in `[0, 1]`,
+always written (T25.F09); the lab's genome files are `genome_format` 11
+(T25.F12); the `cgp` genome types deny unknown fields, so a
 genome from before T25.F03 (`weight`, `projections`) fails to deserialize,
 with no conversion path. A genome from before T25.F05 that names
 `NearbyCreatureCore`, `NearbyCreatureVitals` or `NearbyCreatureIdentity`
@@ -145,13 +145,14 @@ The key is mesh `NodeId` (not global flat offsets). This avoids state/index
 misalignment across topology mutations.
 
 Within each mesh node, operator state, committed outputs and scratch
-buffers are indexed by compute node index. Learned state (T25.F06) is one
-slot per plastic edge over both surfaces in canonical order — a sink edge can
-learn — and, since T25.F07, one scale slot per bundle with a
-group-scope learner, in `BundleId` order, built once at birth
-(`v3-graph-backend-spec.md` Section 13). A member's `scope` and a bundle's
-`inherit_scale` and `retention` and an edge's `retention` are genome fields;
-the learned scale is runtime state. Fixed
+buffers are indexed by compute node index. Learned state (T25.F06, T25.F12)
+is built once at birth from each Graph node's learning layout
+(`v3-graph-backend-spec.md` Section 13): one edge learner per lone edge with
+learning and per member with an effective learning, over both surfaces in
+canonical order — a sink edge can learn — and one scale learner per bundle
+with `scale_learning`, in `BundleId` order. Every `Learning`, a member's
+`policy` and `credits` and a bundle's two slots are genome fields; learned
+values are runtime state. Fixed
 structural outputs (the sinks) carry no operator state.
 
 ---

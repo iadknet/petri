@@ -10,7 +10,7 @@ pub mod sensor_analysis;
 
 pub use companions::{structural_companions, StructuralCompanions};
 pub(crate) use learning::retention_decays;
-pub use learning::{HebbianRule, PlasticityConfig, RewardModulationConfig};
+pub use learning::{HebbianRule, Learning, MemberPolicy, RewardModulationConfig};
 pub use node_edit::{input_ref_kind, InputRefKind, NodeEditError};
 
 use crate::contracts::{InputReference, NodeId, RouteTarget};
@@ -895,7 +895,7 @@ mod tests {
 
     #[test]
     fn plasticity_config_serde_roundtrip_with_modulation() {
-        let cfg = PlasticityConfig {
+        let cfg = Learning {
             rule: HebbianRule::Oja,
             learning_rate: 0.05,
             weight_clamp: 3.0,
@@ -907,13 +907,13 @@ mod tests {
             retention: 1.0,
         };
         let json = serde_json::to_string(&cfg).unwrap();
-        let cfg2: PlasticityConfig = serde_json::from_str(&json).unwrap();
+        let cfg2: Learning = serde_json::from_str(&json).unwrap();
         assert_eq!(cfg, cfg2);
     }
 
     #[test]
     fn plasticity_config_serde_roundtrip_without_modulation() {
-        let cfg = PlasticityConfig {
+        let cfg = Learning {
             rule: HebbianRule::Classic,
             learning_rate: 0.1,
             weight_clamp: 5.0,
@@ -924,7 +924,7 @@ mod tests {
         let json = serde_json::to_string(&cfg).unwrap();
         // modulation: None should be skipped in serialization
         assert!(!json.contains("modulation"));
-        let cfg2: PlasticityConfig = serde_json::from_str(&json).unwrap();
+        let cfg2: Learning = serde_json::from_str(&json).unwrap();
         assert_eq!(cfg, cfg2);
     }
 

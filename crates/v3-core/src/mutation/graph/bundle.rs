@@ -1,28 +1,24 @@
-//! The bundle operators (T25.F03, T25.F08, T25.F09, T25.F11): the one birth
+//! The bundle operators (T25.F03, T25.F08, T25.F11, T25.F12): the one birth
 //! policy behind the four creation operators, four that change an existing
-//! bundle through its record, three that move its learned scale's
-//! retention, and one that detaches a member.
+//! bundle through its record, and one that detaches a member.
 
 use rand::Rng;
 
 use crate::contracts::votes::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
 use crate::contracts::{FieldSet, InputReference, SensorContext, SensorDescriptor, MEMORY_BANK};
 use crate::genome::cgp::{
-    self, BundleBirth, BundleId, BundleSource, CgpGraphBackendDef, Scope, Wiring,
+    self, BundleBirth, BundleId, BundleSource, CgpGraphBackendDef, LearningSlot, Wiring,
 };
-use crate::genome::{retention_decays, BackendDef, NodeGenome, PlasticityConfig};
+use crate::genome::{BackendDef, Learning, MemberPolicy, NodeGenome};
 use crate::mutation::event::{wiring_index, BirthEdgeClass, BundleEdits, MutationSkipReason};
 
-use super::hebbian::{
-    draw_hebbian_config, draw_modulation, draw_retention, is_member, select_eligible,
-    step_retention,
-};
+use super::hebbian::{draw_hebbian_config, draw_modulation, is_member, select_eligible, Target};
 use super::operators::perturb_weight;
 
-/// How a creation operator draws its new bundle's learning attributes
-/// (T25.F08): `Uniform` one mode and one scope for the whole bundle (F07),
-/// `Randomized` a mode and a scope per member. Both draw one
-/// `inherit_scale` for the bundle; neither draws the pattern or the scale.
+/// How a creation operator draws its new bundle's member policies and
+/// `credits` (T25.F08, T25.F12): `Uniform` one policy and one coin for every
+/// member, `Randomized` a policy and a coin per member. Both draw the two
+/// slots first; neither draws the pattern or the scale.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CreationForm {
     Uniform,
@@ -32,7 +28,7 @@ pub(crate) enum CreationForm {
 /// One learning mode `gen_range(0..3u8)` (0 static, 1 Hebbian, 2
 /// reward-modulated) and its config: a learning mode draws one config by
 /// `EnableHebbian`'s law, then `EnableRewardModulation`'s for mode 2.
-fn draw_mode(rng: &mut impl Rng) -> Option<PlasticityConfig> {
+fn draw_mode(rng: &mut impl Rng) -> Option<Learning> {
     let mode = rng.gen_range(0..3u8);
     (mode > 0).then(|| {
         let mut config = draw_hebbian_config(rng);
@@ -43,36 +39,40 @@ fn draw_mode(rng: &mut impl Rng) -> Option<PlasticityConfig> {
     })
 }
 
-/// The scope coin: true `Scope::Group`, the bundle's shared scale.
-fn draw_scope(rng: &mut impl Rng) -> Scope {
+/// A member policy draw (T25.F12 invariant 10): `gen_bool(0.5)` true
+/// `Inherit`, else [`draw_mode`]: absent `Static`, present `Own`.
+fn draw_policy(rng: &mut impl Rng) -> MemberPolicy {
     if rng.gen_bool(0.5) {
-        Scope::Group
+        MemberPolicy::Inherit
     } else {
-        Scope::Edge
+        draw_mode(rng).map_or(MemberPolicy::Static, MemberPolicy::Own)
     }
 }
 
-/// Learned creation (T25.F07 invariant 7, T25.F08 invariant 2), drawn after
-/// a new bundle's shape draws. `Uniform`: one mode with its config, then one
-/// scope coin, written to every member. `Randomized`: per member in
-/// canonical order, its own mode, config and scope coin. Then one
-/// `inherit_scale` coin.
+/// Learned creation (T25.F12 invariant 10), drawn after a new bundle's
+/// shape draws: `scale_learning` then `member_default` by [`draw_mode`];
+/// then `Uniform` one policy and one `credits` coin `gen_bool(0.5)` written
+/// to every member, `Randomized` per member in canonical order a policy
+/// then a coin. Modifiers stay 0.
 fn draw_learning(
     def: &mut CgpGraphBackendDef,
     id: BundleId,
     form: CreationForm,
     rng: &mut impl Rng,
 ) {
+    let scale_learning = draw_mode(rng);
+    let member_default = draw_mode(rng);
+    let mut record = def.bundle_mut(id);
+    record.set_slot(LearningSlot::Scale, scale_learning);
+    record.set_slot(LearningSlot::MemberDefault, member_default);
     let members: Vec<_> = def.members(id).collect();
-    let uniform = (form == CreationForm::Uniform).then(|| (draw_mode(rng), draw_scope(rng)));
+    let uniform = (form == CreationForm::Uniform).then(|| (draw_policy(rng), rng.gen_bool(0.5)));
     for member in members {
-        let (config, scope) = uniform.unwrap_or_else(|| (draw_mode(rng), draw_scope(rng)));
+        let (policy, credits) = uniform.unwrap_or_else(|| (draw_policy(rng), rng.gen_bool(0.5)));
         let mut edge = def.edge_mut(member);
-        edge.set_plasticity(config);
-        edge.set_scope(scope);
+        edge.set_policy(policy);
+        edge.set_credits(credits);
     }
-    let inherit_scale = rng.gen_bool(0.5);
-    def.bundle_mut(id).set_inherit_scale(inherit_scale);
 }
 
 /// The birth law of a creation operator (T25.F11): a live bundle's scale is
@@ -272,17 +272,49 @@ fn graph_node(
 /// `DetachGraphEdge` (T25.F08): one member uniformly in canonical order,
 /// one draw and no other, then the F03 detach ([`cgp::detach`]): its own
 /// weight becomes `compose(own, scale, pattern)` bitwise, it leaves its
-/// bundle keeping its plasticity, its seed composes (T25.F07 invariant 6;
-/// every member alike, T25.F11 invariant 4), and a last member's detach
-/// removes the bundle.
+/// bundle with its effective learning (T25.F12 invariant 8), its seed
+/// composes (T25.F07 invariant 6; every member alike, T25.F11 invariant 4),
+/// and a last member's detach removes the bundle.
 pub(crate) fn detach_member(
     node: &mut NodeGenome,
     rng: &mut impl Rng,
 ) -> Result<BundleEdits, MutationSkipReason> {
     let (def, input_refs) = graph_node(node)?;
-    let picked = select_eligible(def, is_member, rng)?;
+    let Target::Edge(picked) = select_eligible(def, is_member, rng)? else {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    };
     let (_, removed) = cgp::detach(def, picked, input_refs);
     Ok(BundleEdits::detach(removed))
+}
+
+/// A bundle-record predicate.
+pub(super) type BundlePredicate = fn(&cgp::Bundle) -> bool;
+
+/// Whether any bundle record matches `predicate`.
+pub(super) fn any_bundle(def: &CgpGraphBackendDef, predicate: BundlePredicate) -> bool {
+    def.bundles().iter().any(predicate)
+}
+
+/// One bundle uniformly among the records `predicate` admits, in `BundleId`
+/// order: count-then-select, one draw.
+fn pick_where(
+    def: &CgpGraphBackendDef,
+    predicate: BundlePredicate,
+    rng: &mut impl Rng,
+) -> Result<BundleId, MutationSkipReason> {
+    let matching = || {
+        def.indexed_bundles()
+            .filter(|(_, bundle)| predicate(bundle))
+    };
+    let count = matching().count();
+    if count == 0 {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
+    let pick = rng.gen_range(0..count);
+    let (id, _) = matching()
+        .nth(pick)
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
+    Ok(id)
 }
 
 /// The first draw of every unit operator: one bundle, uniformly.
@@ -363,84 +395,6 @@ pub(crate) fn retarget(
         return Err(MutationSkipReason::NoApplicableTarget);
     }
     def.relocate_bundle(id, target);
-    Ok(())
-}
-
-/// A bundle-record predicate of the retention operators.
-pub(super) type BundlePredicate = fn(&cgp::Bundle) -> bool;
-
-/// `EnableBundleRetention`: a record whose retention is exactly 1.
-pub(super) fn retains(bundle: &cgp::Bundle) -> bool {
-    !retention_decays(bundle.retention())
-}
-
-/// `DisableBundleRetention`, `MutateBundleRetention`: a record whose
-/// retention is below 1.
-pub(super) fn is_decaying_bundle(bundle: &cgp::Bundle) -> bool {
-    retention_decays(bundle.retention())
-}
-
-/// Whether any bundle record matches `predicate`.
-pub(super) fn any_bundle(def: &CgpGraphBackendDef, predicate: BundlePredicate) -> bool {
-    def.bundles().iter().any(predicate)
-}
-
-/// One bundle uniformly among the records `predicate` admits, in `BundleId`
-/// order: count-then-select, one draw. A record without a scale slot is
-/// admitted; its retention is inert.
-fn pick_where(
-    def: &CgpGraphBackendDef,
-    predicate: BundlePredicate,
-    rng: &mut impl Rng,
-) -> Result<BundleId, MutationSkipReason> {
-    let matching = || {
-        def.indexed_bundles()
-            .filter(|(_, bundle)| predicate(bundle))
-    };
-    let count = matching().count();
-    if count == 0 {
-        return Err(MutationSkipReason::NoApplicableTarget);
-    }
-    let pick = rng.gen_range(0..count);
-    let (id, _) = matching()
-        .nth(pick)
-        .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    Ok(id)
-}
-
-/// `EnableBundleRetention` (T25.F09): one retaining bundle, then
-/// `EnableRetention`'s draw on its record.
-pub(crate) fn enable_retention(
-    def: &mut CgpGraphBackendDef,
-    rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
-    let id = pick_where(def, retains, rng)?;
-    let retention = draw_retention(rng);
-    def.bundle_mut(id).set_retention(retention);
-    Ok(())
-}
-
-/// `DisableBundleRetention` (T25.F09): one decaying bundle's retention
-/// returns to 1; no value draw.
-pub(crate) fn disable_retention(
-    def: &mut CgpGraphBackendDef,
-    rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
-    let id = pick_where(def, is_decaying_bundle, rng)?;
-    def.bundle_mut(id).set_retention(1.0);
-    Ok(())
-}
-
-/// `MutateBundleRetention` (T25.F09): one decaying bundle, one `u ∈ [−1, 1]`,
-/// `MutateRetention`'s step on its deficit.
-pub(crate) fn mutate_retention(
-    def: &mut CgpGraphBackendDef,
-    rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
-    let id = pick_where(def, is_decaying_bundle, rng)?;
-    let u = rng.gen_range(-1.0f32..=1.0);
-    let retention = step_retention(def.bundles()[id.index()].retention(), u);
-    def.bundle_mut(id).set_retention(retention);
     Ok(())
 }
 

@@ -342,10 +342,9 @@ pub struct SimStats {
     pub graph_edges_detached_total: u64,
     /// Edge bundles committed mutation events removed (T25.F03).
     pub bundles_removed_total: u64,
-    /// Committed attribute changes (the nine plasticity operators and
-    /// `SetScope`) by the scope they landed on, indexed by `Scope::index`
-    /// (T25.F08).
-    pub mutation_attribute_changes_total_by_scope: [u64; 2],
+    /// Committed learning edits by how far they reached, indexed by
+    /// `Broadcast::index` (T25.F12).
+    pub mutation_attribute_changes_total_by_broadcast: [u64; 2],
     /// Bundles committed creation events made (T25.F11), by operator, then
     /// wiring (`plain`, `ring`, `pair`) and creation form (`uniform`,
     /// `randomized`).

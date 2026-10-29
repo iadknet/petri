@@ -42,6 +42,8 @@ fn the_default_draw_stream_is_pinned() {
         applied > 0,
         "the default rate applies events on the founder"
     );
-    // Pinned by T25.F11 commit 3 after two agreeing runs.
-    assert_eq!(hash, 14_628_003_425_138_151_748, "the default draw stream");
+    // Pinned by T25.F11 commit 3 after two agreeing runs; re-pinned by
+    // T25.F12 commit 2 (the learning catalog, the target draw over edges and
+    // slots, the bundle birth draws and the genome JSON key `learning`).
+    assert_eq!(hash, 13_590_202_118_071_790_475, "the default draw stream");
 }

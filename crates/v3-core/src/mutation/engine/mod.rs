@@ -38,7 +38,7 @@ struct SelectedEvent {
     // diffed after it.
     tracked_before: Option<CreatureGenome>,
     /// The reachability and what the event reported (vote-sink class, bundle
-    /// edits, attribute scope), counted only when it commits (T25.F03).
+    /// edits, broadcast), counted only when it commits (T25.F03).
     result: Result<(TargetReachability, EventReport), MutationSkipReason>,
     executed_hits: u32,
     /// The index this event's kept selector first returned, into the genome as
@@ -283,8 +283,8 @@ impl MutationEngine {
                 Ok((reachability, report)) => {
                     summary.record_applied(domain, operator);
                     summary.record_bundle_edits(operator, report.bundle_edits);
-                    if let Some(scope) = report.attribute_scope {
-                        summary.record_attribute_scope(scope);
+                    if let Some(broadcast) = report.broadcast {
+                        summary.record_broadcast(broadcast);
                     }
                     if let Some(class) = report.class {
                         summary.record_vote_edge_class(class);
@@ -513,8 +513,8 @@ pub(crate) fn dispatch(
 }
 
 /// Apply one mutation event through the gate: what it reports counts only
-/// when it commits, so a rolled-back event reports no bundle edits, scope or
-/// class (T25.F03, T25.F08).
+/// when it commits, so a rolled-back event reports no bundle edits, broadcast
+/// or /// class (T25.F03, T25.F08).
 fn apply_event(
     genome: &mut CreatureGenome,
     operator: MutationOperator,

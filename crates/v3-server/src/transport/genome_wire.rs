@@ -823,13 +823,13 @@ mod tests {
     /// Every enum this module and `brain` mirror has the core enum's variant
     /// set and serialized names, and every core value an `ALL` list or the
     /// fixed sink catalog enumerates serializes identically through its
-    /// mirror. `Site`, `WeightSurface` and `LearnerScope` are
+    /// mirror. `Site`, `WeightSurface`, `MemberPolicy` and `LearnerSource` are
     /// wire-named (their core sources carry no serde form), as are
     /// `InputFamily` and `InputKey` (the flat reference, tested below); their
     /// exhaustive `From` is their pin.
     #[test]
     fn mirrors_serialize_as_the_core_types_do() {
-        use crate::transport::brain::{BundleSource, Scope, Wiring};
+        use crate::transport::brain::{BundleSource, Wiring};
 
         assert_same_variants::<core_vote::DirectedVoteKind, DirectedVoteKind>();
         assert_same_variants::<core_vote::VoteSink, VoteSink>();
@@ -843,7 +843,6 @@ mod tests {
         assert_same_variants::<core_mesh::MeshReadClass, MeshReadClass>();
         assert_same_variants::<core_mesh::MeshWriteClass, MeshWriteClass>();
         assert_same_variants::<CoreVmInstruction, VmInstruction>();
-        assert_same_variants::<core_cgp::Scope, Scope>();
         assert_same_variants::<core_cgp::BundleSource, BundleSource>();
         assert_same_variants::<core_cgp::Wiring, Wiring>();
 
@@ -853,7 +852,6 @@ mod tests {
         assert_mirrors_all::<_, OutcomeChannel>(&CoreOutcomeChannel::ALL);
         assert_mirrors_all::<_, MeshReadClass>(&core_mesh::MeshReadClass::ALL);
         assert_mirrors_all::<_, MeshWriteClass>(&core_mesh::MeshWriteClass::ALL);
-        assert_mirrors_all::<_, Scope>(&core_cgp::Scope::ALL);
         // The fixed sink catalog holds every sink kind and every vote sink.
         for sink in core_cgp::CgpGraphBackendDef::new_with_fixed_outputs()
             .output_sinks()

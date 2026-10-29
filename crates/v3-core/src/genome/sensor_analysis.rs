@@ -263,7 +263,7 @@ mod tests {
     use crate::genome::analysis::mesh_reachable_nodes;
     use crate::genome::cgp::test_support::push_sink;
     use crate::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, OutputSink, OutputSinkKind};
-    use crate::genome::{HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef, VmInstruction};
+    use crate::genome::{HebbianRule, Learning, NodeGenome, VmBackendDef, VmInstruction};
     use proptest::prelude::*;
 
     const FOOD_0: OrdinaryFoodTypeId = OrdinaryFoodTypeId::new(0);
@@ -562,7 +562,7 @@ mod tests {
         graph.append_compute_node(crate::genome::cgp::test_support::plastic_node(
             ComputeNodeKind::Add,
             vec![leaf(0)],
-            Some(PlasticityConfig {
+            Some(Learning {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 1.0,
@@ -579,7 +579,7 @@ mod tests {
             ),
         );
         assert!(
-            graph.plastic_edges().next().is_some(),
+            !crate::genome::learning::LearningLayout::of(&graph, &[]).is_empty(),
             "the fixture carries a plastic edge from a world input"
         );
         let census = census_of(&graph_node(

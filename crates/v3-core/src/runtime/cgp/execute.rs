@@ -328,7 +328,7 @@ mod work_counter_tests {
     use crate::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
     };
-    use crate::genome::{BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig};
+    use crate::genome::{BackendDef, CreatureGenome, HebbianRule, Learning, NodeGenome};
     use crate::runtime::mesh::execute_creature_mesh;
     use crate::runtime::state::GraphRuntimeState;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
@@ -419,7 +419,7 @@ mod work_counter_tests {
                                 },
                                 1.0,
                             )],
-                            Some(PlasticityConfig {
+                            Some(Learning {
                                 rule: HebbianRule::Classic,
                                 learning_rate: 0.5,
                                 weight_clamp: 1.0,
@@ -473,7 +473,7 @@ mod clock_tests {
     use crate::genome::cgp::{
         ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
     };
-    use crate::genome::{HebbianRule, PlasticityConfig};
+    use crate::genome::{HebbianRule, Learning};
     use proptest::prelude::*;
 
     fn graph(kind: ComputeNodeKind, disconnected: usize) -> CgpGraphBackendDef {
@@ -556,7 +556,7 @@ mod clock_tests {
         crate::genome::cgp::test_support::set_surface_plasticity(
             &mut def,
             crate::genome::cgp::EdgeSurface::ComputeInput(0),
-            Some(PlasticityConfig {
+            Some(Learning {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 2.0,
@@ -594,7 +594,7 @@ mod clock_tests {
         crate::genome::cgp::test_support::set_surface_plasticity(
             &mut def,
             crate::genome::cgp::EdgeSurface::ComputeInput(0),
-            Some(PlasticityConfig {
+            Some(Learning {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 2.0,

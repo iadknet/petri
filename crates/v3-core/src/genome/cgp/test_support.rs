@@ -8,7 +8,7 @@ use super::{
     EdgeOccurrence, EdgeSurface, GraphEdge, OutputSink, OutputSinkKind,
 };
 use crate::contracts::{FieldSet, InputReference, NodeId, SensorDescriptor};
-use crate::genome::{BackendDef, CreatureGenome, NodeGenome, PlasticityConfig};
+use crate::genome::{BackendDef, CreatureGenome, Learning, NodeGenome};
 use crate::runtime::state::GraphRuntimeState;
 
 /// An editable copy of one output sink.
@@ -68,16 +68,13 @@ pub(crate) fn edit_compute_nodes(
 
 /// `edges`, each carrying `config` (T25.F06), written through the only
 /// writer, [`super::EdgeMut::set_plasticity`], on a scratch compute node.
-pub(crate) fn with_plasticity(
-    edges: Vec<GraphEdge>,
-    config: Option<PlasticityConfig>,
-) -> Vec<GraphEdge> {
+pub(crate) fn with_plasticity(edges: Vec<GraphEdge>, config: Option<Learning>) -> Vec<GraphEdge> {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
         .with_compute_nodes(vec![ComputeNode::new(ComputeNodeKind::Add, edges)]);
     let surface = EdgeSurface::ComputeInput(0);
     for index in 0..def.surface_edges(surface).len() {
         def.edge_mut(EdgeOccurrence::new(surface, index))
-            .set_plasticity(config);
+            .set_learning(config);
     }
     def.surface_edges(surface).to_vec()
 }
@@ -87,7 +84,7 @@ pub(crate) fn with_plasticity(
 pub(crate) fn plastic_node(
     kind: ComputeNodeKind,
     inputs: Vec<GraphEdge>,
-    config: Option<PlasticityConfig>,
+    config: Option<Learning>,
 ) -> ComputeNode {
     ComputeNode::new(kind, with_plasticity(inputs, config))
 }
@@ -96,11 +93,30 @@ pub(crate) fn plastic_node(
 pub(crate) fn set_surface_plasticity(
     def: &mut CgpGraphBackendDef,
     surface: EdgeSurface,
-    config: Option<PlasticityConfig>,
+    config: Option<Learning>,
 ) {
     for index in 0..def.surface_edges(surface).len() {
         def.edge_mut(EdgeOccurrence::new(surface, index))
-            .set_plasticity(config);
+            .set_learning(config);
+    }
+}
+
+/// Store `learning` on the edge at `at`: a lone edge's learning, or on a
+/// member an `Own` override (`Some`) or `Static` (`None`).
+pub(crate) fn store_learning(
+    def: &mut CgpGraphBackendDef,
+    at: EdgeOccurrence,
+    learning: Option<Learning>,
+) {
+    let member = def.edge_at(at).membership().is_some();
+    let mut edge = def.edge_mut(at);
+    if member {
+        edge.set_policy(learning.map_or(
+            crate::genome::MemberPolicy::Static,
+            crate::genome::MemberPolicy::Own,
+        ));
+    } else {
+        edge.set_learning(learning);
     }
 }
 

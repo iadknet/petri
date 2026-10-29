@@ -13,8 +13,7 @@ fn companion_population() -> [v3_core::genome::CreatureGenome; 3] {
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
     };
     use v3_core::genome::{
-        BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef,
-        VmInstruction,
+        BackendDef, CreatureGenome, HebbianRule, Learning, NodeGenome, VmBackendDef, VmInstruction,
     };
     let make = |backend_def| CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -56,7 +55,7 @@ fn companion_population() -> [v3_core::genome::CreatureGenome; 3] {
             v3_core::genome::cgp::EdgeSurface::ComputeInput(0),
             0,
         ))
-        .set_plasticity(Some(PlasticityConfig {
+        .set_learning(Some(Learning {
             rule: HebbianRule::Classic,
             learning_rate: 0.1,
             weight_clamp: 1.0,

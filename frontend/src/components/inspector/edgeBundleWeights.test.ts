@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { composeTerms, scopeLabel } from "./edgeBundleWeights.ts";
+import { composeTerms, policyLabel, sourceLabel } from "./edgeBundleWeights.ts";
 
 describe("composeTerms", () => {
 	it("prints the brain view's scale, pattern, own and genomic without composing them", () => {
@@ -11,9 +11,11 @@ describe("composeTerms", () => {
 	});
 });
 
-describe("scopeLabel", () => {
-	it("prints a member's and a learner's scope in lower case", () => {
-		expect(scopeLabel("Group")).toBe("group scope");
-		expect(scopeLabel("ungrouped")).toBe("ungrouped scope");
+describe("policyLabel and sourceLabel", () => {
+	it("prints a member's policy with its credits and a learner's source", () => {
+		expect(policyLabel("inherit", true)).toBe("inherit · credits");
+		expect(policyLabel("static", false)).toBe("static");
+		expect(sourceLabel("member_default")).toBe("member default");
+		expect(sourceLabel("own")).toBe("own");
 	});
 });

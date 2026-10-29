@@ -6,7 +6,7 @@ use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
 };
 use crate::genome::{
-    BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
+    BackendDef, CreatureGenome, HebbianRule, Learning, NodeGenome, RewardModulationConfig,
     VmInstruction,
 };
 
@@ -104,7 +104,7 @@ fn run_tick_accumulates_reward_modulated_plasticity_update_in_phase_2_5() {
                             },
                             1.0,
                         )],
-                        Some(PlasticityConfig {
+                        Some(Learning {
                             rule: HebbianRule::Classic,
                             learning_rate: 0.5,
                             weight_clamp: 1.0,
@@ -215,7 +215,7 @@ fn mixed_learning_genome(hebbian_edges: usize, reward_edges: usize) -> CreatureG
         crate::genome::cgp::test_support::plastic_node(
             ComputeNodeKind::Constant(1.0),
             vec![edge; edges],
-            Some(PlasticityConfig {
+            Some(Learning {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.5,
                 weight_clamp: 2.0,

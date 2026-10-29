@@ -3,12 +3,14 @@ use proptest::prelude::*;
 use super::*;
 use crate::contracts::votes::{DirectedVoteKind, VoteSink};
 use crate::contracts::InputReference;
+use crate::genome::cgp::test_support::store_learning;
 use crate::genome::cgp::test_support::{plastic_node, set_surface_plasticity};
 use crate::genome::cgp::{
-    compose, detach, BundleId, BundleSource, Membership, Scope, Site, Wiring,
+    compose, detach, BundleId, BundleSource, LearningSlot, Membership, Site, Wiring,
     FIRST_ACTION_VOTE_SINK,
 };
-use crate::genome::HebbianRule;
+use crate::genome::learning::LearningLayout;
+use crate::genome::{HebbianRule, MemberPolicy};
 
 /// A new def field is a compile error here until it is placed inside or
 /// outside genome identity on purpose (I9).
@@ -23,15 +25,14 @@ fn def_fields_are_exhaustively_accounted_for() {
     let GraphEdge {
         source: _,
         own_weight: _,
-        plasticity: _,
-        membership: _,
+        role: _,
     } = GraphEdge::new(leaf(0), 0.0);
     let Bundle {
         source: _,
         wiring: _,
         scale: _,
-        inherit_scale: _,
-        retention: _,
+        scale_learning: _,
+        member_default: _,
     } = Bundle::new(
         RING_SOURCE,
         Wiring::Ring {
@@ -41,10 +42,12 @@ fn def_fields_are_exhaustively_accounted_for() {
     );
     let Membership {
         bundle: _,
-        scope: _,
+        policy: _,
+        credits: _,
     } = Membership {
         bundle: BundleId::new(0),
-        scope: Scope::Edge,
+        policy: MemberPolicy::Static,
+        credits: false,
     };
 }
 
@@ -53,10 +56,10 @@ fn a_graph_edge_is_forty_bytes() {
     assert_eq!(std::mem::size_of::<GraphEdge>(), 40);
 }
 
-/// `Bundle::new` builds the silent record: scale 0, no `inherit_scale`,
-/// retention 1 (T25.F09 invariant 1).
+/// `Bundle::new` builds the silent record: scale 0, both learning slots
+/// absent (T25.F12 invariant 2).
 #[test]
-fn a_new_bundle_record_is_silent_with_retention_one() {
+fn a_new_bundle_record_is_silent_without_learning() {
     let source = BundleSource::Sensor {
         ref_idx: 3,
         field_set: 0,
@@ -67,36 +70,63 @@ fn a_new_bundle_record_is_silent_with_retention_one() {
     };
     let record = Bundle::new(source, wiring);
     assert_eq!(
-        (record.scale(), record.inherit_scale(), record.retention()),
-        (0.0, false, 1.0)
+        (
+            record.scale(),
+            record.scale_learning(),
+            record.member_default()
+        ),
+        (0.0, None, None)
     );
     assert_eq!((record.source(), record.wiring()), (source, wiring));
 }
 
-/// An edge's and a bundle's `retention` are always written and required
-/// (T25.F09 invariant 1, `GENOME_FORMAT` 6).
+const LEARNING_JSON: &str =
+    r#"{"rule":"Oja","learning_rate":0.1,"weight_clamp":2.0,"lamarckian":true,"retention":0.75}"#;
+
+/// A learning's `retention` is always written and required (T25.F09
+/// invariant 1); the genome key is `learning` (T25.F12 invariant 1).
 #[test]
 fn retention_is_always_written_and_required() {
-    let plastic = r#"{"source":{"ComputeNode":0},"own_weight":0.5,"plasticity":{"rule":"Oja","learning_rate":0.1,"weight_clamp":2.0,"lamarckian":true,"retention":0.75}}"#;
-    let edge: GraphEdge = serde_json::from_str(plastic).unwrap();
-    assert_eq!(edge.plasticity().unwrap().retention, 0.75);
+    let plastic =
+        format!(r#"{{"source":{{"ComputeNode":0}},"own_weight":0.5,"learning":{LEARNING_JSON}}}"#);
+    let edge: GraphEdge = serde_json::from_str(&plastic).unwrap();
+    assert_eq!(edge.stored_learning().unwrap().retention, 0.75);
     assert_eq!(serde_json::to_string(&edge).unwrap(), plastic);
-    let without = r#"{"source":{"ComputeNode":0},"own_weight":0.5,"plasticity":{"rule":"Oja","learning_rate":0.1,"weight_clamp":2.0,"lamarckian":true}}"#;
+    let without = r#"{"source":{"ComputeNode":0},"own_weight":0.5,"learning":{"rule":"Oja","learning_rate":0.1,"weight_clamp":2.0,"lamarckian":true}}"#;
     assert!(serde_json::from_str::<GraphEdge>(without).is_err());
+    let old_key = plastic.replace("\"learning\"", "\"plasticity\"");
+    assert!(serde_json::from_str::<GraphEdge>(&old_key).is_err());
+}
 
-    let bundle = r#"{"source":{"Sensor":{"ref_idx":0,"field_set":0}},"wiring":{"Ring":{"kind":"Move","offset":0}},"scale":0.0,"inherit_scale":false,"retention":0.5}"#;
-    let record: Bundle = serde_json::from_str(bundle).unwrap();
-    assert_eq!(record.retention(), 0.5);
-    assert_eq!(serde_json::to_string(&record).unwrap(), bundle);
-    let without = r#"{"source":{"Sensor":{"ref_idx":0,"field_set":0}},"wiring":{"Ring":{"kind":"Move","offset":0}},"scale":0.0,"inherit_scale":false}"#;
-    assert!(serde_json::from_str::<Bundle>(without).is_err());
+/// A bundle's slots round-trip and are omitted when absent; the retired
+/// `inherit_scale` and `retention` keys are refused (T25.F12 invariant 2).
+#[test]
+fn bundle_slots_round_trip_and_the_retired_keys_are_refused() {
+    let silent = r#"{"source":{"Sensor":{"ref_idx":0,"field_set":0}},"wiring":{"Ring":{"kind":"Move","offset":0}},"scale":0.0}"#;
+    let record: Bundle = serde_json::from_str(silent).unwrap();
+    assert_eq!(
+        (record.scale_learning(), record.member_default()),
+        (None, None)
+    );
+    assert_eq!(serde_json::to_string(&record).unwrap(), silent);
+    let both = format!(
+        r#"{{"source":{{"Sensor":{{"ref_idx":0,"field_set":0}}}},"wiring":{{"Ring":{{"kind":"Move","offset":0}}}},"scale":0.0,"scale_learning":{LEARNING_JSON},"member_default":{LEARNING_JSON}}}"#
+    );
+    let record: Bundle = serde_json::from_str(&both).unwrap();
+    assert_eq!(record.scale_learning(), record.member_default());
+    assert_eq!(record.slot(LearningSlot::Scale).unwrap().retention, 0.75);
+    assert_eq!(serde_json::to_string(&record).unwrap(), both);
+    for retired in [r#","inherit_scale":false}"#, r#","retention":1.0}"#] {
+        let with = format!("{}{retired}", &silent[..silent.len() - 1]);
+        assert!(serde_json::from_str::<Bundle>(&with).is_err(), "{with}");
+    }
 }
 
 /// I1 (T25.F09): an edge retention outside `[0, 1]` or non-finite is out of
 /// range; both ends are in range.
 #[test]
 fn plasticity_in_range_bounds_the_retention() {
-    let config = PlasticityConfig {
+    let config = Learning {
         rule: HebbianRule::Classic,
         learning_rate: 0.1,
         weight_clamp: 2.0,
@@ -105,14 +135,14 @@ fn plasticity_in_range_bounds_the_retention() {
         retention: 1.0,
     };
     for retention in [0.0, 0.5, 1.0] {
-        assert!(PlasticityConfig {
+        assert!(Learning {
             retention,
             ..config
         }
         .in_range());
     }
     for retention in [-0.0001, 1.0001, f32::NAN, f32::INFINITY] {
-        assert!(!PlasticityConfig {
+        assert!(!Learning {
             retention,
             ..config
         }
@@ -120,76 +150,65 @@ fn plasticity_in_range_bounds_the_retention() {
     }
 }
 
-/// The edge's plasticity key round-trips and is omitted when `None`
-/// (T25.F06, invariant 1).
+/// The edge's `learning` key round-trips and is omitted when `None`
+/// (T25.F06, T25.F12 invariant 1).
 #[test]
-fn edge_plasticity_round_trips_and_is_omitted_when_none() {
+fn edge_learning_round_trips_and_is_omitted_when_none() {
     let static_json = r#"{"source":{"ComputeNode":0},"own_weight":0.5}"#;
     let edge: GraphEdge = serde_json::from_str(static_json).unwrap();
-    assert!(edge.plasticity().is_none());
+    assert!(edge.stored_learning().is_none());
     assert_eq!(serde_json::to_string(&edge).unwrap(), static_json);
 
-    let plastic_json = r#"{"source":{"ComputeNode":0},"own_weight":0.5,"plasticity":{"rule":"Oja","learning_rate":0.1,"weight_clamp":2.0,"lamarckian":true,"modulation":{"reward_source":"DamageDelta","trace_decay":0.75},"retention":1.0}}"#;
+    let plastic_json = r#"{"source":{"ComputeNode":0},"own_weight":0.5,"learning":{"rule":"Oja","learning_rate":0.1,"weight_clamp":2.0,"lamarckian":true,"modulation":{"reward_source":"DamageDelta","trace_decay":0.75},"retention":1.0}}"#;
     let edge: GraphEdge = serde_json::from_str(plastic_json).unwrap();
-    let plasticity = edge.plasticity().expect("the key is read");
+    let plasticity = edge.stored_learning().expect("the key is read");
     assert_eq!(plasticity.rule, HebbianRule::Oja);
     assert!(plasticity.lamarckian);
     assert_eq!(serde_json::to_string(&edge).unwrap(), plastic_json);
 }
 
-/// A member's `scope` and a bundle's `inherit_scale` are always written and
-/// required: a membership or a bundle record without them is refused at the
-/// load boundary (T25.F07 invariant 1, `GENOME_FORMAT` 5).
+/// A member's `policy` and `credits` are always written and required; a
+/// lone edge cannot hold them nor a member `learning` (T25.F12 invariant 2).
 #[test]
-fn scope_and_inherit_scale_are_always_written_and_required() {
-    let member = r#"{"source":{"InputLeaf":{"ref_idx":0,"sub_idx":1}},"own_weight":0.0,"membership":{"bundle":0,"scope":"Group"}}"#;
-    let edge: GraphEdge = serde_json::from_str(member).unwrap();
-    assert_eq!(
-        edge.membership(),
-        Some(Membership {
-            bundle: BundleId::new(0),
-            scope: Scope::Group,
-        })
+fn a_membership_writes_policy_and_credits_and_a_member_holds_no_lone_learning() {
+    let member = format!(
+        r#"{{"source":{{"InputLeaf":{{"ref_idx":0,"sub_idx":1}}}},"own_weight":0.0,"membership":{{"bundle":0,"policy":{{"Own":{LEARNING_JSON}}},"credits":true}}}}"#
     );
+    let edge: GraphEdge = serde_json::from_str(&member).unwrap();
+    let membership = edge.membership().unwrap();
+    assert_eq!(membership.bundle, BundleId::new(0));
+    assert!(membership.credits);
+    assert_eq!(membership.policy.as_key(), "own");
+    assert_eq!(edge.stored_learning(), membership.policy.stored());
     assert_eq!(serde_json::to_string(&edge).unwrap(), member);
-    let without_scope = r#"{"source":{"InputLeaf":{"ref_idx":0,"sub_idx":1}},"own_weight":0.0,"membership":{"bundle":0}}"#;
-    assert!(serde_json::from_str::<GraphEdge>(without_scope).is_err());
-
-    let bundle = r#"{"source":{"Sensor":{"ref_idx":0,"field_set":0}},"wiring":{"Ring":{"kind":"Move","offset":0}},"scale":0.0,"inherit_scale":true,"retention":1.0}"#;
-    let record: Bundle = serde_json::from_str(bundle).unwrap();
-    assert!(record.inherit_scale());
-    assert_eq!(serde_json::to_string(&record).unwrap(), bundle);
-    let without_flag = r#"{"source":{"Sensor":{"ref_idx":0,"field_set":0}},"wiring":{"Ring":{"kind":"Move","offset":0}},"scale":0.0,"retention":1.0}"#;
-    assert!(serde_json::from_str::<Bundle>(without_flag).is_err());
+    for policy in [r#""Inherit""#, r#""Static""#] {
+        let json = format!(
+            r#"{{"source":{{"InputLeaf":{{"ref_idx":0,"sub_idx":1}}}},"own_weight":0.0,"membership":{{"bundle":0,"policy":{policy},"credits":false}}}}"#
+        );
+        let edge: GraphEdge = serde_json::from_str(&json).unwrap();
+        assert_eq!(edge.stored_learning(), None);
+        assert_eq!(serde_json::to_string(&edge).unwrap(), json);
+    }
+    let without_credits = r#"{"source":{"InputLeaf":{"ref_idx":0,"sub_idx":1}},"own_weight":0.0,"membership":{"bundle":0,"policy":"Static"}}"#;
+    assert!(serde_json::from_str::<GraphEdge>(without_credits).is_err());
+    let both = format!(
+        r#"{{"source":{{"InputLeaf":{{"ref_idx":0,"sub_idx":1}}}},"own_weight":0.0,"learning":{LEARNING_JSON},"membership":{{"bundle":0,"policy":"Static","credits":false}}}}"#
+    );
+    assert!(serde_json::from_str::<GraphEdge>(&both).is_err());
 }
 
-/// Bundle identity is the `BundleId` alone (R5): a member at scope `Bundle`
-/// is still a member of its bundle.
+/// Bundle identity is the `BundleId` alone (R5): whatever its policy and
+/// `credits`, a member is a member of its bundle.
 #[test]
-fn is_member_of_ignores_scope() {
+fn is_member_of_ignores_policy_and_credits() {
     let mut edge = GraphEdge::new(leaf(0), 0.0);
-    edge.membership = Some(Membership {
+    edge.role = EdgeRole::Member(Membership {
         bundle: BundleId::new(2),
-        scope: Scope::Group,
+        policy: MemberPolicy::Inherit,
+        credits: true,
     });
     assert!(edge.is_member_of(BundleId::new(2)));
     assert!(!edge.is_member_of(BundleId::new(1)));
-}
-
-/// A scope's transport key is the genome JSON spelling of that scope, and
-/// `index` is its position in `ALL`, so a telemetry series and a saved
-/// genome name the same scope.
-#[test]
-fn a_scope_key_matches_its_genome_json_spelling_and_index() {
-    assert_eq!(Scope::Edge.as_key(), "Edge");
-    assert_eq!(Scope::Group.as_key(), "Group");
-    for (position, scope) in Scope::ALL.into_iter().enumerate() {
-        assert_eq!(scope.index(), position);
-        assert_eq!(
-            serde_json::to_string(&scope).unwrap(),
-            format!("\"{}\"", scope.as_key())
-        );
-    }
 }
 
 #[test]
@@ -230,8 +249,8 @@ fn leaf(ref_idx: u16) -> GraphSource {
     }
 }
 
-fn plastic() -> Option<PlasticityConfig> {
-    Some(PlasticityConfig {
+fn plastic() -> Option<Learning> {
+    Some(Learning {
         rule: HebbianRule::Classic,
         learning_rate: 0.1,
         weight_clamp: 5.0,
@@ -293,10 +312,10 @@ fn the_json_and_debug_text_of_a_def_name_own_weight_and_print_bundles() {
     assert_eq!(
         format!("{def:?}"),
         "CgpGraphBackendDef { compute_nodes: [ComputeNode { kind: Add, inputs: \
-         [GraphEdge { source: ComputeNode(0), own_weight: 0.5, plasticity: None, \
-         membership: None }] }], output_sinks: [OutputSink { kind: CustomOutput(0), inputs: \
+         [GraphEdge { source: ComputeNode(0), own_weight: 0.5, role: Lone(None) }] }], \
+         output_sinks: [OutputSink { kind: CustomOutput(0), inputs: \
          [GraphEdge { source: InputLeaf { ref_idx: 1, sub_idx: 0 }, own_weight: 1.0, \
-         plasticity: None, membership: None }] }], bundles: [] }"
+         role: Lone(None) }] }], bundles: [] }"
     );
 }
 
@@ -405,7 +424,7 @@ fn a_split_keeps_the_consumers_seed_and_starts_the_identity_edge_without_one() {
         (
             consumer.source(),
             consumer.own_weight(),
-            consumer.plasticity()
+            consumer.stored_learning()
         ),
         (GraphSource::ComputeNode(1), 1.5, plastic())
     );
@@ -614,7 +633,8 @@ fn push_edge_inserts_an_independent_edge_before_the_first_member() {
         inputs[2].membership(),
         Some(Membership {
             bundle: id,
-            scope: Scope::Edge
+            policy: MemberPolicy::Static,
+            credits: false
         })
     );
 }
@@ -630,7 +650,8 @@ fn remove_bundle_leaves_no_member_and_renumbers_higher_bundles() {
     assert!(def.edges().all(|edge| edge.membership()
         != Some(Membership {
             bundle: third,
-            scope: Scope::Edge
+            policy: MemberPolicy::Static,
+            credits: false
         })));
     // The third bundle is now `BundleId(1)`, its members with it.
     let renumbered = BundleId::new(1);
@@ -683,7 +704,8 @@ fn detaching_a_later_bundles_member_ahead_of_another_member_keeps_the_edit_on_th
         def.edge_at(later).membership(),
         Some(Membership {
             bundle: second,
-            scope: Scope::Edge
+            policy: MemberPolicy::Static,
+            credits: false
         })
     );
     let (moved, removed) = detach(&mut def, later, &ring_refs());
@@ -699,7 +721,8 @@ fn detaching_a_later_bundles_member_ahead_of_another_member_keeps_the_edit_on_th
         def.edge_at(sink_occurrence(sink, 1)).membership(),
         Some(Membership {
             bundle: first,
-            scope: Scope::Edge
+            policy: MemberPolicy::Static,
+            credits: false
         })
     );
     assert_eq!(def.members(second).count(), 7);
@@ -819,18 +842,43 @@ fn validate_graph_rejects_each_broken_invariant() {
         offset.check_local_invariants(),
         Err(GraphInvariantViolation::OffsetOutOfRange)
     );
-    // T25.F09 invariant 1: a bundle retention outside [0, 1] or non-finite;
-    // 0 is in range.
+    // I1 on both slots and on an `Own` override (T25.F12 invariant 2): a
+    // retention outside [0, 1] or non-finite; 0 is in range.
+    let learning = plastic().unwrap();
     for retention in [-0.5, 1.5, f32::NAN] {
+        let bad = Learning {
+            retention,
+            ..learning
+        };
+        for slot in LearningSlot::ALL {
+            let mut out = def.clone();
+            match slot {
+                LearningSlot::Scale => out.bundles[0].scale_learning = Some(bad),
+                LearningSlot::MemberDefault => out.bundles[0].member_default = Some(bad),
+            }
+            assert_eq!(
+                out.check_local_invariants(),
+                Err(GraphInvariantViolation::PlasticityOutOfRange)
+            );
+        }
         let mut out = def.clone();
-        out.bundles[0].retention = retention;
+        let member = out.members(BundleId::new(0)).next().unwrap();
+        if let EdgeRole::Member(membership) = &mut out.edge_slot(member).role {
+            membership.policy = MemberPolicy::Own(bad);
+        }
         assert_eq!(
             out.check_local_invariants(),
-            Err(GraphInvariantViolation::BundleRetentionOutOfRange)
+            Err(GraphInvariantViolation::PlasticityOutOfRange)
         );
     }
     let mut zero = def.clone();
-    zero.bundles[0].retention = 0.0;
+    zero.bundle_mut(BundleId::new(0)).set_slot(
+        LearningSlot::Scale,
+        Some(Learning {
+            retention: 0.0,
+            ..learning
+        }),
+    );
     assert_eq!(zero.check_local_invariants(), Ok(()));
     // I4: a `Ring` member on a direction its offset does not map its cell
     // to (record and edge only, so the local check).
@@ -864,10 +912,11 @@ fn validate_graph_rejects_each_broken_invariant() {
     let mut dangling = def;
     for sink in &mut dangling.output_sinks.0 {
         for edge in &mut sink.inputs.0 {
-            if edge.membership.is_some() {
-                edge.membership = Some(Membership {
+            if edge.membership().is_some() {
+                edge.role = EdgeRole::Member(Membership {
                     bundle: BundleId::new(4),
-                    scope: Scope::Edge,
+                    policy: MemberPolicy::Static,
+                    credits: false,
                 });
             }
         }
@@ -907,7 +956,7 @@ fn a_member_reading_channel_eight_is_out_of_shape() {
         .iter_mut()
         .flat_map(|sink| sink.inputs.0.iter_mut())
         .find(|edge| {
-            edge.membership.is_some()
+            edge.membership().is_some()
                 && edge.source
                     == GraphSource::InputLeaf {
                         ref_idx: RING,
@@ -1307,10 +1356,10 @@ fn a_pair_bundle_with_holes_relocates_by_relative_coordinate() {
             sub_idx: PX,
         },
         own_weight: 0.25,
-        plasticity: None,
-        membership: Some(Membership {
+        role: EdgeRole::Member(Membership {
             bundle: id,
-            scope: Scope::Edge,
+            policy: MemberPolicy::Static,
+            credits: false,
         }),
     });
     resort(&mut def, sink);
@@ -1396,7 +1445,7 @@ fn validate_graph_rejects_a_bad_pair_role_range_or_duplicate() {
                 .inputs
                 .0
                 .iter()
-                .filter(|e| e.membership.is_some())
+                .filter(|e| e.membership().is_some())
                 .count();
             (s, n)
         })
@@ -1405,7 +1454,7 @@ fn validate_graph_rejects_a_bad_pair_role_range_or_duplicate() {
     assert!(members >= 2);
     let inputs = &mut swapped.output_sinks.0[two].inputs.0;
     let at: Vec<usize> = (0..inputs.len())
-        .filter(|&i| inputs[i].membership.is_some())
+        .filter(|&i| inputs[i].membership().is_some())
         .collect();
     inputs.swap(at[0], at[1]);
     assert_eq!(
@@ -1543,7 +1592,7 @@ fn clear_slot_edges_are_never_eligible() {
     assert!(def.can_learn(EdgeOccurrence::new(write, 0)));
     assert!(def.can_learn(compute_edge_free_occurrence()));
     def.edge_mut(EdgeOccurrence::new(write, 0))
-        .set_plasticity(plastic());
+        .set_learning(plastic());
     assert_eq!(
         validate_graph(&learning_node(def.clone(), Vec::new())),
         Ok(())
@@ -1551,7 +1600,7 @@ fn clear_slot_edges_are_never_eligible() {
     let EdgeSurface::SinkInput(clear_index) = clear else {
         unreachable!()
     };
-    def.output_sinks.0[clear_index].inputs.0[0].plasticity = plastic();
+    def.output_sinks.0[clear_index].inputs.0[0].role = EdgeRole::Lone(plastic());
     assert_eq!(
         validate_graph(&learning_node(def, Vec::new())),
         Err(GraphInvariantViolation::IneligiblePlasticEdge)
@@ -1566,25 +1615,25 @@ fn compute_edge_free_occurrence() -> EdgeOccurrence {
 #[test]
 #[cfg(debug_assertions)]
 #[should_panic(expected = "a ClearSlot edge does not learn")]
-fn set_plasticity_on_a_clear_slot_edge_is_a_debug_assertion() {
+fn set_learning_on_a_clear_slot_edge_is_a_debug_assertion() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     let clear = def.sink_surface(OutputSinkKind::ClearSlot(0)).unwrap();
     def.push_edge(clear, GraphEdge::new(leaf(0), 1.0));
     def.edge_mut(EdgeOccurrence::new(clear, 0))
-        .set_plasticity(plastic());
+        .set_learning(plastic());
 }
 
-/// A member learns at its scope (T25.F07 invariant 1): it is eligible and
-/// a plastic member, at either scope, passes `validate_graph`; a plastic
-/// `ClearSlot` edge is still rejected.
+/// A member learns under any policy (T25.F12 invariant 2): an `Own`,
+/// crediting member passes `validate_graph`; a learning `ClearSlot` edge is
+/// still rejected.
 #[test]
-fn validate_graph_admits_a_plastic_member_and_rejects_a_plastic_clear_slot_edge() {
+fn validate_graph_admits_a_learning_member_and_rejects_a_learning_clear_slot_edge() {
     let (mut def, id) = grouped(DirectedVoteKind::Move, 1);
     let members: Vec<EdgeOccurrence> = def.members(id).collect();
     assert!(members.iter().all(|&member| def.can_learn(member)));
-    def.edge_mut(members[0]).set_plasticity(plastic());
-    def.edge_mut(members[1]).set_plasticity(plastic());
-    def.edge_mut(members[1]).set_scope(Scope::Group);
+    store_learning(&mut def, members[0], plastic());
+    store_learning(&mut def, members[1], plastic());
+    def.edge_mut(members[1]).set_credits(true);
     assert_eq!(
         validate_graph(&learning_node(def.clone(), ring_refs())),
         Ok(())
@@ -1595,7 +1644,7 @@ fn validate_graph_admits_a_plastic_member_and_rejects_a_plastic_clear_slot_edge(
         unreachable!()
     };
     assert!(!def.can_learn(EdgeOccurrence::new(clear, 0)));
-    def.output_sinks.0[sink].inputs.0[0].plasticity = plastic();
+    def.output_sinks.0[sink].inputs.0[0].role = EdgeRole::Lone(plastic());
     assert_eq!(
         validate_graph(&learning_node(def, ring_refs())),
         Err(GraphInvariantViolation::IneligiblePlasticEdge)
@@ -1603,32 +1652,37 @@ fn validate_graph_admits_a_plastic_member_and_rejects_a_plastic_clear_slot_edge(
 }
 
 /// The node-level key is gone (T25.F06 invariant 1): a `ComputeNode` with
-/// `plasticity` is refused, and the edge-level key reads.
+/// `learning` is refused, and the edge-level key reads.
 #[test]
 fn a_node_level_plasticity_key_is_refused() {
     let config = r#"{"rule":"Classic","learning_rate":0.1,"weight_clamp":5.0,"lamarckian":true,"retention":1.0}"#;
     let node_level = format!(
-        r#"{{"kind":"Add","inputs":[{{"source":{{"ComputeNode":0}},"own_weight":0.5}}],"plasticity":{config}}}"#
+        r#"{{"kind":"Add","inputs":[{{"source":{{"ComputeNode":0}},"own_weight":0.5}}],"learning":{config}}}"#
     );
     assert!(serde_json::from_str::<ComputeNode>(&node_level).is_err());
     let edge_level = format!(
-        r#"{{"kind":"Add","inputs":[{{"source":{{"ComputeNode":0}},"own_weight":0.5,"plasticity":{config}}}]}}"#
+        r#"{{"kind":"Add","inputs":[{{"source":{{"ComputeNode":0}},"own_weight":0.5,"learning":{config}}}]}}"#
     );
     let node: ComputeNode = serde_json::from_str(&edge_level).unwrap();
-    assert_eq!(node.inputs[0].plasticity(), plastic());
+    assert_eq!(node.inputs[0].stored_learning(), plastic());
     assert_eq!(serde_json::to_string(&node).unwrap(), edge_level);
 }
 
-/// `plastic_edges` enumerates every plastic edge on both surfaces in
-/// canonical order, and nothing else.
+/// The layout lists every lone edge with learning on both surfaces in
+/// canonical order, and nothing else (T25.F12 invariant 4).
 #[test]
-fn plastic_edges_enumerate_both_surfaces_in_canonical_order() {
+fn the_layout_lists_lone_learners_on_both_surfaces_in_canonical_order() {
     let mut def = seeded();
     let vote = EdgeSurface::SinkInput(vote_sink(DirectedVoteKind::Move, 2));
     def.push_edge(vote, GraphEdge::new(leaf(0), 1.0));
     def.edge_mut(EdgeOccurrence::new(vote, 0))
-        .set_plasticity(plastic());
-    let sites: Vec<EdgeOccurrence> = def.plastic_edges().map(|(site, _)| site).collect();
+        .set_learning(plastic());
+    let layout = LearningLayout::of(&def, &[]);
+    let sites: Vec<EdgeOccurrence> = layout
+        .edges
+        .iter()
+        .map(|learner| learner.occurrence)
+        .collect();
     assert_eq!(
         sites,
         vec![
@@ -1639,9 +1693,14 @@ fn plastic_edges_enumerate_both_surfaces_in_canonical_order() {
         ]
     );
     // `seeded`'s sink edge is static.
-    assert!(def
-        .plastic_edges()
-        .all(|(site, config)| Some(config) == def.edge_at(site).plasticity()));
+    assert!(
+        layout
+            .edges
+            .iter()
+            .all(|learner| Some(learner.learning)
+                == def.edge_at(learner.occurrence).stored_learning())
+    );
+    assert!(layout.scales.is_empty());
 }
 
 /// One operation of the seed-row model.
@@ -1815,8 +1874,8 @@ proptest! {
                 }
                 SeedOp::SetPlasticity(i) => {
                     if let Some(site) = pick(i).filter(|&site| def.can_learn(site)) {
-                        let config = if def.edge_at(site).plasticity().is_some() { None } else { plastic() };
-                        def.edge_mut(site).set_plasticity(config);
+                        let config = if def.edge_at(site).stored_learning().is_some() { None } else { plastic() };
+                        store_learning(&mut def, site, config);
                     }
                 }
                 SeedOp::AddBundle(offset) => {
@@ -1886,13 +1945,14 @@ proptest! {
                 SeedOp::SetScope(i) => {
                     let members: Vec<EdgeOccurrence> = def.edge_sites().filter(|&site| !independent(&def, site)).collect();
                     if let Some(&member) = members.get(i % members.len().max(1)) {
-                        let scope = def.edge_at(member).membership().unwrap().scope.other();
-                        def.edge_mut(member).set_scope(scope);
+                        let credits = !def.edge_at(member).membership().unwrap().credits;
+                        def.edge_mut(member).set_credits(credits);
                     }
                 }
                 SeedOp::SetInheritScale => {
                     if let Some(bundle) = def.bundles().first().copied() {
-                        def.bundle_mut(BundleId::new(0)).set_inherit_scale(!bundle.inherit_scale());
+                        let learning = bundle.scale_learning().map_or(plastic(), |_| None);
+                        def.bundle_mut(BundleId::new(0)).set_slot(LearningSlot::Scale, learning);
                     }
                 }
                 SeedOp::SetScale => {
@@ -2034,7 +2094,8 @@ fn a_mixed_scope_bundle_survives_a_relocation_and_its_inverse() {
     for (k, &member) in all.iter().enumerate() {
         def.edge_mut(member).set_weight(k as f32 + 0.5);
         if k % 2 == 1 {
-            def.edge_mut(member).set_scope(Scope::Group);
+            def.edge_mut(member).set_credits(true);
+            def.edge_mut(member).set_policy(MemberPolicy::Inherit);
         }
     }
     let edge_seeds: Vec<(EdgeOccurrence, f32)> = all
@@ -2056,23 +2117,26 @@ fn a_mixed_scope_bundle_survives_a_relocation_and_its_inverse() {
     assert_eq!(def.birth_seeds().unwrap(), &seeds_before);
 }
 
-/// `set_scope`, `set_inherit_scale` and `set_retention` (T25.F09) keep
-/// every seed; `set_scale` clears the bundle's.
+/// `set_policy`, `set_credits` and `set_slot` keep every seed (T25.F12
+/// invariant 2); `set_scale` clears the bundle's.
 #[test]
-fn scope_and_inherit_scale_writes_keep_seeds_and_set_scale_clears_the_bundle_seed() {
+fn learning_writes_keep_seeds_and_set_scale_clears_the_bundle_seed() {
     let (mut def, id) = grouped(DirectedVoteKind::Move, 0);
     let member = def.members(id).next().unwrap();
     seed_with(&mut def, &[(member, 2.0)], &[(id, 3.0)]);
-    def.edge_mut(member).set_scope(Scope::Group);
-    def.bundle_mut(id).set_inherit_scale(true);
-    def.bundle_mut(id).set_retention(0.25);
-    assert_eq!(def.bundles()[id.index()].retention(), 0.25);
+    def.edge_mut(member).set_credits(true);
+    def.edge_mut(member)
+        .set_policy(MemberPolicy::Own(plastic().unwrap()));
+    for slot in LearningSlot::ALL {
+        def.bundle_mut(id).set_slot(slot, plastic());
+    }
+    assert_eq!(def.bundles()[id.index()].member_default(), plastic());
     let seeds = def.birth_seeds().unwrap();
     assert_eq!(
         (seeds.value(member), seeds.bundle_value(id)),
         (Some(2.0), Some(3.0))
     );
-    assert!(def.bundles()[id.index()].inherit_scale());
+    assert_eq!(def.bundles()[id.index()].scale_learning(), plastic());
     def.bundle_mut(id).set_scale(0.5);
     let seeds = def.birth_seeds().unwrap();
     assert_eq!(
@@ -2144,8 +2208,9 @@ fn a_pair_gene_places_one_fact_member_per_fact_on_its_kinds_drive() {
             assert_eq!(member.index, k + 1, "after the independent prefix");
             let edge = def.edge_at(member);
             assert_eq!(edge.own_weight(), 0.0);
-            assert_eq!(edge.plasticity(), None);
-            assert_eq!(edge.membership().unwrap().scope, Scope::Edge);
+            assert_eq!(edge.stored_learning(), None);
+            assert_eq!(edge.membership().unwrap().policy, MemberPolicy::Static);
+            assert!(!edge.membership().unwrap().credits);
             assert_eq!(def.member_pattern(member, &pair_refs()), 1.0);
         }
         // Pattern 1: the scale reaches a fact member as any member.
@@ -2166,8 +2231,8 @@ fn fact_members_stay_on_their_drive_under_a_shift_and_follow_a_retarget() {
     let (mut def, id) = fact_gene(DirectedVoteKind::Move, 2);
     for (k, member) in fact_members(&def, id).into_iter().enumerate() {
         def.edge_mut(member).set_weight(k as f32 - 0.5);
-        def.edge_mut(member).set_plasticity(plastic());
-        def.edge_mut(member).set_scope(Scope::Group);
+        store_learning(&mut def, member, plastic());
+        def.edge_mut(member).set_credits(true);
     }
     let seeds: Vec<(EdgeOccurrence, f32)> = def
         .members(id)
@@ -2532,4 +2597,130 @@ fn a_doubly_held_coordinate_carries_its_first_member() {
 
     // Assert
     assert_eq!(after.member, Some(original));
+}
+
+// ── T25.F12: the detach table and the effective learning ────────────────────
+
+fn learning_strategy() -> impl Strategy<Value = Learning> {
+    (
+        0usize..4,
+        0.0f32..=1.0,
+        0.01f32..=10.0,
+        any::<bool>(),
+        0.0f32..=1.0,
+        proptest::option::of(0.0f32..=1.0),
+    )
+        .prop_map(
+            |(rule, learning_rate, weight_clamp, lamarckian, retention, decay)| Learning {
+                rule: HebbianRule::ALL[rule],
+                learning_rate,
+                weight_clamp,
+                lamarckian,
+                modulation: decay.map(|trace_decay| crate::genome::RewardModulationConfig {
+                    reward_source: crate::contracts::OutcomeChannel::DamageDelta,
+                    trace_decay,
+                }),
+                retention,
+            },
+        )
+}
+
+fn policy_strategy() -> impl Strategy<Value = MemberPolicy> {
+    prop_oneof![
+        Just(MemberPolicy::Inherit),
+        Just(MemberPolicy::Static),
+        learning_strategy().prop_map(MemberPolicy::Own),
+    ]
+}
+
+proptest! {
+    /// T25.F12 invariant 8: detaching a member composes its weight
+    /// bitwise and leaves it lone with the table's learning (`Own` its
+    /// override, `Inherit` a copy of `member_default`, `Static` none) for
+    /// any policy, `credits` and slots; `credits` is dropped and the other
+    /// members keep their policies.
+    #[test]
+    fn detach_composes_bitwise_and_yields_the_tables_learning(
+        member in 0usize..12,
+        policy in policy_strategy(),
+        credits in any::<bool>(),
+        scale in -2.0f32..2.0,
+        own in -2.0f32..2.0,
+        scale_learning in proptest::option::of(learning_strategy()),
+        member_default in proptest::option::of(learning_strategy()),
+    ) {
+        let (mut def, id) = paired(DirectedVoteKind::Move, 3);
+        def.bundle_mut(id).set_scale(scale);
+        def.bundle_mut(id).set_slot(LearningSlot::Scale, scale_learning);
+        def.bundle_mut(id).set_slot(LearningSlot::MemberDefault, member_default);
+        let members: Vec<EdgeOccurrence> = def.members(id).collect();
+        let at = members[member % members.len()];
+        def.edge_mut(at).set_weight(own);
+        def.edge_mut(at).set_policy(policy);
+        def.edge_mut(at).set_credits(credits);
+        let pattern = def.pattern(at, &pair_refs());
+        let siblings: Vec<Membership> = members
+            .iter()
+            .filter(|&&m| m != at)
+            .map(|&m| def.edge_at(m).membership().unwrap())
+            .collect();
+        let (moved, removed) = detach(&mut def, at, &pair_refs());
+        prop_assert!(!removed);
+        let edge = def.edge_at(moved);
+        prop_assert_eq!(edge.own_weight().to_bits(), compose(own, scale, pattern).to_bits());
+        let want = match policy {
+            MemberPolicy::Own(learning) => Some(learning),
+            MemberPolicy::Inherit => member_default,
+            MemberPolicy::Static => None,
+        };
+        prop_assert_eq!(edge.role(), EdgeRole::Lone(want));
+        let after: Vec<Membership> = def
+            .members(id)
+            .map(|m| def.edge_at(m).membership().unwrap())
+            .collect();
+        prop_assert_eq!(after, siblings);
+        prop_assert_eq!(def.bundles()[id.index()].scale_learning(), scale_learning);
+    }
+
+    /// T25.F12 invariant 4: the layout's effective learning for a member is
+    /// its override when `Own`, `member_default` or none when `Inherit`,
+    /// none when `Static`; it lists the member as a contributor exactly when
+    /// it credits a bundle with `scale_learning`.
+    #[test]
+    fn the_layouts_effective_learning_follows_the_policy(
+        policies in proptest::collection::vec((policy_strategy(), any::<bool>()), 12),
+        scale_learning in proptest::option::of(learning_strategy()),
+        member_default in proptest::option::of(learning_strategy()),
+    ) {
+        let (mut def, id) = paired(DirectedVoteKind::Move, 3);
+        def.bundle_mut(id).set_slot(LearningSlot::Scale, scale_learning);
+        def.bundle_mut(id).set_slot(LearningSlot::MemberDefault, member_default);
+        let members: Vec<EdgeOccurrence> = def.members(id).collect();
+        for (&at, &(policy, credits)) in members.iter().zip(&policies) {
+            def.edge_mut(at).set_policy(policy);
+            def.edge_mut(at).set_credits(credits);
+        }
+        let layout = LearningLayout::of(&def, &pair_refs());
+        for (&at, &(policy, credits)) in members.iter().zip(&policies) {
+            let want = match policy {
+                MemberPolicy::Own(learning) => Some(learning),
+                MemberPolicy::Inherit => member_default,
+                MemberPolicy::Static => None,
+            };
+            let got = layout
+                .edges
+                .iter()
+                .find(|learner| learner.occurrence == at)
+                .map(|learner| learner.learning);
+            prop_assert_eq!(got, want);
+            let contributes = layout
+                .scales
+                .iter()
+                .any(|scale| scale.contributors.iter().any(|c| c.occurrence == at));
+            prop_assert_eq!(contributes, credits && scale_learning.is_some());
+        }
+        prop_assert_eq!(layout.scales.len(), usize::from(scale_learning.is_some()));
+        // The lone independent edge never learns here.
+        prop_assert!(layout.edges.iter().all(|learner| learner.member.is_some()));
+    }
 }

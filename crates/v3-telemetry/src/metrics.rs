@@ -23,8 +23,8 @@ use opentelemetry_proto::tonic::metrics::v1::{
 use opentelemetry_proto::tonic::resource::v1::Resource;
 use v3_core::contracts::votes::DirectedVoteKind;
 use v3_core::contracts::ActionType;
-use v3_core::genome::cgp::Scope;
 use v3_core::ledger::DeathCause;
+use v3_core::mutation::event::Broadcast;
 use v3_core::mutation::{FORM_KEYS, WIRING_KEYS};
 use v3_core::neighborhood::distributions::capacity_distribution;
 use v3_core::neighborhood::drives::DriveCensus;
@@ -817,16 +817,16 @@ fn mutations(f: &mut Families, s: &SimStats) {
             }),
     );
 
-    // T25.F08: committed attribute changes by the scope they landed on, both
-    // series always exported.
+    // T25.F12: committed learning edits by their reach, both series always
+    // exported.
     f.push(
-        run_name("mutation_attribute_changes_total_by_scope"),
+        run_name("mutation_attribute_changes_total_by_broadcast"),
         Kind::Sum,
         "",
-        Scope::ALL.map(|scope| {
+        Broadcast::ALL.map(|broadcast| {
             (
-                vec![("petri.scope", scope.as_key().to_owned())],
-                s.mutation_attribute_changes_total_by_scope[scope.index()].into(),
+                vec![("petri.broadcast", broadcast.as_key().to_owned())],
+                s.mutation_attribute_changes_total_by_broadcast[broadcast.index()].into(),
             )
         }),
     );
@@ -1070,7 +1070,7 @@ fn tick_values(f: &mut Families, s: &SimStats, census: &Census) {
 
 /// The plasticity census families (T25.F06, T25.F07, T25.F09): at most two
 /// attributes per family; the edges by pathway and surface, by rule, by
-/// inheritance, by scope and by retention, drift and at-clamp by surface,
+/// inheritance, by source and by retention, drift and at-clamp by surface,
 /// the learned scales, their drift and those at their bound by inheritance,
 /// and the learned scales by retention.
 fn plasticity_values(f: &mut Families, plasticity: &PlasticityCensus) {
@@ -1117,12 +1117,12 @@ fn plasticity_values(f: &mut Families, plasticity: &PlasticityCensus) {
         }),
     );
     f.push(
-        "petri.tick.plastic_edges_by_scope".to_owned(),
+        "petri.tick.plastic_edges_by_source".to_owned(),
         sampled,
         "",
-        plasticity.scope_counts().map(|(scope, edges)| {
+        plasticity.source_counts().map(|(source, edges)| {
             (
-                vec![("petri.plasticity_scope", scope.to_owned())],
+                vec![("petri.plasticity_source", source.to_owned())],
                 edges.into(),
             )
         }),

@@ -474,84 +474,83 @@ added/removed/retyped — only their edges are evolvable.
 - `CopyNodeInputs` (copies one compute node's edge set onto another; the
   source is drawn from the nodes that have edges, and a graph with fewer than
   two compute nodes or no edge-bearing node is not an applicable target)
-- The nine plasticity operators act on edges (T25.F06): each picks one edge
-  uniformly among the edges matching its predicate, in `edge_sites` order over
-  both surfaces (count-then-select, one draw), writes through
-  `EdgeMut::set_plasticity`, and applies to a module when any edge matches. A
-  `ClearSlot` edge never matches; a bundle member does (T25.F07). After the
-  pick a member draws the **scope coin** `gen_bool(0.5)`: false, the change
-  lands on the picked member; true, on every member of its bundle the
-  operator's predicate admits, the rest untouched with no draw; a non-member
-  draws no coin. Value draws follow the coin and are drawn once, and each
-  target applies the law to its own config: `EnableHebbian` writes one
-  config to every admitted (static) member; `EnableRewardModulation` sets one
-  modulation, each member keeping its rule, rate, clamp and flag;
-  `DisableRewardModulation` clears the modulation alone; `MutateHebbianRule`
-  and `MutateRewardSource` draw among the others of the picked edge's value
-  and write the drawn value; `ToggleHebbianLamarckian` writes the picked
-  edge's flipped flag; `MutateHebbianRate` and `MutateTraceDecay` draw one
+- The learning operators (T25.F06, T25.F09, T25.F12) edit one `Learning`
+  (rule, rate, clamp, reward modulation, retention, `lamarckian`) wherever
+  it is stored: on a lone edge, on a member as its `Own` override, or in a
+  bundle's `scale_learning` or `member_default` slot. Each draws one target
+  uniformly among the node's eligible targets: edges in `edge_sites` order
+  over both surfaces, then bundle slots in `BundleId` order,
+  `scale_learning` before `member_default` (count-then-select, one draw),
+  and applies to a module when any target matches. A `ClearSlot` edge never
+  matches. A picked member then draws the **broadcast coin**
+  `gen_bool(0.5)`: false, the edit lands on the picked member; true, on
+  every member of its bundle the operator's predicate admits, in canonical
+  order, the rest untouched with no draw; a lone edge and a slot draw no
+  coin. Value draws follow the coin and are drawn once from the picked
+  target's stored learning, and each target applies the law to its own:
+  `EnableHebbian` writes one fresh learning to every target (a member
+  becomes `Own`); `DisableHebbian` clears a lone edge's or a slot's learning
+  and makes a member `Static`; `EnableRewardModulation` sets one modulation,
+  each target keeping its rule, rate, clamp and flag;
+  `DisableRewardModulation` clears the modulation alone;
+  `MutateHebbianRule` and `MutateRewardSource` draw among the others of the
+  picked target's value and write the drawn value;
+  `ToggleHebbianLamarckian` writes the picked target's flipped flag;
+  `MutateHebbianRate` and `MutateTraceDecay` draw one
   `u = gen_range(-1.0..=1.0)` and each target steps its own value by its
-  branch (`× (1 + 0.3u)` above 0.01, else `+ 0.05u`, then `[0, 1]`). Weights
-  and catalog positions are unchanged; a learning attribute carries no
-  genome unit.
-  Plasticity travels with its edge: retarget, split (the consumer keeps it,
+  branch (`× (1 + 0.3u)` above 0.01, else `+ 0.05u`, then `[0, 1]`). A
+  learning setting carries no genome unit. Each committed learning edit
+  counts once by its reach, `members` for a member with a true coin, else
+  `one` (`EventReport.broadcast`, `attribute_changes_by_broadcast`).
+  Learning travels with its edge: retarget, split (the consumer keeps it,
   the identity edge is static), `CopyComputeNode`, `CopySubgraph` and
   `CopyNodeInputs` copy it; `AddGraphEdge` pushes a static edge and a
-  creation draws its bundle's learning; `RemoveGraphEdge` removes it with the edge.
-- `EnableHebbian` (a static, eligible edge: rule, rate `0.01..0.2`, clamp
-  `1.0..5.0`, Lamarckian coin)
-- `DisableHebbian` (a plastic edge: remove its `PlasticityConfig`)
-- `MutateHebbianRule` (a plastic edge: one of the other three rules)
-- `MutateHebbianRate` (a plastic edge: perturb `learning_rate`, kept in `[0, 1]`)
-- `ToggleHebbianLamarckian` (a plastic edge: flip the inheritance flag)
-- `EnableRewardModulation` (a pure Hebbian edge: a channel and decay `0.5..0.99`)
-- `DisableRewardModulation` (a modulated edge: remove its modulation)
-- `MutateRewardSource` (a modulated edge: one of the other three channels)
-- `MutateTraceDecay` (a modulated edge: perturb `trace_decay`, kept in `[0, 1]`)
-- `SetScope` (T25.F07, key `Graph.SetScope`, weight 2, Neutral, after
-  `RemoveBundle` in the catalog; applies to a Graph node with a member): one
-  member uniformly in canonical order, the scope coin, then the other of the
-  picked member's scope written to it alone or to every member of its bundle;
-  no value draw. Scope carries no genome unit.
-  Each committed change of the nine plasticity operators, `SetScope` and
-  the three edge retention operators counts once at the scope it landed on,
-  `Group` for a member with a true coin, else `Edge`
-  (`attribute_changes_by_scope`, T25.F08, T25.F09).
-- **Retention** (T25.F09): an edge's `retention` and a bundle's (its learned
-  scale's) set how far a learned quantity relaxes toward its birth value
-  each tick (graph backend spec Section 13); `EnableHebbian` and both
-  creation forms write 1 with no draw. Six operators after
-  `DetachGraphEdge`, keys `Graph.<name>`, all Neutral, `Δgenome_size` 0,
-  none admitted by restricted size pressure:
+  creation draws its bundle's learning; `RemoveGraphEdge` removes it with
+  the edge.
 
-  | Operator | Weight | Applies to | Draws, in order |
+  | Operator (key `Graph.<name>`) | Weight | Targets (eligible) | Effect |
   | --- | ---: | --- | --- |
-  | `EnableRetention` | 1 | a Graph node with a plastic edge at retention 1 | one such edge uniformly in canonical order; the scope coin for a member (a bundle-wide change reaches every admitted member); one `u = gen_range(-4.0..=0.0)`; retention `1 − 10ᵘ` on every target |
-  | `DisableRetention` | 1 | a Graph node with a plastic edge below retention 1 | the edge and coin; no value draw; retention 1 |
-  | `MutateRetention` | 4 | as `DisableRetention` | the edge and coin; one `u = gen_range(-1.0..=1.0)`; each target's deficit `d = 1 − retention` becomes `(d · (1 + 0.3u)).clamp(10⁻⁴, 1)` |
-  | `EnableBundleRetention` | 1 | a Graph node with a bundle record at retention 1 | one such record uniformly in `BundleId` order (a record without a scale slot admitted, its retention inert); `EnableRetention`'s draw |
-  | `DisableBundleRetention` | 1 | a Graph node with a bundle record below retention 1 | the record; retention 1 |
-  | `MutateBundleRetention` | 4 | as `DisableBundleRetention` | the record; `MutateRetention`'s `u` and step |
+  | `EnableHebbian` | 1 | a lone edge without learning that may learn; a member not `Own`; an absent slot | a fresh learning: rule, rate `0.01..0.2`, clamp `1.0..5.0`, Lamarckian coin, retention 1 |
+  | `DisableHebbian` | 1 | a lone edge with learning; a member not `Static`; a present slot | none; a member becomes `Static` |
+  | `ClearLearningOverride` | 1 | a member not `Inherit` | `Inherit`; no value draw |
+  | `MutateHebbianRule` | 2 | a stored learning (lone, `Own`, present slot) | one of the other three rules |
+  | `MutateHebbianRate` | 4 | as `MutateHebbianRule` | perturb `learning_rate`, kept in `[0, 1]` |
+  | `ToggleHebbianLamarckian` | 2 | as `MutateHebbianRule` | flip the inheritance flag |
+  | `EnableRewardModulation` | 1 | a stored learning without modulation | a channel and decay `0.5..0.99` |
+  | `DisableRewardModulation` | 1 | a stored learning with modulation | remove its modulation |
+  | `MutateRewardSource` | 2 | as `DisableRewardModulation` | one of the other three channels |
+  | `MutateTraceDecay` | 4 | as `DisableRewardModulation` | perturb `trace_decay`, kept in `[0, 1]` |
+  | `ToggleCredits` | 2 | a member | the other of the picked member's `credits` on every target; no value draw |
+  | `EnableRetention` | 1 | a stored learning at retention 1 | one `u = gen_range(-4.0..=0.0)`; retention `1 − 10ᵘ` on every target |
+  | `DisableRetention` | 1 | a stored learning below retention 1 | retention 1; no value draw |
+  | `MutateRetention` | 4 | as `DisableRetention` | one `u = gen_range(-1.0..=1.0)`; each target's deficit `d = 1 − retention` becomes `(d · (1 + 0.3u)).clamp(10⁻⁴, 1)` |
 
-  A scope-`Group` member's retention is inert but editable, as its
-  `lamarckian` flag; the bundle three report no scope.
+  `ClearLearningOverride` and `ToggleCredits` are Neutral; the enables are
+  Increasing, the disables Decreasing (`DisableRetention` Neutral), the
+  rest Neutral; every one has `Δgenome_size` 0 and only the decreasing ones
+  pass restricted size pressure. **Retention** (T25.F09) sets how far a
+  learned value relaxes toward its birth value each tick (graph backend
+  spec Section 13); `EnableHebbian` and the birth draws write 1.
 - Bundle operators (T25.F03, T25.F11), after `MutateTraceDecay`:
   `AddBundleLive`, `AddBundleSilent`, `AlterBundleScale`,
-  `ShiftBundleOffset`, `RetargetBundle`, `RemoveBundle`, then `SetScope`
-  (T25.F07), `DetachGraphEdge` (T25.F08) and the six retention operators
-  (T25.F09). The Graph catalog holds 35 operators at total weight 78; no
-  operator is disabled by configuration. A bundle is a record
+  `ShiftBundleOffset`, `RetargetBundle`, `RemoveBundle`, then
+  `ToggleCredits` (T25.F12, in `SetScope`'s place), `DetachGraphEdge`
+  (T25.F08) and the three retention operators (T25.F09).
+  `ClearLearningOverride` follows `DisableHebbian`. The Graph catalog holds
+  33 operators at total weight 73; no operator is disabled by
+  configuration. A bundle is a record
   `{source: Sensor {ref_idx, field_set} | Memory {previous}, wiring:
   Plain {sink} | Ring {kind, offset} | DirectionPair {kind, offset}, scale,
-  inherit_scale, retention}` plus its member sink edges, each with a
-  `scope` (graph backend spec, "Edge bundles"). The sensor descriptor
+  scale_learning, member_default}` plus its member sink edges, each with a
+  `policy` (`Inherit`, `Static`, `Own(Learning)`) and `credits` (graph
+  backend spec, "Edge bundles"). The sensor descriptor
   (`contracts::SensorDescriptor`) gives every sensor its width and field
   sets: one per slot of `NearbyCreature`, two per area summary (sharing the
   facts), one `Ring` set per neighbor ring, one plain set of every field for
   every other sensor; each shared-memory bank is one plain set of 16 slots
   with no declaration. The unit operators pick one bundle uniformly over
   every wiring, edit the record and move members with it by coordinate,
-  scope included.
+  policies and `credits` included.
 
   **Plans.** `plans(def, set)` lists a set's admissible wirings in order: a
   plain set one `Plain` per present vote sink in catalog order; a `Ring` or
@@ -566,20 +565,25 @@ added/removed/retyped — only their edges are evolvable.
   `gen_range(-1.0f32..=1.0)`; silent: scale 0, no draw); a set with no
   admissible plan skips the event with `NoApplicableTarget` before its
   draws. The node's owner operation then builds every bundle at once, each
-  with every coordinate of its set (own weight 0, static, scope `Edge`, no
-  seed). Then, per bundle in order, learning: the form coin
-  `gen_bool(0.5)` (true `Randomized`); the uniform form draws one mode
-  `gen_range(0..3u8)` (0 static, 1 Hebbian, 2 reward-modulated), its
-  config by `EnableHebbian`'s law (then `EnableRewardModulation`'s for
-  mode 2) and one scope coin, written to every member; the randomized form
-  draws a mode, config and scope coin per member in canonical order; both
-  then draw one `inherit_scale` coin. The pattern is never drawn.
+  with every coordinate of its set (own weight 0, `Static`, `credits`
+  false, no seed). Then, per bundle in order, learning (T25.F12 invariant
+  10): the form coin `gen_bool(0.5)` (true `Randomized`); `scale_learning`
+  then `member_default` each by one mode `gen_range(0..3u8)` (0 absent, 1
+  Hebbian, 2 reward-modulated) with its learning by `EnableHebbian`'s law
+  (then `EnableRewardModulation`'s for mode 2); then the uniform form draws
+  one policy and one `credits` coin `gen_bool(0.5)` written to every
+  member, the randomized form a policy then a coin per member in canonical
+  order. A policy draw is `gen_bool(0.5)` true `Inherit`, else a mode:
+  absent `Static`, present `Own`. Modifiers stay 0 and the pattern is never
+  drawn.
 
   **Detach** (T25.F08): `DetachGraphEdge` applies to a Graph node with a
   member. It draws one member uniformly in canonical order (one draw, no
   coin, no value draw) and detaches it as a retarget does: its own weight
-  becomes `compose(own, scale, pattern)` bitwise, its membership and scope
-  clear, its plasticity stays, it moves to the end of its sink's
+  becomes `compose(own, scale, pattern)` bitwise, its membership clears
+  and its lone learning is its effective learning (`Own` its override,
+  `Inherit` a copy of `member_default` when present, `Static` none;
+  `credits` dropped; T25.F12 invariant 8), it moves to the end of its sink's
   independent prefix, and its seed composes (T25.F07 invariant 6); every
   member, a fact on the drive included, detaches by this one law. A last
   member's detach removes the record and renumbers higher `BundleId`s. A

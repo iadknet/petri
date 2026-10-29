@@ -128,13 +128,12 @@ Constraints:
   dispatch history start empty. Shared memory follows the separate memory
   rule above.
 - Before mutation the parent's learned state captures the draft's
-  `BirthSeeds` (T25.F06, T25.F07): nothing for a backend with no initialized
-  learner and no initialized scale slot, else one row per compute node and
-  one per sink, each sized to its inputs, the own quantity of each
-  initialized ungrouped or edge-scope learner on either surface (`None` for a
-  group-scope learner and every static edge), and one group slot per group
-  record with the learned scale of each initialized scale slot. Parent flags
-  do not restrict the capture.
+  `BirthSeeds` (T25.F06, T25.F12): nothing for a backend with no initialized
+  learner, else one row per compute node and one per sink, each sized to its
+  inputs, the value of each initialized edge learner at its occurrence
+  (`None` elsewhere), and one bundle slot per bundle record with the learned
+  scale of each initialized scale learner. Parent flags do not restrict the
+  capture.
 - Seeds follow their edge occurrence through the entire birth mutation
   sequence, including mesh and compute-node moves and faithful copies, on
   both surfaces: a pushed edge gets an empty seed at its insertion position
@@ -143,27 +142,28 @@ Constraints:
   keeps the consumer's seed while the new identity edge has none. Group
   slots follow their records: a new group gets an empty slot, dropping a
   record (`RemoveGroup`, a last member's removal or detach) removes its
-  slot, and a relocation, a scope write, an `inherit_scale` write or a
-  `retention` write (T25.F09) keeps it.
+  slot, and a relocation, a policy, `credits` or slot write (T25.F12)
+  keeps it.
 - A detached member's seed is composed (T25.F07): when the edge or its group
   has a seed, `compose(edge seed or own weight, group seed or scale,
   pattern)`, reading no flag and clamping nothing; with neither, none.
 - A weight write, a source-changing retarget and an edge reading a removed
   compute node clear the edge's seed and a scale write clears the group's;
   a same-source retarget, a kind change, a learning-attribute change (an
-  edge `retention` write included, T25.F09) and a scope change keep it.
-- The child's constructor reads the final child flags: a Lamarckian
-  ungrouped or edge-scope learner with a seed starts at the seed clamped by
-  the child's edge clamp and counts as initialized; every other ungrouped or
-  edge-scope learner, a Darwinian one with a seed included, starts at its
-  child genomic own weight clamped by its edge clamp, uninitialized until
-  its backend's first visit; a group-scope learner holds its raw genomic own
-  weight. A scale slot starts at `clamp(seed, ±bound)`, initialized, when
-  the child group has `inherit_scale` and a seed, else at `clamp(genomic,
-  ±bound)`. That start is each quantity's birth value, toward which it
-  decays (T25.F09, graph backend spec Section 13). A
-  seed the child does not read is dropped. Only seeded slots are
-  initialized before that visit.
+  `retention` write included, T25.F09) and a policy or `credits` change keep
+  it.
+- The child's constructor reads the child's own learning layout, built once
+  after its mutation (T25.F12): an edge learner whose effective learning is
+  Lamarckian and that has a seed starts at the seed clamped by its clamp and
+  counts as initialized; every other edge learner, a Darwinian one with a
+  seed included, starts at its child genomic own weight clamped by its
+  clamp, uninitialized until its backend's first visit. A scale learner
+  starts at `clamp(seed, ±clamp)`, initialized, when its `scale_learning` is
+  Lamarckian and the bundle has a seed, else at `clamp(genomic, ±clamp)`;
+  one without contributors is seeded and captured like any other. That start
+  is each learner's birth value, toward which it decays (T25.F09, graph
+  backend spec Section 13). A seed the child has no Lamarckian learner for is
+  dropped. Only seeded learners are initialized before that visit.
 - Reproduction writes no runtime field and never changes the parent's state;
   a built creature's genome carries no seeds, and runtime arrays do not define
   homology.

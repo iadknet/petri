@@ -176,20 +176,22 @@ memory writes do not establish useful learning or memory capability.
 
 From T25.F06 every persistence checkpoint sample carries
 `plasticity_census` beside `sensor_census`: `creatures`, `carriers`
-(creatures with a plastic edge on either surface of a reachable node),
+(creatures with a learner, an edge's or a scale's, on a reachable node,
+T25.F12),
 `edges` rows `{learning, surface, edges, drift_sum, at_clamp}` for the four
 (pathway, surface) cells, `edges_by_rule` and `edges_by_inheritance` rows
 `{key, edges}`, every row present. Drift and at-clamp read initialized edges
-only. The block is absent in samples stored before T25.F06. Since T25.F07 it
-adds `edges_by_scope` rows `{key, edges}` (`ungrouped`, `edge`, `group`) and
-`scales` rows `{inheritance, scales, drift_sum, at_bound}` (`darwinian`,
-`lamarckian`, by the group's `inherit_scale`), drift and at-bound over
-initialized scale slots, once per group; edge drift and at-clamp read
-initialized own quantities only, so a group-scope learner adds neither.
+only. The block is absent in samples stored before T25.F06. Since T25.F12 it
+carries `edges_by_source` rows `{key, edges}` (`lone`, `own`,
+`member_default`, replacing T25.F07's `edges_by_scope`) over edge learners
+and `scales` rows `{inheritance, scales, drift_sum, at_bound}` (`darwinian`,
+`lamarckian`, by `scale_learning`'s `lamarckian`), drift and at-bound (its
+clamp) over initialized scale learners, every scale learner counted once
+per bundle; edge drift and at-clamp read initialized edge learners only.
 Since T25.F09 every drift is `|learned - birth|` (lifetime learning; a
 Lamarckian edge's ancestral component no longer counts), and the block adds
-`edges_by_retention` (every reachable plastic edge by its retention) and
-`scales_by_retention` (every scale slot by its group's) rows `{key, count,
+`edges_by_retention` (every reachable edge learner by its retention) and
+`scales_by_retention` (every scale learner by its own) rows `{key, count,
 initialized, drift_sum, at_bound}` for the keys `none` (retention exactly
 1), `1e-3`, `1e-2`, `1e-1` and `1` (the bin's upper bound on `1 −
 retention`); drift and at-bound read initialized entries, and both lists

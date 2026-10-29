@@ -631,7 +631,9 @@ impl WorldTracking {
                 not_applicable_target_total: stats.mutation_not_applicable_target_total,
                 graph_edges_detached_total: stats.graph_edges_detached_total,
                 bundles_removed_total: stats.bundles_removed_total,
-                attribute_changes_by_scope: stats.mutation_attribute_changes_total_by_scope.into(),
+                attribute_changes_by_broadcast: stats
+                    .mutation_attribute_changes_total_by_broadcast
+                    .into(),
                 operator_funnel_by_operator: stats
                     .mutation_operator_funnel_total_by_operator
                     .iter()
@@ -910,20 +912,22 @@ impl PlasticKeyRow {
 /// One inheritance cell of a checkpoint's learned scales (T25.F07).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LearnedScaleRow {
-    /// `darwinian` or `lamarckian`: the bundle's `inherit_scale`.
+    /// `darwinian` or `lamarckian`: the bundle's `scale_learning`'s
+    /// `lamarckian` (T25.F12).
     pub inheritance: String,
     pub scales: u64,
-    /// Sum of `|learned - birth|` over the initialized scale slots
+    /// Sum of `|learned - birth|` over the initialized scale learners
     /// (T25.F09).
     pub drift_sum: String,
-    /// Initialized scale slots at their bound.
+    /// Initialized scale learners at their clamp.
     pub at_bound: u64,
 }
 
 /// The plasticity census of one checkpoint (T25.F06, T25.F07, T25.F09):
-/// living creatures, carriers, the reachable plastic edges by (pathway,
-/// surface), by rule, by inheritance, by scope and by retention, and the
-/// learned scales by inheritance and by retention, every row always present.
+/// living creatures, carriers (a learner on a reachable node, T25.F12), the
+/// reachable edge learners by (pathway, surface), by rule, by inheritance,
+/// by source and by retention, and the learned scales by inheritance and by
+/// retention, every row always present.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlasticityCensusBlock {
     pub creatures: u64,
@@ -931,9 +935,10 @@ pub struct PlasticityCensusBlock {
     pub edges: Vec<PlasticEdgeRow>,
     pub edges_by_rule: Vec<PlasticKeyRow>,
     pub edges_by_inheritance: Vec<PlasticKeyRow>,
-    /// Since T25.F07; empty in a report stored before it.
+    /// Edge learners by source (`lone`, `own`, `member_default`), since
+    /// T25.F12; empty in a report stored before it.
     #[serde(default)]
-    pub edges_by_scope: Vec<PlasticKeyRow>,
+    pub edges_by_source: Vec<PlasticKeyRow>,
     /// Since T25.F07; empty in a report stored before it.
     #[serde(default)]
     pub scales: Vec<LearnedScaleRow>,
@@ -971,7 +976,7 @@ impl PlasticityCensusBlock {
                 .collect(),
             edges_by_rule: PlasticKeyRow::rows(census.rule_counts()),
             edges_by_inheritance: PlasticKeyRow::rows(census.inheritance_counts()),
-            edges_by_scope: PlasticKeyRow::rows(census.scope_counts()),
+            edges_by_source: PlasticKeyRow::rows(census.source_counts()),
             scales: census
                 .scale_cells()
                 .map(|(inheritance, cell)| LearnedScaleRow {

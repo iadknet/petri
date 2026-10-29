@@ -3,15 +3,14 @@ use std::fmt;
 
 use crate::config::{MutationConfig, ReachableBiasConfig};
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
-use crate::genome::cgp::Scope;
 use crate::mutation::graph::GraphOperator;
 use crate::mutation::input_ref::InputRefOperator;
 use crate::mutation::topology::TopologyOperator;
 use crate::mutation::vm::VmOperator;
 
 pub use crate::mutation::event::{
-    wiring_index, BirthEdgeClass, BundleEdits, ComplexityEffect, EventReport, MutationSkipReason,
-    TargetReachability, FORM_KEYS, WIRING_KEYS,
+    wiring_index, BirthEdgeClass, Broadcast, BundleEdits, ComplexityEffect, EventReport,
+    MutationSkipReason, TargetReachability, FORM_KEYS, WIRING_KEYS,
 };
 
 /// Domain selected for a mutation event.
@@ -406,10 +405,9 @@ pub struct MutationSummary {
     /// `randomized`), so a wiring is attributed to the operator that built
     /// it when one event builds several.
     pub bundles_created_by_operator: HashMap<MutationOperator, [[u32; 2]; 3]>,
-    /// Committed attribute changes (the nine plasticity operators and
-    /// `SetScope`) by the scope they landed on, indexed by
-    /// [`Scope::index`] (T25.F08).
-    pub attribute_changes_by_scope: [u32; 2],
+    /// Committed learning edits (the fourteen learning operators) by how
+    /// far they reached, indexed by [`Broadcast::index`] (T25.F12).
+    pub attribute_changes_by_broadcast: [u32; 2],
 }
 
 impl MutationSummary {
@@ -438,7 +436,7 @@ impl MutationSummary {
             graph_edges_detached: 0,
             bundles_removed: 0,
             bundles_created_by_operator: HashMap::new(),
-            attribute_changes_by_scope: [0; 2],
+            attribute_changes_by_broadcast: [0; 2],
         }
     }
 
@@ -460,9 +458,9 @@ impl MutationSummary {
         self.bundles_removed += u32::from(edits.removed);
     }
 
-    /// Record one committed attribute change at the scope it landed on.
-    pub fn record_attribute_scope(&mut self, scope: Scope) {
-        self.attribute_changes_by_scope[scope.index()] += 1;
+    /// Record one committed learning edit at its reach.
+    pub fn record_broadcast(&mut self, broadcast: Broadcast) {
+        self.attribute_changes_by_broadcast[broadcast.index()] += 1;
     }
 
     /// Record the class of a vote-sink edge an applied event pushed.

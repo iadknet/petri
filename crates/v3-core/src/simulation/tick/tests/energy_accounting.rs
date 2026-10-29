@@ -378,8 +378,7 @@ fn learning_genome(reward: bool) -> crate::genome::CreatureGenome {
     use crate::contracts::OutcomeChannel;
     use crate::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource};
     use crate::genome::{
-        BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig,
-        RewardModulationConfig,
+        BackendDef, CreatureGenome, HebbianRule, Learning, NodeGenome, RewardModulationConfig,
     };
     CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -398,7 +397,7 @@ fn learning_genome(reward: bool) -> crate::genome::CreatureGenome {
                             },
                             0.5,
                         )],
-                        Some(PlasticityConfig {
+                        Some(Learning {
                             rule: HebbianRule::Classic,
                             learning_rate: 0.5,
                             weight_clamp: 2.0,
@@ -464,7 +463,7 @@ fn sink_learning_genome() -> crate::genome::CreatureGenome {
     use crate::genome::cgp::{
         CgpGraphBackendDef, EdgeOccurrence, GraphEdge, GraphSource, OutputSinkKind,
     };
-    use crate::genome::{BackendDef, HebbianRule, PlasticityConfig, RewardModulationConfig};
+    use crate::genome::{BackendDef, HebbianRule, Learning, RewardModulationConfig};
     let mut genome = learning_genome(true);
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     let eat = def
@@ -481,7 +480,7 @@ fn sink_learning_genome() -> crate::genome::CreatureGenome {
         ),
     );
     def.edge_mut(EdgeOccurrence::new(eat, 0))
-        .set_plasticity(Some(PlasticityConfig {
+        .set_learning(Some(Learning {
             rule: HebbianRule::Classic,
             learning_rate: 0.5,
             weight_clamp: 2.0,

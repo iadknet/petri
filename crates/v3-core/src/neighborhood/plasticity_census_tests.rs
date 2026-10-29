@@ -12,14 +12,12 @@ use crate::genome::cgp::{
     validate_graph, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, GraphEdge,
     GraphInvariantViolation, GraphSource, OutputSinkKind,
 };
-use crate::genome::{
-    BackendDef, CreatureGenome, NodeGenome, PlasticityConfig, RewardModulationConfig,
-};
+use crate::genome::{BackendDef, CreatureGenome, Learning, NodeGenome, RewardModulationConfig};
 use crate::runtime::plasticity::PlasticityKind;
 use crate::runtime::state::GraphRuntimeState;
 
-fn plastic(rule: HebbianRule, reward_modulated: bool, lamarckian: bool) -> PlasticityConfig {
-    PlasticityConfig {
+fn plastic(rule: HebbianRule, reward_modulated: bool, lamarckian: bool) -> Learning {
+    Learning {
         rule,
         learning_rate: 0.1,
         weight_clamp: 2.0,
@@ -32,7 +30,7 @@ fn plastic(rule: HebbianRule, reward_modulated: bool, lamarckian: bool) -> Plast
     }
 }
 
-fn node(plasticity: Option<PlasticityConfig>, weights: &[f32]) -> ComputeNode {
+fn node(plasticity: Option<Learning>, weights: &[f32]) -> ComputeNode {
     plastic_node(
         ComputeNodeKind::Add,
         weights
@@ -154,7 +152,7 @@ fn an_uninitialized_edge_has_no_drift_and_is_never_at_its_clamp() {
 /// normalized by the reader.
 #[test]
 fn an_out_of_range_clamp_is_rejected_at_the_load_boundary() {
-    let json = r#"{"compute_nodes":[{"kind":"Add","inputs":[{"source":{"ComputeNode":0},"own_weight":0.0,"plasticity":{"rule":"Oja","learning_rate":0.1,"weight_clamp":50.0,"lamarckian":false,"retention":1.0}}]}],"output_sinks":[]}"#;
+    let json = r#"{"compute_nodes":[{"kind":"Add","inputs":[{"source":{"ComputeNode":0},"own_weight":0.0,"learning":{"rule":"Oja","learning_rate":0.1,"weight_clamp":50.0,"lamarckian":false,"retention":1.0}}]}],"output_sinks":[]}"#;
     let def: CgpGraphBackendDef = serde_json::from_str(json).unwrap();
     let node = genome_of(def).nodes.remove(0);
     assert_eq!(
@@ -181,7 +179,7 @@ fn edges_land_in_their_pathway_surface_rule_and_inheritance() {
         .unwrap();
     def.push_edge(vote, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
     def.edge_mut(EdgeOccurrence::new(vote, 0))
-        .set_plasticity(Some(plastic(HebbianRule::Oja, true, false)));
+        .set_learning(Some(plastic(HebbianRule::Oja, true, false)));
     let census = census_of(&genome, &[0], None);
     assert_eq!(census.carriers, 1);
     assert_eq!(census.edges[REWARD][COMPUTE].edges, 2);
@@ -242,7 +240,7 @@ fn the_keyed_readers_carry_every_count_under_its_key() {
         ],
         edges_by_rule: [11, 12, 13, 14],
         edges_by_inheritance: [21, 22],
-        edges_by_scope: [31, 32, 33],
+        edges_by_source: [31, 32, 33],
         scales: [
             LearnedScales {
                 scales: 41,
@@ -280,8 +278,8 @@ fn the_keyed_readers_carry_every_count_under_its_key() {
     assert_eq!(rules, expected);
     assert_eq!(rules.len(), 4);
     assert_eq!(
-        census.scope_counts().collect::<Vec<_>>(),
-        vec![("ungrouped", 31), ("edge", 32), ("group", 33)]
+        census.source_counts().collect::<Vec<_>>(),
+        vec![("lone", 31), ("own", 32), ("member_default", 33)]
     );
     let scales: Vec<_> = census.scale_cells().collect();
     assert_eq!(
@@ -312,17 +310,18 @@ fn the_keyed_readers_carry_every_count_under_its_key() {
     assert_eq!(totals, vec![("compute", 0.625, 7), ("sink", 2.25, 10)]);
 }
 
-/// T25.F07 invariant 10: a bundle learner adds no edge drift, an unchanged
-/// correction under a nonzero genomic scale drifts 0, and a learned scale
-/// counts once per bundle by its `inherit_scale`, with its drift and bound.
+/// T25.F12 invariant 11: member learners count by source, an unchanged
+/// modifier under a nonzero genomic scale drifts 0, a crediting `Static`
+/// member adds no edge, and a learned scale counts once per bundle by its
+/// `scale_learning`'s `lamarckian`, with its drift and bound.
 #[test]
-fn bundle_scope_learners_and_learned_scales_are_censused_by_scope_and_scale() {
+fn member_learners_and_learned_scales_are_censused_by_source_and_scale() {
     use crate::contracts::votes::DirectedVoteKind;
     use crate::contracts::WorldInputKey;
-    use crate::genome::cgp::{BirthSeeds, EdgeSurface, Scope};
-    use crate::genome::HebbianRule;
+    use crate::genome::cgp::{BirthSeeds, EdgeSurface, LearningSlot};
+    use crate::genome::{HebbianRule, MemberPolicy};
 
-    let lamarckian = PlasticityConfig {
+    let lamarckian = Learning {
         rule: HebbianRule::Classic,
         learning_rate: 0.1,
         weight_clamp: 1.5,
@@ -333,17 +332,19 @@ fn bundle_scope_learners_and_learned_scales_are_censused_by_scope_and_scale() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     let id = def.add_ring_bundle(0, DirectedVoteKind::Move, 0);
     def.bundle_mut(id).set_scale(0.5);
-    def.bundle_mut(id).set_inherit_scale(true);
+    def.bundle_mut(id)
+        .set_slot(LearningSlot::Scale, Some(lamarckian));
+    def.bundle_mut(id)
+        .set_slot(LearningSlot::MemberDefault, Some(lamarckian));
     let members: Vec<EdgeOccurrence> = def.members(id).collect();
     def.edge_mut(members[0]).set_weight(0.25);
-    for (k, scope) in [Scope::Edge, Scope::Group, Scope::Group]
-        .into_iter()
-        .enumerate()
-    {
-        let mut edge = def.edge_mut(members[k]);
-        edge.set_plasticity(Some(lamarckian));
-        edge.set_scope(scope);
+    def.edge_mut(members[0])
+        .set_policy(MemberPolicy::Own(lamarckian));
+    for &member in &members[1..3] {
+        def.edge_mut(member).set_policy(MemberPolicy::Inherit);
+        def.edge_mut(member).set_credits(true);
     }
+    def.edge_mut(members[3]).set_credits(true);
     let mut sinks: Vec<Vec<Option<f32>>> = def
         .output_sinks()
         .iter()
@@ -352,8 +353,8 @@ fn bundle_scope_learners_and_learned_scales_are_censused_by_scope_and_scale() {
     let EdgeSurface::SinkInput(sink) = members[0].surface else {
         unreachable!()
     };
-    // The edge learner's seed is its genomic correction; the scale is
-    // seeded past its bound.
+    // The `Own` learner's seed is its genomic modifier; the scale is seeded
+    // past its clamp.
     sinks[sink][members[0].index] = Some(0.25);
     let seeds = BirthSeeds::Rows {
         compute: Vec::new(),
@@ -374,10 +375,11 @@ fn bundle_scope_learners_and_learned_scales_are_censused_by_scope_and_scale() {
     let state = GraphRuntimeState::for_genome(&genome, vec![Some(seeds)]);
     let census = PlasticityCensus::observe([(&[0usize][..], state.learned())]);
 
-    assert_eq!(census.edges_by_scope, [0, 1, 2]);
+    assert_eq!(census.edges_by_source, [0, 1, 2]);
+    assert_eq!(census.carriers, 1);
     let sink_cell = census.edges[0][1];
     assert_eq!(sink_cell.edges, 3);
-    assert_eq!(sink_cell.drift_sum, 0.0, "the unchanged correction");
+    assert_eq!(sink_cell.drift_sum, 0.0, "the unchanged modifier");
     assert_eq!(sink_cell.at_clamp, 0);
     let [darwinian, lamarckian_scales] = census.scales;
     assert_eq!(darwinian, LearnedScales::default());
@@ -424,7 +426,8 @@ fn retention_bins_cover_every_admitted_retention() {
 fn edges_and_scales_are_censused_by_retention_bin_with_birth_drift() {
     use crate::contracts::votes::DirectedVoteKind;
     use crate::contracts::{InputReference, WorldInputKey};
-    use crate::genome::cgp::Scope;
+    use crate::genome::cgp::LearningSlot;
+    use crate::genome::MemberPolicy;
 
     for (retention, bin) in [
         (1.0, 0),
@@ -436,17 +439,16 @@ fn edges_and_scales_are_censused_by_retention_bin_with_birth_drift() {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         let id = def.add_ring_bundle(0, DirectedVoteKind::Move, 0);
         def.bundle_mut(id).set_scale(0.5);
-        def.bundle_mut(id).set_retention(retention);
         let members: Vec<EdgeOccurrence> = def.members(id).collect();
-        let config = PlasticityConfig {
+        let config = Learning {
             retention,
             ..plastic(HebbianRule::Classic, false, false)
         };
-        for (k, scope) in [Scope::Edge, Scope::Group].into_iter().enumerate() {
-            let mut edge = def.edge_mut(members[k]);
-            edge.set_plasticity(Some(config));
-            edge.set_scope(scope);
-        }
+        def.bundle_mut(id)
+            .set_slot(LearningSlot::Scale, Some(config));
+        def.edge_mut(members[0])
+            .set_policy(MemberPolicy::Own(config));
+        def.edge_mut(members[1]).set_credits(true);
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![NodeGenome {
@@ -460,7 +462,7 @@ fn edges_and_scales_are_censused_by_retention_bin_with_birth_drift() {
         let census = PlasticityCensus::observe([(&[0usize][..], unvisited.learned())]);
         let mut expected = [RetentionCell::default(); 5];
         expected[bin] = RetentionCell {
-            count: 2,
+            count: 1,
             ..RetentionCell::default()
         };
         assert_eq!(census.edges_by_retention, expected, "{retention}");
@@ -472,9 +474,8 @@ fn edges_and_scales_are_censused_by_retention_bin_with_birth_drift() {
         visited.learned.set_scale(0, 0, 1.25);
         let census = PlasticityCensus::observe([(&[0usize][..], visited.learned())]);
         let edges = census.edges_by_retention[bin];
-        // The bundle learner counts but has no learned own quantity.
-        assert_eq!((edges.count, edges.initialized, edges.at_bound), (2, 1, 1));
-        assert_eq!(edges.drift_sum, 2.0, "|-2 - 0| from the birth correction");
+        assert_eq!((edges.count, edges.initialized, edges.at_bound), (1, 1, 1));
+        assert_eq!(edges.drift_sum, 2.0, "|-2 - 0| from the birth modifier");
         let scales = census.scales_by_retention[bin];
         assert_eq!(
             (scales.count, scales.initialized, scales.at_bound),

@@ -1403,7 +1403,7 @@ fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
         BirthSeeds, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
         GraphSource,
     };
-    use v3_core::genome::{BackendDef, HebbianRule, PlasticityConfig, RewardModulationConfig};
+    use v3_core::genome::{BackendDef, HebbianRule, Learning, RewardModulationConfig};
 
     let receiver = Receiver::start();
     let telemetry = Telemetry::start_with(options(receiver.endpoint(), Limits::default()));
@@ -1442,7 +1442,7 @@ fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
                     EdgeSurface::ComputeInput(compute),
                     index,
                 ))
-                .set_plasticity(Some(PlasticityConfig {
+                .set_learning(Some(Learning {
                     rule: HebbianRule::Covariance,
                     learning_rate: 0.1,
                     weight_clamp: 1.0,

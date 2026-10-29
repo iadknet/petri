@@ -63,13 +63,14 @@ pub struct Bundle {
     source: BundleSource,            // Sensor { ref_idx: u16, field_set: u8 } | Memory { previous: bool }
     wiring: Wiring,                  // Plain { sink } | Ring { kind, offset } | DirectionPair { kind, offset }; offset < 8
     scale: f32,                      // one shared weight; a live birth draws it, a silent birth 0
-    inherit_scale: bool,             // a parent's learned scale seeds the child (T25.F07), born false
-    retention: f32,                  // the learned scale's retention per tick, [0, 1] (T25.F09), born 1
+    scale_learning: Option<Learning>, // how the scale learns (T25.F12), born absent; omitted when None
+    member_default: Option<Learning>, // what `Inherit` members run (T25.F12), born absent; omitted when None
 }
 
 pub struct Membership {
     bundle: BundleId,
-    scope: Scope,                    // Edge | Group (T25.F07; the learning scope T25.F12 replaces), born Edge
+    policy: MemberPolicy,            // Inherit | Static | Own(Learning) (T25.F12), born Static
+    credits: bool,                   // the member's activity feeds the scale (T25.F12), born false
 }
 
 pub struct ComputeNode {
@@ -85,17 +86,17 @@ pub struct OutputSink {
 pub struct GraphEdge {
     source: GraphSource,
     own_weight: f32,                 // JSON key `own_weight`
-    plasticity: Option<PlasticityConfig>, // Section 13; omitted when None
-    membership: Option<Membership>,  // { bundle: BundleId, scope: Scope }; omitted when None
-}                                    // 40 bytes
+    role: EdgeRole,                  // Lone(Option<Learning>) | Member(Membership) (T25.F12)
+}                                    // 40 bytes; JSON `learning` (lone) or `membership`, never both
 ```
 
 Design choice: edges are co-located with each node/sink for linear,
 cache-friendly evaluation. Fixed structural outputs are stored in separate
 Vecs to prevent topology mutations from affecting them. Fields are private;
 the container (`cgp/container.rs`) is the only writer and keeps the birth
-seeds and the bundle invariants aligned; `EdgeMut::set_plasticity` is the only
-writer of an edge's learning attributes. A bundle stores no member list: its
+seeds and the bundle invariants aligned; `EdgeMut::set_learning`,
+`set_policy`, `set_credits` and `BundleMut::set_slot` are the only writers
+of learning (Section 13). A bundle stores no member list: its
 members are ordinary sink edges whose membership names it (Section 6).
 Equality, the `Debug` genome identity and JSON cover every heritable field
 and nothing else (`Debug` prints `bundles` unconditionally);
@@ -357,7 +358,7 @@ for every member. A non-member's genomic weight is its `own_weight`.
   `(kind, offset)` for every kind whose eight direction sinks (and, for a
   pair, its drive) are present. A new bundle materializes every coordinate
   of its set in canonical order (a pair's twelve compass coordinates, then
-  its facts), own weight 0, static, scope `Edge`, no seed; its scale follows
+  its facts), own weight 0, `Static`, `credits` false, no seed; its scale follows
   the birth law (`v3-mutation-spec.md`).
 - **Invariants.** `check_local_invariants` checks everything the record and
   the edge decide, after every bundle-touching primitive in debug builds:
@@ -546,134 +547,153 @@ counted in the per-visit energy cost. They are evaluated once post-evaluation.
 
 ---
 
-## 13. Plasticity
+## 13. Learning
 
-### PlasticityConfig
+### Learning
 
-Per-edge learning attributes (T25.F06), on `GraphEdge.plasticity`:
+One learning type (T25.F06, T25.F12), `genome::learning::Learning`, serves
+every learnable number:
 
 ```rust
-pub struct PlasticityConfig {
+pub struct Learning {
     pub rule: HebbianRule,        // Classic, Oja, AntiHebb, Covariance
     pub learning_rate: f32,       // [0, 1]
-    pub weight_clamp: f32,        // [0.01, 10]
-    pub lamarckian: bool,
+    pub weight_clamp: f32,        // [0.01, 10], the clamp of the learned value
+    pub lamarckian: bool,         // a child inherits the learned value
     pub modulation: Option<RewardModulationConfig>,
-    pub retention: f32,           // [0, 1], learned-weight retention per tick (T25.F09)
+    pub retention: f32,           // [0, 1], learned-value retention per tick (T25.F09)
 }
 
 pub struct RewardModulationConfig {
     pub reward_source: OutcomeChannel,  // EnergyDelta, ActionSuccess, DamageDelta, OffspringSuccess
     pub trace_decay: f32,               // [0.0, 1.0]
 }
+
+pub enum MemberPolicy { Inherit, Static, Own(Learning) }
 ```
 
-Every edge on either surface may be plastic except an edge of a `ClearSlot`
-sink (its sum is ignored); `validate_graph` rejects that case and any value
-outside the ranges above (I1), which the mutation draws and perturbations
-keep by construction. The laws read the stored values; no runtime clamp
-normalizes them. A learning attribute, a member's `scope` and a bundle's
-`inherit_scale` and `retention` carry no genome unit; `validate_graph`
-rejects a bundle retention outside `[0, 1]` (`BundleRetentionOutOfRange`). `CgpGraphBackendDef::plastic_edges()`
-enumerates the plastic edges in canonical (`edge_sites`) order and is the
-one definition of "carries learning".
+It is stored on a lone edge (`learning`), on a member as its override
+(`policy: Own(Learning)`), and in a bundle's two slots: `scale_learning`
+("learns as a group") and `member_default` ("learns per edge"), either,
+both or neither present. A **learner** is one learnable number: a lone
+edge's weight, a member's **modifier** (its own weight) or a bundle's
+scale. A member's **effective learning** is its override for `Own`,
+`member_default` for `Inherit` (none when absent), none for `Static`; its
+`credits` switch feeds the bundle's scale whatever its policy, so a member
+may learn its modifier and credit at once. A **contributor** is a member
+with `credits` of a bundle with `scale_learning`.
 
-A plastic bundle member (T25.F07) learns at its `scope`, the same for every
-member of every wiring: an **edge learner** (`Edge`) learns its own
-correction as an ungrouped edge learns its weight; a **group learner**
-(`Group`, the learning scope's name until T25.F12 replaces it) learns for its
-bundle, crediting the bundle's one shared scale. A bundle with at least one
-group learner has a **scale slot** whose **bound** is the smallest
-`weight_clamp` among its group learners; a static member of such a bundle is
-a **passive member**, weighed through the learned scale. Scope never splits
-a bundle: membership compares the `BundleId` only.
+Every lone edge on either surface may learn except an edge of a `ClearSlot`
+sink (its sum is ignored); members sit on vote sinks only. `validate_graph`
+checks I1 on every stored learning (lone, `Own`, both slots) and rejects a
+learning `ClearSlot` edge, and the mutation draws and perturbations keep the
+ranges by construction. The laws read the stored values; no runtime clamp
+normalizes them. No learning setting carries a genome unit. The writers are
+`EdgeMut::set_learning` (a lone edge), `EdgeMut::set_policy` and
+`set_credits` (a member) and `BundleMut::set_slot`; none changes a seed. A
+new member is born `Static` with `credits` false.
+
+### Learning layout
+
+`LearningLayout::of(def, input_refs)` (genome-owned) is the one analysis of
+what learns: in canonical order every **edge learner** (a lone edge with
+learning, or a member with an effective learning) with its occurrence,
+effective learning, source (`Lone`, `Own`, `MemberDefault`) and, for a
+member, its bundle and pattern; in `BundleId` order every **scale learner**
+(a bundle with `scale_learning`, whether or not it has contributors) with its
+learning, its contributors (possibly none) and its members (every member,
+each weighing through the learned scale). It is the only code that resolves
+`Inherit` or reads a policy or `credits` to decide what learns, and its
+emptiness is the one definition of "carries learning": runtime
+construction, `StructuralCompanions.has_plasticity`, the mesh annotations'
+stateful flag (an edge learner into a live compute node or a sink, or any
+scale learner), the census carriers and the lab's masking
+(`CreatureGenome::clear_learning`, which makes every lone edge static, every
+member `Static` and both slots absent) read it.
 
 When `modulation` is `None`: pure Hebbian learning, applied after the
 effects of each committed visit. When `Some`: reward-modulated three-factor
-learning, the eligibility trace updated per committed visit and the weight
+learning, the eligibility trace updated per committed visit and the value
 in Phase 2.5.
 
 ### Learned state
 
 `GraphRuntimeState::for_genome(genome, seeds)` is the only constructor and
-builds the learned state once (`runtime::plasticity::LearnedState`): per
-mesh node, the learner slots over both surfaces in canonical order, the
-scale slots in `BundleId` order (genomic scale, bound, learned scale, seeded
-flag), the passive members, a learned own quantity per ungrouped or edge
-learner (a group learner stores none), a trace per reward-modulated learner
-and a visited flag. A graph without a plastic edge allocates no learned
-state and runs the static loops. One composition gives every dynamic edge's
-**applied weight**:
+builds the learned state once per birth (`runtime::plasticity::LearnedState`)
+from each Graph node's layout, after the child's mutation and before its
+first visit: per learner its effective learning, value, birth value, trace
+and seeded flag, the contributor and member indices, and a visited flag per
+backend. `runtime::plasticity` names no member policy, `credits` or slot. A
+genome whose layouts are all empty allocates no learned state and runs the
+static loops. One composition gives every dynamic edge's **applied
+weight** (an edge learner, or a member of a bundle with a scale learner):
 
 ```text
 applied = own + scale × pattern
-own   = the learned own quantity when the learner has one, else the genomic own weight
-scale = the learned scale when the bundle has a scale slot, else the genomic scale
-pattern = the wiring's pattern at the member's coordinate; 0 for an ungrouped edge
+own   = the learned value of an edge learner, else the genomic own weight
+scale = the learned scale when the bundle has a scale learner, else the genomic scale
+pattern = the wiring's pattern at the member's coordinate; 0 for a lone edge
 ```
 
 The executor's weighing, `applied_weight(occurrence)` (one edge, else the
 genomic weight), `applied_weights(node)` (every dynamic edge in canonical
 order) and the view agree; the applied weight is never clamped. The
 executor hands the learner each edge's occurrence and value and the learner
-decides whether the edge is a learner, a passive member or static. Readers
-use the read-only views: per plastic edge `(occurrence, genomic, learned,
-applied, trace, bound, kind, scope, birth, retention)`, where `genomic` is
-the genomic own weight (a member's correction), `birth` the own quantity's
-birth value, `learned` the initialized own quantity (always `None` for a
-group learner) and `trace` present only for an initialized learner; and per
-scale slot `(bundle, genomic, birth, retention, learned, bound,
-inherit_scale)`, `learned` present only for an initialized scale slot.
+decides whether the edge is dynamic. Readers use the read-only views: per
+edge learner `(occurrence, genomic, birth, retention, learned, applied,
+trace, bound, kind, learning, source, initialized, inherits)`, where
+`genomic` is the genomic own weight (a member's modifier), `birth` its birth
+value, `learned` present once initialized, `trace` present only for an
+initialized modulated learner and `inherits` the effective `lamarckian`;
+and per scale learner `(bundle, genomic, birth, retention, learned, bound,
+lamarckian)`, `learned` present once initialized.
 
-- A learner slot is initialized when its backend has been visited (the flag
-  is set at visit entry, a failed visit included) or when it was seeded at
-  birth; a scale slot when its backend has been visited or its scale was
-  seeded. Reward, `capture()` and the views read initialized slots only, each
-  slot on its own.
-- Every learned quantity starts at its **birth value** (T25.F09). A
-  Lamarckian ungrouped or edge learner with a birth seed starts at the seed
-  clamped by the child's edge clamp, initialized; every other ungrouped or
-  edge learner (a Darwinian one with a seed included) starts at its genomic
-  own weight clamped by its edge clamp and stays uninitialized until its
-  backend's first visit. A group learner ignores any seed on its row and
-  holds its raw genomic own weight, which is not a learned quantity, is
-  never written and composes unclamped. A scale slot starts at
-  `clamp(seed, ±bound)`, seeded, when the child bundle has `inherit_scale`
-  and a seed, else at `clamp(genomic, ±bound)`. Traces start at zero. See
+- A learner is initialized when its backend has been visited (the flag is
+  set at visit entry, a failed visit included) or when it was seeded at
+  birth. Reward, `capture()` and the views read initialized learners only,
+  each on its own.
+- Every learned value starts at its **birth value** (T25.F09): an edge
+  learner at `clamp(seed if its learning is Lamarckian else genomic own,
+  ±clamp)`, a scale learner the same with the bundle's seed, genomic scale
+  and `scale_learning`. A seeded learner is initialized; every other one
+  stays uninitialized until its backend's first visit. A scale learner
+  without contributors keeps its value, decays, is captured and is seeded
+  like any other; it only receives no credit. Traces start at zero. See
   [reproduction inheritance](v3-reproduction-spec.md#graph-state).
 - Birth seeds are temporary, excluded from serialization and genome
   equality, and consumed by the constructor.
 
-### Samples, order and the Hebbian laws (per committed visit)
+### Samples, order and the one update law (per committed visit)
 
-On a learning graph the executor records, for every plastic edge, the pre
+On a learning graph the executor records, for every dynamic edge, the pre
 value its evaluation used — a compute edge's ordered read (lower sources this
 visit's outputs, self and higher the last committed) and a sink edge's value
 as the sink sum read it (Section 9) — and the post value: the node's
 committed output, or the sink's `sanitize_f32(wsum)`. No source is
 re-resolved after evaluation. Evaluation reads the applied weight in force
-at visit start. After the effects, each pure-Hebbian learner's change is
-computed from its samples and visit-start applied weight `w` with its own
-rule and rate, in canonical order: an ungrouped or edge learner applies it to
-its own quantity, bounded by its own clamp; a group learner adds `pattern ×
-dw` to its scale's accumulator. Then every scale with a contribution (a zero
-one included) is written once, scale slots in order:
+at visit start. After the effects, from visit-start state, each learner
+takes two steps (T25.F12 invariant 6): aggregation, then one scalar update.
+An edge learner evaluates its learning's rule on its own `pre`, `post` and
+visit-start applied weight `w`; a scale learner evaluates `scale_learning`'s
+rule on each contributor's `pre`, `post` and visit-start applied weight and
+sums the results times each contributor's pattern, unnormalized:
 
 ```text
 Classic    dw = eta * pre * post
 Oja        dw = eta * post * (pre - w * post)
 AntiHebb   dw = -eta * pre * post
 Covariance dw = eta * (pre - 0.5) * (post - 0.5)
-own   <- clamp(own + dw, -weight_clamp, weight_clamp)        (ungrouped or edge learner)
-scale <- clamp(scale + Σ pattern × dw, -bound, bound)        (once per scale per event)
+own   <- clamp(own + dw, -weight_clamp, weight_clamp)                 (edge learner)
+scale <- clamp(scale + Σ pattern × dw, -weight_clamp, weight_clamp)   (scale learner, once)
 ```
 
-A static member contributes nothing; a member with a negative pattern
-contributes with the opposite sign of its `dw`, so the net change is the sum
-over contributors; the birth clamp keeps every stored scale inside its
-bound, so no write snaps. `plasticity_updates` counts one per contributing learner per event and
-`plasticity_changes` one per contributor whose stored quantity changed (for a
-group learner its scale, so a moved scale counts every contributor).
+A non-crediting member contributes nothing; a member with a negative
+pattern contributes with the opposite sign of its `dw`; the birth clamp
+keeps every stored value inside its clamp, so no write snaps.
+`plasticity_updates` counts learner updates (an edge learner per commit, a
+scale learner per commit with a contributor, a reward step per initialized
+modulated learner) and `plasticity_changes` those whose stored value moved;
+a scale counts once, not per contributor.
 
 On a recurrent compute edge the pre value is the committed value the
 evaluation read (T25.F06; the retired replay read this visit's output). A
@@ -684,17 +704,15 @@ failed visit changes no learned value or trace.
 ```text
 trace <- trace_decay * trace                        (once per world tick, begin_tick)
 x     <- b + retention * (x - b)                    (once per world tick, begin_tick, after the traces)
-trace <- trace + activity(pre, post, w)             (per committed visit)
+trace <- trace + activity                           (per committed visit; Σ pattern × activity for a scale)
 ```
 
-The second line is the learned-weight decay (T25.F09): every initialized
-own quantity of an ungrouped or edge learner relaxes toward its birth value
-`b` by its edge's `retention`, and every initialized learned scale by its
-bundle's; a retention of exactly 1 is skipped (an exact no-op), an
-uninitialized quantity holds `b`, and a group learner has no own decay. The
-stored value stays absolute, so a decayed value stops within `ulp(x) /
-(2(1 − retention))` of `b`. Learning in the same tick acts on the decayed
-value.
+Each learner has one trace. The second line is the learned-value decay
+(T25.F09): every initialized learner relaxes toward its birth value `b` by
+its learning's `retention`; a retention of exactly 1 is skipped (an exact
+no-op) and an uninitialized learner holds `b`. The stored value stays
+absolute, so a decayed value stops within `ulp(x) / (2(1 − retention))` of
+`b`. Learning in the same tick acts on the decayed value.
 
 Activity excludes the learning rate: Classic `pre*post`, Oja
 `post*(pre-w*post)`, AntiHebb `-pre*post`, Covariance `(pre-0.5)*(post-0.5)`,
@@ -704,23 +722,22 @@ bounded by the per-pass hop cap; a skipped tick leaves only the decay. Lambda
 by lambda^d after d skipped ticks. Input context includes evaluation-time
 energy. Learning charges no energy or work (T25.F02).
 
-### Reward-modulated weight update (Phase 2.5)
+### Reward-modulated update (Phase 2.5)
 
 ```text
-dw = learning_rate * outcome_signal[reward_source] * trace
-new_own = clamp(own + dw, -weight_clamp, weight_clamp)            (ungrouped or edge learner)
-scale <- clamp(scale + Σ pattern × dw, -bound, bound)             (group learners, once per tick)
+x <- clamp(x + learning_rate * outcome_signal[reward_source] * trace, -weight_clamp, weight_clamp)
 ```
 
-A modulated learner changes no weight at a visit; a modulated group learner
-contributes only while its scale slot is initialized, and the scale is
-written once per backend's Phase 2.5 pass, as at a visit.
+The reward step is `three_factor` per initialized modulated learner, an
+edge's or a scale's, at its own source, rate and clamp. A modulated learner
+changes no value at a visit.
 
 Eta applies once: unit activity/reward at eta 0.5 yields trace 1 and delta
 0.5. At lambda 0 and unit reward, a feed-forward edge matches its pure
-Hebbian update. Phase 2.5 updates every initialized modulated edge each tick,
-even on skipped visits or zero deltas, and counts each update; a seeded
-modulated slot counts from birth. Reward does not clear eligibility.
+Hebbian update. Phase 2.5 updates every initialized modulated learner each
+tick, even on skipped visits or zero deltas, and counts each update; a
+seeded modulated learner counts from birth. Reward does not clear
+eligibility.
 
 ---
 

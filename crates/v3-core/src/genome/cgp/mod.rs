@@ -17,14 +17,14 @@ pub(crate) mod test_support;
 
 pub use bundle::{
     compose, detach, hosts, pair_relative, plans, ring_offset, BirthCoordinate, Bundle,
-    BundleBirth, BundleId, BundleSource, Site, Wiring,
+    BundleBirth, BundleId, BundleSource, LearningSlot, Site, Wiring,
 };
 pub(crate) use container::bundle_capacity_admits;
 pub use container::{
     validate_graph, BirthSeeds, BundleMut, CgpGraphBackendDef, ComputeNode, ComputeNodes, EdgeList,
     EdgeMut, EdgeOccurrence, EdgeSurface, GraphInvariantViolation, OutputSink, OutputSinks,
 };
-pub use edge::{GraphEdge, GraphSource, Membership, Scope};
+pub use edge::{EdgeRole, GraphEdge, GraphSource, Membership};
 
 // ── Compute layer ───────────────────────────────────────────────────────────
 

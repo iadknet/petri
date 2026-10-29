@@ -99,7 +99,7 @@ mod tests {
 
     use crate::contracts::NodeId;
     use crate::genome::cgp::{CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge};
-    use crate::genome::{HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef};
+    use crate::genome::{HebbianRule, Learning, NodeGenome, VmBackendDef};
 
     fn vm_genome(program: Vec<VmInstruction>) -> CreatureGenome {
         CreatureGenome {
@@ -264,7 +264,7 @@ mod tests {
                 },
                 1.0,
             )],
-            Some(PlasticityConfig {
+            Some(Learning {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 1.0,

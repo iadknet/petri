@@ -12,17 +12,18 @@ use std::fmt;
 use std::ops::Deref;
 
 use super::bundle::{
-    compose, plans, BirthCoordinate, Bundle, BundleBirth, BundleId, BundleSource, Site, Wiring,
+    compose, plans, BirthCoordinate, Bundle, BundleBirth, BundleId, BundleSource, LearningSlot,
+    Site, Wiring,
 };
+use super::edge::{EdgeRole, Membership};
 use super::edge::{GraphEdge, GraphSource};
-use super::edge::{Membership, Scope};
 use super::{
     ComputeNodeKind, OutputSinkKind, CUSTOM_OUTPUT_COUNT, FIXED_SINK_COUNT, SHARED_MEMORY_SLOTS,
 };
 use crate::contracts::votes::{ActionParamField, VoteSink, VOTE_DIRECTION_COUNT};
 use crate::contracts::MAX_GATE_SLOTS;
 use crate::contracts::{FieldSet, InputReference, SensorContext};
-use crate::genome::{BackendDef, NodeEditError, NodeGenome, PlasticityConfig};
+use crate::genome::{BackendDef, Learning, MemberPolicy, NodeEditError, NodeGenome};
 
 // ── Read-only list newtypes ─────────────────────────────────────────────────
 
@@ -296,7 +297,7 @@ impl EdgeMut<'_> {
         let edge = self.def.edge_slot(self.occurrence);
         let changed = edge.source != source;
         debug_assert!(
-            !changed || edge.membership.is_none(),
+            !changed || edge.membership().is_none(),
             "a member's source changes only through its bundle or after a detach"
         );
         edge.source = source;
@@ -313,34 +314,54 @@ impl EdgeMut<'_> {
         self.def.debug_assert_seed_shape();
     }
 
-    /// Set or clear the edge's learning attributes (T25.F06), the only
-    /// writer; no seed change. A config is in range (I1) and the edge may
+    /// Set or clear a lone edge's learning (T25.F06, T25.F12), the only
+    /// writer; no seed change. A learning is in range (I1) and the edge may
     /// learn ([`CgpGraphBackendDef::can_learn`]).
-    pub fn set_plasticity(&mut self, plasticity: Option<PlasticityConfig>) {
-        debug_assert!(
-            plasticity.is_none_or(|config| config.in_range()),
-            "set_plasticity: a config is in range (I1)"
-        );
-        debug_assert!(
-            plasticity.is_none() || self.def.can_learn(self.occurrence),
-            "set_plasticity: a ClearSlot edge does not learn"
-        );
-        self.def.edge_slot(self.occurrence).plasticity = plasticity;
-    }
-
-    /// Set a member's learning scope (T25.F07), the only writer; no seed
-    /// change.
     ///
     /// # Panics
     ///
+    /// If the edge is a member.
+    pub fn set_learning(&mut self, learning: Option<Learning>) {
+        debug_assert!(
+            learning.is_none_or(|learning| learning.in_range()),
+            "set_learning: a learning is in range (I1)"
+        );
+        debug_assert!(
+            learning.is_none() || self.def.can_learn(self.occurrence),
+            "set_learning: a ClearSlot edge does not learn"
+        );
+        let edge = self.def.edge_slot(self.occurrence);
+        assert!(
+            matches!(edge.role, EdgeRole::Lone(_)),
+            "set_learning: the edge is lone"
+        );
+        edge.role = EdgeRole::Lone(learning);
+    }
+
+    /// Set a member's policy (T25.F12), the only writer; no seed change. An
+    /// override is in range (I1).
+    pub fn set_policy(&mut self, policy: MemberPolicy) {
+        debug_assert!(
+            policy.stored().is_none_or(|learning| learning.in_range()),
+            "set_policy: an override is in range (I1)"
+        );
+        self.membership_mut().policy = policy;
+    }
+
+    /// Set whether a member's activity feeds its bundle's scale (T25.F12),
+    /// the only writer; no seed change.
+    pub fn set_credits(&mut self, credits: bool) {
+        self.membership_mut().credits = credits;
+    }
+
+    /// # Panics
+    ///
     /// If the edge is not a member.
-    pub fn set_scope(&mut self, scope: Scope) {
-        self.def
-            .edge_slot(self.occurrence)
-            .membership
-            .as_mut()
-            .expect("set_scope: the edge is a member")
-            .scope = scope;
+    fn membership_mut(&mut self) -> &mut Membership {
+        match &mut self.def.edge_slot(self.occurrence).role {
+            EdgeRole::Member(membership) => membership,
+            EdgeRole::Lone(_) => panic!("the edge is a member"),
+        }
     }
 }
 
@@ -365,20 +386,18 @@ impl BundleMut<'_> {
         self.def.bundles[self.bundle.index()].scale = scale;
     }
 
-    /// Set whether a parent's learned scale seeds the child's (T25.F07),
-    /// the only writer; no seed change.
-    pub fn set_inherit_scale(&mut self, inherit_scale: bool) {
-        self.def.bundles[self.bundle.index()].inherit_scale = inherit_scale;
-    }
-
-    /// Set the learned scale's retention (T25.F09), the only writer; in
-    /// `[0, 1]`; no seed change.
-    pub fn set_retention(&mut self, retention: f32) {
+    /// Set or clear one of the bundle's learning slots (T25.F12), the only
+    /// writer; no seed change. A learning is in range (I1).
+    pub fn set_slot(&mut self, slot: LearningSlot, learning: Option<Learning>) {
         debug_assert!(
-            (0.0..=1.0).contains(&retention),
-            "set_retention: a retention is in [0, 1]"
+            learning.is_none_or(|learning| learning.in_range()),
+            "set_slot: a learning is in range (I1)"
         );
-        self.def.bundles[self.bundle.index()].retention = retention;
+        let record = &mut self.def.bundles[self.bundle.index()];
+        match slot {
+            LearningSlot::Scale => record.scale_learning = learning,
+            LearningSlot::MemberDefault => record.member_default = learning,
+        }
     }
 }
 
@@ -405,14 +424,11 @@ pub enum GraphInvariantViolation {
     /// I10: a sink's members are not after its independent edges in
     /// `(BundleId, sub_idx)` order.
     SinkOrder,
-    /// I1 (T25.F06): a learning attribute is non-finite or out of range.
+    /// I1 (T25.F06, T25.F12): a stored learning (lone, `Own` or a bundle
+    /// slot) is non-finite or out of range.
     PlasticityOutOfRange,
-    /// T25.F06 invariant 2, T25.F07 invariant 1: a `ClearSlot` edge is
-    /// plastic.
+    /// T25.F06 invariant 2: a `ClearSlot` edge learns.
     IneligiblePlasticEdge,
-    /// T25.F09 invariant 1: a bundle's retention is non-finite or outside
-    /// `[0, 1]`.
-    BundleRetentionOutOfRange,
 }
 
 /// Whether a graph holding `existing` bundle records can take `births` more
@@ -475,7 +491,7 @@ pub fn validate_graph(node: &NodeGenome) -> Result<(), GraphInvariantViolation> 
     }
     for sink in def.output_sinks.iter() {
         for edge in sink.inputs.iter() {
-            let Some(Membership { bundle, .. }) = edge.membership else {
+            let Some(Membership { bundle, .. }) = edge.membership() else {
                 continue;
             };
             let record = &def.bundles[bundle.index()];
@@ -620,20 +636,9 @@ impl CgpGraphBackendDef {
         &self.surface_edges(occurrence.surface)[occurrence.index]
     }
 
-    /// Every plastic edge with its learning attributes, in canonical order
-    /// (T25.F06): the one definition of "carries learning".
-    pub fn plastic_edges(&self) -> impl Iterator<Item = (EdgeOccurrence, PlasticityConfig)> + '_ {
-        self.edge_sites().filter_map(|occurrence| {
-            self.edge_at(occurrence)
-                .plasticity
-                .map(|config| (occurrence, config))
-        })
-    }
-
-    /// Whether the edge at `occurrence` may carry learning attributes
-    /// (T25.F06 invariant 2, T25.F07 invariant 1): every edge except one of
-    /// a `ClearSlot` sink, whose sum is ignored. A member learns at its
-    /// scope.
+    /// Whether the lone edge at `occurrence` may carry learning (T25.F06
+    /// invariant 2): every edge except one of a `ClearSlot` sink, whose sum
+    /// is ignored. A member never sits on a `ClearSlot` sink.
     #[must_use]
     pub fn can_learn(&self, occurrence: EdgeOccurrence) -> bool {
         match occurrence.surface {
@@ -691,7 +696,7 @@ impl CgpGraphBackendDef {
         sink: OutputSinkKind,
         input_refs: &[InputReference],
     ) -> f32 {
-        match edge.membership {
+        match edge.membership() {
             None => edge.own_weight,
             Some(membership) => compose(
                 edge.own_weight,
@@ -705,7 +710,7 @@ impl CgpGraphBackendDef {
     /// field and sink direction, 0 for an ungrouped edge (T25.F07).
     #[must_use]
     pub fn pattern(&self, occurrence: EdgeOccurrence, input_refs: &[InputReference]) -> f32 {
-        if self.edge_at(occurrence).membership.is_none() {
+        if self.edge_at(occurrence).membership().is_none() {
             return 0.0;
         }
         self.member_pattern(occurrence, input_refs)
@@ -742,7 +747,7 @@ impl CgpGraphBackendDef {
         sink: OutputSinkKind,
         input_refs: &[InputReference],
     ) -> f32 {
-        let Membership { bundle, .. } = edge.membership.expect("pattern_at: a member");
+        let Membership { bundle, .. } = edge.membership().expect("pattern_at: a member");
         let record = &self.bundles[bundle.index()];
         record
             .source
@@ -761,7 +766,7 @@ impl CgpGraphBackendDef {
         let EdgeSurface::SinkInput(sink) = occurrence.surface else {
             return None;
         };
-        let Membership { bundle, .. } = self.edge_at(occurrence).membership?;
+        let Membership { bundle, .. } = self.edge_at(occurrence).membership()?;
         Site::of(
             self.output_sinks[sink].kind,
             &self.bundles[bundle.index()].wiring,
@@ -980,11 +985,11 @@ impl CgpGraphBackendDef {
             }
             EdgeSurface::SinkInput(i) => {
                 debug_assert!(
-                    edge.membership.is_none(),
+                    edge.membership().is_none(),
                     "push_edge adds an ungrouped edge"
                 );
                 debug_assert!(
-                    edge.plasticity.is_none()
+                    edge.stored_learning().is_none()
                         || !matches!(self.output_sinks[i].kind, OutputSinkKind::ClearSlot(_)),
                     "a ClearSlot edge never learns"
                 );
@@ -1013,7 +1018,7 @@ impl CgpGraphBackendDef {
             }
             EdgeSurface::SinkInput(i) => {
                 let removed = self.output_sinks.0[i].inputs.0.remove(index);
-                if let Some(Membership { bundle, .. }) = removed.membership {
+                if let Some(Membership { bundle, .. }) = removed.membership() {
                     if self.members(bundle).next().is_none() {
                         self.drop_bundle_record(bundle);
                         record_removed = true;
@@ -1068,7 +1073,7 @@ impl CgpGraphBackendDef {
             }
             EdgeSurface::SinkInput(sink) => {
                 debug_assert!(
-                    self.output_sinks[sink].inputs[index].membership.is_none(),
+                    self.output_sinks[sink].inputs[index].membership().is_none(),
                     "split_edge: a member is detached before its split"
                 );
                 let new_idx = self.compute_nodes.len() as u16;
@@ -1252,10 +1257,10 @@ impl CgpGraphBackendDef {
         GraphEdge {
             source,
             own_weight: 0.0,
-            plasticity: None,
-            membership: Some(Membership {
+            role: EdgeRole::Member(Membership {
                 bundle,
-                scope: Scope::Edge,
+                policy: MemberPolicy::Static,
+                credits: false,
             }),
         }
     }
@@ -1332,7 +1337,8 @@ impl CgpGraphBackendDef {
             .birth_seeds
             .as_mut()
             .and_then(|seeds| seeds.row_mut(occurrence.surface).remove(occurrence.index));
-        let Membership { bundle, .. } = edge.membership.expect("detach_at: the edge is a member");
+        let Membership { bundle, policy, .. } =
+            edge.membership().expect("detach_at: the edge is a member");
         let scale = self.bundles[bundle.index()].scale;
         // The composed seed (T25.F07 invariant 6): what the detached edge
         // weighed at the parent, from the edge's and the bundle's seeds, each
@@ -1350,7 +1356,9 @@ impl CgpGraphBackendDef {
             )
         });
         edge.own_weight = compose(edge.own_weight, scale, pattern);
-        edge.membership = None;
+        // The detach table (T25.F12 invariant 8): the member's effective
+        // learning becomes its lone learning; `credits` is dropped.
+        edge.role = EdgeRole::Lone(policy.effective(self.bundles[bundle.index()].member_default));
         let at = self.first_member(sink);
         self.output_sinks.0[sink].inputs.0.insert(at, edge);
         if let Some(seeds) = &mut self.birth_seeds {
@@ -1367,10 +1375,18 @@ impl CgpGraphBackendDef {
         )
     }
 
-    /// Make nothing learn (T25.F12 invariant 4): every edge static; no
-    /// seed change.
+    /// Make nothing learn (T25.F12 invariant 4): every lone edge static,
+    /// every member `Static` and both slots of every bundle absent; no seed
+    /// change.
     pub fn clear_learning(&mut self) {
-        self.for_each_edge_mut(|edge| edge.plasticity = None);
+        self.for_each_edge_mut(|edge| match &mut edge.role {
+            EdgeRole::Lone(learning) => *learning = None,
+            EdgeRole::Member(membership) => membership.policy = MemberPolicy::Static,
+        });
+        for bundle in &mut self.bundles {
+            bundle.scale_learning = None;
+            bundle.member_default = None;
+        }
     }
 
     /// A handle for changing `bundle`'s record.
@@ -1383,7 +1399,7 @@ impl CgpGraphBackendDef {
         let inputs = &self.output_sinks[sink].inputs;
         inputs
             .iter()
-            .position(|edge| edge.membership.is_some())
+            .position(|edge| edge.membership().is_some())
             .unwrap_or(inputs.len())
     }
 
@@ -1391,7 +1407,7 @@ impl CgpGraphBackendDef {
     /// sink (a wiring puts each field of a bundle on a sink at most once);
     /// a compute-node source keys `u16::MAX`.
     fn member_key(edge: &GraphEdge) -> Option<(BundleId, u16)> {
-        let Membership { bundle, .. } = edge.membership?;
+        let Membership { bundle, .. } = edge.membership()?;
         Some((bundle, member_field(edge.source).unwrap_or(u16::MAX)))
     }
 
@@ -1406,7 +1422,7 @@ impl CgpGraphBackendDef {
         let inputs = &mut self.output_sinks.0[sink].inputs.0;
         let at = inputs
             .iter()
-            .position(|other| other.membership.is_some() && Self::member_key(other) > key)
+            .position(|other| other.membership().is_some() && Self::member_key(other) > key)
             .unwrap_or(inputs.len());
         inputs.insert(at, edge);
         if let Some(seeds) = &mut self.birth_seeds {
@@ -1453,7 +1469,7 @@ impl CgpGraphBackendDef {
         }
         for sink in &mut self.output_sinks.0 {
             for edge in &mut sink.inputs.0 {
-                if let Some(Membership { bundle: id, .. }) = &mut edge.membership {
+                if let EdgeRole::Member(Membership { bundle: id, .. }) = &mut edge.role {
                     debug_assert_ne!(*id, bundle, "the dropped bundle has no member");
                     if *id > bundle {
                         id.0 -= 1;
@@ -1489,7 +1505,7 @@ impl CgpGraphBackendDef {
         if self
             .compute_nodes
             .iter()
-            .any(|node| node.inputs.iter().any(|e| e.membership.is_some()))
+            .any(|node| node.inputs.iter().any(|e| e.membership().is_some()))
         {
             return Err(V::MemberOnComputeInput);
         }
@@ -1501,18 +1517,24 @@ impl CgpGraphBackendDef {
         }) {
             return Err(V::OffsetOutOfRange);
         }
-        if self
-            .bundles
-            .iter()
-            .any(|bundle| !(0.0..=1.0).contains(&bundle.retention))
-        {
-            return Err(V::BundleRetentionOutOfRange);
+        let slots_in_range = self.bundles.iter().all(|bundle| {
+            LearningSlot::ALL
+                .into_iter()
+                .filter_map(|slot| bundle.slot(slot))
+                .all(|learning| learning.in_range())
+        });
+        if !slots_in_range {
+            return Err(V::PlasticityOutOfRange);
         }
-        for (occurrence, config) in self.plastic_edges() {
-            if !config.in_range() {
+        for occurrence in self.edge_sites() {
+            let edge = self.edge_at(occurrence);
+            let Some(learning) = edge.stored_learning() else {
+                continue;
+            };
+            if !learning.in_range() {
                 return Err(V::PlasticityOutOfRange);
             }
-            if !self.can_learn(occurrence) {
+            if edge.membership().is_none() && !self.can_learn(occurrence) {
                 return Err(V::IneligiblePlasticEdge);
             }
         }

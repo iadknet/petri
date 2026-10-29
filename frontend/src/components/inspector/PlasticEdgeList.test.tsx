@@ -16,7 +16,7 @@ import { weightLabel } from "./graphInternalsEdges.tsx";
 
 const hebbian: EdgeLearner = learner({ rule: "Oja" });
 const rewarded: EdgeLearner = learner({
-	inherits: true,
+	lamarckian: true,
 	modulation: { reward_source: "EnergyDelta", trace_decay: 0.5 },
 });
 
@@ -81,13 +81,14 @@ const refs: InputRef[] = [
 	{ family: "world", key: "NeighborBarrierRing" },
 ];
 
-/** A ring bundle's two group-scope learners on `Move[1]` and `Move[2]` that
- * differ in rule, rate, reward source and trace: one learned scale moves
- * both (preservation case: heterogeneous contributors, T25.F07 invariant 4). */
+/** A ring bundle's two `own` members on `Move[1]` and `Move[2]` whose
+ * overrides differ in rule, rate, reward source and trace (T25.F12): each
+ * is its own learner on top of the bundle term. */
 function bundleLearners(initialized: boolean): GraphBrain {
 	const member = (field: number) => ({
 		bundle: 0,
-		scope: "Group" as const,
+		policy: "own" as const,
+		credits: true,
 		site: { Direction: field + 1 },
 		field,
 		pattern: 1,
@@ -104,7 +105,7 @@ function bundleLearners(initialized: boolean): GraphBrain {
 						genomic: 0.75,
 						applied: 0.75,
 						member: member(0),
-						learner: learner({ rule: "Oja", scope: "group", initialized, inherits: false }),
+						learner: learner({ rule: "Oja", source: "own", initialized }),
 					},
 				],
 			},
@@ -121,9 +122,8 @@ function bundleLearners(initialized: boolean): GraphBrain {
 							rule: "Covariance",
 							learning_rate: 0.3,
 							modulation: { reward_source: "DamageDelta", trace_decay: 0.25 },
-							scope: "group",
+							source: "own",
 							initialized,
-							inherits: false,
 						}),
 					},
 				],
@@ -133,13 +133,13 @@ function bundleLearners(initialized: boolean): GraphBrain {
 	});
 }
 
-/** The bundle learners' poll: no own quantity, the scale slot initialized. */
+/** The member learners' poll: both initialized with their modifiers. */
 const bundleLearning: NodeLearning = {
 	node_id: 0,
 	scales: [{ bundle: 0, learned: 0.8, initialized: true }],
 	edges: [
-		{ surface: "sink", container: 0, edge: 0, applied: 1.05, initialized: true },
-		{ surface: "sink", container: 1, edge: 0, applied: 0.8, initialized: true },
+		{ surface: "sink", container: 0, edge: 0, applied: 1.05, learned: 0.25, initialized: true },
+		{ surface: "sink", container: 1, edge: 0, applied: 0.8, learned: 0, initialized: true },
 	],
 };
 
@@ -151,54 +151,44 @@ describe("PlasticEdgeList", () => {
 		);
 	});
 
-	it("names a member's scope in the badge and its tooltip", () => {
-		const bundle = { ...hebbian, scope: "group" } as const;
-		const edge = { ...hebbian, scope: "edge" } as const;
-		expect(plasticityBadge(bundle)).toBe("Oja · hebbian · darwinian · group scope");
-		expect(plasticityBadge(edge)).toBe("Oja · hebbian · darwinian · edge scope");
-		expect(plasticityDetail(bundle)[0]).toMatch(/shared scale/);
+	it("names a member learner's source in the badge and its tooltip", () => {
+		const own = { ...hebbian, source: "own" } as const;
+		const inherited = { ...hebbian, source: "member_default" } as const;
+		expect(plasticityBadge(own)).toBe("Oja · hebbian · darwinian · own");
+		expect(plasticityBadge(inherited)).toBe("Oja · hebbian · darwinian · member default");
+		expect(plasticityDetail(own)[0]).toMatch(/Own override/);
+		expect(plasticityDetail(inherited)[0]).toMatch(/member default/);
 		expect(plasticityDetail(hebbian)).toHaveLength(3);
 	});
 
-	it("explains a bundle learner's inheritance by the view's inherits, its lamarckian flag inert", () => {
-		const darwinianScale = { ...hebbian, scope: "group", inherits: false } as const;
-		expect(plasticityBadge(darwinianScale)).toBe("Oja · hebbian · darwinian · group scope");
-		const detail = plasticityDetail(darwinianScale);
-		expect(detail.at(-1)).toMatch(/genomic scale/);
-		expect(detail.at(-1)).toMatch(/Lamarckian flag is inert/);
-		expect(detail.join(" ")).not.toMatch(/inherit the learned weight/);
-		const inheritedScale = { ...hebbian, scope: "group", inherits: true } as const;
-		expect(plasticityBadge(inheritedScale)).toBe("Oja · hebbian · lamarckian · group scope");
-		expect(plasticityDetail(inheritedScale).at(-1)).toMatch(/learned scale/);
-		const lamarckianEdge = { ...hebbian, scope: "edge", inherits: true } as const;
-		expect(plasticityBadge(lamarckianEdge)).toBe("Oja · hebbian · lamarckian · edge scope");
+	it("explains inheritance by the learner's own lamarckian flag, whatever its source", () => {
+		const lamarckian = { ...hebbian, source: "member_default", lamarckian: true } as const;
+		expect(plasticityBadge(lamarckian)).toBe("Oja · hebbian · lamarckian · member default");
+		expect(plasticityDetail(lamarckian).at(-1)).toMatch(/inherit the learned weight/);
+		expect(plasticityDetail(hebbian).at(-1)).toMatch(/genomic weight/);
 	});
 
-	it("states an edge's retention only when it decays (T25.F09)", () => {
+	it("states a learner's retention only when it decays, for every source (T25.F09)", () => {
 		expect(plasticityDetail(hebbian).join(" ")).not.toMatch(/Decays/);
 		const decaying = { ...hebbian, retention: 0.999 };
 		const detail = plasticityDetail(decaying);
 		expect(detail).toHaveLength(4);
 		expect(detail.join(" ")).toMatch(/keeps 0\.9990 of its learned change/);
-	});
-
-	it("names a bundle learner's own retention inert: its bundle's retention governs", () => {
-		const forgetful = { ...hebbian, retention: 0 };
-		const detail = plasticityDetail({ ...forgetful, scope: "group" }).join(" ");
-		expect(detail).not.toMatch(/Decays/);
-		expect(detail).toMatch(/Edge retention is inert at group scope/);
-		expect(plasticityDetail({ ...forgetful, scope: "edge" }).join(" ")).toMatch(
+		expect(plasticityDetail({ ...decaying, source: "own" }).join(" ")).toMatch(
 			/Decays toward its birth weight/,
 		);
 	});
 
-	it("shows heterogeneous contributors of one scale as their own learners", () => {
+	it("shows heterogeneous member overrides as their own learners", () => {
 		const rows = collectPlasticEdges(bundleLearners(false), refs, bundleLearning);
 		expect(rows.map((row) => [row.learner.rule, row.learner.learning_rate])).toEqual([
 			["Oja", 0.1],
 			["Covariance", 0.3],
 		]);
-		expect(rows.every((row) => row.initialized && row.learned === undefined)).toBe(true);
+		expect(rows.map((row) => [row.initialized, row.learned])).toEqual([
+			[true, 0.25],
+			[true, 0],
+		]);
 		expect(rows.map((row) => row.applied)).toEqual([1.05, 0.8]);
 		render(
 			<PlasticEdgeList
@@ -213,7 +203,7 @@ describe("PlasticEdgeList", () => {
 		const badges = screen.getAllByTestId("plasticity-badge");
 		expect(badges[1]).toHaveTextContent("Covariance · reward DamageDelta · decay 0.25");
 		fireEvent.mouseEnter(badges[0] as HTMLElement);
-		expect(screen.getByTestId("tooltip")).toHaveTextContent(/genomic scale/);
+		expect(screen.getByTestId("tooltip")).toHaveTextContent(/Own override/);
 	});
 
 	it("takes a learner's initialization from the brain when the poll lists nothing", () => {

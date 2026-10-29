@@ -1,8 +1,10 @@
-//! The bundle census (T25.F11, `bundles-v1`): the edge bundles a population
-//! carries, by wiring (`Plain`, `Ring`, `DirectionPair`), with their genomic
-//! and learned scales off zero, their members and members with a nonzero own
-//! correction, the bundles on unreachable nodes, and rows by wiring and
-//! target (a geometric wiring's kind, a `Plain` wiring's sink).
+//! The bundle census (T25.F11, T25.F12, `bundles-v2`): the edge bundles a
+//! population carries, by wiring (`Plain`, `Ring`, `DirectionPair`), with
+//! their genomic and learned scales off zero, their members and members with
+//! a nonzero own modifier, their learning (the bundles with each slot, the
+//! members by policy and the crediting members), the bundles on unreachable
+//! nodes, and rows by wiring and target (a geometric wiring's kind, a
+//! `Plain` wiring's sink).
 //!
 //! One creature's reading ([`CreatureBundles`]) is shared by the population
 //! census ([`BundleCensus`]) and the ring-rule census, which takes its `Ring`
@@ -13,7 +15,7 @@ use std::collections::BTreeMap;
 
 use crate::contracts::votes::{DirectedVoteKind, VoteSink};
 use crate::genome::cgp::{BundleId, Wiring};
-use crate::genome::{BackendDef, CreatureGenome};
+use crate::genome::{BackendDef, CreatureGenome, MemberPolicy};
 use crate::mutation::types::{wiring_index, WIRING_KEYS};
 use crate::neighborhood::PATH_WEIGHT_FLOOR;
 use crate::runtime::plasticity::LearnedState;
@@ -44,6 +46,31 @@ pub struct WiringCounts {
     pub own_nonzero: u64,
     /// Bundles on unreachable nodes.
     pub unreachable: u64,
+    /// Reachable bundles with `scale_learning` (T25.F12).
+    pub scale_learning: u64,
+    /// Reachable bundles with `member_default` (T25.F12).
+    pub member_default: u64,
+    /// Members of reachable bundles by policy, in [`POLICY_KEYS`] order.
+    pub members_by_policy: [u64; 3],
+    /// Members of reachable bundles with `credits`.
+    pub crediting: u64,
+}
+
+/// The member policy keys, by [`policy_index`].
+pub const POLICY_KEYS: [&str; 3] = [
+    MemberPolicy::Inherit.as_key(),
+    MemberPolicy::Static.as_key(),
+    "own",
+];
+
+/// The position of `policy`'s key in [`POLICY_KEYS`].
+#[must_use]
+pub const fn policy_index(policy: MemberPolicy) -> usize {
+    match policy {
+        MemberPolicy::Inherit => 0,
+        MemberPolicy::Static => 1,
+        MemberPolicy::Own(_) => 2,
+    }
 }
 
 impl WiringCounts {
@@ -54,6 +81,16 @@ impl WiringCounts {
         self.members += other.members;
         self.own_nonzero += other.own_nonzero;
         self.unreachable += other.unreachable;
+        self.scale_learning += other.scale_learning;
+        self.member_default += other.member_default;
+        for (total, count) in self
+            .members_by_policy
+            .iter_mut()
+            .zip(other.members_by_policy)
+        {
+            *total += count;
+        }
+        self.crediting += other.crediting;
     }
 }
 
@@ -153,6 +190,13 @@ impl CreatureBundles {
                 let genomic = off_zero(bundle.scale());
                 let learned_nonzero = scales.get(&id).copied().flatten().is_some_and(off_zero);
                 let total = &mut reading.wirings[row];
+                total.scale_learning += u64::from(bundle.scale_learning().is_some());
+                total.member_default += u64::from(bundle.member_default().is_some());
+                for member in def.members(id) {
+                    let membership = def.edge_at(member).membership().expect("a member");
+                    total.members_by_policy[policy_index(membership.policy)] += 1;
+                    total.crediting += u64::from(membership.credits);
+                }
                 total.bundles += 1;
                 total.genomic_nonzero += u64::from(genomic);
                 total.learned_nonzero += u64::from(learned_nonzero);

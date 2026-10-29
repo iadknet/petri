@@ -2,7 +2,7 @@ import { type EdgeProps, getBezierPath } from "@xyflow/react";
 import type { MouseEvent, PointerEvent } from "react";
 import { TipBubble, useTipAnchor } from "../config-panel/shared/Tooltip.tsx";
 import { plasticityDetail } from "./PlasticEdgeList.tsx";
-import { composeTerms } from "./edgeBundleWeights.ts";
+import { composeTerms, policyLabel } from "./edgeBundleWeights.ts";
 import type { GraphModelEdge } from "./graphFullModel.ts";
 
 /** An edge's tooltip facts: its endpoints' labels and the model's weights. */
@@ -27,10 +27,10 @@ function plasticWeights(plastic: NonNullable<EdgeTip["plastic"]>): string {
 	}`;
 }
 
-/** A member's weight in force and scope (T25.F07): a static member of a
- * learning bundle weighs through the learned scale. */
+/** A member's weight in force, policy and `credits` (T25.F12): every member
+ * of a bundle with a learning scale weighs through the learned scale. */
 export function memberApplied(member: NonNullable<EdgeTip["member"]>): string {
-	return `applied ${member.applied.toFixed(3)} · scope ${member.scope}`;
+	return `applied ${member.applied.toFixed(3)} · ${policyLabel(member.policy, member.credits)}`;
 }
 
 /** The tooltip body: endpoints, then a member's composition and a plastic edge's learning. */

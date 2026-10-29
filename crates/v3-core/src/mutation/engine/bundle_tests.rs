@@ -11,16 +11,15 @@ use crate::contracts::votes::{DirectedVoteKind, VoteSink};
 use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::parseability::ParseabilityGate;
-use crate::genome::cgp::{
-    test_support::edit_sinks, BundleId, CgpGraphBackendDef, OutputSinkKind, Scope,
-};
+use crate::genome::cgp::{test_support::edit_sinks, BundleId, CgpGraphBackendDef, OutputSinkKind};
 use crate::genome::{NodeGenome, VmBackendDef, VmInstruction};
+use crate::mutation::event::Broadcast;
 use crate::mutation::graph::GraphOperator;
 use crate::mutation::input_ref::InputRefOperator;
 use crate::mutation::BundleEdits;
 
 /// One gated Graph event through the engine's [`apply_event`], with the
-/// bundle edits and attribute scope it reported: empty when the gate rolled
+/// bundle edits and broadcast it reported: empty when the gate rolled
 /// it back, since only a committed event carries its [`EventReport`].
 fn gated_graph_event(
     genome: &mut CreatureGenome,
@@ -32,11 +31,11 @@ fn gated_graph_event(
 ) -> (
     Result<(TargetReachability, EventReport), MutationSkipReason>,
     BundleEdits,
-    Option<Scope>,
+    Option<Broadcast>,
 ) {
     let result = apply_event(genome, op.into(), targets, rng, config, context);
     let report = result.map_or_else(|_| EventReport::default(), |(_, report)| report);
-    (result, report.bundle_edits, report.attribute_scope)
+    (result, report.bundle_edits, report.broadcast)
 }
 
 fn graph_index(genome: &CreatureGenome) -> usize {
@@ -168,19 +167,19 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
     }
 }
 
-/// An attribute operator that reports its scope when it commits (here
-/// `EnableHebbian` and `SetScope`) reports none when the gate rolls it back:
-/// the bundle's ring reference is no longer a ring, which no attribute
+/// A learning operator that reports its reach when it commits (here
+/// `EnableHebbian` and `ToggleCredits`) reports none when the gate rolls it
+/// back: the bundle's ring reference is no longer a ring, which no learning
 /// operator reads, so the operator applies and only the gate rejects it.
 #[test]
-fn a_rolled_back_attribute_change_reports_no_scope() {
+fn a_rolled_back_learning_edit_reports_no_broadcast() {
     let (valid, idx, ring) = grouped_founder();
     let mut broken = valid.clone();
     broken.nodes[idx].input_refs[usize::from(ring)] = InputReference::ActionVotes;
     assert!(validate_graph(&broken.nodes[idx]).is_err());
     let config = MutationConfig::default();
     let all = every_node(&valid);
-    for op in [GraphOperator::EnableHebbian, GraphOperator::SetScope] {
+    for op in [GraphOperator::EnableHebbian, GraphOperator::ToggleCredits] {
         for seed in 0..16 {
             let mut committed = valid.clone();
             let (result, _, scope) = gated_graph_event(
@@ -215,11 +214,12 @@ fn a_rolled_back_attribute_change_reports_no_scope() {
     }
 }
 
-/// The ten operators whose committed change reports its scope (T25.F08
-/// invariant 8).
-const ATTRIBUTE_OPERATORS: [GraphOperator; 13] = [
+/// The fourteen operators whose committed change reports its reach (T25.F12
+/// invariant 9).
+const ATTRIBUTE_OPERATORS: [GraphOperator; 14] = [
     GraphOperator::EnableHebbian,
     GraphOperator::DisableHebbian,
+    GraphOperator::ClearLearningOverride,
     GraphOperator::MutateHebbianRule,
     GraphOperator::MutateHebbianRate,
     GraphOperator::ToggleHebbianLamarckian,
@@ -227,7 +227,7 @@ const ATTRIBUTE_OPERATORS: [GraphOperator; 13] = [
     GraphOperator::DisableRewardModulation,
     GraphOperator::MutateRewardSource,
     GraphOperator::MutateTraceDecay,
-    GraphOperator::SetScope,
+    GraphOperator::ToggleCredits,
     GraphOperator::EnableRetention,
     GraphOperator::DisableRetention,
     GraphOperator::MutateRetention,
@@ -477,14 +477,13 @@ fn a_sole_members_detach_moves_genome_size_by_the_unit_rule() {
     }
 }
 
-/// The thirteen attribute operators (T25.F09 adds the three edge retention
-/// operators, `retention.rs`) report the scope their committed change
-/// landed on (T25.F08 invariant 8): `Bundle` when a member was picked and
-/// the coin was true (the change reaches every admitted member), else
-/// `Edge` (one edge changed: a member with a false coin, or a non-member).
-/// Creation and detach report none.
+/// The fourteen learning operators report the reach of their committed
+/// change (T25.F12 invariant 9): `Members` when a member was picked and the
+/// coin was true (the change reaches every admitted member), else `One`
+/// (one target changed: a member with a false coin, a lone edge or a
+/// slot). Creation and detach report none.
 #[test]
-fn a_committed_attribute_change_reports_the_scope_it_landed_on() {
+fn a_committed_learning_edit_reports_its_reach() {
     let (genome, idx, _) = grouped_founder();
     let all = every_node(&genome);
     let plasticity = |genome: &CreatureGenome| -> Vec<_> {
@@ -499,14 +498,15 @@ fn a_committed_attribute_change_reports_the_scope_it_landed_on() {
                 def.edge_sites()
                     .map(|at| {
                         let edge = def.edge_at(at);
-                        (edge.plasticity(), edge.membership())
+                        (edge.stored_learning(), edge.membership())
                     })
                     .collect::<Vec<_>>()
             })
             .collect()
     };
-    // EnableHebbian: (member, true coin), (member, false coin), non-member.
-    let mut seen = [false; 3];
+    // EnableHebbian: (member, true coin), (member, false coin), a lone
+    // edge, a slot (no edge changes).
+    let mut seen = [false; 4];
     for seed in 0..256 {
         let mut changed = genome.clone();
         let (result, _, scope) = gated_graph_event(
@@ -526,26 +526,30 @@ fn a_committed_attribute_change_reports_the_scope_it_landed_on() {
             .map(|(_, new)| new.1)
             .collect();
         match scope {
-            Some(Scope::Group) => {
+            Some(Broadcast::Members) => {
                 assert_eq!(diffs.len(), 8, "every member, seed {seed}");
                 seen[0] = true;
             }
-            Some(Scope::Edge) => {
-                assert_eq!(diffs.len(), 1, "seed {seed}");
-                seen[if diffs[0].is_some() { 1 } else { 2 }] = true;
+            Some(Broadcast::One) => {
+                assert!(diffs.len() <= 1, "seed {seed}");
+                seen[match diffs.first() {
+                    Some(Some(_)) => 1,
+                    Some(None) => 2,
+                    None => 3,
+                }] = true;
             }
-            None => panic!("an attribute change reports its scope, seed {seed}"),
+            None => panic!("a learning edit reports its reach, seed {seed}"),
         }
     }
-    assert_eq!(seen, [true; 3], "every case drawn");
+    assert_eq!(seen, [true; 4], "every case drawn");
 
-    // SetScope: `Bundle` flips every member, `Edge` one.
-    let mut scopes = [false; 2];
+    // ToggleCredits: `Members` flips every member, `One` one.
+    let mut reaches = [false; 2];
     for seed in 0..64 {
         let mut changed = genome.clone();
         let (result, _, scope) = gated_graph_event(
             &mut changed,
-            GraphOperator::SetScope,
+            GraphOperator::ToggleCredits,
             &mut TargetSelector::reachable_only(&all, 0.0),
             &mut SmallRng::seed_from_u64(seed),
             &MutationConfig::default(),
@@ -553,15 +557,15 @@ fn a_committed_attribute_change_reports_the_scope_it_landed_on() {
         );
         assert!(result.is_ok());
         let def = graph_mut(&mut changed.nodes[idx]);
-        let bundle_scope = def
+        let crediting = def
             .members(BundleId::new(0))
-            .filter(|&at| def.edge_at(at).membership().unwrap().scope == Scope::Group)
+            .filter(|&at| def.edge_at(at).membership().unwrap().credits)
             .count();
-        let scope = scope.expect("SetScope reports its scope");
-        assert_eq!(bundle_scope, if scope == Scope::Group { 8 } else { 1 });
-        scopes[scope.index()] = true;
+        let reach = scope.expect("ToggleCredits reports its reach");
+        assert_eq!(crediting, if reach == Broadcast::Members { 8 } else { 1 });
+        reaches[reach.index()] = true;
     }
-    assert_eq!(scopes, [true; 2]);
+    assert_eq!(reaches, [true; 2]);
 
     for op in [
         GraphOperator::AddBundleSilent,
@@ -579,14 +583,14 @@ fn a_committed_attribute_change_reports_the_scope_it_landed_on() {
             &crate::config::test_sensor_context(2),
         );
         assert!(result.is_ok(), "{op:?}");
-        assert_eq!(scope, None, "{op:?} reports no attribute scope");
+        assert_eq!(scope, None, "{op:?} reports no broadcast");
     }
 
     let mut summary = MutationSummary::zero();
-    summary.record_attribute_scope(Scope::Group);
-    summary.record_attribute_scope(Scope::Edge);
-    summary.record_attribute_scope(Scope::Group);
-    assert_eq!(summary.attribute_changes_by_scope, [1, 2]);
+    summary.record_broadcast(Broadcast::Members);
+    summary.record_broadcast(Broadcast::One);
+    summary.record_broadcast(Broadcast::Members);
+    assert_eq!(summary.attribute_changes_by_broadcast, [1, 2]);
 }
 
 /// A summary accumulates every committed event's detaches and removals.
@@ -653,10 +657,7 @@ fn expected_delta(
         | MutationOperator::Graph(GraphOperator::RetargetBundle)
         | MutationOperator::Graph(GraphOperator::EnableRetention)
         | MutationOperator::Graph(GraphOperator::DisableRetention)
-        | MutationOperator::Graph(GraphOperator::MutateRetention)
-        | MutationOperator::Graph(GraphOperator::EnableBundleRetention)
-        | MutationOperator::Graph(GraphOperator::DisableBundleRetention)
-        | MutationOperator::Graph(GraphOperator::MutateBundleRetention) => Some(vec![0]),
+        | MutationOperator::Graph(GraphOperator::MutateRetention) => Some(vec![0]),
         _ => None,
     }
 }
@@ -833,12 +834,12 @@ proptest! {
                 &mut rng,
                 &crate::config::test_sensor_context(2),
             );
-            // Every committed attribute change reports one scope (T25.F08).
+            // Every committed learning edit reports one reach (T25.F12).
             let attribute_events: u32 = ATTRIBUTE_OPERATORS
                 .iter()
                 .filter_map(|op| summary.applied_by_operator.get(&MutationOperator::from(*op)))
                 .sum();
-            prop_assert_eq!(summary.attribute_changes_by_scope.iter().sum::<u32>(), attribute_events);
+            prop_assert_eq!(summary.attribute_changes_by_broadcast.iter().sum::<u32>(), attribute_events);
             prop_assert!(!summary.skip_reasons.contains_key(&MutationSkipReason::GraphInvariantViolation));
             for node in &genome.nodes {
                 prop_assert_eq!(validate_graph(node), Ok(()));

@@ -57,7 +57,7 @@ use v3_core::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
 use v3_core::genome::{
-    BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
+    BackendDef, CreatureGenome, HebbianRule, Learning, NodeGenome, RewardModulationConfig,
     VmBackendDef, VmInstruction,
 };
 use v3_core::kernel::WorldState;
@@ -465,7 +465,7 @@ fn reward_modulated_node_genome_impl(
         v3_core::genome::cgp::EdgeSurface::ComputeInput(1),
         0,
     ))
-    .set_plasticity(Some(PlasticityConfig {
+    .set_learning(Some(Learning {
         rule: HebbianRule::Classic,
         learning_rate: 0.5,
         weight_clamp: 10.0,

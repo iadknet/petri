@@ -243,6 +243,34 @@
       "before": "the recruitment-paths-v3 goal-only experiment block, run once per goal world set, with its wall clock; gate, sweep and synthetic reports carried the Undefined string and a null wall clock",
       "after": "absent: the experiment is retired with T20.F01's input-opportunity assay; the lab's why-not ladder routes their questions",
       "comparison": "no like-for-like; past full reports keep the block and past summaries its wall clock, claims and omitted-path entry, as history"
+    },
+    {
+      "feature": "T25.F12",
+      "counter": "plasticity_updates, plasticity_changes",
+      "before": "a group-scope scale counted one update per contributor and, when it moved, one change per contributor; each contributor ran its own configuration and trace",
+      "after": "one update law per learner: an edge learner per commit, a scale learner per commit with a contributor, a reward step per initialized modulated learner; a scale counts once, not per contributor",
+      "comparison": "edge-learner counts are like-for-like; scale counts are not (a scale with n contributors counted n before and 1 after)"
+    },
+    {
+      "feature": "T25.F12",
+      "counter": "plasticity_census (edges_by_scope -> edges_by_source, carriers, scale cells)",
+      "before": "edges_by_scope keyed ungrouped, edge and group, listing group-scope contributors as edges without a learned value; carriers had a plastic edge on a reachable node; scale cells keyed by the bundle's inherit_scale and bounded by the smallest contributor clamp",
+      "after": "edges_by_source keyed lone, own and member_default over edge learners only; carriers have any learner (an edge's or a scale's) on a reachable node; scale cells keyed by scale_learning's lamarckian, its clamp and retention, every scale learner counted",
+      "comparison": "lone is like-for-like with ungrouped; own and member_default have no predecessor; carriers gain bundle-only learners; edge totals drop the former group-scope contributors"
+    },
+    {
+      "feature": "T25.F12",
+      "counter": "attribute_changes_by_scope -> attribute_changes_by_broadcast",
+      "before": "mutation_supply.attribute_changes_by_scope keyed edge and bundle by the scope coin, a non-member edit reported as edge",
+      "after": "mutation_supply.attribute_changes_by_broadcast keyed one and members by the broadcast coin's reach, over the fourteen learning operators (lone edges, members and both bundle slots)",
+      "comparison": "members is like-for-like with bundle; one counts edge plus the slot edits and ClearLearningOverride and ToggleCredits, which had no predecessor"
+    },
+    {
+      "feature": "T25.F12",
+      "counter": "bundles (bundles-v1 -> bundles-v2)",
+      "before": "bundles-v1: per wiring bundles, genomic_nonzero, learned_nonzero, members, own_nonzero and unreachable; created; rows",
+      "after": "bundles-v2: the same, plus learning per wiring (scale_learning and member_default: bundles with the slot; members_by_policy keyed inherit, static and own; crediting), kept on each world's last checkpoint as rows are",
+      "comparison": "the v1 fields are like-for-like; learning has no predecessor"
     }
   ],
   "goal_worlds": {

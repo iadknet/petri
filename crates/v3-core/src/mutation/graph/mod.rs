@@ -6,10 +6,10 @@ use rand::Rng;
 
 use crate::config::MutationConfig;
 use crate::contracts::SensorContext;
-use crate::genome::cgp::{CgpGraphBackendDef, Scope};
+use crate::genome::cgp::CgpGraphBackendDef;
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::event::{
-    BirthEdgeClass, BundleEdits, EventReport, MutationSkipReason, TargetReachability,
+    BirthEdgeClass, Broadcast, BundleEdits, EventReport, MutationSkipReason, TargetReachability,
 };
 use crate::mutation::reachability::TargetSelector;
 
@@ -30,6 +30,7 @@ pub enum GraphOperator {
     CopyNodeInputs,
     EnableHebbian,
     DisableHebbian,
+    ClearLearningOverride,
     MutateHebbianRule,
     MutateHebbianRate,
     ToggleHebbianLamarckian,
@@ -43,18 +44,15 @@ pub enum GraphOperator {
     ShiftBundleOffset,
     RetargetBundle,
     RemoveBundle,
-    SetScope,
+    ToggleCredits,
     DetachGraphEdge,
     EnableRetention,
     DisableRetention,
     MutateRetention,
-    EnableBundleRetention,
-    DisableBundleRetention,
-    MutateBundleRetention,
 }
 
 impl GraphOperator {
-    pub const ALL: [Self; 35] = [
+    pub const ALL: [Self; 33] = [
         Self::AlterGraphEdgeWeight,
         Self::SwapGraphOperator,
         Self::MutateGraphOperatorParam,
@@ -69,6 +67,7 @@ impl GraphOperator {
         Self::CopyNodeInputs,
         Self::EnableHebbian,
         Self::DisableHebbian,
+        Self::ClearLearningOverride,
         Self::MutateHebbianRule,
         Self::MutateHebbianRate,
         Self::ToggleHebbianLamarckian,
@@ -82,14 +81,11 @@ impl GraphOperator {
         Self::ShiftBundleOffset,
         Self::RetargetBundle,
         Self::RemoveBundle,
-        Self::SetScope,
+        Self::ToggleCredits,
         Self::DetachGraphEdge,
         Self::EnableRetention,
         Self::DisableRetention,
         Self::MutateRetention,
-        Self::EnableBundleRetention,
-        Self::DisableBundleRetention,
-        Self::MutateBundleRetention,
     ];
 
     /// Per-operator weight reflecting impact tier.
@@ -111,6 +107,8 @@ impl GraphOperator {
             Self::CopyNodeInputs => 2,
             Self::EnableHebbian => 1,
             Self::DisableHebbian => 1,
+            // T25.F12: after `DisableHebbian`, at its structural tier.
+            Self::ClearLearningOverride => 1,
             Self::MutateHebbianRule => 2,
             Self::MutateHebbianRate => 4,
             Self::ToggleHebbianLamarckian => 2,
@@ -125,17 +123,16 @@ impl GraphOperator {
             Self::ShiftBundleOffset => 2,
             Self::RetargetBundle => 2,
             Self::RemoveBundle => 2,
-            // T25.F07: after `RemoveBundle`, at the tier of a moderate edit.
-            Self::SetScope => 2,
-            // T25.F08: after `SetScope`, detach at a moderate edit's tier.
+            // T25.F12: in `SetScope`'s place, at the tier of a moderate edit.
+            Self::ToggleCredits => 2,
+            // T25.F08: after `ToggleCredits`, detach at a moderate edit's
+            // tier.
             Self::DetachGraphEdge => 2,
             // T25.F09: after `DetachGraphEdge`, the enable and disable twins
             // at a structural tier and the steps at a refinement's, as
             // their trace-decay analogs.
             Self::EnableRetention | Self::DisableRetention => 1,
             Self::MutateRetention => 4,
-            Self::EnableBundleRetention | Self::DisableBundleRetention => 1,
-            Self::MutateBundleRetention => 4,
         }
     }
 
@@ -158,6 +155,7 @@ impl GraphOperator {
             Self::CopyNodeInputs => "Graph.CopyNodeInputs",
             Self::EnableHebbian => "Graph.EnableHebbian",
             Self::DisableHebbian => "Graph.DisableHebbian",
+            Self::ClearLearningOverride => "Graph.ClearLearningOverride",
             Self::MutateHebbianRule => "Graph.MutateHebbianRule",
             Self::MutateHebbianRate => "Graph.MutateHebbianRate",
             Self::ToggleHebbianLamarckian => "Graph.ToggleHebbianLamarckian",
@@ -171,14 +169,11 @@ impl GraphOperator {
             Self::ShiftBundleOffset => "Graph.ShiftBundleOffset",
             Self::RetargetBundle => "Graph.RetargetBundle",
             Self::RemoveBundle => "Graph.RemoveBundle",
-            Self::SetScope => "Graph.SetScope",
+            Self::ToggleCredits => "Graph.ToggleCredits",
             Self::DetachGraphEdge => "Graph.DetachGraphEdge",
             Self::EnableRetention => "Graph.EnableRetention",
             Self::DisableRetention => "Graph.DisableRetention",
             Self::MutateRetention => "Graph.MutateRetention",
-            Self::EnableBundleRetention => "Graph.EnableBundleRetention",
-            Self::DisableBundleRetention => "Graph.DisableBundleRetention",
-            Self::MutateBundleRetention => "Graph.MutateBundleRetention",
         }
     }
 
@@ -214,14 +209,12 @@ impl GraphOperator {
             | Self::AlterBundleScale
             | Self::ShiftBundleOffset
             | Self::RetargetBundle
-            | Self::SetScope
+            | Self::ClearLearningOverride
+            | Self::ToggleCredits
             | Self::DetachGraphEdge
             | Self::EnableRetention
             | Self::DisableRetention
-            | Self::MutateRetention
-            | Self::EnableBundleRetention
-            | Self::DisableBundleRetention
-            | Self::MutateBundleRetention => ComplexityEffect::Neutral,
+            | Self::MutateRetention => ComplexityEffect::Neutral,
         }
     }
 
@@ -243,16 +236,17 @@ impl GraphOperator {
             Self::CopyInternalNode => operators::can_copy_compute_node(def),
             Self::CopySubgraph => operators::can_copy_subgraph(def),
             Self::CopyNodeInputs => operators::can_copy_node_inputs(def),
-            Self::EnableHebbian => hebbian::any_edge(def, hebbian::can_enable_hebbian),
-            Self::DisableHebbian
-            | Self::MutateHebbianRule
-            | Self::MutateHebbianRate
-            | Self::ToggleHebbianLamarckian => hebbian::any_edge(def, hebbian::is_plastic),
+            Self::EnableHebbian => hebbian::any_target(def, hebbian::can_enable_hebbian),
+            Self::DisableHebbian => hebbian::any_target(def, hebbian::can_disable_hebbian),
+            Self::ClearLearningOverride => hebbian::any_target(def, hebbian::can_clear_override),
+            Self::MutateHebbianRule | Self::MutateHebbianRate | Self::ToggleHebbianLamarckian => {
+                hebbian::any_target(def, hebbian::stores_learning)
+            }
             Self::EnableRewardModulation => {
-                hebbian::any_edge(def, hebbian::can_enable_reward_modulation)
+                hebbian::any_target(def, hebbian::can_enable_reward_modulation)
             }
             Self::DisableRewardModulation | Self::MutateRewardSource | Self::MutateTraceDecay => {
-                hebbian::any_edge(def, hebbian::is_reward_modulated)
+                hebbian::any_target(def, hebbian::is_reward_modulated)
             }
             Self::AddBundleLive | Self::AddBundleSilent => {
                 bundle::bundle_sources(def, inputs.refs, inputs.context)
@@ -263,14 +257,12 @@ impl GraphOperator {
                 bundle::has_bundle(def)
             }
             Self::ShiftBundleOffset => bundle::any_bundle(def, bundle::is_geometric),
-            Self::SetScope | Self::DetachGraphEdge => hebbian::any_edge(def, hebbian::is_member),
-            Self::EnableRetention => hebbian::any_edge(def, hebbian::can_enable_retention),
-            Self::DisableRetention | Self::MutateRetention => {
-                hebbian::any_edge(def, hebbian::is_decaying)
+            Self::ToggleCredits | Self::DetachGraphEdge => {
+                hebbian::any_target(def, hebbian::is_member)
             }
-            Self::EnableBundleRetention => bundle::any_bundle(def, bundle::retains),
-            Self::DisableBundleRetention | Self::MutateBundleRetention => {
-                bundle::any_bundle(def, bundle::is_decaying_bundle)
+            Self::EnableRetention => hebbian::any_target(def, hebbian::can_enable_retention),
+            Self::DisableRetention | Self::MutateRetention => {
+                hebbian::any_target(def, hebbian::is_decaying)
             }
         }
     }
@@ -352,8 +344,7 @@ impl GraphMutator {
 
     /// Dispatch `op` onto one already-selected node, with what the event
     /// reports: the class of the vote-sink edge an `AddGraphEdge` pushed
-    /// (T11.F30) and the scope an attribute operator's change landed on
-    /// (T25.F08 invariant 8).
+    /// (T11.F30) and how far a learning edit reached (T25.F12 invariant 9).
     pub(crate) fn apply_to_node(
         genome: &mut CreatureGenome,
         op: GraphOperator,
@@ -400,45 +391,51 @@ impl GraphMutator {
             GraphOperator::CopyNodeInputs => {
                 unreported(operators::apply_copy_node_inputs(genome, node_idx, rng))
             }
-            GraphOperator::EnableHebbian => scoped(hebbian::enable_hebbian_in_def(
+            GraphOperator::EnableHebbian => broadcast(hebbian::enable_hebbian_in_def(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::DisableHebbian => scoped(hebbian::disable_hebbian_in_def(
+            GraphOperator::DisableHebbian => broadcast(hebbian::disable_hebbian_in_def(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::MutateHebbianRule => scoped(hebbian::mutate_hebbian_rule_in_def(
+            GraphOperator::ClearLearningOverride => {
+                broadcast(hebbian::clear_learning_override_in_def(
+                    operators::graph_def_mut(genome, node_idx)?,
+                    rng,
+                ))
+            }
+            GraphOperator::MutateHebbianRule => broadcast(hebbian::mutate_hebbian_rule_in_def(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::MutateHebbianRate => scoped(hebbian::mutate_hebbian_rate_in_def(
+            GraphOperator::MutateHebbianRate => broadcast(hebbian::mutate_hebbian_rate_in_def(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
             GraphOperator::ToggleHebbianLamarckian => {
-                scoped(hebbian::toggle_hebbian_lamarckian_in_def(
+                broadcast(hebbian::toggle_hebbian_lamarckian_in_def(
                     operators::graph_def_mut(genome, node_idx)?,
                     rng,
                 ))
             }
             GraphOperator::EnableRewardModulation => {
-                scoped(hebbian::enable_reward_modulation_in_def(
+                broadcast(hebbian::enable_reward_modulation_in_def(
                     operators::graph_def_mut(genome, node_idx)?,
                     rng,
                 ))
             }
             GraphOperator::DisableRewardModulation => {
-                scoped(hebbian::disable_reward_modulation_in_def(
+                broadcast(hebbian::disable_reward_modulation_in_def(
                     operators::graph_def_mut(genome, node_idx)?,
                     rng,
                 ))
             }
-            GraphOperator::MutateRewardSource => scoped(hebbian::mutate_reward_source_in_def(
+            GraphOperator::MutateRewardSource => broadcast(hebbian::mutate_reward_source_in_def(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::MutateTraceDecay => scoped(hebbian::mutate_trace_decay_in_def(
+            GraphOperator::MutateTraceDecay => broadcast(hebbian::mutate_trace_decay_in_def(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
@@ -458,7 +455,7 @@ impl GraphMutator {
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::SetScope => scoped(hebbian::set_scope_in_def(
+            GraphOperator::ToggleCredits => broadcast(hebbian::toggle_credits_in_def(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
@@ -477,27 +474,15 @@ impl GraphMutator {
             GraphOperator::DetachGraphEdge => {
                 edited(bundle::detach_member(node_mut(genome, node_idx)?, rng))
             }
-            GraphOperator::EnableRetention => scoped(hebbian::enable_retention_in_def(
+            GraphOperator::EnableRetention => broadcast(hebbian::enable_retention_in_def(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::DisableRetention => scoped(hebbian::disable_retention_in_def(
+            GraphOperator::DisableRetention => broadcast(hebbian::disable_retention_in_def(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-            GraphOperator::MutateRetention => scoped(hebbian::mutate_retention_in_def(
-                operators::graph_def_mut(genome, node_idx)?,
-                rng,
-            )),
-            GraphOperator::EnableBundleRetention => unreported(bundle::enable_retention(
-                operators::graph_def_mut(genome, node_idx)?,
-                rng,
-            )),
-            GraphOperator::DisableBundleRetention => unreported(bundle::disable_retention(
-                operators::graph_def_mut(genome, node_idx)?,
-                rng,
-            )),
-            GraphOperator::MutateBundleRetention => unreported(bundle::mutate_retention(
+            GraphOperator::MutateRetention => broadcast(hebbian::mutate_retention_in_def(
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
@@ -510,10 +495,12 @@ fn unreported(result: Result<(), MutationSkipReason>) -> Result<EventReport, Mut
     result.map(|()| EventReport::default())
 }
 
-/// An attribute change reporting the scope it landed on.
-fn scoped(result: Result<Scope, MutationSkipReason>) -> Result<EventReport, MutationSkipReason> {
-    result.map(|scope| EventReport {
-        attribute_scope: Some(scope),
+/// A learning edit reporting its reach.
+fn broadcast(
+    result: Result<Broadcast, MutationSkipReason>,
+) -> Result<EventReport, MutationSkipReason> {
+    result.map(|broadcast| EventReport {
+        broadcast: Some(broadcast),
         ..EventReport::default()
     })
 }

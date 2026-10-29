@@ -20,10 +20,10 @@ use super::rules::{activity, hebbian_delta, relax, three_factor};
 use super::{OutcomeSignalBank, PlasticityKind};
 use crate::contracts::InputReference;
 use crate::genome::cgp::{
-    compose, BirthSeeds, BundleId, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface, Scope,
+    compose, BirthSeeds, BundleId, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface,
 };
 use crate::genome::learning::{LearnerSource, LearningLayout, MemberTerm};
-use crate::genome::{retention_decays, BackendDef, CreatureGenome, PlasticityConfig};
+use crate::genome::{retention_decays, BackendDef, CreatureGenome, Learning};
 
 /// Where a member's bundle term reads its scale.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -45,7 +45,7 @@ struct Term {
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct EdgeLearner {
     occurrence: EdgeOccurrence,
-    config: PlasticityConfig,
+    config: Learning,
     source: LearnerSource,
     /// The genomic own weight: a lone edge's weight, a member's modifier.
     genomic: f32,
@@ -62,16 +62,11 @@ struct EdgeLearner {
     dynamic: usize,
 }
 
-/// One member feeding a scale with its own configuration and trace.
+/// One member feeding a scale: its pattern and its position among the
+/// dynamic edges (its samples and its applied weight).
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct Contributor {
-    occurrence: EdgeOccurrence,
-    config: PlasticityConfig,
-    /// The member's genomic modifier.
-    own: f32,
     pattern: f32,
-    trace: f32,
-    /// The member's position among the dynamic edges (its samples).
     dynamic: usize,
 }
 
@@ -79,15 +74,17 @@ struct Contributor {
 #[derive(Debug, Clone, PartialEq)]
 struct ScaleLearner {
     bundle: BundleId,
-    config: PlasticityConfig,
+    config: Learning,
     /// The genomic scale.
     genomic: f32,
     /// The clamped seed or the clamped genomic scale.
     birth: f32,
     /// The learned scale.
     value: f32,
+    /// The eligibility trace; 0 and unused when pure Hebbian.
+    trace: f32,
     seeded: bool,
-    /// The members feeding the scale, in canonical order.
+    /// The members feeding the scale, in canonical order; possibly none.
     contributors: Box<[Contributor]>,
 }
 
@@ -129,8 +126,29 @@ pub(crate) struct BackendLearning {
 }
 
 /// `value` bounded by `config`'s clamp.
-fn bounded(value: f32, config: &PlasticityConfig) -> f32 {
+fn bounded(value: f32, config: &Learning) -> f32 {
     value.clamp(-config.weight_clamp, config.weight_clamp)
+}
+
+/// One learner's scalar update from its visit's aggregate `change`: a
+/// reward-modulated learner adds it to its trace; a pure-Hebbian one adds it
+/// to its value, bounded once, and counts the update and whether the stored
+/// value moved (exact inequality excludes changes rounded or clamped away).
+fn update(
+    config: &Learning,
+    value: &mut f32,
+    trace: &mut f32,
+    change: f32,
+    counts: &mut LearningCounts,
+) {
+    if config.modulation.is_some() {
+        *trace += change;
+        return;
+    }
+    let old = *value;
+    *value = bounded(old + change, config);
+    counts.changes += u32::from(*value != old);
+    counts.updates += 1;
 }
 
 impl BackendLearning {
@@ -180,7 +198,7 @@ impl BackendLearning {
         let dynamic = |at: EdgeOccurrence| {
             order
                 .binary_search_by_key(&at, |&(occurrence, _)| occurrence)
-                .expect("every learner and contributor is a dynamic edge")
+                .expect("every learner and every member of a learning scale is dynamic")
         };
 
         let edges = layout
@@ -221,17 +239,14 @@ impl BackendLearning {
                     genomic,
                     birth,
                     value: birth,
+                    trace: 0.0,
                     seeded: seed.is_some(),
                     contributors: scale
                         .contributors
                         .iter()
                         .map(|contributor| Contributor {
-                            occurrence: contributor.term.occurrence,
-                            config: contributor.learning,
-                            own: def.edge_at(contributor.term.occurrence).own_weight(),
-                            pattern: contributor.term.pattern,
-                            trace: 0.0,
-                            dynamic: dynamic(contributor.term.occurrence),
+                            pattern: contributor.pattern,
+                            dynamic: dynamic(contributor.occurrence),
                         })
                         .collect(),
                 }
@@ -287,10 +302,8 @@ impl BackendLearning {
             }
         }
         for scale in self.scales.iter_mut() {
-            for contributor in scale.contributors.iter_mut() {
-                if let Some(modulation) = contributor.config.modulation {
-                    contributor.trace *= modulation.trace_decay;
-                }
+            if let Some(modulation) = scale.config.modulation {
+                scale.trace *= modulation.trace_decay;
             }
         }
     }
@@ -313,117 +326,115 @@ impl BackendLearning {
         }
     }
 
-    /// Write scale `index`'s summed credit once, `clamp(scale + Σ,
-    /// ±clamp)`, when `credited` contributions arrived: changes count every
-    /// credited contribution of a moved scale.
-    fn write_scale(&mut self, index: usize, sum: f32, credited: u32, counts: &mut LearningCounts) {
-        if credited == 0 {
-            return;
-        }
-        let scale = &mut self.scales[index];
-        let old = scale.value;
-        scale.value = bounded(old + sum, &scale.config);
-        // Exact stored-value inequality excludes sums rounded or clamped
-        // away.
-        if scale.value != old {
-            counts.changes += credited;
-        }
-    }
-
-    /// The three-factor update: each initialized modulated edge learner
-    /// updates its own quantity, then each initialized scale sums its
-    /// modulated contributors' credit and is written once.
+    /// The one reward step (T25.F12 invariant 6): `three_factor` per
+    /// initialized reward-modulated learner, an edge's or a scale's, at its
+    /// own source, rate and clamp.
     fn reward(&mut self, signals: &OutcomeSignalBank) -> LearningCounts {
         let mut counts = LearningCounts::default();
         let visited = self.visited;
-        for learner in self.edges.iter_mut() {
-            let Some(modulation) = learner.config.modulation else {
+        let learners = self
+            .edges
+            .iter_mut()
+            .map(|learner| {
+                (
+                    &learner.config,
+                    learner.seeded,
+                    &mut learner.value,
+                    learner.trace,
+                )
+            })
+            .chain(
+                self.scales
+                    .iter_mut()
+                    .map(|scale| (&scale.config, scale.seeded, &mut scale.value, scale.trace)),
+            );
+        for (config, seeded, value, trace) in learners {
+            let Some(modulation) = config.modulation else {
                 continue;
             };
-            if !(visited || learner.seeded) {
+            if !(visited || seeded) {
                 continue;
             }
             let signal = signals.signals[modulation.reward_source as usize];
-            let old = learner.value;
-            learner.value = three_factor(
+            let old = *value;
+            *value = three_factor(
                 old,
-                learner.config.learning_rate,
+                config.learning_rate,
                 signal,
-                learner.trace,
-                learner.config.weight_clamp,
+                trace,
+                config.weight_clamp,
             );
             // Compare the final stored f32, including clamping and rounding.
-            counts.changes += u32::from(learner.value != old);
+            counts.changes += u32::from(*value != old);
             counts.updates += 1;
-        }
-        for index in 0..self.scales.len() {
-            if !self.initialized(self.scales[index].seeded) {
-                continue;
-            }
-            let (mut sum, mut credited) = (0.0f32, 0u32);
-            for contributor in self.scales[index].contributors.iter() {
-                let Some(modulation) = contributor.config.modulation else {
-                    continue;
-                };
-                let signal = signals.signals[modulation.reward_source as usize];
-                sum += contributor.pattern
-                    * contributor.config.learning_rate
-                    * signal
-                    * contributor.trace;
-                credited += 1;
-            }
-            counts.updates += credited;
-            self.write_scale(index, sum, credited, &mut counts);
         }
         counts
     }
 
-    /// Learn from a committed visit's samples (invariant 6), from
-    /// visit-start values: each pure-Hebbian edge learner applies its
-    /// rule's change bounded by its clamp and each modulated one adds its
-    /// activity to its trace; then each scale sums its pure-Hebbian
-    /// contributors' `pattern × Δ`, its modulated contributors adding
-    /// their activity to their traces, and is written once.
+    /// The one update law over a committed visit's samples (T25.F12
+    /// invariant 6), from visit-start state. Aggregation: an edge learner
+    /// takes its rule on its own `pre`, `post` and applied weight; a scale
+    /// learner sums its rule over its contributors times each pattern.
+    /// Update: pure Hebbian adds the aggregate at the learner's rate,
+    /// bounded by its clamp, written once; reward-modulated adds it to the
+    /// learner's trace.
     fn commit(&mut self, samples: &Samples) -> LearningCounts {
         let mut counts = LearningCounts::default();
+        // Aggregate every scale first: contributors read visit-start
+        // modifiers and scales.
+        let aggregates: Vec<Option<f32>> = self
+            .scales
+            .iter()
+            .map(|scale| {
+                (!scale.contributors.is_empty()).then(|| {
+                    let config = scale.config;
+                    scale.contributors.iter().fold(0.0f32, |sum, contributor| {
+                        let at = contributor.dynamic;
+                        let w = self.applied(self.order[at].1);
+                        let (pre, post) = (samples.pre[at], samples.post[at]);
+                        let change = if config.modulation.is_some() {
+                            activity(config.rule, pre, post, w)
+                        } else {
+                            hebbian_delta(config.rule, config.learning_rate, pre, post, w)
+                        };
+                        sum + contributor.pattern * change
+                    })
+                })
+            })
+            .collect();
         for index in 0..self.edges.len() {
             let learner = self.edges[index];
-            let (pre, post) = (samples.pre[learner.dynamic], samples.post[learner.dynamic]);
-            // Own quantities change only at their own learner and scales
-            // after this loop, so this is the visit-start applied weight.
+            let at = learner.dynamic;
+            let (pre, post) = (samples.pre[at], samples.post[at]);
+            // Scales are written after this loop, so this is the visit-start
+            // applied weight.
             let w = self.learner_applied(index);
             let config = learner.config;
+            let change = if config.modulation.is_some() {
+                activity(config.rule, pre, post, w)
+            } else {
+                hebbian_delta(config.rule, config.learning_rate, pre, post, w)
+            };
             let learner = &mut self.edges[index];
-            if config.modulation.is_some() {
-                learner.trace += activity(config.rule, pre, post, w);
-                continue;
-            }
-            let dw = hebbian_delta(config.rule, config.learning_rate, pre, post, w);
-            let old = learner.value;
-            learner.value = bounded(old + dw, &config);
-            // Exact stored-value inequality excludes deltas rounded or
-            // clamped away.
-            counts.changes += u32::from(learner.value != old);
-            counts.updates += 1;
+            update(
+                &config,
+                &mut learner.value,
+                &mut learner.trace,
+                change,
+                &mut counts,
+            );
         }
-        for index in 0..self.scales.len() {
-            let scale_value = self.scales[index].value;
-            let (mut sum, mut credited) = (0.0f32, 0u32);
-            for contributor in self.scales[index].contributors.iter_mut() {
-                let at = contributor.dynamic;
-                let (pre, post) = (samples.pre[at], samples.post[at]);
-                let w = compose(contributor.own, scale_value, contributor.pattern);
-                let config = contributor.config;
-                if config.modulation.is_some() {
-                    contributor.trace += activity(config.rule, pre, post, w);
-                    continue;
-                }
-                let dw = hebbian_delta(config.rule, config.learning_rate, pre, post, w);
-                sum += contributor.pattern * dw;
-                credited += 1;
+        for (scale, aggregate) in self.scales.iter_mut().zip(aggregates) {
+            if let Some(change) = aggregate {
+                let config = scale.config;
+                update(
+                    &config,
+                    &mut scale.value,
+                    &mut scale.trace,
+                    change,
+                    &mut counts,
+                );
             }
-            counts.updates += credited;
-            self.write_scale(index, sum, credited, &mut counts);
         }
         counts
     }
@@ -495,51 +506,11 @@ impl BackendLearning {
                 .map(|_| learner.trace),
             bound: learner.config.weight_clamp,
             kind: PlasticityKind::of(&learner.config),
-            scope: match learner.source {
-                LearnerSource::Lone => None,
-                LearnerSource::Own => Some(Scope::Edge),
-            },
+            learning: learner.config,
+            source: learner.source,
             initialized,
             inherits: learner.config.lamarckian,
         }
-    }
-
-    /// The view of a contributor of scale `scale`: no own quantity; its
-    /// initialization and inheritance are its scale's.
-    fn contributor_view(&self, scale: &ScaleLearner, contributor: &Contributor) -> LearnedEdge {
-        LearnedEdge {
-            occurrence: contributor.occurrence,
-            genomic: contributor.own,
-            birth: contributor.own,
-            retention: contributor.config.retention,
-            learned: None,
-            applied: compose(contributor.own, scale.value, contributor.pattern),
-            trace: contributor
-                .config
-                .modulation
-                .filter(|_| self.visited)
-                .map(|_| contributor.trace),
-            bound: contributor.config.weight_clamp,
-            kind: PlasticityKind::of(&contributor.config),
-            scope: Some(Scope::Group),
-            initialized: self.initialized(scale.seeded),
-            inherits: scale.config.lamarckian,
-        }
-    }
-
-    /// Every learning edge's view in canonical order.
-    fn edge_views(&self) -> Vec<LearnedEdge> {
-        let mut views: Vec<LearnedEdge> = (0..self.edges.len())
-            .map(|index| self.edge_view(index))
-            .chain(self.scales.iter().flat_map(|scale| {
-                scale
-                    .contributors
-                    .iter()
-                    .map(move |contributor| self.contributor_view(scale, contributor))
-            }))
-            .collect();
-        views.sort_by_key(|view| view.occurrence);
-        views
     }
 }
 
@@ -565,37 +536,35 @@ impl PartialEq for LearnedState {
     }
 }
 
-/// One learning edge as the readers see it, in canonical order.
+/// One edge learner as the readers see it, in canonical order.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LearnedEdge {
     pub occurrence: EdgeOccurrence,
-    /// The genomic own weight: an ungrouped edge's weight, a member's
-    /// correction (not its composed weight).
+    /// The genomic own weight: a lone edge's weight, a member's modifier
+    /// (not its composed weight).
     pub genomic: f32,
-    /// The own quantity's birth value (T25.F09); a bundle learner's raw
-    /// entry, which no reading uses.
+    /// The own quantity's birth value (T25.F09).
     pub birth: f32,
-    /// The edge's stored retention.
+    /// The effective learning's retention.
     pub retention: f32,
-    /// The learned own quantity, `Some` only for an initialized ungrouped
-    /// or edge-scope learner; always `None` for a bundle learner.
+    /// The learned own quantity, `Some` once initialized.
     pub learned: Option<f32>,
     /// The weight in force: `own + scale × pattern`.
     pub applied: f32,
     /// The eligibility trace, `Some` only for an initialized
     /// reward-modulated learner.
     pub trace: Option<f32>,
-    /// The edge's weight clamp.
+    /// The effective learning's clamp.
     pub bound: f32,
     pub kind: PlasticityKind,
-    /// The member's scope, `None` for an ungrouped edge.
-    pub scope: Option<Scope>,
-    /// Whether the learner is initialized: its own for an ungrouped or edge
-    /// learner, its bundle's scale for a bundle learner.
+    /// The effective learning the learner runs.
+    pub learning: Learning,
+    /// Where the effective learning is stored.
+    pub source: LearnerSource,
+    /// Whether the learner is initialized (visited or seeded).
     pub initialized: bool,
-    /// Whether a child inherits what it learns: its `lamarckian` flag for
-    /// an ungrouped or edge learner, its scale's for a bundle learner, as
-    /// `capture` reads them.
+    /// Whether a child inherits what it learns: the effective learning's
+    /// `lamarckian`, as `capture` reads it.
     pub inherits: bool,
 }
 
@@ -613,7 +582,9 @@ pub struct LearnedScale {
     pub learned: Option<f32>,
     /// The scale's clamp.
     pub bound: f32,
-    pub inherit_scale: bool,
+    /// Whether a child inherits the learned scale (its learning's
+    /// `lamarckian`).
+    pub lamarckian: bool,
 }
 
 impl LearnedState {
@@ -658,12 +629,10 @@ impl LearnedState {
                 .edges
                 .iter()
                 .any(|learner| learner.config.modulation.is_some())
-                || backend.scales.iter().any(|scale| {
-                    scale
-                        .contributors
-                        .iter()
-                        .any(|contributor| contributor.config.modulation.is_some())
-                })
+                || backend
+                    .scales
+                    .iter()
+                    .any(|scale| scale.config.modulation.is_some())
         })
     }
 
@@ -717,7 +686,7 @@ impl LearnedState {
         self.backends
             .get(node_idx)
             .into_iter()
-            .flat_map(BackendLearning::edge_views)
+            .flat_map(|backend| (0..backend.edges.len()).map(|index| backend.edge_view(index)))
     }
 
     /// The read-only view of mesh node `node_idx`'s scale learners, in
@@ -731,7 +700,7 @@ impl LearnedState {
                 retention: scale.config.retention,
                 learned: backend.initialized(scale.seeded).then_some(scale.value),
                 bound: scale.config.weight_clamp,
-                inherit_scale: scale.config.lamarckian,
+                lamarckian: scale.config.lamarckian,
             })
         })
     }
@@ -796,6 +765,11 @@ impl LearnedState {
         let backend = &mut self.backends[node_idx];
         backend.visited = true;
         backend.scales[slot].value = scale;
+    }
+
+    /// The trace of mesh node `node_idx`'s scale learner `slot`.
+    pub(crate) fn scale_trace(&self, node_idx: usize, slot: usize) -> f32 {
+        self.backends[node_idx].scales[slot].trace
     }
 }
 

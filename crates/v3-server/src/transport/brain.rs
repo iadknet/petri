@@ -9,8 +9,12 @@
 use serde::Serialize;
 use v3_core::contracts::{InputReference, NodeId, SensorContext};
 use v3_core::genome::cgp::{self as core_cgp, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface};
+use v3_core::genome::learning::LearnerSource as CoreLearnerSource;
 use v3_core::genome::mesh_annotations::MeshNodeAnnotation;
-use v3_core::genome::{BackendDef, CreatureGenome, VmBackendDef};
+use v3_core::genome::{
+    BackendDef, CreatureGenome, Learning as CoreLearning, MemberPolicy as CoreMemberPolicy,
+    VmBackendDef,
+};
 use v3_core::runtime::plasticity::{LearnedEdge, LearnedState};
 
 use crate::transport::genome_wire::{
@@ -144,17 +148,17 @@ pub struct BrainSink {
 }
 
 /// One edge: its source, its own weight, its genomic (composed) weight, the
-/// weight in force and, when a member, its bundle facts and, when plastic,
-/// its learner.
+/// weight in force and, when a member, its bundle facts and, when an edge
+/// learner, its learner.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct BrainEdge {
     pub source: GraphSource,
-    /// The edge's own weight: its genomic weight when ungrouped, its
-    /// correction on top of the bundle term when a member.
+    /// The edge's own weight: its genomic weight when lone, its modifier on
+    /// top of the bundle term when a member.
     pub own: f32,
-    /// The genomic weight (`genomic_weight`): `own` when ungrouped, the
-    /// composed weight of a member.
+    /// The genomic weight (`genomic_weight`): `own` when lone, the composed
+    /// weight of a member.
     pub genomic: f32,
     /// The weight in force (`applied_weights`), else `genomic`.
     pub applied: f32,
@@ -166,14 +170,16 @@ pub struct BrainEdge {
     pub learner: Option<EdgeLearner>,
 }
 
-/// A member's bundle facts: its bundle, scope, site, field, pattern and its
-/// bundle's genomic scale.
+/// A member's bundle facts: its bundle, policy, `credits`, site, field,
+/// pattern and its bundle's genomic scale.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct EdgeMember {
     /// The bundle's index in `bundles`.
     pub bundle: usize,
-    pub scope: Scope,
+    pub policy: MemberPolicy,
+    /// Whether the member's activity feeds its bundle's scale.
+    pub credits: bool,
     /// The member's site relative to its bundle's kind; omitted for a member
     /// off its kind's sinks.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -187,19 +193,24 @@ pub struct EdgeMember {
     pub scale: f32,
 }
 
-/// A member's learning scope.
+/// How a member's modifier learns (T25.F12): through its bundle's
+/// `member_default`, not at all, or by its own override (the learner's
+/// learning, source `own`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[cfg_attr(test, derive(ts_rs::TS, serde::Deserialize))]
-pub enum Scope {
-    Edge,
-    Group,
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum MemberPolicy {
+    Inherit,
+    Static,
+    Own,
 }
 
-impl From<core_cgp::Scope> for Scope {
-    fn from(scope: core_cgp::Scope) -> Self {
-        match scope {
-            core_cgp::Scope::Edge => Self::Edge,
-            core_cgp::Scope::Group => Self::Group,
+impl From<CoreMemberPolicy> for MemberPolicy {
+    fn from(policy: CoreMemberPolicy) -> Self {
+        match policy {
+            CoreMemberPolicy::Inherit => Self::Inherit,
+            CoreMemberPolicy::Static => Self::Static,
+            CoreMemberPolicy::Own(_) => Self::Own,
         }
     }
 }
@@ -224,23 +235,23 @@ impl From<core_cgp::Site> for Site {
     }
 }
 
-/// A learner's scope: an ungrouped edge, an edge-scope or a group-scope
-/// member.
+/// Where an edge learner's learning is stored (T25.F12): a lone edge's, a
+/// member's override, or its bundle's `member_default`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
-pub enum LearnerScope {
-    Ungrouped,
-    Edge,
-    Group,
+pub enum LearnerSource {
+    Lone,
+    Own,
+    MemberDefault,
 }
 
-impl From<Option<core_cgp::Scope>> for LearnerScope {
-    fn from(scope: Option<core_cgp::Scope>) -> Self {
-        match scope {
-            None => Self::Ungrouped,
-            Some(core_cgp::Scope::Edge) => Self::Edge,
-            Some(core_cgp::Scope::Group) => Self::Group,
+impl From<CoreLearnerSource> for LearnerSource {
+    fn from(source: CoreLearnerSource) -> Self {
+        match source {
+            CoreLearnerSource::Lone => Self::Lone,
+            CoreLearnerSource::Own => Self::Own,
+            CoreLearnerSource::MemberDefault => Self::MemberDefault,
         }
     }
 }
@@ -253,24 +264,49 @@ pub struct LearnerModulation {
     pub trace_decay: f32,
 }
 
-/// A plastic edge's learner, from its learning attributes and the
-/// runtime's view of it (`LearnedEdge`).
+/// One learning configuration (T25.F12): what a lone edge, a member's
+/// override and a bundle's two slots store, the one wire `Learning`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[cfg_attr(test, derive(ts_rs::TS))]
-pub struct EdgeLearner {
+pub struct Learning {
     pub rule: HebbianRule,
     pub learning_rate: f32,
     pub weight_clamp: f32,
+    /// Whether a child inherits what this learning learns.
+    pub lamarckian: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub modulation: Option<LearnerModulation>,
     pub retention: f32,
-    pub scope: LearnerScope,
+}
+
+impl From<CoreLearning> for Learning {
+    fn from(learning: CoreLearning) -> Self {
+        Self {
+            rule: learning.rule.into(),
+            learning_rate: learning.learning_rate,
+            weight_clamp: learning.weight_clamp,
+            lamarckian: learning.lamarckian,
+            modulation: learning.modulation.map(|modulation| LearnerModulation {
+                reward_source: modulation.reward_source.into(),
+                trace_decay: modulation.trace_decay,
+            }),
+            retention: learning.retention,
+        }
+    }
+}
+
+/// An edge learner, from the runtime's view of it (`LearnedEdge`): its
+/// effective learning and where it is stored.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct EdgeLearner {
+    #[serde(flatten)]
+    #[cfg_attr(test, ts(flatten))]
+    pub learning: Learning,
+    pub source: LearnerSource,
     pub initialized: bool,
-    /// Whether a child inherits what this learner learns: its `lamarckian`
-    /// flag, or its bundle's `inherit_scale` at group scope.
-    pub inherits: bool,
-    /// The learned own quantity, when initialized; never at group scope.
+    /// The learned own quantity, when initialized.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub learned: Option<f32>,
@@ -288,9 +324,16 @@ pub struct BrainBundle {
     pub source: BundleSource,
     pub wiring: Wiring,
     pub scale: f32,
-    pub inherit_scale: bool,
-    pub retention: f32,
-    /// An initialized scale slot's value; omitted otherwise.
+    /// How the scale learns ("learns as a group"); omitted when it does not.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub scale_learning: Option<Learning>,
+    /// The learning `inherit` members run ("learns per edge"); omitted when
+    /// absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
+    pub member_default: Option<Learning>,
+    /// An initialized learned scale's value; omitted otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(test, ts(optional))]
     pub learned_scale: Option<f32>,
@@ -552,8 +595,8 @@ fn graph_brain(
                 source: record.source().into(),
                 wiring: record.wiring().into(),
                 scale: record.scale(),
-                inherit_scale: record.inherit_scale(),
-                retention: record.retention(),
+                scale_learning: record.scale_learning().map(Learning::from),
+                member_default: record.member_default().map(Learning::from),
                 learned_scale,
                 coordinates,
             }
@@ -575,7 +618,8 @@ fn brain_edge(
     let genomic = def.genomic_weight(walked.occurrence, input_refs);
     let member = edge.membership().map(|membership| EdgeMember {
         bundle: membership.bundle.index(),
-        scope: membership.scope.into(),
+        policy: membership.policy.into(),
+        credits: membership.credits,
         site: def.site_of(walked.occurrence).map(Site::from),
         field: match edge.source() {
             core_cgp::GraphSource::InputLeaf { sub_idx, .. } => Some(sub_idx),
@@ -585,24 +629,13 @@ fn brain_edge(
         pattern: def.pattern(walked.occurrence, input_refs),
         scale: def.bundles()[membership.bundle.index()].scale(),
     });
-    let learner = edge
-        .plasticity()
-        .zip(walked.view)
-        .map(|(config, view)| EdgeLearner {
-            rule: config.rule.into(),
-            learning_rate: config.learning_rate,
-            weight_clamp: config.weight_clamp,
-            modulation: config.modulation.map(|modulation| LearnerModulation {
-                reward_source: modulation.reward_source.into(),
-                trace_decay: modulation.trace_decay,
-            }),
-            retention: view.retention,
-            scope: view.scope.into(),
-            initialized: view.initialized,
-            inherits: view.inherits,
-            learned: view.learned,
-            trace: view.trace,
-        });
+    let learner = walked.view.map(|view| EdgeLearner {
+        learning: view.learning.into(),
+        source: view.source.into(),
+        initialized: view.initialized,
+        learned: view.learned,
+        trace: view.trace,
+    });
     BrainEdge {
         source: edge.source().into(),
         own: edge.own_weight(),

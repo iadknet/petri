@@ -1,7 +1,7 @@
 use super::*;
 use crate::bench::indicators::lineage_diversity;
 use crate::bench::profiles::build_config;
-use crate::bench::schema::{AttributeChangesByScope, OperatorFunnel};
+use crate::bench::schema::{AttributeChangesByBroadcast, OperatorFunnel};
 use crate::bench::tests::small_profile;
 use crate::UNDEFINED;
 use proptest::prelude::*;
@@ -130,7 +130,7 @@ fn plasticity_for(population: u64) -> PlasticityCensusBlock {
         ],
         edges_by_rule: keys(&["classic", "oja", "anti_hebb", "covariance"]),
         edges_by_inheritance: keys(&["darwinian", "lamarckian"]),
-        edges_by_scope: keys(&["ungrouped", "edge", "group"]),
+        edges_by_source: keys(&["lone", "own", "member_default"]),
         scales: ["darwinian", "lamarckian"]
             .iter()
             .map(|inheritance| LearnedScaleRow {
@@ -763,7 +763,7 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
     stats.mutation_not_applicable_target_total = 3;
     stats.graph_edges_detached_total = 8;
     stats.bundles_removed_total = 2;
-    stats.mutation_attribute_changes_total_by_scope = [7, 4];
+    stats.mutation_attribute_changes_total_by_broadcast = [7, 4];
     stats.mutation_operator_funnel_total_by_operator.insert(
         MutationOperator::Graph(GraphOperator::DetachGraphEdge),
         v3_core::mutation::types::MutationOperatorFunnel {
@@ -830,7 +830,7 @@ fn transferred_tracking_blocks_read_the_stats_counters_behind_them() {
             not_applicable_target_total: 3,
             graph_edges_detached_total: 8,
             bundles_removed_total: 2,
-            attribute_changes_by_scope: AttributeChangesByScope { edge: 7, bundle: 4 },
+            attribute_changes_by_broadcast: AttributeChangesByBroadcast { one: 7, members: 4 },
             operator_funnel_by_operator: BTreeMap::from([(
                 "Graph.DetachGraphEdge".to_string(),
                 OperatorFunnel {
@@ -1464,7 +1464,7 @@ fn tracking_fields_survive_a_round_trip() {
                 not_applicable_target_total: 1,
                 graph_edges_detached_total: 4,
                 bundles_removed_total: 1,
-                attribute_changes_by_scope: AttributeChangesByScope { edge: 2, bundle: 1 },
+                attribute_changes_by_broadcast: AttributeChangesByBroadcast { one: 2, members: 1 },
                 operator_funnel_by_operator: BTreeMap::from([(
                     "Graph.AddBundleLive".to_string(),
                     OperatorFunnel {

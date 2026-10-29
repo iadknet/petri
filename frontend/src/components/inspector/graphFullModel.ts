@@ -3,8 +3,8 @@ import type { EdgeLearner } from "../../types/generated/EdgeLearner.ts";
 import type { GraphBrain } from "../../types/generated/GraphBrain.ts";
 import type { GraphSource } from "../../types/generated/GraphSource.ts";
 import type { InputRef } from "../../types/generated/InputRef.ts";
+import type { MemberPolicy } from "../../types/generated/MemberPolicy.ts";
 import type { NodeLearning } from "../../types/generated/NodeLearning.ts";
-import type { Scope } from "../../types/generated/Scope.ts";
 import type { WeightSurface } from "../../types/generated/WeightSurface.ts";
 import { joinLearning } from "./brainLearning.ts";
 import type { NodeCategory } from "./graphNodeCategories.ts";
@@ -57,7 +57,8 @@ export interface GraphModelEdge {
  * server's. */
 export interface MemberComposition {
 	bundle: number;
-	scope: Scope;
+	policy: MemberPolicy;
+	credits: boolean;
 	scale: number;
 	pattern: number;
 	/** The weight in force. */
@@ -69,9 +70,9 @@ export interface PlasticFacts {
 	genomic: number;
 	/** The weight in force. */
 	applied: number;
-	/** The learned own quantity, once initialized; never for a group-scope member. */
+	/** The learned own quantity, once initialized. */
 	learned?: number;
-	/** Whether the learner is initialized (at group scope, its scale slot). */
+	/** Whether the learner is initialized (visited or seeded). */
 	initialized: boolean;
 }
 
@@ -162,7 +163,8 @@ export function buildFullGraphModel(
 			const state = join.edge(surface, container, index, edge);
 			const member = edge.member && {
 				bundle: edge.member.bundle,
-				scope: edge.member.scope,
+				policy: edge.member.policy,
+				credits: edge.member.credits,
 				scale: edge.member.scale,
 				pattern: edge.member.pattern,
 				applied: state.applied,

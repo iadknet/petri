@@ -264,10 +264,15 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// (Graph weight 78, InputRef 12) and every creation wires a whole field
 /// set (default 11389669539280857404 -> 7093485144231482914, rate 0.0
 /// 5635669974551787686 -> 5095409984910669136).
+/// Re-pinned by T25.F12 commit 2 after two agreeing runs: the one learning
+/// type and its genome text, the catalog (Graph weight 78 -> 73), the
+/// target draw over edges and slots and the bundle birth draws (default
+/// 7093485144231482914 -> 14525610195308079782, rate 0.0
+/// 5095409984910669136 -> 16460463457823769532).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 7093485144231482914);
-    assert_eq!(short_run_identity(Some(0.0)), 5095409984910669136);
+    assert_eq!(short_run_identity(None), 14525610195308079782);
+    assert_eq!(short_run_identity(Some(0.0)), 16460463457823769532);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.

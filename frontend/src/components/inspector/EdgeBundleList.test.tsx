@@ -21,7 +21,15 @@ function member(
 		own: terms.own,
 		genomic: terms.genomic,
 		applied: terms.genomic,
-		member: { bundle: 0, scope: "Edge", site, field, pattern: terms.pattern, scale: terms.scale },
+		member: {
+			bundle: 0,
+			policy: "static",
+			credits: false,
+			site,
+			field,
+			pattern: terms.pattern,
+			scale: terms.scale,
+		},
 	};
 }
 
@@ -103,12 +111,22 @@ describe("EdgeBundleList", () => {
 		);
 	});
 
-	it("shows the learned scale, inherit_scale, and each member's scope and applied weight", () => {
+	it("shows the learned scale, both slots, and each member's policy and applied weight", () => {
 		const def = grouped();
 		const bundle = def.bundles[0];
-		if (bundle) bundle.inherit_scale = true;
+		if (bundle)
+			bundle.scale_learning = {
+				rule: "Oja",
+				learning_rate: 0.1,
+				weight_clamp: 2,
+				lamarckian: true,
+				retention: 1,
+			};
 		const first = def.output_sinks[1]?.edges[0]?.member;
-		if (first) first.scope = "Group";
+		if (first) {
+			first.policy = "inherit";
+			first.credits = true;
+		}
 		render(
 			<EdgeBundleList
 				graphDef={def}
@@ -122,28 +140,37 @@ describe("EdgeBundleList", () => {
 		);
 		expect(screen.getByTestId("edge-bundle")).toHaveTextContent("scale=0.500");
 		expect(screen.getByTestId("edge-bundle-learned-scale")).toHaveTextContent("learned=1.250");
-		expect(screen.getByTestId("edge-bundle-inherit-scale")).toHaveTextContent("inherits scale");
-		expect(screen.queryByTestId("edge-bundle-retention")).toBeNull();
+		expect(screen.getByTestId("edge-bundle-scale-learning")).toHaveTextContent(
+			"scale learning: Oja · hebbian · lamarckian",
+		);
+		expect(screen.getByTestId("edge-bundle-member-default")).toHaveTextContent("no member default");
 		const members = screen.getAllByTestId("edge-bundle-member");
-		expect(members[0]).toHaveTextContent("own=0.250 genomic=0.750 applied=1.500 group scope");
-		expect(members[1]).toHaveTextContent("applied=0.500 edge scope");
+		expect(members[0]).toHaveTextContent("own=0.250 genomic=0.750 applied=1.500 inherit · credits");
+		expect(members[1]).toHaveTextContent("applied=0.500 static");
 	});
 
-	it("shows a bundle's retention when it decays (T25.F09)", () => {
+	it("shows a slot's retention when it decays (T25.F09, T25.F12)", () => {
 		const def = grouped();
 		const bundle = def.bundles[0];
-		if (bundle) bundle.retention = 0.99;
+		if (bundle)
+			bundle.member_default = {
+				rule: "Classic",
+				learning_rate: 0.1,
+				weight_clamp: 2,
+				lamarckian: false,
+				retention: 0.99,
+			};
 		render(<EdgeBundleList graphDef={def} inputRefs={[]} learning={null} />);
-		expect(screen.getByTestId("edge-bundle-retention")).toHaveTextContent("retention=0.9900");
+		expect(screen.getByTestId("edge-bundle-member-default")).toHaveTextContent(
+			"member default: Classic · hebbian · darwinian · retention 0.9900",
+		);
 	});
 
 	it("takes the learned scale from the brain when the poll lists none", () => {
 		const def = grouped();
 		render(<EdgeBundleList graphDef={def} inputRefs={[]} learning={null} />);
 		expect(screen.queryByTestId("edge-bundle-learned-scale")).toBeNull();
-		expect(screen.getByTestId("edge-bundle-inherit-scale")).toHaveTextContent(
-			"genomic scale at birth",
-		);
+		expect(screen.getByTestId("edge-bundle-scale-learning")).toHaveTextContent("no scale learning");
 		const bundle = def.bundles[0];
 		if (bundle) bundle.learned_scale = 2;
 		render(<EdgeBundleList graphDef={def} inputRefs={[]} learning={null} />);
@@ -293,7 +320,8 @@ describe("coordinateMember", () => {
 			genomic: 0.75,
 			scale: 0.5,
 			pattern: 1,
-			scope: "Edge",
+			policy: "static",
+			credits: false,
 			applied: 1.5,
 		});
 		expect(coordinateMember(graph, { field: 0, site: "Sink" }, join)).toBeUndefined();

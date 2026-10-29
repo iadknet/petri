@@ -179,7 +179,7 @@ mod tests {
             vec![(
                 "bundles",
                 vec!["version", "creatures", "carriers", "wirings", "created"],
-                vec!["rows"],
+                vec!["rows", "learning"],
             )]
         );
     }

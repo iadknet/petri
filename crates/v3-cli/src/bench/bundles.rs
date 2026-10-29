@@ -1,9 +1,11 @@
-//! The per-sample `bundles` block (T25.F11, `bundles-v1`): the bundles the
-//! living population carries, by wiring (`plain`, `ring`, `pair`), with
-//! their genomic and learned scales off zero, their members and members
-//! with a nonzero own correction, the bundles on unreachable nodes, rows by
-//! wiring and target (a geometric wiring's kind, a `Plain` wiring's sink),
-//! and the run's creations by operator, wiring and form.
+//! The per-sample `bundles` block (T25.F11, T25.F12, `bundles-v2`): the
+//! bundles the living population carries, by wiring (`plain`, `ring`,
+//! `pair`), with their genomic and learned scales off zero, their members
+//! and members with a nonzero own modifier, the bundles on unreachable
+//! nodes, their learning by wiring (the bundles with each slot, the members
+//! by policy and the crediting members), rows by wiring and target (a
+//! geometric wiring's kind, a `Plain` wiring's sink), and the run's
+//! creations by operator, wiring and form.
 
 use std::collections::BTreeMap;
 
@@ -11,11 +13,11 @@ use super::retention::{retained_struct, CheckpointRetention};
 use serde::{Deserialize, Serialize};
 use v3_core::genome::CreatureGenome;
 use v3_core::mutation::types::{MutationOperator, FORM_KEYS, WIRING_KEYS};
-use v3_core::neighborhood::bundles::{BundleCensus, BundleTarget};
+use v3_core::neighborhood::bundles::{BundleCensus, BundleTarget, POLICY_KEYS};
 use v3_core::runtime::plasticity::LearnedState;
 
 /// The block's definition version.
-pub const BUNDLES_VERSION: &str = "bundles-v1";
+pub const BUNDLES_VERSION: &str = "bundles-v2";
 
 /// One wiring's totals over the reachable bundles.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,6 +35,19 @@ pub struct WiringTotals {
     pub own_nonzero: u64,
     /// Bundles of this wiring on unreachable nodes.
     pub unreachable: u64,
+}
+
+/// One wiring's learning over the reachable bundles (T25.F12).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WiringLearning {
+    /// Bundles with `scale_learning`.
+    pub scale_learning: u64,
+    /// Bundles with `member_default`.
+    pub member_default: u64,
+    /// Members by policy key (`inherit`, `static`, `own`).
+    pub members_by_policy: BTreeMap<String, u64>,
+    /// Members with `credits`.
+    pub crediting: u64,
 }
 
 /// One `(wiring, target)` row: a geometric wiring's kind or a `Plain`
@@ -63,6 +78,8 @@ retained_struct! {
         pub created: BTreeMap<String, BTreeMap<String, BTreeMap<String, u64>>>
             => CheckpointRetention::Every,
         pub rows: Vec<BundleRow> => CheckpointRetention::Last,
+        /// Learning by wiring key (T25.F12).
+        pub learning: BTreeMap<String, WiringLearning> => CheckpointRetention::Last,
     }
 }
 
@@ -96,6 +113,25 @@ impl Bundles {
                         members: total.members,
                         own_nonzero: total.own_nonzero,
                         unreachable: total.unreachable,
+                    },
+                )
+            })
+            .collect();
+        let learning = WIRING_KEYS
+            .iter()
+            .zip(&census.wirings)
+            .map(|(key, total)| {
+                (
+                    key.to_string(),
+                    WiringLearning {
+                        scale_learning: total.scale_learning,
+                        member_default: total.member_default,
+                        members_by_policy: POLICY_KEYS
+                            .iter()
+                            .zip(total.members_by_policy)
+                            .map(|(policy, count)| (policy.to_string(), count))
+                            .collect(),
+                        crediting: total.crediting,
                     },
                 )
             })
@@ -142,6 +178,7 @@ impl Bundles {
             wirings,
             created,
             rows: rows.into_values().collect(),
+            learning,
         }
     }
 

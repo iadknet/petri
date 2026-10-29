@@ -28,7 +28,7 @@ use crate::contracts::OutcomeChannel;
 use crate::contracts::{InputReference, NodeId};
 use crate::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge};
 use crate::genome::{
-    BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
+    BackendDef, CreatureGenome, HebbianRule, Learning, NodeGenome, RewardModulationConfig,
     VmBackendDef, VmInstruction,
 };
 use crate::mutation::graph::operators::{random_compute_node_kind, random_graph_source};
@@ -98,11 +98,11 @@ fn input_refs(rng: &mut SmallRng, count: usize) -> Vec<InputReference> {
         .collect()
 }
 
-fn plasticity(rng: &mut SmallRng) -> Option<PlasticityConfig> {
+fn plasticity(rng: &mut SmallRng) -> Option<Learning> {
     if !rng.gen_bool(0.4) {
         return None;
     }
-    Some(PlasticityConfig {
+    Some(Learning {
         rule: HebbianRule::Classic,
         learning_rate: 0.1,
         weight_clamp: 5.0,

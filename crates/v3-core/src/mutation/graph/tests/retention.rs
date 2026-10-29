@@ -1,5 +1,5 @@
-//! T25.F09 retention operators: the catalog, applicability, draw orders,
-//! the value laws and the scope report.
+//! T25.F09 retention operators over every stored learning (T25.F12): the
+//! catalog, applicability, draw orders, the value laws and the reach.
 
 use proptest::prelude::*;
 use rand::rngs::SmallRng;
@@ -8,33 +8,32 @@ use rand::{Rng, SeedableRng};
 use crate::config::MutationConfig;
 use crate::contracts::votes::DirectedVoteKind;
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
+use crate::genome::cgp::test_support::store_learning;
 use crate::genome::cgp::{
-    validate_graph, BundleId, CgpGraphBackendDef, EdgeOccurrence, GraphEdge, GraphSource, Scope,
+    validate_graph, BundleId, CgpGraphBackendDef, EdgeOccurrence, GraphEdge, GraphSource,
+    LearningSlot,
 };
-use crate::genome::{BackendDef, HebbianRule, NodeGenome, PlasticityConfig};
-use crate::mutation::event::{ComplexityEffect, MutationSkipReason};
+use crate::genome::{BackendDef, HebbianRule, Learning, NodeGenome};
+use crate::mutation::event::{Broadcast, ComplexityEffect};
 use crate::mutation::graph::hebbian::{
     disable_retention_in_def, draw_retention, enable_retention_in_def, mutate_retention_in_def,
     step_retention, RETENTION_DEFICIT_MIN,
 };
-use crate::mutation::graph::{bundle, GraphMutator, GraphOperator};
+use crate::mutation::graph::{GraphMutator, GraphOperator};
 use crate::mutation::MutationOperator;
 
-const RETENTION_OPERATORS: [GraphOperator; 6] = [
+const RETENTION_OPERATORS: [GraphOperator; 3] = [
     GraphOperator::EnableRetention,
     GraphOperator::DisableRetention,
     GraphOperator::MutateRetention,
-    GraphOperator::EnableBundleRetention,
-    GraphOperator::DisableBundleRetention,
-    GraphOperator::MutateBundleRetention,
 ];
 
 fn rng(seed: u64) -> SmallRng {
     SmallRng::seed_from_u64(seed)
 }
 
-fn plastic(retention: f32) -> PlasticityConfig {
-    PlasticityConfig {
+fn plastic(retention: f32) -> Learning {
+    Learning {
         rule: HebbianRule::Classic,
         learning_rate: 0.1,
         weight_clamp: 2.0,
@@ -48,16 +47,15 @@ fn refs() -> Vec<InputReference> {
     vec![InputReference::World(WorldInputKey::NeighborBarrierRing)]
 }
 
-/// A full catalog with an ungrouped plastic sink edge (retention
-/// `ungrouped`) and a ring bundle whose first three members carry
-/// retentions `members` (the rest static).
+/// A full catalog with a lone learning sink edge (retention `ungrouped`)
+/// and a ring bundle whose first three members are `Own` members of
+/// retentions `members` (the rest `Static`), both slots absent.
 fn fixture(ungrouped: f32, members: [f32; 3]) -> (CgpGraphBackendDef, Vec<EdgeOccurrence>) {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     let id = def.add_ring_bundle(0, DirectedVoteKind::Move, 0);
     let all: Vec<EdgeOccurrence> = def.members(id).collect();
     for (&member, &retention) in all.iter().zip(&members) {
-        def.edge_mut(member)
-            .set_plasticity(Some(plastic(retention)));
+        store_learning(&mut def, member, Some(plastic(retention)));
     }
     let surface = def
         .sink_surface(crate::genome::cgp::OutputSinkKind::CustomOutput(0))
@@ -73,7 +71,7 @@ fn fixture(ungrouped: f32, members: [f32; 3]) -> (CgpGraphBackendDef, Vec<EdgeOc
         ),
     );
     let at = EdgeOccurrence::new(surface, def.surface_edges(surface).len() - 1);
-    def.edge_mut(at).set_plasticity(Some(plastic(ungrouped)));
+    def.edge_mut(at).set_learning(Some(plastic(ungrouped)));
     let mut targets = vec![at];
     targets.extend(all);
     (def, targets)
@@ -89,7 +87,9 @@ fn node(def: CgpGraphBackendDef) -> NodeGenome {
 }
 
 fn retention_at(def: &CgpGraphBackendDef, at: EdgeOccurrence) -> Option<f32> {
-    def.edge_at(at).plasticity().map(|config| config.retention)
+    def.edge_at(at)
+        .stored_learning()
+        .map(|config| config.retention)
 }
 
 /// The edges `after` changed from `before`.
@@ -103,12 +103,12 @@ fn edited(before: &CgpGraphBackendDef, after: &CgpGraphBackendDef) -> Vec<EdgeOc
 /// The pick and, for a member, the coin, over the edges `matches` admits.
 fn replay_pick(
     def: &CgpGraphBackendDef,
-    matches: impl Fn(Option<PlasticityConfig>) -> bool,
+    matches: impl Fn(Option<Learning>) -> bool,
     rng: &mut SmallRng,
 ) -> (EdgeOccurrence, Option<bool>) {
     let matching: Vec<EdgeOccurrence> = def
         .edge_sites()
-        .filter(|&at| matches(def.edge_at(at).plasticity()))
+        .filter(|&at| matches(def.edge_at(at).stored_learning()))
         .collect();
     let picked = matching[rng.gen_range(0..matching.len())];
     let coin = def.edge_at(picked).membership().map(|_| rng.gen_bool(0.5));
@@ -116,8 +116,8 @@ fn replay_pick(
 }
 
 #[test]
-fn the_six_retention_operators_keep_their_slots_keys_and_tiers() {
-    assert_eq!(&GraphOperator::ALL[29..35], &RETENTION_OPERATORS);
+fn the_three_retention_operators_keep_their_slots_keys_and_tiers() {
+    assert_eq!(&GraphOperator::ALL[30..33], &RETENTION_OPERATORS);
     let keys = RETENTION_OPERATORS.map(|op| MutationOperator::from(op).as_key());
     assert_eq!(
         keys,
@@ -125,15 +125,9 @@ fn the_six_retention_operators_keep_their_slots_keys_and_tiers() {
             "Graph.EnableRetention",
             "Graph.DisableRetention",
             "Graph.MutateRetention",
-            "Graph.EnableBundleRetention",
-            "Graph.DisableBundleRetention",
-            "Graph.MutateBundleRetention",
         ]
     );
-    assert_eq!(
-        RETENTION_OPERATORS.map(GraphOperator::weight),
-        [1, 1, 4, 1, 1, 4]
-    );
+    assert_eq!(RETENTION_OPERATORS.map(GraphOperator::weight), [1, 1, 4]);
     for op in RETENTION_OPERATORS {
         assert_eq!(op.complexity_effect(), ComplexityEffect::Neutral, "{op:?}");
         assert_eq!(
@@ -145,9 +139,8 @@ fn the_six_retention_operators_keep_their_slots_keys_and_tiers() {
     }
 }
 
-/// Each operator applies exactly where its predicate admits a site: the
-/// edge three on a plastic edge at or below 1, the bundle three on a record
-/// at or below 1 (a record without a scale slot included).
+/// Each operator applies exactly where its predicate admits a stored
+/// learning at or below 1: a lone edge, an `Own` member or a present slot.
 #[test]
 fn the_retention_operators_apply_exactly_where_their_predicate_admits() {
     let applies = |def: &CgpGraphBackendDef| -> Vec<bool> {
@@ -167,23 +160,29 @@ fn the_retention_operators_apply_exactly_where_their_predicate_admits() {
             })
             .collect()
     };
-    // No plastic edge decays; the bundle retains: enable only.
+    // Nothing decays: enable only.
     let (def, _) = fixture(1.0, [1.0; 3]);
-    assert_eq!(applies(&def), [true, false, false, true, false, false]);
-    // Every plastic edge and the bundle decay: disable and mutate only.
-    let (mut def, _) = fixture(0.5, [0.5; 3]);
-    def.bundle_mut(BundleId::new(0)).set_retention(0.5);
-    assert_eq!(applies(&def), [false, true, true, false, true, true]);
-    // A graph without a plastic edge or a bundle: nothing.
+    assert_eq!(applies(&def), [true, false, false]);
+    // Every stored learning decays: disable and mutate only.
+    let (def, _) = fixture(0.5, [0.5; 3]);
+    assert_eq!(applies(&def), [false, true, true]);
+    // A decaying slot alone admits disable and mutate.
+    let mut slot_only = CgpGraphBackendDef::new_with_fixed_outputs();
+    let id = slot_only.add_ring_bundle(0, DirectedVoteKind::Move, 0);
+    slot_only
+        .bundle_mut(id)
+        .set_slot(LearningSlot::MemberDefault, Some(plastic(0.5)));
+    assert_eq!(applies(&slot_only), [false, true, true]);
+    // A graph without a stored learning: nothing.
     let bare = CgpGraphBackendDef::new_with_fixed_outputs();
-    assert_eq!(applies(&bare), [false; 6]);
+    assert_eq!(applies(&bare), [false; 3]);
 }
 
 /// `EnableRetention`: the pick, the coin, one `u = gen_range(−4..=0)`, and
-/// `ρ = 1 − 10ᵘ` on the picked edge or every admitted member; the scope it
+/// `ρ = 1 − 10ᵘ` on the picked edge or every admitted member; the reach it
 /// reports is the coin's.
 #[test]
-fn enable_retention_draws_after_the_coin_and_reports_its_scope() {
+fn enable_retention_draws_after_the_coin_and_reports_its_reach() {
     let (original, edges) = fixture(1.0, [1.0, 0.5, 1.0]);
     let mut seen = [false; 3];
     for seed in 0..128 {
@@ -197,10 +196,10 @@ fn enable_retention_draws_after_the_coin_and_reports_its_scope() {
         let retention = 1.0 - 10f32.powf(u);
         let mut def = original.clone();
         let mut actual = rng(seed);
-        let scope = enable_retention_in_def(&mut def, &mut actual).unwrap();
+        let reach = enable_retention_in_def(&mut def, &mut actual).unwrap();
         assert_eq!(actual.gen::<u64>(), expected.gen::<u64>(), "seed {seed}");
         let want = if coin == Some(true) {
-            // Every admitted member: the decaying one and the static ones
+            // Every admitted member: the decaying one and the `Static` ones
             // are not.
             vec![edges[1], edges[3]]
         } else {
@@ -211,11 +210,11 @@ fn enable_retention_draws_after_the_coin_and_reports_its_scope() {
             .iter()
             .all(|&at| retention_at(&def, at) == Some(retention)));
         assert_eq!(
-            scope,
+            reach,
             if coin == Some(true) {
-                Scope::Group
+                Broadcast::Members
             } else {
-                Scope::Edge
+                Broadcast::One
             }
         );
         seen[match coin {
@@ -250,7 +249,7 @@ fn disable_retention_returns_retention_to_one_with_no_value_draw() {
         };
         assert_eq!(edited(&original, &def), want, "seed {seed}");
         for at in want {
-            assert_eq!(def.edge_at(at).plasticity(), Some(plastic(1.0)));
+            assert_eq!(def.edge_at(at).stored_learning(), Some(plastic(1.0)));
         }
     }
 }
@@ -299,74 +298,16 @@ fn the_retention_step_clamps_the_deficit() {
     assert_eq!(step_retention(0.5, 1.0), 1.0 - 0.5 * (1.0 + 0.3 * 1.0));
 }
 
-/// The bundle three pick one record uniformly among those their predicate
-/// admits, in `BundleId` order, with one draw, then the value law; they
-/// report no scope and keep every member.
+/// Through the dispatch: every retention operator reports its reach and
+/// every result passes the graph invariants, slots included.
 #[test]
-fn the_bundle_retention_operators_pick_an_admitted_record() {
-    let mut original = CgpGraphBackendDef::new_with_fixed_outputs();
-    for offset in 0..4 {
-        original.add_ring_bundle(0, DirectedVoteKind::Move, offset);
-    }
-    original.bundle_mut(BundleId::new(1)).set_retention(0.5);
-    original.bundle_mut(BundleId::new(3)).set_retention(0.9);
-    let retention = |def: &CgpGraphBackendDef| -> Vec<f32> {
-        def.bundles()
-            .iter()
-            .map(|bundle| bundle.retention())
-            .collect()
-    };
-    let before = retention(&original);
-    for seed in 0..32 {
-        // Enable: bundles 0 and 2 retain.
-        let mut expected = rng(seed);
-        let id = [0, 2][expected.gen_range(0..2)];
-        let drawn = draw_retention(&mut expected);
-        let mut def = original.clone();
-        let mut actual = rng(seed);
-        bundle::enable_retention(&mut def, &mut actual).unwrap();
-        assert_eq!(actual.gen::<u64>(), expected.gen::<u64>());
-        let mut want = before.clone();
-        want[id] = drawn;
-        assert_eq!(retention(&def), want, "seed {seed}");
-        assert_eq!(def.output_sinks(), original.output_sinks());
-
-        // Disable: bundles 1 and 3 decay; no value draw.
-        let mut expected = rng(seed);
-        let id = [1, 3][expected.gen_range(0..2)];
-        let mut def = original.clone();
-        let mut actual = rng(seed);
-        bundle::disable_retention(&mut def, &mut actual).unwrap();
-        assert_eq!(actual.gen::<u64>(), expected.gen::<u64>());
-        let mut want = before.clone();
-        want[id] = 1.0;
-        assert_eq!(retention(&def), want, "seed {seed}");
-
-        // Mutate: one `u` on the picked record's deficit.
-        let mut expected = rng(seed);
-        let id = [1, 3][expected.gen_range(0..2)];
-        let u = expected.gen_range(-1.0f32..=1.0);
-        let mut def = original.clone();
-        bundle::mutate_retention(&mut def, &mut rng(seed)).unwrap();
-        let mut want = before.clone();
-        want[id] = step_retention(before[id], u);
-        assert_eq!(retention(&def), want, "seed {seed}");
-    }
-    let all_retain = CgpGraphBackendDef::new_with_fixed_outputs();
-    assert_eq!(
-        bundle::disable_retention(&mut all_retain.clone(), &mut rng(0)),
-        Err(MutationSkipReason::NoApplicableTarget)
-    );
-}
-
-/// Through the dispatch: the edge three report their scope, the bundle three
-/// none, and every result passes the graph invariants.
-#[test]
-fn the_dispatch_reports_edge_scopes_and_keeps_the_graph_valid() {
+fn the_dispatch_reports_the_reach_and_keeps_the_graph_valid() {
     let (mut def, _) = fixture(1.0, [0.5, 1.0, 0.5]);
-    def.bundle_mut(BundleId::new(0)).set_retention(0.5);
-    // A second, retaining record, so every bundle operator has a site.
-    def.add_ring_bundle(0, DirectedVoteKind::Move, 1);
+    let id = BundleId::new(0);
+    def.bundle_mut(id)
+        .set_slot(LearningSlot::Scale, Some(plastic(0.5)));
+    def.bundle_mut(id)
+        .set_slot(LearningSlot::MemberDefault, Some(plastic(1.0)));
     let genome = crate::genome::CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![node(def)],
@@ -383,13 +324,7 @@ fn the_dispatch_reports_edge_scopes_and_keeps_the_graph_valid() {
                 &crate::config::test_sensor_context(1),
             )
             .unwrap();
-            let edge_layer = matches!(
-                op,
-                GraphOperator::EnableRetention
-                    | GraphOperator::DisableRetention
-                    | GraphOperator::MutateRetention
-            );
-            assert_eq!(report.attribute_scope.is_some(), edge_layer, "{op:?}");
+            assert!(report.broadcast.is_some(), "{op:?}");
             assert_eq!(
                 validate_graph(&changed.nodes[0]),
                 Ok(()),

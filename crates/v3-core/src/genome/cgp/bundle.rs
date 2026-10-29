@@ -1,8 +1,8 @@
 //! Bundles (T25.F03, T25.F11): one developmental program that wires a whole
 //! field set.
 //!
-//! A [`Bundle`] is a record `{source, wiring, scale, inherit_scale,
-//! retention}`; its members are real sink edges whose [`super::Membership`]
+//! A [`Bundle`] is a record `{source, wiring, scale, scale_learning,
+//! member_default}`; its members are real sink edges whose [`super::Membership`]
 //! names it. Every member, whatever its wiring, weighs
 //! [`compose`]`(own_weight, scale, pattern)`, the pattern read from the
 //! wiring at the member's coordinate `(field, site)`.
@@ -12,6 +12,7 @@ use crate::contracts::votes::{DirectedVoteKind, VoteSink, VOTE_DIRECTION_COUNT};
 use crate::contracts::{
     compass_x, compass_y, FieldSet, InputReference, SensorContext, SensorDescriptor, MEMORY_BANK,
 };
+use crate::genome::learning::Learning;
 
 /// Where a member sits relative to its bundle's wiring (T25.F11): the one
 /// vote sink of a `Plain` wiring, a direction sink `K(d)` of a geometric
@@ -307,24 +308,39 @@ pub struct Bundle {
     pub(super) wiring: Wiring,
     /// One shared weight.
     pub(super) scale: f32,
-    /// Whether a parent's learned scale seeds the child's (T25.F07); born
-    /// false.
-    pub(super) inherit_scale: bool,
-    /// The learned scale's retention per world tick, in `[0, 1]` (T25.F09);
-    /// born 1, an exact no-op.
-    pub(super) retention: f32,
+    /// How the scale learns ("learns as a group", T25.F12); born absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) scale_learning: Option<Learning>,
+    /// The learning every `Inherit` member runs ("learns per edge",
+    /// T25.F12); born absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) member_default: Option<Learning>,
+}
+
+/// One of a bundle's two learning slots (T25.F12 invariant 2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LearningSlot {
+    /// `scale_learning`.
+    Scale,
+    /// `member_default`.
+    MemberDefault,
+}
+
+impl LearningSlot {
+    /// Both slots in target order: `scale_learning` first.
+    pub const ALL: [Self; 2] = [Self::Scale, Self::MemberDefault];
 }
 
 impl Bundle {
-    /// A silent record: scale 0, `inherit_scale` false, retention 1.
+    /// A silent record: scale 0, both learning slots absent.
     #[must_use]
     pub(super) const fn new(source: BundleSource, wiring: Wiring) -> Self {
         Self {
             source,
             wiring,
             scale: 0.0,
-            inherit_scale: false,
-            retention: 1.0,
+            scale_learning: None,
+            member_default: None,
         }
     }
 
@@ -346,18 +362,28 @@ impl Bundle {
         self.scale
     }
 
-    /// Whether a parent's learned scale seeds the child's.
+    /// How the scale learns, `None` for a scale that does not.
     #[inline]
     #[must_use]
-    pub const fn inherit_scale(&self) -> bool {
-        self.inherit_scale
+    pub const fn scale_learning(&self) -> Option<Learning> {
+        self.scale_learning
     }
 
-    /// The learned scale's retention per world tick (T25.F09).
+    /// The learning `Inherit` members run, `None` for none.
     #[inline]
     #[must_use]
-    pub const fn retention(&self) -> f32 {
-        self.retention
+    pub const fn member_default(&self) -> Option<Learning> {
+        self.member_default
+    }
+
+    /// The learning stored in `slot`.
+    #[inline]
+    #[must_use]
+    pub const fn slot(&self, slot: LearningSlot) -> Option<Learning> {
+        match slot {
+            LearningSlot::Scale => self.scale_learning,
+            LearningSlot::MemberDefault => self.member_default,
+        }
     }
 }
 

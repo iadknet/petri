@@ -413,8 +413,7 @@ mod tests {
         OutputSinkKind,
     };
     use crate::genome::{
-        BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef,
-        VmInstruction,
+        BackendDef, CreatureGenome, HebbianRule, Learning, NodeGenome, VmBackendDef, VmInstruction,
     };
     use crate::runtime::mesh::execute_creature_mesh;
     use crate::runtime::state::GraphRuntimeState;
@@ -852,7 +851,7 @@ mod tests {
                                 },
                                 1.0,
                             )],
-                            Some(PlasticityConfig {
+                            Some(Learning {
                                 rule: HebbianRule::Classic,
                                 learning_rate: 0.5,
                                 weight_clamp: 1.0,

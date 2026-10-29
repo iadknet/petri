@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 54221d8a7529979953cec550e914723dc26a71f9e9f79354929cff825e343625 # shrinks to ops = [PushSink(0), Remove(15), PushSink(0), Remove(52)]
+cc 1a0d8817699c03827ecbd6c4fae163ff5897f3345fa264be2eaa625dc58df615 # shrinks to ops = [SetPlasticity(12), PushCompute(0)]

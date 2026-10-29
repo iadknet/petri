@@ -21,7 +21,7 @@ use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
     GraphSource, OutputSink, OutputSinkKind,
 };
-use crate::genome::PlasticityConfig;
+use crate::genome::Learning;
 use crate::mutation::event::MutationSkipReason;
 use crate::mutation::graph::operators::{
     copy_cgp_subgraph, copy_compute_node, split_existing_edge,
@@ -241,12 +241,12 @@ fn copy_internal_node_inserts_the_copy_directly_after_its_source() {
             child.compute_nodes()[source + 1]
                 .inputs
                 .iter()
-                .map(GraphEdge::plasticity)
+                .map(GraphEdge::stored_learning)
                 .collect::<Vec<_>>(),
             parent.compute_nodes()[source]
                 .inputs
                 .iter()
-                .map(GraphEdge::plasticity)
+                .map(GraphEdge::stored_learning)
                 .collect::<Vec<_>>(),
         );
     }
@@ -442,7 +442,7 @@ fn introspection_edge_def(
             } else {
                 Vec::new()
             },
-            plasticity.then_some(PlasticityConfig {
+            plasticity.then_some(Learning {
                 rule: crate::genome::HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 5.0,

@@ -1,6 +1,6 @@
-//! Group-scope learning (T25.F07): scale slots, pattern-weighted credit,
-//! passive members, seeds by scope and the single applied-weight
-//! composition.
+//! Bundle learning (T25.F07, T25.F12): scale learners fed by crediting
+//! members, member modifiers learning by their effective learning, seeds,
+//! and the single applied-weight composition, all through one update law.
 
 use super::learned::LearningCounts;
 use super::{LearnedState, OutcomeSignalBank};
@@ -11,10 +11,12 @@ use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::genome::cgp::{
     BirthSeeds, BundleId, CgpGraphBackendDef, ComputeNodeKind, EdgeOccurrence, EdgeSurface,
-    GraphEdge, GraphSource, OutputSinkKind, Scope,
+    GraphEdge, GraphSource, LearningSlot, OutputSinkKind,
 };
+use crate::genome::learning::LearnerSource;
 use crate::genome::{
-    BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, RewardModulationConfig,
+    BackendDef, CreatureGenome, HebbianRule, Learning, MemberPolicy, NodeGenome,
+    RewardModulationConfig,
 };
 use crate::runtime::cgp::execute::execute_graph_impl;
 use crate::runtime::cgp::tracer::GraphTracer;
@@ -35,8 +37,8 @@ fn refs() -> Vec<InputReference> {
     ]
 }
 
-fn hebbian(rule: HebbianRule, eta: f32, clamp: f32) -> PlasticityConfig {
-    PlasticityConfig {
+fn hebbian(rule: HebbianRule, eta: f32, clamp: f32) -> Learning {
+    Learning {
         rule,
         learning_rate: eta,
         weight_clamp: clamp,
@@ -46,13 +48,20 @@ fn hebbian(rule: HebbianRule, eta: f32, clamp: f32) -> PlasticityConfig {
     }
 }
 
-fn modulated(eta: f32, clamp: f32) -> PlasticityConfig {
-    PlasticityConfig {
+fn modulated(eta: f32, clamp: f32) -> Learning {
+    Learning {
         modulation: Some(RewardModulationConfig {
             reward_source: OutcomeChannel::EnergyDelta,
             trace_decay: 0.9,
         }),
         ..hebbian(HebbianRule::Classic, eta, clamp)
+    }
+}
+
+fn lamarckian(learning: Learning) -> Learning {
+    Learning {
+        lamarckian: true,
+        ..learning
     }
 }
 
@@ -87,10 +96,23 @@ fn member_with_sign(def: &CgpGraphBackendDef, id: BundleId, sign: f32) -> EdgeOc
         .expect("a member of that sign")
 }
 
-fn learn(def: &mut CgpGraphBackendDef, at: EdgeOccurrence, config: PlasticityConfig, scope: Scope) {
+/// Set the member at `at`'s policy and `credits`.
+fn member(def: &mut CgpGraphBackendDef, at: EdgeOccurrence, policy: MemberPolicy, credits: bool) {
     let mut edge = def.edge_mut(at);
-    edge.set_plasticity(Some(config));
-    edge.set_scope(scope);
+    edge.set_policy(policy);
+    edge.set_credits(credits);
+}
+
+/// Set bundle `id`'s two slots.
+fn slots(
+    def: &mut CgpGraphBackendDef,
+    id: BundleId,
+    scale: Option<Learning>,
+    default: Option<Learning>,
+) {
+    let mut record = def.bundle_mut(id);
+    record.set_slot(LearningSlot::Scale, scale);
+    record.set_slot(LearningSlot::MemberDefault, default);
 }
 
 fn genome(def: &CgpGraphBackendDef) -> CreatureGenome {
@@ -175,12 +197,12 @@ fn view_edge(state: &LearnedState, at: EdgeOccurrence) -> super::LearnedEdge {
     state
         .edges(0)
         .find(|edge| edge.occurrence == at)
-        .expect("a learner")
+        .expect("an edge learner")
 }
 
 fn scale(state: &LearnedState) -> super::LearnedScale {
     let scales: Vec<_> = state.scales(0).collect();
-    assert_eq!(scales.len(), 1, "one scale slot");
+    assert_eq!(scales.len(), 1, "one scale learner");
     scales[0]
 }
 
@@ -198,60 +220,65 @@ fn signals(energy: f32) -> OutcomeSignalBank {
     bank
 }
 
-/// Oja's `w` is the visit-start applied weight `own + scale × pattern`, for
-/// an edge learner (its correction moves) and a bundle learner (the scale
-/// moves by `pattern × Δ`).
+/// Oja's `w` is the visit-start applied weight `modifier + scale ×
+/// pattern`, for a member learning its modifier and for a contributor of a
+/// learning scale (the scale moves by `pattern × Δ` at `scale_learning`'s
+/// rate).
 #[test]
-fn oja_bundle_members_use_visit_start_applied_weight() {
+fn oja_members_use_the_visit_start_applied_weight() {
     let (mut def, id) = pair_def(0.5);
-    let edge = member_with_sign(&def, id, 1.0);
-    let bundle = member_with_sign(&def, id, -1.0);
+    let own = member_with_sign(&def, id, 1.0);
+    let credits = member_with_sign(&def, id, -1.0);
     let oja = hebbian(HebbianRule::Oja, 0.5, 4.0);
-    def.edge_mut(edge).set_weight(0.25);
-    learn(&mut def, edge, oja, Scope::Edge);
-    learn(&mut def, bundle, oja, Scope::Group);
+    slots(&mut def, id, Some(oja), None);
+    def.edge_mut(own).set_weight(0.25);
+    member(&mut def, own, MemberPolicy::Own(oja), false);
+    member(&mut def, credits, MemberPolicy::Static, true);
     let refs = refs();
-    let (p_edge, p_bundle) = (def.pattern(edge, &refs), def.pattern(bundle, &refs));
+    let (p_own, p_credit) = (def.pattern(own, &refs), def.pattern(credits, &refs));
     let mut learned = state(&def, None);
     let (pre, post) = (0.8f32, 1.5f32);
     drive(&mut learned, &def, |_| pre, post);
 
-    let w_edge = 0.5 * p_edge + 0.25;
-    let delta_edge = 0.5 * post * (pre - w_edge * post);
-    assert_eq!(view_edge(&learned, edge).learned, Some(0.25 + delta_edge));
-    let w_bundle = 0.5 * p_bundle;
-    let delta_bundle = 0.5 * post * (pre - w_bundle * post);
-    assert_eq!(scale(&learned).learned, Some(0.5 + p_bundle * delta_bundle));
-    // Δ would differ under the genomic own weight alone.
-    assert_ne!(delta_bundle, 0.5 * post * pre);
+    let w_own = 0.5 * p_own + 0.25;
+    let delta_own = 0.5 * post * (pre - w_own * post);
+    assert_eq!(view_edge(&learned, own).learned, Some(0.25 + delta_own));
+    let w_credit = 0.5 * p_credit;
+    let delta_credit = 0.5 * post * (pre - w_credit * post);
+    assert_eq!(scale(&learned).learned, Some(0.5 + p_credit * delta_credit));
 }
 
-/// The scale's change is `clamp(scale + Σ pattern × Δ, ±bound)`, summed
-/// over the bundle learners in canonical order and bounded once; bundle
-/// learners store no own quantity, and a negative-pattern member's
-/// contribution has the opposite sign of its `Δ`.
+/// A scale's change is `clamp(scale + Σ pattern × Δ, ±clamp)`, summed over
+/// its contributors in canonical order with `scale_learning`'s rule and
+/// rate and bounded once; a negative-pattern contributor's contribution has
+/// the opposite sign of its `Δ`; the scale counts one update.
 #[test]
-fn bundle_scale_credit_is_pattern_weighted_summed_in_order_and_bounded_once() {
+fn scale_credit_is_pattern_weighted_summed_in_order_and_bounded_once() {
     let (mut def, id) = pair_def(0.0);
     let positive = member_with_sign(&def, id, 1.0);
     let negative = member_with_sign(&def, id, -1.0);
-    let classic = hebbian(HebbianRule::Classic, 1.0, 1.0);
-    learn(&mut def, positive, classic, Scope::Group);
-    learn(&mut def, negative, classic, Scope::Group);
+    slots(
+        &mut def,
+        id,
+        Some(hebbian(HebbianRule::Classic, 1.0, 1.0)),
+        None,
+    );
+    member(&mut def, positive, MemberPolicy::Static, true);
+    member(&mut def, negative, MemberPolicy::Static, true);
     let refs = refs();
     let (p_pos, p_neg) = (def.pattern(positive, &refs), def.pattern(negative, &refs));
 
-    // A lone negative-pattern learner with Δ > 0 lowers the scale.
+    // A lone negative-pattern contributor with Δ > 0 lowers the scale.
     {
         let mut lone = def.clone();
-        lone.edge_mut(positive).set_plasticity(None);
+        lone.edge_mut(positive).set_credits(false);
         let mut learned = state(&lone, None);
         drive(&mut learned, &lone, |_| 0.5, 0.5);
         assert_eq!(scale(&learned).learned, Some(p_neg * (1.0 * 0.5 * 0.5)));
         assert!(scale(&learned).learned.unwrap() < 0.0);
     }
 
-    // Contributions +3 then −2.5 against bound 1: one bounded write gives
+    // Contributions +3 then −2.5 against clamp 1: one bounded write gives
     // 0.5; bounding each would give −1.
     let pre = |at: EdgeOccurrence| {
         if at == positive {
@@ -264,48 +291,55 @@ fn bundle_scale_credit_is_pattern_weighted_summed_in_order_and_bounded_once() {
     };
     let mut learned = state(&def, None);
     let counts = drive(&mut learned, &def, pre, 1.0);
-    let contributions = [
+    let mut ordered = [
         (positive, p_pos * (1.0 * pre(positive) * 1.0)),
         (negative, p_neg * (1.0 * pre(negative) * 1.0)),
     ];
-    let mut ordered = contributions;
-    let position = |at| def.edge_sites().position(|site| site == at);
-    ordered.sort_by_key(|&(at, _)| position(at));
+    ordered.sort_by_key(|&(at, _)| at);
     let sum = ordered.iter().fold(0.0f32, |sum, &(_, c)| sum + c);
     let written = scale(&learned).learned.unwrap();
     assert_eq!(written, sum.clamp(-1.0, 1.0));
     assert!((written - 0.5).abs() < 1e-5, "{written}");
-    assert_eq!(counts.updates, 2);
+    assert_eq!(
+        (counts.updates, counts.changes),
+        (1, 1),
+        "a scale counts once"
+    );
+    assert_eq!(
+        learned.edges(0).count(),
+        0,
+        "a Static member is no edge learner"
+    );
     for at in [positive, negative] {
-        let edge = view_edge(&learned, at);
-        assert_eq!(
-            edge.learned, None,
-            "a bundle learner stores no own quantity"
-        );
-        assert_eq!(edge.genomic, 0.0);
-        assert_eq!(edge.applied, written * def.pattern(at, &refs));
+        assert_eq!(applied(&learned, at), written * def.pattern(at, &refs));
     }
 }
 
-/// Under a zero reward, committed visits move traces but neither own
-/// quantities nor scales, at either scope.
+/// A modulated scale and a modulated member change no value at a visit;
+/// the scale's one trace takes `Σ pattern × activity`; a zero reward moves
+/// nothing and counts one reward step per learner.
 #[test]
-fn a_modulated_learner_changes_no_weight_at_a_visit() {
+fn a_modulated_learner_changes_no_value_at_a_visit() {
     let (mut def, id) = ring_def(0.5);
     let all = members(&def, id);
+    slots(&mut def, id, Some(modulated(0.5, 4.0)), None);
     def.edge_mut(all[0]).set_weight(0.25);
-    learn(&mut def, all[0], modulated(0.5, 4.0), Scope::Edge);
-    learn(&mut def, all[1], modulated(0.5, 4.0), Scope::Group);
+    member(
+        &mut def,
+        all[0],
+        MemberPolicy::Own(modulated(0.5, 4.0)),
+        false,
+    );
+    member(&mut def, all[1], MemberPolicy::Static, true);
+    member(&mut def, all[2], MemberPolicy::Static, true);
     let mut learned = state(&def, None);
     for _ in 0..3 {
         drive(&mut learned, &def, |_| 1.0, 2.0);
     }
     let edge = view_edge(&learned, all[0]);
     assert_eq!(edge.learned, Some(0.25));
-    assert!(edge.trace.is_some_and(|trace| trace != 0.0));
-    assert!(view_edge(&learned, all[1])
-        .trace
-        .is_some_and(|trace| trace != 0.0));
+    assert_eq!(edge.trace, Some(6.0));
+    assert_eq!(learned.scale_trace(0, 0), 3.0 * (1.0 * 2.0 + 1.0 * 2.0));
     assert_eq!(scale(&learned).learned, Some(0.5));
     let counts = learned.apply_reward(&signals(0.0));
     assert_eq!((counts.updates, counts.changes), (2, 0));
@@ -313,22 +347,23 @@ fn a_modulated_learner_changes_no_weight_at_a_visit() {
     assert_eq!(scale(&learned).learned, Some(0.5));
 }
 
-/// A static member of a learning bundle samples nothing and moves nothing,
-/// and is weighed through the learned scale.
+/// A member without `credits` feeds nothing to the scale and is weighed
+/// through the learned scale.
 #[test]
-fn a_static_member_contributes_nothing() {
+fn a_member_without_credits_contributes_nothing() {
     let (mut def, id) = ring_def(0.0);
     let all = members(&def, id);
-    learn(
+    slots(
         &mut def,
-        all[0],
-        hebbian(HebbianRule::Classic, 0.5, 4.0),
-        Scope::Group,
+        id,
+        Some(hebbian(HebbianRule::Classic, 0.5, 4.0)),
+        None,
     );
+    member(&mut def, all[0], MemberPolicy::Static, true);
     def.edge_mut(all[1]).set_weight(0.125);
     let mut learned = state(&def, None);
-    // The static member reads a large value; only the learner's Δ moves the
-    // scale.
+    // The non-crediting member reads a large value; only the contributor's
+    // Δ moves the scale.
     drive(
         &mut learned,
         &def,
@@ -338,11 +373,7 @@ fn a_static_member_contributes_nothing() {
     let moved = scale(&learned).learned.unwrap();
     assert_eq!(moved, 0.5 * 1.0 * 2.0);
     assert_eq!(applied(&learned, all[1]), moved + 0.125);
-    assert_eq!(
-        learned.edges(0).count(),
-        1,
-        "the static member is no learner"
-    );
+    assert_eq!(learned.edges(0).count(), 0);
     assert_eq!(
         learned.applied_weights(0).count(),
         8,
@@ -350,38 +381,223 @@ fn a_static_member_contributes_nothing() {
     );
 }
 
-/// In one visit, edge learners move their own corrections and bundle
-/// learners move the scale.
+/// The note's case: a bundle-only learner learns. A bundle with
+/// `scale_learning`, no `member_default` and every member `Static` and
+/// crediting has one learner, its scale, and it moves.
 #[test]
-fn a_mixed_bundle_updates_edge_learners_and_the_scale_separately() {
+fn a_bundle_only_learner_learns() {
+    let (mut def, id) = ring_def(0.25);
+    slots(
+        &mut def,
+        id,
+        Some(hebbian(HebbianRule::Classic, 0.25, 4.0)),
+        None,
+    );
+    for at in members(&def, id) {
+        member(&mut def, at, MemberPolicy::Static, true);
+    }
+    let mut learned = state(&def, None);
+    assert!(learned.has_learning());
+    let counts = drive(&mut learned, &def, |_| 1.0, 1.0);
+    assert_eq!(scale(&learned).learned, Some(0.25 + 8.0 * 0.25));
+    assert_eq!((counts.updates, counts.changes), (1, 1));
+}
+
+/// The note's cases: an `Inherit` member under a learning scale without
+/// `member_default` moves only through the scale; `member_default` serves
+/// `Inherit` members and leaves `Own` and `Static` ones; a member that
+/// learns and credits updates both from one visit.
+#[test]
+fn member_default_serves_inherit_members_alone() {
     let (mut def, id) = ring_def(0.5);
     let all = members(&def, id);
     let classic = hebbian(HebbianRule::Classic, 0.5, 4.0);
-    learn(&mut def, all[0], classic, Scope::Edge);
-    learn(&mut def, all[1], classic, Scope::Group);
-    learn(&mut def, all[2], classic, Scope::Group);
-    let mut learned = state(&def, None);
-    let counts = drive(&mut learned, &def, |_| 1.0, 2.0);
-    let delta = 0.5 * 1.0 * 2.0;
-    assert_eq!(view_edge(&learned, all[0]).learned, Some(delta));
-    assert_eq!(scale(&learned).learned, Some(0.5 + (delta + delta)));
-    assert_eq!(view_edge(&learned, all[1]).learned, None);
-    assert_eq!(
-        applied(&learned, all[0]),
-        0.5 + 2.0 * delta + delta,
-        "the edge learner composes its correction with the learned scale"
+    slots(&mut def, id, Some(classic), None);
+    member(&mut def, all[0], MemberPolicy::Inherit, true);
+    member(
+        &mut def,
+        all[1],
+        MemberPolicy::Own(hebbian(HebbianRule::AntiHebb, 0.25, 4.0)),
+        false,
     );
+    member(&mut def, all[2], MemberPolicy::Static, false);
+
+    // Without `member_default`, the `Inherit` member learns no modifier.
+    let mut learned = state(&def, None);
+    let sources: Vec<_> = learned
+        .edges(0)
+        .map(|edge| (edge.occurrence, edge.source))
+        .collect();
+    assert_eq!(sources, vec![(all[1], LearnerSource::Own)]);
+    drive(&mut learned, &def, |_| 1.0, 2.0);
+    let moved = 0.5 + 1.0 * (0.5 * 1.0 * 2.0);
+    assert_eq!(scale(&learned).learned, Some(moved));
+    assert_eq!(applied(&learned, all[0]), moved, "the scale alone moves it");
+
+    // With `member_default`, it learns its modifier by the default and
+    // credits from the same visit; the `Own` member keeps its override and
+    // the `Static` member stays static.
+    let default = hebbian(HebbianRule::Classic, 0.125, 3.0);
+    slots(&mut def, id, Some(classic), Some(default));
+    let mut learned = state(&def, None);
+    let sources: Vec<_> = learned
+        .edges(0)
+        .map(|edge| (edge.occurrence, edge.source))
+        .collect();
+    assert_eq!(
+        sources,
+        vec![
+            (all[0], LearnerSource::MemberDefault),
+            (all[1], LearnerSource::Own)
+        ]
+    );
+    assert_eq!(view_edge(&learned, all[0]).bound, default.weight_clamp);
+    let counts = drive(&mut learned, &def, |_| 1.0, 2.0);
+    assert_eq!(view_edge(&learned, all[0]).learned, Some(0.125 * 2.0));
+    assert_eq!(view_edge(&learned, all[1]).learned, Some(-0.25 * 2.0));
+    assert_eq!(scale(&learned).learned, Some(moved));
     assert_eq!((counts.updates, counts.changes), (3, 3));
+    assert_eq!(
+        applied(&learned, all[2]),
+        moved,
+        "a Static member reads the scale"
+    );
 }
 
-/// Phase 2.5 sums the modulated bundle learners' contributions and writes
-/// the scale once; a scale slot that is not initialized takes none.
+/// The note's case: the slots evolve independently. Clearing
+/// `member_default` leaves the scale's learner; clearing `scale_learning`
+/// leaves the `Inherit` members' learners.
 #[test]
-fn reward_credit_to_a_scale_is_one_bounded_write_per_tick() {
+fn the_slots_evolve_independently() {
+    let (mut def, id) = ring_def(0.5);
+    let all = members(&def, id);
+    let classic = hebbian(HebbianRule::Classic, 0.5, 4.0);
+    for &at in &all {
+        member(&mut def, at, MemberPolicy::Inherit, true);
+    }
+    slots(&mut def, id, Some(classic), Some(classic));
+    let both = state(&def, None);
+    assert_eq!((both.edges(0).count(), both.scales(0).count()), (8, 1));
+    slots(&mut def, id, Some(classic), None);
+    let scale_only = state(&def, None);
+    assert_eq!(
+        (scale_only.edges(0).count(), scale_only.scales(0).count()),
+        (0, 1)
+    );
+    slots(&mut def, id, None, Some(classic));
+    let default_only = state(&def, None);
+    assert_eq!(
+        (
+            default_only.edges(0).count(),
+            default_only.scales(0).count()
+        ),
+        (8, 0)
+    );
+    assert!(default_only
+        .applied_weights(0)
+        .all(|(at, weight)| weight == def.genomic_weight(at, &refs())));
+}
+
+/// The note's case: switching one member's `credits` off leaves its
+/// siblings' credit to the scale.
+#[test]
+fn disabling_one_member_leaves_its_siblings_credit() {
     let (mut def, id) = ring_def(0.0);
     let all = members(&def, id);
-    learn(&mut def, all[0], modulated(0.5, 1.0), Scope::Group);
-    learn(&mut def, all[1], modulated(0.25, 3.0), Scope::Group);
+    slots(
+        &mut def,
+        id,
+        Some(hebbian(HebbianRule::Classic, 1.0, 10.0)),
+        None,
+    );
+    for &at in &all {
+        member(&mut def, at, MemberPolicy::Static, true);
+    }
+    def.edge_mut(all[3]).set_credits(false);
+    let mut learned = state(&def, None);
+    drive(&mut learned, &def, |_| 1.0, 1.0);
+    assert_eq!(scale(&learned).learned, Some(7.0));
+}
+
+/// The note's case: a child whose last contributor was switched off keeps,
+/// decays and passes on its scale. A scale learner without contributors is
+/// seeded, receives no credit, relaxes toward its birth value and is
+/// captured.
+#[test]
+fn a_scale_without_contributors_keeps_decays_and_passes_on() {
+    let (mut def, id) = ring_def(0.5);
+    let retaining = Learning {
+        retention: 0.5,
+        ..lamarckian(hebbian(HebbianRule::Classic, 1.0, 4.0))
+    };
+    slots(&mut def, id, Some(retaining), None);
+    let parent = seeds(&def, |seeds| seed_bundle(seeds, id, 2.5));
+    let mut child = state(&def, Some(parent));
+    assert_eq!(scale(&child).learned, Some(2.5));
+    let counts = drive(&mut child, &def, |_| 1.0, 1.0);
+    assert_eq!(
+        counts,
+        LearningCounts::default(),
+        "no contributor, no credit"
+    );
+    assert_eq!(scale(&child).learned, Some(2.5));
+    child.begin_tick();
+    assert_eq!(
+        scale(&child).learned,
+        Some(2.5),
+        "the birth value is the seed"
+    );
+    child.set_scale(0, 0, 3.5);
+    child.begin_tick();
+    assert_eq!(scale(&child).learned, Some(2.5 + 0.5 * (3.5 - 2.5)));
+    let captured = child.capture(0, &def).expect("an initialized scale");
+    assert_eq!(captured.bundle_value(id), Some(3.0));
+}
+
+/// Lamarckian seeding of a scale and a modifier: each seeds by its own
+/// learning's `lamarckian`; a Darwinian one starts at its genomic value.
+#[test]
+fn a_scale_and_a_modifier_seed_by_their_own_lamarckian() {
+    let (mut def, id) = ring_def(0.5);
+    let all = members(&def, id);
+    let classic = hebbian(HebbianRule::Classic, 0.5, 4.0);
+    def.edge_mut(all[0]).set_weight(0.25);
+    member(&mut def, all[0], MemberPolicy::Inherit, true);
+    let parent = |def: &CgpGraphBackendDef| {
+        seeds(def, |seeds| {
+            seed_bundle(seeds, id, 1.5);
+            seed_edge(seeds, all[0], 0.75);
+        })
+    };
+    slots(&mut def, id, Some(lamarckian(classic)), Some(classic));
+    let child = state(&def, Some(parent(&def)));
+    assert_eq!(scale(&child).learned, Some(1.5));
+    assert!(scale(&child).lamarckian);
+    let edge = view_edge(&child, all[0]);
+    assert_eq!((edge.learned, edge.inherits), (None, false));
+    assert_eq!(edge.applied, 0.25 + 1.5);
+
+    slots(&mut def, id, Some(classic), Some(lamarckian(classic)));
+    let child = state(&def, Some(parent(&def)));
+    assert_eq!(scale(&child).learned, None);
+    let edge = view_edge(&child, all[0]);
+    assert_eq!((edge.learned, edge.inherits), (Some(0.75), true));
+    assert_eq!(edge.applied, 0.75 + 0.5);
+    let captured = child.capture(0, &def).expect("a seeded modifier");
+    assert_eq!(captured.value(all[0]), Some(0.75));
+    assert_eq!(captured.bundle_value(id), None);
+}
+
+/// Reward: one `three_factor` per initialized modulated learner at its own
+/// source, rate and clamp; the scale's step reads its one trace and counts
+/// once; an uninitialized scale takes none.
+#[test]
+fn reward_is_one_bounded_step_per_learner() {
+    let (mut def, id) = ring_def(0.0);
+    let all = members(&def, id);
+    slots(&mut def, id, Some(modulated(0.5, 1.0)), None);
+    member(&mut def, all[0], MemberPolicy::Static, true);
+    member(&mut def, all[1], MemberPolicy::Static, true);
 
     let mut fresh = state(&def, None);
     let counts = fresh.apply_reward(&signals(1.0));
@@ -390,52 +606,39 @@ fn reward_credit_to_a_scale_is_one_bounded_write_per_tick() {
 
     let mut learned = state(&def, None);
     drive(&mut learned, &def, |_| 1.0, 2.0);
-    let traces: Vec<f32> = learned.edges(0).map(|edge| edge.trace.unwrap()).collect();
-    assert_eq!(traces, vec![2.0, 2.0]);
+    assert_eq!(learned.scale_trace(0, 0), 4.0);
     let counts = learned.apply_reward(&signals(1.0));
-    // 0.5 × 1 × 2 + 0.25 × 1 × 2 = 1.5, bounded once by the smaller clamp.
-    assert_eq!(scale(&learned).bound, 1.0);
+    // 0.5 × 1 × 4 = 2, bounded once by the clamp.
     assert_eq!(scale(&learned).learned, Some(1.0));
-    assert_eq!((counts.updates, counts.changes), (2, 2));
-}
+    assert_eq!((counts.updates, counts.changes), (1, 1));
 
-/// Inside the bound, a modulated bundle learner's reward credit to its
-/// scale is exactly `pattern × η × signal × trace`.
-#[test]
-fn reward_credit_to_a_scale_is_pattern_times_rate_times_signal_times_trace() {
-    // Arrange
     let (mut def, id) = pair_def(0.5);
     let negative = member_with_sign(&def, id, -1.0);
-    learn(&mut def, negative, modulated(0.25, 10.0), Scope::Group);
+    slots(&mut def, id, Some(modulated(0.25, 10.0)), None);
+    member(&mut def, negative, MemberPolicy::Static, true);
     let pattern = def.pattern(negative, &refs());
     let mut learned = state(&def, None);
     drive(&mut learned, &def, |_| 1.0, 2.0);
-    let trace = view_edge(&learned, negative).trace.unwrap();
-    assert_eq!(scale(&learned).learned, Some(0.5), "no visit write");
-
-    // Act
-    let counts = learned.apply_reward(&signals(3.0));
-
-    // Assert
-    let expected = 0.5 + pattern * 0.25 * 3.0 * trace;
-    assert!(expected.abs() < 10.0, "the credit stays inside the bound");
-    assert_eq!(scale(&learned).learned, Some(expected));
-    assert_eq!((counts.updates, counts.changes), (1, 1));
+    let trace = learned.scale_trace(0, 0);
+    assert_eq!(trace, pattern * 2.0);
+    learned.apply_reward(&signals(3.0));
+    assert_eq!(scale(&learned).learned, Some(0.5 + 0.25 * 3.0 * trace));
 }
 
-/// An unseeded genomic scale outside its bound starts at the bound, its
+/// An unseeded genomic scale outside its clamp starts at the clamp, its
 /// birth value (T25.F09 invariant 2), so a zero-`Σ` write leaves it
 /// unchanged and counts no change.
 #[test]
-fn a_genomic_scale_outside_the_bound_starts_at_the_bound() {
+fn a_genomic_scale_outside_the_clamp_starts_at_the_clamp() {
     let (mut def, id) = ring_def(7.0);
     let all = members(&def, id);
-    learn(
+    slots(
         &mut def,
-        all[0],
-        hebbian(HebbianRule::Classic, 0.0, 2.0),
-        Scope::Group,
+        id,
+        Some(hebbian(HebbianRule::Classic, 0.0, 2.0)),
+        None,
     );
+    member(&mut def, all[0], MemberPolicy::Static, true);
     let mut learned = state(&def, None);
     assert_eq!((scale(&learned).genomic, scale(&learned).birth), (7.0, 2.0));
     let first = drive(&mut learned, &def, |_| 1.0, 1.0);
@@ -443,93 +646,26 @@ fn a_genomic_scale_outside_the_bound_starts_at_the_bound() {
     assert_eq!((first.updates, first.changes), (1, 0));
 }
 
-/// `inherit_scale` without a bundle learner seeds nothing (no scale slot);
-/// a bundle learner without `inherit_scale` starts at the genomic scale.
+/// Initialization is per learner: a seeded scale with an uninitialized
+/// modifier, a seeded modifier with an uninitialized scale, and a failed
+/// first visit that initializes both.
 #[test]
-fn a_scale_seeds_only_with_a_bundle_scope_learner() {
+fn initialization_is_per_learner_across_edges_and_scales() {
     let (mut def, id) = ring_def(0.5);
     let all = members(&def, id);
-    def.bundle_mut(id).set_inherit_scale(true);
-    learn(
+    slots(
         &mut def,
-        all[0],
-        hebbian(HebbianRule::Classic, 0.5, 4.0),
-        Scope::Edge,
+        id,
+        Some(lamarckian(hebbian(HebbianRule::Classic, 0.5, 4.0))),
+        None,
     );
-    let parent_seeds = seeds(&def, |seeds| seed_bundle(seeds, id, 1.5));
-    let edge_only = state(&def, Some(parent_seeds.clone()));
-    assert_eq!(edge_only.scales(0).count(), 0);
-    assert_eq!(applied(&edge_only, all[0]), 0.5);
-
-    learn(
+    member(&mut def, all[0], MemberPolicy::Static, true);
+    member(
         &mut def,
-        all[0],
-        hebbian(HebbianRule::Classic, 0.5, 4.0),
-        Scope::Group,
+        all[1],
+        MemberPolicy::Own(lamarckian(modulated(0.5, 4.0))),
+        false,
     );
-    def.bundle_mut(id).set_inherit_scale(false);
-    let darwinian = state(&def, Some(parent_seeds.clone()));
-    assert_eq!(scale(&darwinian).learned, None);
-    assert_eq!(applied(&darwinian, all[0]), 0.5);
-
-    def.bundle_mut(id).set_inherit_scale(true);
-    let lamarckian = state(&def, Some(parent_seeds));
-    assert_eq!(scale(&lamarckian).learned, Some(1.5));
-    assert_eq!(applied(&lamarckian, all[0]), 1.5);
-}
-
-/// A Lamarckian bundle learner ignores a seed on its row, starts at its
-/// genomic own weight and is captured as `None`; after `SetScope` to
-/// `Edge` its child starts at its genomic correction.
-#[test]
-fn a_bundle_learner_stores_no_own_quantity() {
-    let (mut def, id) = ring_def(0.5);
-    let all = members(&def, id);
-    def.edge_mut(all[0]).set_weight(0.25);
-    let lamarckian = PlasticityConfig {
-        lamarckian: true,
-        ..hebbian(HebbianRule::Classic, 0.5, 4.0)
-    };
-    learn(&mut def, all[0], lamarckian, Scope::Group);
-    let parent = state(
-        &def,
-        Some(seeds(&def, |seeds| seed_edge(seeds, all[0], 3.0))),
-    );
-    let edge = view_edge(&parent, all[0]);
-    assert_eq!((edge.learned, edge.genomic), (None, 0.25));
-    assert_eq!(edge.applied, 0.75);
-    let mut visited = parent.clone();
-    drive(&mut visited, &def, |_| 1.0, 1.0);
-    let captured = visited.capture(0, &def).expect("an initialized backend");
-    assert_eq!(captured.value(all[0]), None);
-
-    let mut child = def.clone();
-    child.edge_mut(all[0]).set_scope(Scope::Edge);
-    let child_state = state(&child, Some(captured));
-    let edge = view_edge(&child_state, all[0]);
-    assert_eq!(edge.learned, None, "unseeded and unvisited");
-    assert_eq!(edge.applied, 0.25 + 0.5);
-}
-
-/// Initialization is per slot: a seeded scale with no initialized learner,
-/// a seeded edge learner with an uninitialized scale, and a failed first
-/// visit that initializes both.
-#[test]
-fn initialization_is_per_slot_across_edges_and_scales() {
-    let (mut def, id) = ring_def(0.5);
-    let all = members(&def, id);
-    def.bundle_mut(id).set_inherit_scale(true);
-    learn(
-        &mut def,
-        all[0],
-        hebbian(HebbianRule::Classic, 0.5, 4.0),
-        Scope::Group,
-    );
-    let lamarckian = PlasticityConfig {
-        lamarckian: true,
-        ..modulated(0.5, 4.0)
-    };
-    learn(&mut def, all[1], lamarckian, Scope::Edge);
 
     let scale_seeded = state(
         &def,
@@ -538,7 +674,7 @@ fn initialization_is_per_slot_across_edges_and_scales() {
     assert_eq!(scale(&scale_seeded).learned, Some(1.25));
     assert!(scale_seeded
         .edges(0)
-        .all(|edge| edge.learned.is_none() && edge.trace.is_none()));
+        .all(|edge| edge.learned.is_none() && edge.trace.is_none() && !edge.initialized));
     let captured = scale_seeded.capture(0, &def).expect("a seeded scale");
     assert_eq!(captured.bundle_value(id), Some(1.25));
     assert_eq!(captured.value(all[1]), None);
@@ -550,10 +686,7 @@ fn initialization_is_per_slot_across_edges_and_scales() {
     assert_eq!(scale(&edge_seeded).learned, None);
     let edge = view_edge(&edge_seeded, all[1]);
     assert_eq!((edge.learned, edge.trace), (Some(0.75), Some(0.0)));
-    let captured = edge_seeded.capture(0, &def).expect("a seeded learner");
-    assert_eq!(captured.value(all[1]), Some(0.75));
-    assert_eq!(captured.bundle_value(id), None);
-    // The unseeded, uninitialized scale takes no reward.
+    assert!(edge.initialized && edge.inherits);
     let mut rewarded = edge_seeded.clone();
     rewarded.apply_reward(&signals(1.0));
     assert_eq!(scale(&rewarded).learned, None);
@@ -564,87 +697,6 @@ fn initialization_is_per_slot_across_edges_and_scales() {
     assert_eq!(scale(&failed).learned, Some(0.5));
     assert_eq!(view_edge(&failed, all[1]).learned, Some(0.0));
     assert!(failed.capture(0, &def).is_some());
-}
-
-/// The view resolves each learner's initialization and inheritance by its
-/// scope (T30.F01 R3): an ungrouped or edge learner reads its own slot and
-/// its `lamarckian` flag; a bundle learner reads its scale slot and its
-/// bundle's `inherit_scale`, as `capture()` applies them.
-#[test]
-fn the_view_resolves_initialization_and_inheritance_by_scope() {
-    let (mut def, id) = ring_def(0.5);
-    let all = members(&def, id);
-    def.bundle_mut(id).set_inherit_scale(true);
-    learn(
-        &mut def,
-        all[0],
-        hebbian(HebbianRule::Classic, 0.5, 4.0),
-        Scope::Group,
-    );
-    let lamarckian = PlasticityConfig {
-        lamarckian: true,
-        ..hebbian(HebbianRule::Classic, 0.5, 4.0)
-    };
-    learn(&mut def, all[1], lamarckian, Scope::Edge);
-
-    let unborn = state(&def, None);
-    let (bundle, edge) = (view_edge(&unborn, all[0]), view_edge(&unborn, all[1]));
-    assert_eq!((bundle.initialized, bundle.inherits), (false, true));
-    assert_eq!((edge.initialized, edge.inherits), (false, true));
-
-    // A seeded scale initializes the bundle learner, not the edge learner.
-    let scale_seeded = state(
-        &def,
-        Some(seeds(&def, |seeds| seed_bundle(seeds, id, 1.25))),
-    );
-    assert!(view_edge(&scale_seeded, all[0]).initialized);
-    assert!(!view_edge(&scale_seeded, all[1]).initialized);
-
-    // A seeded edge learner initializes itself, not the bundle learner.
-    let edge_seeded = state(
-        &def,
-        Some(seeds(&def, |seeds| seed_edge(seeds, all[1], 0.75))),
-    );
-    assert!(!view_edge(&edge_seeded, all[0]).initialized);
-    assert!(view_edge(&edge_seeded, all[1]).initialized);
-
-    // A visit initializes both.
-    let mut visited = state(&def, None);
-    visited.learner(0).expect("a learning backend").enter();
-    assert!(visited.edges(0).all(|edge| edge.initialized));
-
-    // A Lamarckian bundle learner inherits through its bundle alone.
-    def.bundle_mut(id).set_inherit_scale(false);
-    learn(&mut def, all[0], lamarckian, Scope::Group);
-    learn(
-        &mut def,
-        all[1],
-        hebbian(HebbianRule::Classic, 0.5, 4.0),
-        Scope::Edge,
-    );
-    let darwinian = state(&def, None);
-    assert!(!view_edge(&darwinian, all[0]).inherits);
-    assert!(!view_edge(&darwinian, all[1]).inherits);
-}
-
-/// Counters (invariant 9): a bundle of two contributors whose scale moves
-/// counts two updates and two changes; a scale held at its bound counts
-/// two updates and no change.
-#[test]
-fn counters_count_every_contributor_of_a_moved_scale() {
-    let (mut def, id) = ring_def(0.0);
-    let all = members(&def, id);
-    let classic = hebbian(HebbianRule::Classic, 0.5, 1.0);
-    learn(&mut def, all[0], classic, Scope::Group);
-    learn(&mut def, all[1], classic, Scope::Group);
-    let mut learned = state(&def, None);
-    let first = drive(&mut learned, &def, |_| 1.0, 0.5);
-    assert_eq!((first.updates, first.changes), (2, 2));
-    let mut saturated = state(&def, None);
-    drive(&mut saturated, &def, |_| 10.0, 10.0);
-    assert_eq!(scale(&saturated).learned, Some(1.0));
-    let held = drive(&mut saturated, &def, |_| 10.0, 10.0);
-    assert_eq!((held.updates, held.changes), (2, 0));
 }
 
 /// Records each sink's weighted inputs.
@@ -692,8 +744,8 @@ fn ring_sensors(values: [f32; 8]) -> SensorSnapshot {
     }
 }
 
-/// Invariant 3: across an ungrouped learner, an edge learner, a bundle
-/// learner and a passive member, the executor's weighing, `applied_weight`,
+/// Across a lone learner, an `Own` member, a crediting `Static` member and
+/// a plain `Static` member, the executor's weighing, `applied_weight`,
 /// `applied_weights` and the view's `applied` agree.
 #[test]
 fn applied_weight_agrees_with_the_executor_and_the_view() {
@@ -701,20 +753,17 @@ fn applied_weight_agrees_with_the_executor_and_the_view() {
     let silent = def.add_ring_bundle(RING_REF, DirectedVoteKind::Move, 1);
     def.bundle_mut(silent).set_scale(-0.25);
     let all = members(&def, id);
-    def.bundle_mut(id).set_inherit_scale(true);
-    let lamarckian = PlasticityConfig {
-        lamarckian: true,
-        ..hebbian(HebbianRule::Classic, 0.1, 4.0)
-    };
+    let learning = lamarckian(hebbian(HebbianRule::Classic, 0.1, 4.0));
+    slots(&mut def, id, Some(learning), None);
     def.edge_mut(all[0]).set_weight(0.25);
-    learn(&mut def, all[0], lamarckian, Scope::Edge);
-    learn(&mut def, all[1], lamarckian, Scope::Group);
+    member(&mut def, all[0], MemberPolicy::Own(learning), false);
+    member(&mut def, all[1], MemberPolicy::Static, true);
     def.edge_mut(all[2]).set_weight(-0.5);
-    let ungrouped_surface = def
+    let lone_surface = def
         .sink_surface(OutputSinkKind::CustomOutput(0))
         .expect("a custom output sink");
     def.push_edge(
-        ungrouped_surface,
+        lone_surface,
         GraphEdge::new(
             GraphSource::InputLeaf {
                 ref_idx: RING_REF,
@@ -723,12 +772,12 @@ fn applied_weight_agrees_with_the_executor_and_the_view() {
             0.75,
         ),
     );
-    let ungrouped = EdgeOccurrence::new(ungrouped_surface, 0);
-    def.edge_mut(ungrouped).set_plasticity(Some(lamarckian));
+    let lone = EdgeOccurrence::new(lone_surface, 0);
+    def.edge_mut(lone).set_learning(Some(learning));
     let birth = seeds(&def, |seeds| {
         seed_bundle(seeds, id, 1.25);
         seed_edge(seeds, all[0], 0.5);
-        seed_edge(seeds, ungrouped, -1.5);
+        seed_edge(seeds, lone, -1.5);
     });
     let mut runtime = GraphRuntimeState::for_genome(&genome(&def), vec![Some(birth)]);
     let refs = refs();
@@ -736,7 +785,7 @@ fn applied_weight_agrees_with_the_executor_and_the_view() {
         (all[0], 0.5 + 1.25),
         (all[1], 1.25),
         (all[2], -0.5 + 1.25),
-        (ungrouped, -1.5),
+        (lone, -1.5),
     ];
     let learned = runtime.learned().clone();
     for (at, weight) in expected {
@@ -746,8 +795,8 @@ fn applied_weight_agrees_with_the_executor_and_the_view() {
     for edge in learned.edges(0) {
         assert_eq!(edge.applied, applied(&learned, edge.occurrence));
     }
-    // A static member of a bundle without a scale slot is no dynamic edge
-    // and resolves to its genomic weight.
+    // A member of a bundle without a learning scale is no dynamic edge and
+    // resolves to its genomic weight.
     let silent_member = members(&def, silent)[0];
     assert!(learned
         .applied_weights(0)
@@ -789,10 +838,9 @@ fn applied_weight_agrees_with_the_executor_and_the_view() {
 }
 
 /// T25.F11 invariant 4, the one member law: a fact member (on the drive)
-/// reads pattern 1 like every member, so a `Bundle`-scope fact learner
-/// credits `1 × Δ` to the scale, an `Edge`-scope one learns its own
-/// correction on top of the scale, and a static fact member of a bundle
-/// with a scale slot weighs `scale × 1 + own`.
+/// reads pattern 1 like every member, so a crediting fact member credits
+/// `1 × Δ` to the scale, an `Own` one learns its modifier on top of the
+/// scale, and a `Static` fact member weighs `scale × 1 + modifier`.
 #[test]
 fn a_fact_member_weighs_and_learns_with_the_scale() {
     use crate::genome::cgp::Site;
@@ -807,9 +855,10 @@ fn a_fact_member_weighs_and_learns_with_the_scale() {
     assert_eq!(facts.len(), 3);
     assert!(facts.iter().all(|&fact| def.pattern(fact, &refs()) == 1.0));
     let classic = hebbian(HebbianRule::Classic, 1.0, 4.0);
-    learn(&mut def, facts[0], classic, Scope::Group);
+    slots(&mut def, id, Some(classic), None);
+    member(&mut def, facts[0], MemberPolicy::Static, true);
     def.edge_mut(facts[1]).set_weight(0.25);
-    learn(&mut def, facts[1], classic, Scope::Edge);
+    member(&mut def, facts[1], MemberPolicy::Own(classic), false);
     def.edge_mut(facts[2]).set_weight(-0.125);
     let mut learned = state(&def, None);
     drive(&mut learned, &def, |_| 0.5, 0.5);
@@ -820,140 +869,37 @@ fn a_fact_member_weighs_and_learns_with_the_scale() {
         Some(scaled),
         "1 × Δ moves the scale"
     );
-    assert_eq!(view_edge(&learned, facts[0]).applied, scaled);
+    assert_eq!(applied(&learned, facts[0]), scaled);
     assert_eq!(view_edge(&learned, facts[1]).learned, Some(0.25 + delta));
     assert_eq!(applied(&learned, facts[1]), scaled + (0.25 + delta));
     assert_eq!(
         applied(&learned, facts[2]),
         scaled - 0.125,
-        "a passive fact member"
+        "a static fact member"
     );
 }
 
-/// FNV-1a over `text`: a stable digest of a `Debug` rendering, whose `f32`
-/// formatting round-trips exactly.
-fn fnv1a(text: &str) -> u64 {
-    text.bytes().fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
-        (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
-    })
-}
-
-/// Every reading of `state` on `def`: the edge and scale views, the applied
-/// weights and the captured seeds.
-fn reading(state: &LearnedState, def: &CgpGraphBackendDef) -> String {
-    format!(
-        "{:?}|{:?}|{:?}|{:?}",
-        state.edges(0).collect::<Vec<_>>(),
-        state.scales(0).collect::<Vec<_>>(),
-        state.applied_weights(0).collect::<Vec<_>>(),
-        state.capture(0, def),
-    )
-}
-
-/// T25.F12 commit 1 preservation (invariant 12): a bundle whose group
-/// contributors differ in rule, rate, reward source and trace decay, with
-/// an edge-scope learner, a group-scope member with a nonzero correction,
-/// a static member, a decaying scale and a seeded parent, read through
-/// every visit, tick and reward step. The digest pins today's semantics.
+/// Invariant 5: the runtime reads only the layout. `runtime::plasticity`
+/// names no member policy, `credits` or bundle slot, so `Inherit` is never
+/// resolved during a visit; the layout is built once, in `for_genome`.
 #[test]
-fn commit_one_preserves_contributor_semantics() {
-    let (mut def, id) = ring_def(0.375);
-    let all = members(&def, id);
-    def.bundle_mut(id).set_inherit_scale(true);
-    def.bundle_mut(id).set_retention(0.875);
-    let lamarckian = |config: PlasticityConfig| PlasticityConfig {
-        lamarckian: true,
-        ..config
-    };
-    let source = |config: PlasticityConfig, channel: OutcomeChannel, decay: f32| PlasticityConfig {
-        modulation: Some(RewardModulationConfig {
-            reward_source: channel,
-            trace_decay: decay,
-        }),
-        ..config
-    };
-    def.edge_mut(all[0]).set_weight(0.25);
-    learn(
-        &mut def,
-        all[0],
-        hebbian(HebbianRule::Classic, 0.125, 3.0),
-        Scope::Group,
-    );
-    learn(
-        &mut def,
-        all[1],
-        hebbian(HebbianRule::Oja, 0.5, 2.0),
-        Scope::Group,
-    );
-    learn(
-        &mut def,
-        all[2],
-        source(
-            hebbian(HebbianRule::Covariance, 0.25, 4.0),
-            OutcomeChannel::EnergyDelta,
-            0.75,
-        ),
-        Scope::Group,
-    );
-    def.edge_mut(all[3]).set_weight(-0.5);
-    learn(
-        &mut def,
-        all[3],
-        source(
-            hebbian(HebbianRule::AntiHebb, 0.0625, 5.0),
-            OutcomeChannel::ActionSuccess,
-            0.5,
-        ),
-        Scope::Group,
-    );
-    def.edge_mut(all[4]).set_weight(0.125);
-    learn(
-        &mut def,
-        all[4],
-        lamarckian(PlasticityConfig {
-            retention: 0.9,
-            ..hebbian(HebbianRule::Classic, 0.25, 1.5)
-        }),
-        Scope::Edge,
-    );
-    learn(
-        &mut def,
-        all[5],
-        lamarckian(source(
-            hebbian(HebbianRule::Classic, 0.5, 2.5),
-            OutcomeChannel::DamageDelta,
-            0.875,
-        )),
-        Scope::Edge,
-    );
-    def.edge_mut(all[6]).set_weight(0.75);
-    let parent_seeds = seeds(&def, |seeds| {
-        seed_bundle(seeds, id, 1.125);
-        seed_edge(seeds, all[0], 2.0);
-        seed_edge(seeds, all[4], -0.625);
-    });
-
-    let mut log = String::new();
-    for seeded in [None, Some(parent_seeds)] {
-        let mut learned = state(&def, seeded);
-        log.push_str(&reading(&learned, &def));
-        for step in 0..4u8 {
-            learned.begin_tick();
-            let value = f32::from(step) * 0.25 - 0.375;
-            let counts = drive(
-                &mut learned,
-                &def,
-                |at| value + 0.0625 * at.index as f32,
-                0.5 + value,
-            );
-            let mut bank = OutcomeSignalBank::default();
-            bank.signals[OutcomeChannel::EnergyDelta as usize] = 0.5 - value;
-            bank.signals[OutcomeChannel::ActionSuccess as usize] = value;
-            bank.signals[OutcomeChannel::DamageDelta as usize] = -0.25;
-            let rewarded = learned.apply_reward(&bank);
-            log.push_str(&format!("{counts:?}{rewarded:?}"));
-            log.push_str(&reading(&learned, &def));
+fn the_runtime_names_no_policy_credits_or_slot() {
+    for source in [
+        include_str!("learned.rs"),
+        include_str!("mod.rs"),
+        include_str!("rules.rs"),
+        include_str!("kind.rs"),
+    ] {
+        for name in [
+            "MemberPolicy",
+            "credits",
+            "scale_learning",
+            "member_default",
+            "LearningSlot",
+        ] {
+            assert!(!source.contains(name), "{name}");
         }
     }
-    assert_eq!(fnv1a(&log), 15_357_053_464_873_532_514, "{log}");
+    let learned = include_str!("learned.rs");
+    assert_eq!(learned.matches("LearningLayout::of(").count(), 1);
 }

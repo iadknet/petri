@@ -11,9 +11,9 @@ use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::genome::cgp::test_support::plastic_node;
 use crate::genome::cgp::{
     BirthSeeds, BundleId, CgpGraphBackendDef, ComputeNodeKind, EdgeOccurrence, EdgeSurface,
-    GraphEdge, GraphSource, Scope,
+    GraphEdge, GraphSource, LearningSlot,
 };
-use crate::genome::{BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig};
+use crate::genome::{BackendDef, CreatureGenome, HebbianRule, Learning, MemberPolicy, NodeGenome};
 
 const RING_REF: u16 = 0;
 
@@ -21,8 +21,8 @@ fn refs() -> Vec<InputReference> {
     vec![InputReference::World(WorldInputKey::NeighborBarrierRing)]
 }
 
-fn config(rule: HebbianRule, eta: f32, clamp: f32, retention: f32) -> PlasticityConfig {
-    PlasticityConfig {
+fn config(rule: HebbianRule, eta: f32, clamp: f32, retention: f32) -> Learning {
+    Learning {
         rule,
         learning_rate: eta,
         weight_clamp: clamp,
@@ -50,7 +50,7 @@ fn state(def: &CgpGraphBackendDef, seeds: Option<BirthSeeds>) -> LearnedState {
 
 /// One compute node whose single input edge has genomic weight `weight`
 /// and learning attributes `config`.
-fn ungrouped(weight: f32, config: PlasticityConfig) -> CgpGraphBackendDef {
+fn ungrouped(weight: f32, config: Learning) -> CgpGraphBackendDef {
     CgpGraphBackendDef::new_with_fixed_outputs()
         .with_compute_nodes(vec![plastic_node(
             ComputeNodeKind::Add,
@@ -67,20 +67,26 @@ fn ungrouped(weight: f32, config: PlasticityConfig) -> CgpGraphBackendDef {
 }
 
 /// A full catalog with one `Ring` bundle (pattern 1) at genomic scale
-/// `scale` and retention `retention`.
-fn ring(scale: f32, retention: f32) -> (CgpGraphBackendDef, BundleId, Vec<EdgeOccurrence>) {
+/// `scale`.
+fn ring(scale: f32) -> (CgpGraphBackendDef, BundleId, Vec<EdgeOccurrence>) {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     let id = def.add_ring_bundle(RING_REF, DirectedVoteKind::Move, 0);
     def.bundle_mut(id).set_scale(scale);
-    def.bundle_mut(id).set_retention(retention);
     let members = def.members(id).collect();
     (def, id, members)
 }
 
-fn learn(def: &mut CgpGraphBackendDef, at: EdgeOccurrence, config: PlasticityConfig, scope: Scope) {
-    let mut edge = def.edge_mut(at);
-    edge.set_plasticity(Some(config));
-    edge.set_scope(scope);
+/// The member at `at` learns its modifier by its own `config`.
+fn learn(def: &mut CgpGraphBackendDef, at: EdgeOccurrence, config: Learning) {
+    def.edge_mut(at).set_policy(MemberPolicy::Own(config));
+}
+
+/// Bundle 0's scale learns by `config`, the member at `at` a `Static`
+/// contributor.
+fn learn_scale(def: &mut CgpGraphBackendDef, at: EdgeOccurrence, config: Learning) {
+    def.bundle_mut(BundleId::new(0))
+        .set_slot(LearningSlot::Scale, Some(config));
+    def.edge_mut(at).set_credits(true);
 }
 
 fn edge(state: &LearnedState, slot: usize) -> super::LearnedEdge {
@@ -169,12 +175,11 @@ fn a_lamarckian_learner_starts_at_its_clamped_seed() {
 /// zero-`Σ` write leaves it there.
 #[test]
 fn an_out_of_bound_genomic_scale_starts_at_its_bound() {
-    let (mut def, _, members) = ring(7.0, 1.0);
-    learn(
+    let (mut def, _, members) = ring(7.0);
+    learn_scale(
         &mut def,
         members[0],
         config(HebbianRule::Classic, 0.0, 2.0, 1.0),
-        Scope::Group,
     );
     let mut learned = state(&def, None);
     let view = scale(&learned);
@@ -183,17 +188,16 @@ fn an_out_of_bound_genomic_scale_starts_at_its_bound() {
     assert_eq!(scale(&learned).learned, Some(2.0));
 }
 
-/// A scope-`Bundle` learner's out-of-clamp own correction is not a learned
+/// A `Static` contributor's out-of-clamp modifier is not a learned
 /// quantity: it composes raw before and after scale learning.
 #[test]
-fn a_bundle_learners_out_of_clamp_correction_composes_raw() {
-    let (mut def, _, members) = ring(0.5, 1.0);
+fn a_static_contributors_out_of_clamp_modifier_composes_raw() {
+    let (mut def, _, members) = ring(0.5);
     def.edge_mut(members[0]).set_weight(5.0);
-    learn(
+    learn_scale(
         &mut def,
         members[0],
         config(HebbianRule::Classic, 0.25, 2.0, 1.0),
-        Scope::Group,
     );
     let mut learned = state(&def, None);
     assert_eq!(applied(&learned, members[0]), 5.5);
@@ -201,7 +205,7 @@ fn a_bundle_learners_out_of_clamp_correction_composes_raw() {
     let moved = scale(&learned).learned.expect("an initialized scale");
     assert_eq!(moved, 0.75);
     assert_eq!(applied(&learned, members[0]), 5.0 + moved);
-    assert_eq!(edge(&learned, 0).learned, None);
+    assert_eq!(learned.edges(0).count(), 0);
 }
 
 // ── The law (invariant 3) ───────────────────────────────────────────────────
@@ -241,13 +245,14 @@ fn a_seeded_learner_relaxes_toward_its_clamped_seed_not_its_genomic_weight() {
 /// bound-clamped seed, not its genomic scale.
 #[test]
 fn a_seeded_scale_relaxes_toward_its_clamped_seed_not_its_genomic_scale() {
-    let (mut def, id, members) = ring(0.5, 0.5);
-    def.bundle_mut(id).set_inherit_scale(true);
-    learn(
+    let (mut def, _, members) = ring(0.5);
+    learn_scale(
         &mut def,
         members[0],
-        config(HebbianRule::Classic, 0.0, 2.0, 1.0),
-        Scope::Group,
+        Learning {
+            lamarckian: true,
+            ..config(HebbianRule::Classic, 0.0, 2.0, 0.5)
+        },
     );
     let mut seeds = compute_seed(&def, 0.0);
     let BirthSeeds::Rows { bundles, .. } = &mut seeds;
@@ -263,17 +268,16 @@ fn a_seeded_scale_relaxes_toward_its_clamped_seed_not_its_genomic_scale() {
     assert_ne!(relaxed, Some(relax(1.0, 0.5, 0.5)));
 }
 
-/// An edge-scope member decays toward its birth own correction, not its
-/// composed weight.
+/// An `Own` member decays toward its birth modifier, not its composed
+/// weight.
 #[test]
-fn an_edge_scope_member_decays_toward_its_own_correction() {
-    let (mut def, _, members) = ring(1.0, 1.0);
+fn an_own_member_decays_toward_its_own_modifier() {
+    let (mut def, _, members) = ring(1.0);
     def.edge_mut(members[0]).set_weight(0.25);
     learn(
         &mut def,
         members[0],
         config(HebbianRule::Classic, 0.0, 2.0, 0.5),
-        Scope::Edge,
     );
     let mut learned = state(&def, None);
     learned.set_slot(0, 0, 1.25, 0.0);
@@ -283,17 +287,16 @@ fn an_edge_scope_member_decays_toward_its_own_correction() {
     assert_eq!(view.applied, 1.75);
 }
 
-/// A scope-`Bundle` member has no own decay, whatever its retention, while
-/// its scale decays by its bundle's retention.
+/// A scale decays by its own learning's retention; a `Static` contributor
+/// has no decay.
 #[test]
-fn a_bundle_scale_decays_by_its_bundles_retention_and_its_learner_has_none() {
-    let (mut def, _, members) = ring(0.5, 0.5);
+fn a_scale_decays_by_its_retention_and_a_static_contributor_has_none() {
+    let (mut def, _, members) = ring(0.5);
     def.edge_mut(members[0]).set_weight(0.125);
-    learn(
+    learn_scale(
         &mut def,
         members[0],
-        config(HebbianRule::Classic, 0.0, 4.0, 0.0),
-        Scope::Group,
+        config(HebbianRule::Classic, 0.0, 4.0, 0.5),
     );
     let mut learned = state(&def, None);
     assert_eq!(
@@ -304,24 +307,22 @@ fn a_bundle_scale_decays_by_its_bundles_retention_and_its_learner_has_none() {
     learned.begin_tick();
     assert_eq!(scale(&learned).learned, Some(1.5));
     assert_eq!(applied(&learned, members[0]), 1.625);
-    assert_eq!(edge(&learned, 0).learned, None);
+    assert_eq!(learned.edges(0).count(), 0);
 }
 
 /// `ρ = 1` leaves every stored f32 bit-identical, tick after tick.
 #[test]
 fn a_retention_of_one_leaves_every_stored_value_bit_identical() {
-    let (mut def, _, members) = ring(0.5, 1.0);
+    let (mut def, _, members) = ring(0.5);
     learn(
         &mut def,
         members[0],
         config(HebbianRule::Classic, 0.0, 2.0, 1.0),
-        Scope::Edge,
     );
-    learn(
+    learn_scale(
         &mut def,
         members[1],
         config(HebbianRule::Classic, 0.0, 2.0, 1.0),
-        Scope::Group,
     );
     let mut learned = state(&def, None);
     learned.set_slot(0, 0, 0.1, 0.0);
@@ -361,26 +362,24 @@ fn a_retention_of_one_is_not_applied_where_the_law_would_round() {
 /// not decayed, even at `ρ = 0`.
 #[test]
 fn an_uninitialized_slot_is_untouched() {
-    let (mut def, _, members) = ring(3.0, 0.0);
-    learn(
+    let (mut def, _, members) = ring(3.0);
+    learn_scale(
         &mut def,
         members[0],
         config(HebbianRule::Classic, 0.0, 2.0, 0.0),
-        Scope::Group,
     );
     def.edge_mut(members[1]).set_weight(1.5);
     learn(
         &mut def,
         members[1],
         config(HebbianRule::Classic, 0.0, 2.0, 0.0),
-        Scope::Edge,
     );
     let mut learned = state(&def, None);
     let before = learned.clone();
     learned.begin_tick();
     assert_eq!(learned, before);
     assert_eq!(scale(&learned).learned, None);
-    assert_eq!(edge(&learned, 1).learned, None);
+    assert_eq!(edge(&learned, 0).learned, None);
 }
 
 /// Oja's pull and the decay are two bounded attractors: a strongly driven

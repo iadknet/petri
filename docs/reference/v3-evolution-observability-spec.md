@@ -82,13 +82,14 @@ changes while preserving existing work accounting:
   surface (T25.F06): per committed visit for a pure-Hebbian edge, per
   initialized modulated edge per tick for a reward-modulated one (a seeded
   modulated slot counts from birth); `hebbian_updates_total` and
-  `reward_modulated_updates_total` partition it. Since T25.F07 a group-scope
-  learner counts one per contribution to its group's scale.
+  `reward_modulated_updates_total` partition it. Since T25.F12 the count is
+  per learner (an edge learner per commit, a scale learner per commit with a
+  contributor, a reward step per initialized modulated learner): a scale
+  counts once, not per contributor.
 - `plasticity_changes_total` counts assignments whose final clamped `f32`
-  stored quantity is unequal (`!=`) to the immediately prior one: an
-  ungrouped or edge-scope learner's own quantity, and for a group-scope
-  learner its group's scale, so a moved scale counts every contributor
-  (T25.F07). Its partitions are `hebbian_changes_total` and
+  stored value is unequal (`!=`) to the immediately prior one, per learner,
+  an edge's or a scale's; a moved scale counts once (T25.F12). Its
+  partitions are `hebbian_changes_total` and
   `reward_modulated_changes_total`; each changed count is at most that
   pathway's assignment count. Proposed deltas that clamp or round away do
   not count as changes. Formulas, costs, and write timing are unchanged.

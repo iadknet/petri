@@ -4,14 +4,15 @@ import type { BundleCoordinate } from "../../types/generated/BundleCoordinate.ts
 import type { BundleSource } from "../../types/generated/BundleSource.ts";
 import type { GraphBrain } from "../../types/generated/GraphBrain.ts";
 import type { InputRef } from "../../types/generated/InputRef.ts";
+import type { Learning } from "../../types/generated/Learning.ts";
+import type { MemberPolicy } from "../../types/generated/MemberPolicy.ts";
 import type { NodeLearning } from "../../types/generated/NodeLearning.ts";
-import type { Scope } from "../../types/generated/Scope.ts";
 import type { Site } from "../../types/generated/Site.ts";
 import type { Wiring } from "../../types/generated/Wiring.ts";
 import { Tip } from "../config-panel/shared/Tooltip.tsx";
 import { type LearningJoin, joinLearning } from "./brainLearning.ts";
 import { directionName } from "./directions.ts";
-import { composeTerms, scopeLabel } from "./edgeBundleWeights.ts";
+import { composeTerms, policyLabel } from "./edgeBundleWeights.ts";
 import { describeInputRef, formatInputRef } from "./inputRefUtils.ts";
 import { formatVoteSink } from "./voteSinks.ts";
 
@@ -30,7 +31,8 @@ export interface BundleMember {
 	scale: number;
 	pattern: number;
 	/** How the member learns when plastic (T25.F07). */
-	scope: Scope;
+	policy: MemberPolicy;
+	credits: boolean;
 	/** The weight in force. */
 	applied: number;
 }
@@ -53,7 +55,8 @@ export function coordinateMember(
 		genomic: edge.genomic,
 		scale: member.scale,
 		pattern: member.pattern,
-		scope: member.scope,
+		policy: member.policy,
+		credits: member.credits,
 		applied: join.edge(at.surface, at.container, at.edge, edge).applied,
 	};
 }
@@ -111,7 +114,10 @@ function MemberWeights({ member }: { member: BundleMember }) {
 		>
 			own={member.own.toFixed(3)} genomic={member.genomic.toFixed(3)} applied=
 			{member.applied.toFixed(3)}
-			<span data-testid="edge-bundle-member-scope"> {scopeLabel(member.scope)}</span>
+			<span data-testid="edge-bundle-member-policy">
+				{" "}
+				{policyLabel(member.policy, member.credits)}
+			</span>
 		</Tip>
 	);
 }
@@ -151,27 +157,59 @@ function BundleFacts({
 				scale={bundle.scale.toFixed(3)}
 			</Tip>
 			{learnedScale !== undefined ? (
-				<Tip content="The learned scale the bundle's group-scope members moved; every member weighs through it.">
+				<Tip content="The learned scale its crediting members moved; every member weighs through it.">
 					<span data-testid="edge-bundle-learned-scale">learned={learnedScale.toFixed(3)}</span>
 				</Tip>
 			) : null}
-			<Tip
-				content={
-					bundle.inherit_scale
-						? "inherit_scale: a parent's learned scale seeds the child's."
-						: "No inherit_scale: a child starts from the genomic scale."
-				}
-			>
-				<span data-testid="edge-bundle-inherit-scale">
-					{bundle.inherit_scale ? "inherits scale" : "genomic scale at birth"}
-				</span>
-			</Tip>
-			{bundle.retention < 1 ? (
-				<Tip content="The learned scale decays toward its birth value, keeping this share of its learned change each tick.">
-					<span data-testid="edge-bundle-retention">retention={bundle.retention.toFixed(4)}</span>
-				</Tip>
-			) : null}
+			<SlotFact
+				name="scale learning"
+				learning={bundle.scale_learning}
+				testId="edge-bundle-scale-learning"
+				absent="The scale does not learn."
+				present="The scale learns as a group from its crediting members."
+			/>
+			<SlotFact
+				name="member default"
+				learning={bundle.member_default}
+				testId="edge-bundle-member-default"
+				absent="Inherit members do not learn their modifiers."
+				present="Every inherit member learns its modifier by this learning."
+			/>
 		</>
+	);
+}
+
+/** One of a bundle's learning slots (T25.F12): absent, or its learning. */
+function SlotFact({
+	name,
+	learning,
+	testId,
+	absent,
+	present,
+}: {
+	name: string;
+	learning: Learning | undefined;
+	testId: string;
+	absent: string;
+	present: string;
+}) {
+	if (learning === undefined) {
+		return (
+			<Tip content={absent}>
+				<span data-testid={testId}>no {name}</span>
+			</Tip>
+		);
+	}
+	const pathway = learning.modulation ? `reward ${learning.modulation.reward_source}` : "hebbian";
+	const inheritance = learning.lamarckian ? "lamarckian" : "darwinian";
+	const decay = learning.retention < 1 ? ` · retention ${learning.retention.toFixed(4)}` : "";
+	return (
+		<Tip content={present}>
+			<span data-testid={testId}>
+				{name}: {learning.rule} · {pathway} · {inheritance}
+				{decay}
+			</span>
+		</Tip>
 	);
 }
 

@@ -1056,28 +1056,28 @@ pub struct MutationSupply {
     /// `groups_removed_total` at T25.F11); absent in reports stored before
     /// T25.F11.
     pub bundles_removed_total: u64,
-    /// Committed attribute changes by the scope they landed on (T25.F08,
-    /// scope `group` renamed `bundle` at T25.F11); absent in reports stored
-    /// before T25.F08.
-    pub attribute_changes_by_scope: AttributeChangesByScope,
+    /// Committed learning edits by their reach (T25.F12, replacing T25.F08's
+    /// `attribute_changes_by_scope`); absent in reports stored before
+    /// T25.F12.
+    pub attribute_changes_by_broadcast: AttributeChangesByBroadcast,
     /// The event funnel of every operator an event tried, keyed
     /// `MutationOperator::as_key()` (T25.F08); absent in reports stored
     /// before T25.F08.
     pub operator_funnel_by_operator: BTreeMap<String, OperatorFunnel>,
 }
 
-/// Committed attribute changes (the nine plasticity operators and
-/// `SetScope`) by the scope they landed on (T25.F08 invariant 8).
+/// Committed learning edits (the fourteen learning operators) by their
+/// reach (T25.F12 invariant 9): one target, or every admitted member.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
-pub struct AttributeChangesByScope {
-    pub edge: u64,
-    pub bundle: u64,
+pub struct AttributeChangesByBroadcast {
+    pub one: u64,
+    pub members: u64,
 }
 
-impl From<[u64; 2]> for AttributeChangesByScope {
-    fn from([edge, bundle]: [u64; 2]) -> Self {
-        Self { edge, bundle }
+impl From<[u64; 2]> for AttributeChangesByBroadcast {
+    fn from([one, members]: [u64; 2]) -> Self {
+        Self { one, members }
     }
 }
 

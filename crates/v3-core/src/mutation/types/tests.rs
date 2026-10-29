@@ -280,6 +280,7 @@ fn the_graph_catalog_is_a_bijection_onto_its_engine_operators() {
             | GraphOperator::CopyNodeInputs
             | GraphOperator::EnableHebbian
             | GraphOperator::DisableHebbian
+            | GraphOperator::ClearLearningOverride
             | GraphOperator::MutateHebbianRule
             | GraphOperator::MutateHebbianRate
             | GraphOperator::ToggleHebbianLamarckian
@@ -293,25 +294,22 @@ fn the_graph_catalog_is_a_bijection_onto_its_engine_operators() {
             | GraphOperator::ShiftBundleOffset
             | GraphOperator::RetargetBundle
             | GraphOperator::RemoveBundle
-            | GraphOperator::SetScope
+            | GraphOperator::ToggleCredits
             | GraphOperator::DetachGraphEdge
             | GraphOperator::EnableRetention
             | GraphOperator::DisableRetention
-            | GraphOperator::MutateRetention
-            | GraphOperator::EnableBundleRetention
-            | GraphOperator::DisableBundleRetention
-            | GraphOperator::MutateBundleRetention => {}
+            | GraphOperator::MutateRetention => {}
         }
     }
-    // T25.F11 invariant 7: the four `Add*Bundle` and `RecruitNeutralInput`
-    // leave, `AddBundleLive` and `AddBundleSilent` join (35 at weight 78);
-    // `InputRef.Add` becomes `AddSensorLive` and `AddSensorSilent` (5 at
-    // weight 12).
-    assert_eq!(variants.len(), 35);
+    // T25.F12 invariant 9: `SetScope` and the three bundle retention
+    // operators (weights 2, 1, 1, 4) leave, `ClearLearningOverride` (1) and
+    // `ToggleCredits` (2) join (33 at weight 73); `InputRef.Add` is
+    // `AddSensorLive` and `AddSensorSilent` (5 at weight 12, T25.F11).
+    assert_eq!(variants.len(), 33);
     let weight = |weights: &mut dyn Iterator<Item = u8>| weights.map(u32::from).sum::<u32>();
     assert_eq!(
         weight(&mut GraphOperator::ALL.into_iter().map(GraphOperator::weight)),
-        78
+        73
     );
     assert_eq!(
         weight(
@@ -322,7 +320,7 @@ fn the_graph_catalog_is_a_bijection_onto_its_engine_operators() {
         12
     );
     assert_eq!(InputRefOperator::ALL.len(), 5);
-    assert_eq!(MutationOperator::ALL.len(), 69);
+    assert_eq!(MutationOperator::ALL.len(), 67);
 
     let image: HashSet<MutationOperator> = GraphOperator::ALL
         .into_iter()
@@ -445,10 +443,10 @@ fn operator_keys_are_unique_and_domain_qualified() {
     }
 }
 
-/// Every operator's key on `ac3747005`, in today's flat order (T30.F10
-/// invariant 2): the nested catalog reproduces it verbatim.
+/// Every operator's key in the flat order (T30.F10 invariant 2, T25.F12
+/// invariant 9's catalog): the nested catalog reproduces it verbatim.
 #[rustfmt::skip]
-const KEYS_AT_AC3747005: [&str; 69] = [
+const KEYS: [&str; 67] = [
     "Topology.AddNode", "Topology.RemoveNode", "Topology.RetargetNodeTarget",
     "Topology.AddRouteTarget", "Topology.AddFeedbackRoute", "Topology.RemoveRouteTarget",
     "Topology.ChangeEntryNode", "Topology.SwapNodeBackend", "Topology.CopyNode",
@@ -463,14 +461,14 @@ const KEYS_AT_AC3747005: [&str; 69] = [
     "Graph.AddInternalGraphNode", "Graph.RemoveInternalGraphNode", "Graph.AddGraphEdge",
     "Graph.RetargetGraphEdge", "Graph.RemoveGraphEdge", "Graph.GraphRawFieldMutation",
     "Graph.CopyInternalNode", "Graph.CopySubgraph", "Graph.CopyNodeInputs",
-    "Graph.EnableHebbian", "Graph.DisableHebbian", "Graph.MutateHebbianRule",
+    "Graph.EnableHebbian", "Graph.DisableHebbian", "Graph.ClearLearningOverride",
+    "Graph.MutateHebbianRule",
     "Graph.MutateHebbianRate", "Graph.ToggleHebbianLamarckian", "Graph.EnableRewardModulation",
     "Graph.DisableRewardModulation", "Graph.MutateRewardSource", "Graph.MutateTraceDecay",
     "Graph.AddBundleLive", "Graph.AddBundleSilent", "Graph.AlterBundleScale",
-    "Graph.ShiftBundleOffset", "Graph.RetargetBundle", "Graph.RemoveBundle", "Graph.SetScope",
-    "Graph.DetachGraphEdge", "Graph.EnableRetention", "Graph.DisableRetention",
-    "Graph.MutateRetention", "Graph.EnableBundleRetention", "Graph.DisableBundleRetention",
-    "Graph.MutateBundleRetention",
+    "Graph.ShiftBundleOffset", "Graph.RetargetBundle", "Graph.RemoveBundle",
+    "Graph.ToggleCredits", "Graph.DetachGraphEdge", "Graph.EnableRetention",
+    "Graph.DisableRetention", "Graph.MutateRetention",
     "InputRef.AddSensorLive", "InputRef.AddSensorSilent", "InputRef.Prune", "InputRef.Swap",
     "InputRef.RawFieldMutation",
 ];
@@ -487,7 +485,7 @@ fn the_nested_catalog_derives_every_operator_fact() {
     use std::collections::HashSet;
 
     let keys: Vec<&str> = MutationOperator::ALL.iter().map(|op| op.as_key()).collect();
-    assert_eq!(keys, KEYS_AT_AC3747005, "keys and order are today's");
+    assert_eq!(keys, KEYS, "keys and order are today's");
     assert_eq!(
         keys.iter().collect::<HashSet<_>>().len(),
         MutationOperator::ALL.len()

@@ -1405,7 +1405,7 @@ mod tests {
                 for site in compute {
                     graph
                         .edge_mut(site)
-                        .set_plasticity(Some(v3_core::genome::PlasticityConfig {
+                        .set_learning(Some(v3_core::genome::Learning {
                             rule: v3_core::genome::HebbianRule::Classic,
                             learning_rate: 0.5,
                             weight_clamp: 5.0,

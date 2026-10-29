@@ -2752,7 +2752,8 @@ async fn get_creature_brain_resolves_ring_members_and_their_bundle() {
                 edge["member"],
                 serde_json::json!({
                     "bundle": bundle,
-                    "scope": "Edge",
+                    "policy": "static",
+                    "credits": false,
                     "site": {"Direction": field},
                     "field": field,
                     "pattern": 1.0,
@@ -2776,7 +2777,7 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
     use v3_core::genome::cgp::{
         BirthSeeds, EdgeOccurrence, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind,
     };
-    use v3_core::genome::{BackendDef, HebbianRule, PlasticityConfig};
+    use v3_core::genome::{BackendDef, HebbianRule, Learning};
 
     let state = test_state();
     let creature_id = {
@@ -2784,7 +2785,7 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
         handle.sim.creatures.keys().next().expect("a creature")
     };
     let uri = format!("/v3/simulation/creature/{}", creature_id.data().as_ffi());
-    let config = PlasticityConfig {
+    let config = Learning {
         rule: HebbianRule::Classic,
         learning_rate: 0.1,
         weight_clamp: 2.0,
@@ -2826,9 +2827,9 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
                 ),
             );
             let vote = EdgeOccurrence::new(vote_sink, def.surface_edges(vote_sink).len() - 1);
-            def.edge_mut(vote).set_plasticity(Some(config));
+            def.edge_mut(vote).set_learning(Some(config));
             def.edge_mut(compute).set_weight(3.0);
-            def.edge_mut(compute).set_plasticity(Some(config));
+            def.edge_mut(compute).set_learning(Some(config));
             let mut sinks: Vec<Vec<Option<f32>>> = def
                 .output_sinks()
                 .iter()
@@ -2900,10 +2901,10 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
             "rule": "Classic",
             "learning_rate": 0.1_f32,
             "weight_clamp": 2.0,
+            "lamarckian": true,
             "retention": 1.0,
-            "scope": "ungrouped",
+            "source": "lone",
             "initialized": false,
-            "inherits": true,
         })
     );
     let seeded = brain_sink_edge(graph, vote);
@@ -2918,19 +2919,22 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
     }
 }
 
-/// A group-scope scale (invariants 4 and 5): contributors that differ in
-/// rule, rate, reward source and trace are shown as their learners with one
-/// learned scale on the bundle (preservation case: heterogeneous
-/// contributors); a passive member's applied weight follows the learned
-/// scale and is listed in `learning` (preservation case: genomic 0.5,
-/// applied 1.5); only an edge-scope learner's correction is `learned`.
+/// A learned scale (T25.F12 invariants 5 and 11): the bundle carries both
+/// slots and its seeded learned scale; an `Own` member's learner shows its
+/// override and seeded modifier, an `Inherit` member's shows
+/// `member_default` with source `member_default`, and `Static` members,
+/// crediting or not, carry no learner while their applied weight follows
+/// the learned scale and is listed in `learning` (genomic 0.5, applied
+/// 1.5).
 #[tokio::test]
 async fn get_creature_learning_lists_learned_scales_and_passive_members() {
     use v3_core::contracts::votes::DirectedVoteKind;
     use v3_core::contracts::OutcomeChannel;
     use v3_core::contracts::{InputReference, WorldInputKey};
-    use v3_core::genome::cgp::{BirthSeeds, EdgeOccurrence, EdgeSurface, Scope};
-    use v3_core::genome::{BackendDef, HebbianRule, PlasticityConfig, RewardModulationConfig};
+    use v3_core::genome::cgp::{BirthSeeds, EdgeOccurrence, EdgeSurface, LearningSlot};
+    use v3_core::genome::{
+        BackendDef, HebbianRule, Learning, MemberPolicy, RewardModulationConfig,
+    };
 
     let state = test_state();
     let creature_id = {
@@ -2938,7 +2942,7 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
         handle.sim.creatures.keys().next().expect("a creature")
     };
     let uri = format!("/v3/simulation/creature/{}", creature_id.data().as_ffi());
-    let config = PlasticityConfig {
+    let config = Learning {
         rule: HebbianRule::Classic,
         learning_rate: 0.1,
         weight_clamp: 4.0,
@@ -2946,7 +2950,7 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
         modulation: None,
         retention: 1.0,
     };
-    let other = PlasticityConfig {
+    let other = Learning {
         rule: HebbianRule::Oja,
         learning_rate: 0.25,
         weight_clamp: 3.0,
@@ -2976,14 +2980,17 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
                 unreachable!()
             };
             def.bundle_mut(id).set_scale(0.5);
-            def.bundle_mut(id).set_inherit_scale(true);
+            def.bundle_mut(id)
+                .set_slot(LearningSlot::Scale, Some(config));
+            def.bundle_mut(id)
+                .set_slot(LearningSlot::MemberDefault, Some(other));
             let members: Vec<EdgeOccurrence> = def.members(id).collect();
             def.edge_mut(members[0]).set_weight(0.25);
-            def.edge_mut(members[0]).set_plasticity(Some(config));
-            def.edge_mut(members[1]).set_plasticity(Some(config));
-            def.edge_mut(members[1]).set_scope(Scope::Group);
-            def.edge_mut(members[3]).set_plasticity(Some(other));
-            def.edge_mut(members[3]).set_scope(Scope::Group);
+            def.edge_mut(members[0])
+                .set_policy(MemberPolicy::Own(config));
+            def.edge_mut(members[1]).set_policy(MemberPolicy::Inherit);
+            def.edge_mut(members[1]).set_credits(true);
+            def.edge_mut(members[3]).set_credits(true);
             let mut sinks: Vec<Vec<Option<f32>>> = def
                 .output_sinks()
                 .iter()
@@ -3021,22 +3028,19 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
         *entry["scales"].as_array().unwrap().last().unwrap(),
         serde_json::json!({"bundle": bundle, "learned": 1.5, "initialized": true})
     );
-    let edge_learner = learning_edge(entry, members[0]);
-    assert_eq!(edge_learner["applied"], 2.25);
-    assert_eq!(edge_learner["learned"], 0.75);
-    assert_eq!(edge_learner["initialized"], true);
-    for at in [members[1], members[3]] {
-        let bundle_learner = learning_edge(entry, at);
-        assert_eq!(bundle_learner["applied"], 1.5);
-        assert!(bundle_learner.get("learned").is_none());
-        assert_eq!(
-            bundle_learner["initialized"], true,
-            "its scale slot is seeded"
-        );
+    let own = learning_edge(entry, members[0]);
+    assert_eq!(own["applied"], 2.25);
+    assert_eq!(own["learned"], 0.75);
+    assert_eq!(own["initialized"], true);
+    let inherit = learning_edge(entry, members[1]);
+    assert_eq!(inherit["applied"], 1.5);
+    assert!(inherit.get("learned").is_none(), "Darwinian and unvisited");
+    assert_eq!(inherit["initialized"], false);
+    for at in [members[2], members[3]] {
+        let fixed = learning_edge(entry, at);
+        assert_eq!(fixed["applied"], 1.5, "a Static member reads the scale");
+        assert!(fixed.get("learned").is_none() && fixed.get("initialized").is_none());
     }
-    let passive = learning_edge(entry, members[2]);
-    assert_eq!(passive["applied"], 1.5);
-    assert!(passive.get("learned").is_none() && passive.get("initialized").is_none());
 
     let graph = brain_graph(&body, node_id);
     let record = &graph["bundles"][bundle];
@@ -3044,30 +3048,51 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
         (&record["scale"], &record["learned_scale"]),
         (&serde_json::json!(0.5), &serde_json::json!(1.5))
     );
+    assert_eq!(
+        (
+            &record["scale_learning"]["rule"],
+            &record["member_default"]["rule"]
+        ),
+        (&serde_json::json!("Classic"), &serde_json::json!("Oja"))
+    );
+    assert!(record.get("inherit_scale").is_none() && record.get("retention").is_none());
     let passive = brain_sink_edge(graph, members[2]);
     assert_eq!(
         (&passive["genomic"], &passive["applied"]),
         (&serde_json::json!(0.5), &serde_json::json!(1.5))
     );
     assert!(passive.get("learner").is_none());
+    assert!(brain_sink_edge(graph, members[3])["learner"].is_null());
+    assert_eq!(
+        (
+            &brain_sink_edge(graph, members[3])["member"]["policy"],
+            &brain_sink_edge(graph, members[3])["member"]["credits"]
+        ),
+        (&serde_json::json!("static"), &serde_json::json!(true))
+    );
     assert_eq!(
         brain_sink_edge(graph, members[1])["learner"],
         serde_json::json!({
-            "rule": "Classic", "learning_rate": 0.1_f32, "weight_clamp": 4.0, "retention": 1.0,
-            "scope": "group", "initialized": true, "inherits": true,
+            "rule": "Oja", "learning_rate": 0.25, "weight_clamp": 3.0, "lamarckian": false,
+            "modulation": {"reward_source": "DamageDelta", "trace_decay": 0.5},
+            "retention": 1.0, "source": "member_default", "initialized": false,
         })
     );
     assert_eq!(
-        brain_sink_edge(graph, members[3])["learner"],
+        brain_sink_edge(graph, members[1])["member"]["policy"],
+        "inherit"
+    );
+    assert_eq!(
+        brain_sink_edge(graph, members[0])["learner"],
         serde_json::json!({
-            "rule": "Oja", "learning_rate": 0.25, "weight_clamp": 3.0,
-            "modulation": {"reward_source": "DamageDelta", "trace_decay": 0.5},
-            "retention": 1.0, "scope": "group", "initialized": true, "inherits": true,
+            "rule": "Classic", "learning_rate": 0.1_f32, "weight_clamp": 4.0, "lamarckian": true,
+            "retention": 1.0, "source": "own", "initialized": true, "learned": 0.75,
         })
     );
-    let edge = brain_sink_edge(graph, members[0]);
-    assert_eq!(edge["learner"]["scope"], "edge");
-    assert_eq!(edge["learner"]["learned"], 0.75);
+    assert_eq!(
+        brain_sink_edge(graph, members[0])["member"]["policy"],
+        "own"
+    );
 }
 
 /// `brain` lists a bundle's coordinates under the run's `SensorContext`
@@ -3337,7 +3362,7 @@ async fn get_creature_brain_resolves_pair_coordinates_and_fact_members() {
     };
     let (status, body) = do_request(router(state), get_req(&uri)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    assert_eq!(body["protocol_version"], "v3alpha17");
+    assert_eq!(body["protocol_version"], "v3alpha18");
     let graph = brain_graph(&body, node_id);
 
     let gene = &graph["bundles"][bundle];

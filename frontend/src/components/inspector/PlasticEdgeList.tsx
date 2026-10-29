@@ -6,7 +6,7 @@ import type { NodeLearning } from "../../types/generated/NodeLearning.ts";
 import type { WeightSurface } from "../../types/generated/WeightSurface.ts";
 import { Tip } from "../config-panel/shared/Tooltip.tsx";
 import { joinLearning } from "./brainLearning.ts";
-import { scopeLabel } from "./edgeBundleWeights.ts";
+import { sourceLabel } from "./edgeBundleWeights.ts";
 import { describeGraphSource, describeOutputSink } from "./graphNodeFormatters.ts";
 
 interface PlasticEdgeListProps {
@@ -28,62 +28,49 @@ export interface PlasticEdgeRow {
 	genomic: number;
 	/** The weight in force. */
 	applied: number;
-	/** The learned own quantity, once initialized; never for a group-scope member. */
+	/** The learned own quantity, once initialized. */
 	learned: number | undefined;
-	/** Whether the learner is initialized (at group scope, its scale slot). */
+	/** Whether the learner is initialized (visited or seeded). */
 	initialized: boolean;
 }
 
 /**
  * The per-edge plasticity badge: rule, pathway, trace decay and inheritance
- * (T25.F06), and a member's scope (T25.F07).
+ * (T25.F06), and where a member's learning is stored (T25.F12).
  */
 export function plasticityBadge(learner: EdgeLearner): string {
 	const pathway = learner.modulation
 		? `reward ${learner.modulation.reward_source} · decay ${learner.modulation.trace_decay.toFixed(2)}`
 		: "hebbian";
-	const inheritance = learner.inherits ? "lamarckian" : "darwinian";
+	const inheritance = learner.lamarckian ? "lamarckian" : "darwinian";
 	const badge = `${learner.rule} · ${pathway} · ${inheritance}`;
-	return learner.scope === "ungrouped" ? badge : `${badge} · ${scopeLabel(learner.scope)}`;
-}
-
-/** The inheritance sentence: a bundle learner's follows its bundle's `inherit_scale`. */
-function inheritanceDetail(learner: EdgeLearner): string {
-	if (learner.scope === "group") {
-		return learner.inherits
-			? "Inherits the scale: offspring start from the bundle's learned scale (the Lamarckian flag is inert at group scope)."
-			: "Darwinian scale: offspring start from the bundle's genomic scale (the Lamarckian flag is inert at group scope).";
-	}
-	return learner.inherits
-		? "Lamarckian: offspring inherit the learned weight."
-		: "Darwinian: offspring start from the genomic weight.";
-}
-
-/** The decay sentence of a retention below 1: inert for a bundle learner, which has no own decay. */
-function retentionDetail(learner: EdgeLearner): string {
-	return learner.scope === "group"
-		? "Edge retention is inert at group scope: the bundle's retention governs its shared scale."
-		: `Decays toward its birth weight: keeps ${learner.retention.toFixed(4)} of its learned change each tick.`;
+	return learner.source === "lone" ? badge : `${badge} · ${sourceLabel(learner.source)}`;
 }
 
 /** The badge spelled out, one sentence per attribute, for its tooltip. */
 export function plasticityDetail(learner: EdgeLearner): string[] {
-	const scoped =
-		learner.scope === "ungrouped"
+	const stored =
+		learner.source === "lone"
 			? []
 			: [
-					learner.scope === "group"
-						? "Group scope: learns for its bundle, moving the bundle's shared scale."
-						: "Edge scope: learns its own correction on top of the bundle term.",
+					learner.source === "own"
+						? "Own override: learns its modifier on top of the bundle term."
+						: "Follows its bundle's member default: learns its modifier on top of the bundle term.",
 				];
 	return [
-		...scoped,
+		...stored,
 		`${learner.rule} rule, learning rate ${learner.learning_rate.toFixed(3)}, weight clamp ±${learner.weight_clamp.toFixed(2)}.`,
 		learner.modulation
 			? `Reward-modulated by ${learner.modulation.reward_source}; its eligibility trace keeps ${learner.modulation.trace_decay.toFixed(2)} of itself each tick.`
 			: "Hebbian: learns from co-activity alone.",
-		...(learner.retention < 1 ? [retentionDetail(learner)] : []),
-		inheritanceDetail(learner),
+		...(learner.retention < 1
+			? [
+					`Decays toward its birth weight: keeps ${learner.retention.toFixed(4)} of its learned change each tick.`,
+				]
+			: []),
+		learner.lamarckian
+			? "Lamarckian: offspring inherit the learned weight."
+			: "Darwinian: offspring start from the genomic weight.",
 	];
 }
 

@@ -599,7 +599,7 @@ fn energy_floor_at_zero_after_action_execution() {
 fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
     use crate::contracts::OutcomeChannel;
     use crate::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind, GraphEdge, GraphSource};
-    use crate::genome::{HebbianRule, PlasticityConfig, RewardModulationConfig};
+    use crate::genome::{HebbianRule, Learning, RewardModulationConfig};
     for lamarckian in [false, true] {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         def.append_compute_node(crate::genome::cgp::test_support::plastic_node(
@@ -611,7 +611,7 @@ fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
                 },
                 0.5,
             )],
-            Some(PlasticityConfig {
+            Some(Learning {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.5,
                 weight_clamp: 2.0,

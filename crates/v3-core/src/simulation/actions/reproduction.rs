@@ -477,9 +477,9 @@ pub(crate) fn spawn_child(
     }
     for (total, count) in sim
         .stats
-        .mutation_attribute_changes_total_by_scope
+        .mutation_attribute_changes_total_by_broadcast
         .iter_mut()
-        .zip(summary.attribute_changes_by_scope)
+        .zip(summary.attribute_changes_by_broadcast)
     {
         *total += u64::from(count);
     }
@@ -550,7 +550,7 @@ mod tests {
         ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge, GraphSource,
     };
     use crate::genome::{BackendDef, CreatureGenome};
-    use crate::genome::{HebbianRule, PlasticityConfig};
+    use crate::genome::{HebbianRule, Learning};
     use crate::simulation::tick::reproduce_now;
 
     /// A parent state on `genome` whose plastic slots of mesh node `n`
@@ -810,7 +810,7 @@ mod tests {
             crate::genome::cgp::test_support::plastic_node(
                 ComputeNodeKind::Add,
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.5)],
-                Some(PlasticityConfig {
+                Some(Learning {
                     rule: HebbianRule::Classic,
                     learning_rate: 0.1,
                     weight_clamp: 5.0,
@@ -834,7 +834,7 @@ mod tests {
             crate::genome::cgp::test_support::plastic_node(
                 ComputeNodeKind::Add,
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.5)],
-                Some(PlasticityConfig {
+                Some(Learning {
                     rule: HebbianRule::Classic,
                     learning_rate: 0.1,
                     weight_clamp: 5.0,
@@ -857,7 +857,7 @@ mod tests {
             genome_with_cgp_compute_nodes(vec![crate::genome::cgp::test_support::plastic_node(
                 ComputeNodeKind::Add,
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.5)],
-                Some(PlasticityConfig {
+                Some(Learning {
                     rule: HebbianRule::Oja,
                     learning_rate: 0.1,
                     weight_clamp: 5.0,
@@ -966,7 +966,7 @@ mod tests {
                 },
                 0.1,
             )],
-            Some(PlasticityConfig {
+            Some(Learning {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 5.0,
@@ -1072,7 +1072,7 @@ mod tests {
                     },
                     0.5,
                 )],
-                Some(PlasticityConfig {
+                Some(Learning {
                     rule: HebbianRule::Classic,
                     learning_rate: 0.1,
                     weight_clamp: 5.0,
@@ -1289,21 +1289,22 @@ mod tests {
         genome
     }
 
-    /// A birth's committed attribute changes reach the run's totals by the
-    /// scope they landed on (T25.F08 invariant 8): over a pair-grouped
-    /// parent's births, the two totals sum to the applied events of the ten
-    /// attribute operators, and both scopes are reached.
+    /// A birth's committed learning edits reach the run's totals by their
+    /// reach (T25.F12 invariant 9): over a pair-grouped parent's births, the
+    /// two totals sum to the applied events of the fourteen learning
+    /// operators, and both reaches are reached.
     #[test]
-    fn a_births_attribute_changes_reach_the_run_totals_by_scope() {
+    fn a_births_learning_edits_reach_the_run_totals_by_broadcast() {
         use crate::config::SimulationConfig;
         use crate::mutation::graph::GraphOperator;
         use crate::mutation::types::MutationOperator as Op;
         use crate::simulation::seeding::seed_simulation_with_founder_genomes;
         use rand::SeedableRng;
 
-        const ATTRIBUTE: [Op; 10] = [
+        const ATTRIBUTE: [Op; 14] = [
             Op::Graph(GraphOperator::EnableHebbian),
             Op::Graph(GraphOperator::DisableHebbian),
+            Op::Graph(GraphOperator::ClearLearningOverride),
             Op::Graph(GraphOperator::MutateHebbianRule),
             Op::Graph(GraphOperator::MutateHebbianRate),
             Op::Graph(GraphOperator::ToggleHebbianLamarckian),
@@ -1311,7 +1312,10 @@ mod tests {
             Op::Graph(GraphOperator::DisableRewardModulation),
             Op::Graph(GraphOperator::MutateRewardSource),
             Op::Graph(GraphOperator::MutateTraceDecay),
-            Op::Graph(GraphOperator::SetScope),
+            Op::Graph(GraphOperator::ToggleCredits),
+            Op::Graph(GraphOperator::EnableRetention),
+            Op::Graph(GraphOperator::DisableRetention),
+            Op::Graph(GraphOperator::MutateRetention),
         ];
         let mut reached = [false; 2];
         for seed in 0..64 {
@@ -1348,7 +1352,7 @@ mod tests {
                 .iter()
                 .filter_map(|op| sim.stats.mutation_events_applied_total_by_operator.get(op))
                 .sum();
-            let totals = sim.stats.mutation_attribute_changes_total_by_scope;
+            let totals = sim.stats.mutation_attribute_changes_total_by_broadcast;
             assert_eq!(totals.iter().sum::<u64>(), applied, "seed {seed}");
             for (seen, total) in reached.iter_mut().zip(totals) {
                 *seen |= total > 0;
@@ -1357,6 +1361,6 @@ mod tests {
                 break;
             }
         }
-        assert_eq!(reached, [true; 2], "both scopes reached");
+        assert_eq!(reached, [true; 2], "both reaches reached");
     }
 }
