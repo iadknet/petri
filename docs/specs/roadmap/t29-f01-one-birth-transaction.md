@@ -136,7 +136,7 @@ gate wall-clock flag shows the mapping or capture costs more than predeclared.
 - [x] Focused tests: `cargo test -p v3-core --test viability` -> pass (30/30), digests unchanged before and after; acceptance-guard tests (`cargo test -p v3-core --lib -- creature::birth`), whose catalog properties run committed and rejected events through the engine's gate (`apply_event`) and bound each event's fresh learnables -> pass (19/19).
 - [x] `cargo test --workspace` -> pass (3,107 tests, 0 failed), every pin in invariant 11 unchanged; `cargo check --workspace --all-targets`, `cargo clippy --workspace --all-targets` and `cargo fmt --all --check` -> clean.
 - [ ] `make rust-test-slow` -> pass, readings unchanged.
-- [ ] Gate profile: summary at `docs/progress/features/t29-f01.json`, deterministic blocks identical to the epoch, raw hash and byte count checked, series entry points to the summary, no full report staged.
+- [x] Gate profile: `make bench PROFILE=gate FEATURE=t29-f01` -> outer exit 0, CLI exit 0, `severe=false`; summary at `docs/progress/features/t29-f01.json`, deterministic block identical to the epoch, raw hash and byte count checked, series entry points to the summary, no full report staged.
 
 ## Performance and Goal Impact
 
@@ -153,7 +153,13 @@ threshold against the gate epoch, ±5 % as a hypothesis; a `flag` is
 reported with its mechanism and a `severe` blocks closure until remediation
 removes it or the user accepts it. No indicator has an expected direction.
 
-**Measured verdict.** Pending.
+**Measured verdict.** Gate (`make bench PROFILE=gate FEATURE=t29-f01`, outer
+exit 0 from the shell, CLI exit 0 from the summary's `measurement_evidence`):
+`severe=false` against `t25-f12.json`; deterministic block identical to the
+epoch's (no pin, draw-stream tail or gate value moved); all nine work counters
+at 0.000000%; wall-clock 0.002682 vs 0.002714 ms per creature tick (-1.16%,
+inside the 25% flag and the +-5% hypothesis), so the mapping and capture cost
+is not visible in the gate. As predeclared.
 
 - Summary: [gate](../../progress/features/t29-f01.json).
 - Full readings: [`docs/progress/readings/t29-f01.md`](../../progress/readings/t29-f01.md).
