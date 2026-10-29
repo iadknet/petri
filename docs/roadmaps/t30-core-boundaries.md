@@ -383,8 +383,9 @@ behavior.
   benchmark already key by `world_input_key_label`
   (`neighborhood/sensor_census.rs`). The food-typed label becomes
   `WorldInputKey`'s own transport key in contracts, every count that leaves
-  core keys by it, and the readers' separate label function goes; `as_key`
-  stays the family name the inspector and its fixtures use. The wire and
+  core keys by it, and the readers' separate label function goes; F16's
+  spec makes that key `as_key`, as for every other key type, and names the
+  family-only key the inspector's fixtures use `family_name`. The wire and
   telemetry keys for food-parameterized families change (no compatibility
   aliases); the frontend's generated types are unchanged, since the maps are
   string-keyed. F11 also edits how the engine collects the added node's world
