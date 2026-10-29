@@ -152,11 +152,26 @@ impl CreatureState {
     }
 
     /// The upper energy bound a credit is capped at (T26.F02 body rule):
-    /// the body's own `capacity`. Read by the action layer's cap step and the
+    /// the body's own `capacity`. Read by [`Self::cap_energy`] and the
     /// creature detail response.
     #[must_use]
     pub fn energy_cap(&self) -> f32 {
         self.body.capacity
+    }
+
+    /// Cap the energy at [`Self::energy_cap`] and return the applied excess
+    /// (`0.0` when under the cap), which the caller books to its flow. The
+    /// comparison leaves a `NaN` energy unchanged and caps `+∞`. The caller
+    /// observes the credit it capped; the cap itself is not observed.
+    pub(crate) fn cap_energy(&mut self) -> f64 {
+        let cap = self.energy_cap();
+        if self.energy > cap {
+            let excess = crate::ledger::applied_debit(self.energy, cap);
+            self.energy = cap;
+            excess
+        } else {
+            0.0
+        }
     }
 
     /// Observe the already-applied arithmetic without changing the stored energy.

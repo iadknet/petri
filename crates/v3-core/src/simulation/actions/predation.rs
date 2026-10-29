@@ -128,7 +128,7 @@ pub(crate) fn apply_steal_energy(
         attacker.observe_energy(before, DeathCause::Predation);
 
     // Cap attacker energy at its body's cap.
-    inputs.flows.maximum_energy_clamp_loss += super::cap_energy(&mut inputs.creatures[attacker_id]);
+    inputs.flows.maximum_energy_clamp_loss += inputs.creatures[attacker_id].cap_energy();
 
     // A drained victim is killed: the attacker takes the complexity bonus.
     if inputs.creatures[victim_id].energy <= 0.0 {
@@ -139,8 +139,7 @@ pub(crate) fn apply_steal_energy(
         attacker.energy += bonus;
         inputs.flows.predation_kill_bonus_credit -=
             attacker.observe_energy(before, DeathCause::Predation);
-        inputs.flows.maximum_energy_clamp_loss +=
-            super::cap_energy(&mut inputs.creatures[attacker_id]);
+        inputs.flows.maximum_energy_clamp_loss += inputs.creatures[attacker_id].cap_energy();
         let result = ActionResult::new(ActionOutcome::TransferredAndKilled, effort);
         return (result.with_amount(actual), Some(victim_id));
     }

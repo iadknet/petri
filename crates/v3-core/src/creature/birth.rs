@@ -19,7 +19,6 @@ use crate::creature::body::HeritableBody;
 use crate::creature::state::CreatureState;
 use crate::genome::learning::{InheritanceMapping, Seeds};
 use crate::genome::CreatureGenome;
-use crate::ledger::applied_debit;
 use crate::mutation::body::sample_body_draws;
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::{BirthEdgeClass, MutationEngine, MutationOperator, MutationSummary};
@@ -220,14 +219,7 @@ impl Zygote {
         creature.birth_mutation_operators = provenance.birth_mutation_operators;
         creature.birth_edge_class = provenance.birth_edge_class;
         creature.heading = place.heading;
-        let cap = creature.energy_cap();
-        let overflow = if creature.energy > cap {
-            let excess = applied_debit(creature.energy, cap);
-            creature.energy = cap;
-            excess
-        } else {
-            0.0
-        };
+        let overflow = creature.cap_energy();
         Newborn { creature, overflow }
     }
 }

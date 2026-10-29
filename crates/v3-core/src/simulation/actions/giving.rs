@@ -100,8 +100,7 @@ pub(crate) fn apply_give_energy(
     let recipient_before = recipient.energy;
     recipient.energy += amount;
     inputs.flows.gift_credit -= recipient.observe_energy(recipient_before, DeathCause::Gift);
-    inputs.flows.maximum_energy_clamp_loss +=
-        super::cap_energy(&mut inputs.creatures[recipient_id]);
+    inputs.flows.maximum_energy_clamp_loss += inputs.creatures[recipient_id].cap_energy();
     (
         ActionResult::new(ActionOutcome::Success, effort).with_amount(amount),
         Some(recipient_id),

@@ -95,22 +95,6 @@ fn charge_effort(creature: &mut CreatureState, effort: f32, cause: DeathCause) -
     creature.observe_energy(before, cause)
 }
 
-/// Cap `creature`'s energy at its body's cap ([`CreatureState::energy_cap`])
-/// and return the applied excess (`0.0` when under the cap), which the
-/// caller books to its flow. The comparison leaves a `NaN` energy unchanged
-/// and caps `+∞`. The caller observes the credit it capped; the cap itself
-/// is not observed.
-fn cap_energy(creature: &mut CreatureState) -> f64 {
-    let cap = creature.energy_cap();
-    if creature.energy > cap {
-        let excess = applied_debit(creature.energy, cap);
-        creature.energy = cap;
-        excess
-    } else {
-        0.0
-    }
-}
-
 /// Classification for rejected move actions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MoveBlockedCause {
@@ -200,7 +184,7 @@ pub fn apply_typed_eat(
             creature.energy = 0.0;
             flows.zero_floor_credit += applied_debit(0.0, credited);
         }
-        flows.maximum_energy_clamp_loss += cap_energy(creature);
+        flows.maximum_energy_clamp_loss += creature.cap_energy();
         creature.observe_energy(before, DeathCause::ActionEat);
     }
     let effort = pay_effort(

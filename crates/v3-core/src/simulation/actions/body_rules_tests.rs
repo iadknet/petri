@@ -340,10 +340,7 @@ fn a_lowered_range_clamps_the_next_unmutated_newborn_but_not_its_parent() {
 
     for (id, cap) in [(late, 200.0), (newborn, 100.0)] {
         sim.creatures[id].energy = 1_000.0;
-        assert_eq!(
-            super::cap_energy(&mut sim.creatures[id]),
-            debit(1_000.0, cap)
-        );
+        assert_eq!(sim.creatures[id].cap_energy(), debit(1_000.0, cap));
         assert_eq!(sim.creatures[id].energy, cap);
     }
 }
