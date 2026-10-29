@@ -1,6 +1,6 @@
 # T30.F12 — The Sink Catalog Is Whole
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-29
 **Feature**: T30.F12
 **Track**: [T30 — Core Boundaries](../../roadmaps/t30-core-boundaries.md)
@@ -201,12 +201,12 @@ regression past its threshold would show it wrong.
       `frontend/`, `npx tsc -b`, `npx biome check src/` and
       `npx vitest run` (680 passed) -> pass on `b9e4071c6`; the pass after
       it touches neither.
-- [ ] `make check` -> exit 0, reproducibility and draw-stream pins unchanged.
+- [x] `make check` -> exit 0 on tested commit `19029eeb7`, reproducibility and draw-stream pins unchanged.
 - [x] Invariant 7's grep -> no match; output in readings.
 - [x] Lab comparator hashes, T30.F09 invariant 2's method: the SHA-256 of
       each comparator genome's canonical JSON on `768dde1fc`, taken before
       any edit, equals the one on the final code; both in readings.
-- [ ] `make rust-test-slow` -> exit 0.
+- [x] `make rust-test-slow` -> exit 0 on `19029eeb7` (6 passed).
 - [x] Gate profile: summary stored at `docs/progress/features/t30-f12.json`,
       deterministic block identical to the epoch, raw hash and byte count
       checked, series entry points to the summary, no full report staged.
@@ -238,9 +238,9 @@ at `.bench-artifacts/t30-f12/gate.json` (ignored, unstaged); summary 36,763 byte
 
 ## Success Criteria
 
-- [ ] No Graph node can be built or loaded without the full catalog, and no
+- [x] No Graph node can be built or loaded without the full catalog, and no
       edit or reader handles a partial one (invariants 2–7).
-- [ ] Draws, trajectories and serialized genomes are unchanged (invariant 1,
+- [x] Draws, trajectories and serialized genomes are unchanged (invariant 1,
       the comparator hashes).
 
 ## Notes for AI Agents
@@ -262,3 +262,8 @@ at `.bench-artifacts/t30-f12/gate.json` (ignored, unstaged); summary 36,763 byte
   `genome/cgp/container_tests.rs:2740` still duplicates `add_bundle`'s
   private writes to bypass insertion cost; pre-existing, already marked
   `WORKAROUND(T30.F11)`, and paid by T30.F11's ordered bulk construction.
+- Cost: `/usage` not recorded (user command); 3
+  implementer passes with 2, 2 and 2 advisor consults; 1 spec-owner resume
+  after Plan; 2 Codex rounds, final `ready`; final review
+  lens 1 none, lens 2 none, lens 3 one P2; Opus 5.5 high in every Fable
+  role (user override 2026-10-29).

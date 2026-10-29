@@ -42,7 +42,7 @@ behavior.
   - Goal: Offspring mutate exactly as before, with each mutation operator defined once and selected and dispatched by one engine path for every domain, so adding an operator edits one catalog, with no behavior change.
 - [ ] **T30.F11 — Operators Report Their Own Edits** — Depends on: None
   - Goal: Offspring mutate exactly as before, with every Graph edit reporting what it changed and keeping its own container rules, so the engine never infers an edit by comparing genome copies, with no behavior change.
-- [ ] **T30.F12 — The Sink Catalog Is Whole** — Depends on: T30.F09
+- [x] **T30.F12 — The Sink Catalog Is Whole** — Depends on: T30.F09
   - Goal: Every Graph node carries the full vote and parameter sink catalog by validation, not by convention, so no edit or reader handles a partial catalog, with no behavior change.
 - [x] **T30.F13 — Censuses Live in Core, Summaries Follow Their Types** — Depends on: None
   - Goal: Every population census is computed once in core's readers and each benchmark sample block is declared once with its retention policy, so a new block is not wired by hand in five places and the summary keeps the same minimum, with no simulation behavior change.
