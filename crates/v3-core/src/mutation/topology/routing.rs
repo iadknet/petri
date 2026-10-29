@@ -169,7 +169,7 @@ pub(super) fn apply_add_route_target(
         slot,
         gate_bias: old.gate_bias,
     });
-    genome.nodes.push(birth::detour(new_id, old.target_id, rng));
+    genome.append_node(birth::detour(new_id, old.target_id, rng));
     Ok(reachability)
 }
 

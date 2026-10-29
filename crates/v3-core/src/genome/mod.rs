@@ -5,6 +5,7 @@ pub(crate) mod cgp_mesh_annotations;
 pub mod companions;
 pub mod learning;
 pub mod mesh_annotations;
+pub mod mesh_edit;
 mod node_edit;
 pub mod sensor_analysis;
 

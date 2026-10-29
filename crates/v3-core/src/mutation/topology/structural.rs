@@ -1,10 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use rand::Rng;
 
-use crate::contracts::{NodeId, RouteTarget};
+use crate::contracts::NodeId;
 use crate::genome::analysis::{mesh_backward_slice, mesh_forward_slice};
-use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
+use crate::genome::mesh_edit::Attachment;
+use crate::genome::{BackendDef, CreatureGenome};
 use crate::mutation::event::{MutationSkipReason, TargetReachability};
 use crate::mutation::reachability::TargetSelector;
 
@@ -70,20 +71,8 @@ pub(super) fn apply_remove_node(
     let (idx, reachability) = targets
         .select(&eligible, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let removed = genome.nodes[idx].node_id;
     let successor = bypass_successor(genome, idx);
-    genome.nodes.remove(idx);
-    for node in &mut genome.nodes {
-        if let Some(successor) = successor {
-            for target in &mut node.targets {
-                if target.target_id == removed {
-                    target.target_id = successor;
-                }
-            }
-        } else {
-            node.targets.retain(|target| target.target_id != removed);
-        }
-    }
+    genome.remove_node(idx, successor);
     Ok(reachability)
 }
 
@@ -149,27 +138,21 @@ fn copy_attached(
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let predecessors = safe_predecessors(genome, source);
     let (predecessor, slot, gate_bias) = predecessors[rng.gen_range(0..predecessors.len())];
-    let old_id = genome.nodes[source].node_id;
     let new_id = next_node_id(genome);
-    let mut clone = genome.nodes[source].clone();
-    clone.node_id = new_id;
-    for target in &mut clone.targets {
-        if target.target_id == old_id {
-            target.target_id = new_id;
-        }
-    }
-    if swap_backend {
-        *clone.backend_edit().1 = match clone.backend_def() {
-            BackendDef::Vm(_) => birth::blank_graph_backend(),
-            BackendDef::Graph(_) => birth::minimal_vm_backend(),
-        };
-    }
-    genome.nodes[predecessor].targets.push(RouteTarget {
-        target_id: new_id,
-        slot,
-        gate_bias,
+    let backend = swap_backend.then(|| match genome.nodes[source].backend_def() {
+        BackendDef::Vm(_) => birth::blank_graph_backend(),
+        BackendDef::Graph(_) => birth::minimal_vm_backend(),
     });
-    genome.nodes.push(clone);
+    genome.copy_node_attached(
+        source,
+        new_id,
+        backend,
+        Attachment {
+            from: predecessor,
+            slot,
+            gate_bias,
+        },
+    );
     Ok(reachability)
 }
 
@@ -211,62 +194,21 @@ fn clone_and_remap_slice(
     }
     let (source_idx, slot) = attachable[rng.gen_range(0..attachable.len())];
     let mut used: HashSet<_> = genome.nodes.iter().map(|n| n.node_id).collect();
-    // Build old_id -> new_id mapping. `new_ids` records the fresh ids in
-    // `gene_indices` order (ascending, since the slice functions return sorted
-    // indices) so the backlink target the seeded draw picks below is a function
-    // of genome content alone rather than of the map's hash order (T10.F11).
-    let mut id_map = HashMap::with_capacity(gene_indices.len());
+    // `new_ids` records the fresh ids in `gene_indices` order (ascending,
+    // since the slice functions return sorted indices) so the backlink target
+    // the seeded draw picks below is a function of genome content alone
+    // rather than of a map's hash order (T10.F11).
     let mut new_ids: Vec<NodeId> = Vec::with_capacity(gene_indices.len());
     let mut next_id = next_node_id(genome);
-    for &idx in gene_indices {
-        let old_id = genome.nodes[idx].node_id;
-        id_map.insert(old_id, next_id);
+    for _ in gene_indices {
         new_ids.push(next_id);
         used.insert(next_id);
         next_id = unused_id(&used, next_id.0.wrapping_add(1));
     }
-
-    let cloned: Vec<NodeGenome> = gene_indices
-        .iter()
-        .map(|&idx| {
-            let original = &genome.nodes[idx];
-            NodeGenome::new(
-                id_map[&original.node_id],
-                original.input_refs().to_vec(),
-                original.backend_def().clone(),
-                original
-                    .targets
-                    .iter()
-                    .map(|t| {
-                        if let Some(&new_id) = id_map.get(&t.target_id) {
-                            RouteTarget {
-                                target_id: new_id,
-                                slot: t.slot,
-                                gate_bias: t.gate_bias,
-                            }
-                        } else {
-                            *t // external target preserved
-                        }
-                    })
-                    .collect(),
-            )
-        })
-        .collect();
-
-    genome.nodes.extend(cloned);
-
-    // Note: previously remapped CustomOutput slots in cloned Graph backends
-    // to avoid clobbering. CGP Graph backends have fixed output sinks (not
-    // remappable), and VM backends don't have CustomOutput node kinds, so
-    // this remapping step is now a no-op and has been removed.
-
-    // Attach through the preflighted free slot, retaining ordered target draws.
-    let link_target = new_ids[rng.gen_range(0..new_ids.len())];
-    genome.nodes[source_idx].targets.push(RouteTarget {
-        target_id: link_target,
-        slot,
-        gate_bias: 0.0,
-    });
+    // Attach through the preflighted free slot. The link draw reads only the
+    // slice length, so it is taken before the clone, keeping the draw order.
+    let link = rng.gen_range(0..new_ids.len());
+    genome.clone_slice(gene_indices, &new_ids, source_idx, slot, link);
     Ok(())
 }
 
@@ -330,7 +272,7 @@ pub(super) fn apply_splice_node(
     let position = targets[rng.gen_range(0..targets.len())];
     let successor = genome.nodes[idx].targets[position].target_id;
     let new_id = next_node_id(genome);
-    genome.nodes.push(birth::detour(new_id, successor, rng));
+    genome.append_node(birth::detour(new_id, successor, rng));
     genome.nodes[idx].targets[position].target_id = new_id;
     Ok(reachability)
 }
