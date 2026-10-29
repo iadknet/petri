@@ -3,6 +3,7 @@ use rand::Rng;
 use super::{birth, structural::next_node_id};
 use crate::contracts::{InputReference, NodeId, RouteTarget, SensorContext, MAX_GATE_SLOTS};
 use crate::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge, OutputSinkKind};
+use crate::genome::learning::{GraphMapping, InheritanceMapping};
 use crate::genome::CreatureGenome;
 use crate::genome::{BackendDef, NodeGenome, VmInstruction};
 use crate::mutation::event::{MutationSkipReason, TargetReachability};
@@ -60,7 +61,7 @@ fn add_gate_write(
     context: &SensorContext,
     slot: u8,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<GraphMapping, MutationSkipReason> {
     match backend {
         BackendDef::Vm(vm) => {
             if vm.register_count == 0 {
@@ -76,6 +77,7 @@ fn add_gate_write(
                 src: rng.gen_range(0..vm.register_count),
             };
             insert_new_instruction_with_reference_repair(&mut vm.program, at, instruction)
+                .map(|()| GraphMapping::Identity)
         }
         BackendDef::Graph(graph) => {
             let sink = gate_sink(graph, slot).ok_or(MutationSkipReason::NoApplicableTarget)?;
@@ -87,8 +89,7 @@ fn add_gate_write(
                 },
                 rng,
             );
-            graph.push_edge(EdgeSurface::SinkInput(sink), GraphEdge::new(source, 1.0));
-            Ok(())
+            Ok(graph.push_edge(EdgeSurface::SinkInput(sink), GraphEdge::new(source, 1.0)))
         }
     }
 }
@@ -140,7 +141,7 @@ pub(super) fn apply_add_route_target(
     targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     context: &SensorContext,
-) -> Result<TargetReachability, MutationSkipReason> {
+) -> Result<(TargetReachability, InheritanceMapping), MutationSkipReason> {
     let eligible: Vec<_> = genome
         .nodes
         .iter()
@@ -161,7 +162,8 @@ pub(super) fn apply_add_route_target(
     let slot = lowest_unused_slot(&genome.nodes[idx].targets)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let (input_refs, backend) = genome.nodes[idx].backend_edit();
-    add_gate_write(backend, input_refs, context, slot, rng)?;
+    let gate_write = add_gate_write(backend, input_refs, context, slot, rng)?;
+    let gate_write = InheritanceMapping::within(idx, genome.nodes.len(), gate_write);
     let old = genome.nodes[idx].targets[0];
     let new_id = next_node_id(genome);
     genome.nodes[idx].targets.push(RouteTarget {
@@ -169,8 +171,8 @@ pub(super) fn apply_add_route_target(
         slot,
         gate_bias: old.gate_bias,
     });
-    genome.append_node(birth::detour(new_id, old.target_id, rng));
-    Ok(reachability)
+    let detour = genome.append_node(birth::detour(new_id, old.target_id, rng));
+    Ok((reachability, detour.after(&gate_write)))
 }
 
 /// The node ids a feedback branch from `source` may route to (T11.F29):
@@ -255,7 +257,7 @@ pub(super) fn apply_add_feedback_route(
     targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     context: &SensorContext,
-) -> Result<TargetReachability, MutationSkipReason> {
+) -> Result<(TargetReachability, InheritanceMapping), MutationSkipReason> {
     let executed = targets.executed();
     let eligible: Vec<_> = (0..genome.nodes.len())
         .filter(|&i| feedback_slot(genome, executed, i).is_some())
@@ -268,8 +270,9 @@ pub(super) fn apply_add_feedback_route(
     let node = &genome.nodes[idx];
     let incumbent = static_incumbent(&node.targets).expect("eligible source has an incumbent");
     let gate_bias = losing_bias(node.targets[incumbent].gate_bias);
+    let node_count = genome.nodes.len();
     let (input_refs, backend) = genome.nodes[idx].backend_edit();
-    add_gate_write(backend, input_refs, context, slot, rng)?;
+    let gate_write = add_gate_write(backend, input_refs, context, slot, rng)?;
     // The destinations read only routing targets, which the gate write
     // leaves alone.
     let candidates = feedback_destinations(genome, executed, idx);
@@ -280,7 +283,10 @@ pub(super) fn apply_add_feedback_route(
         slot,
         gate_bias,
     });
-    Ok(reachability)
+    Ok((
+        reachability,
+        InheritanceMapping::within(idx, node_count, gate_write),
+    ))
 }
 
 pub(super) fn apply_remove_route_target(

@@ -59,7 +59,7 @@ fn add_sensor_on_bare_node(
     let BackendDef::Graph(before) = node.backend_def().clone() else {
         unreachable!()
     };
-    let (_, class) = add_sensor_by_law(
+    let ((_, class), _) = add_sensor_by_law(
         &mut node,
         reference,
         BirthLaw::Live,
@@ -93,7 +93,8 @@ fn add_graph_edge_and_add_sensor_reach_every_drive() {
             crate::mutation::graph::operators::test_inputs(&refs),
             &mut SmallRng::seed_from_u64(seed),
         )
-        .unwrap();
+        .unwrap()
+        .0;
         if let Some(sink @ VoteSink::Drive(_)) = grown_vote_sink(&before, &def) {
             assert_eq!(class, Some(BirthEdgeClass::Drive));
             by_edge.insert(sink.index());
@@ -177,7 +178,7 @@ proptest! {
     fn the_reported_class_is_the_class_of_the_pushed_sink(seed in any::<u64>(), slot in 0usize..24) {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         let before = def.clone();
-        let class = add_edge(&mut def, crate::mutation::graph::operators::test_inputs(&[InputReference::ActionVotes]), &mut SmallRng::seed_from_u64(seed)).unwrap();
+        let class = add_edge(&mut def, crate::mutation::graph::operators::test_inputs(&[InputReference::ActionVotes]), &mut SmallRng::seed_from_u64(seed)).unwrap().0;
         prop_assert_eq!(class, grown_vote_sink(&before, &def).and_then(BirthEdgeClass::of_sink));
 
         for reference in [InputReference::UpstreamSlot(slot), InputReference::ActionVotes] {

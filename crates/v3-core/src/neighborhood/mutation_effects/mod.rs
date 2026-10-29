@@ -465,7 +465,8 @@ impl Proposals<'_> {
             ParentExecuted::Indices(self.executed),
             &mut rng,
             &self.sensors,
-        );
+        )
+        .0;
         (child, summary)
     }
 }

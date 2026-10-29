@@ -11,6 +11,7 @@ use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeEdit, EdgeOccurrence, EdgeSurface,
     GraphEdge, GraphSource, OutputSinkKind,
 };
+use crate::genome::learning::GraphMapping;
 use crate::genome::{BackendDef, CreatureGenome};
 use crate::mutation::event::{BirthEdgeClass, BundleEdits, MutationSkipReason};
 
@@ -82,7 +83,7 @@ pub(super) fn alter_edge_weight(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<GraphMapping, MutationSkipReason> {
     let def = graph_def_mut(genome, node_idx)?;
     alter_edge_weight_in_def(def, rng)
 }
@@ -110,7 +111,7 @@ pub(super) fn add_internal_node(
     node_idx: usize,
     context: &SensorContext,
     rng: &mut impl Rng,
-) -> Result<BundleEdits, MutationSkipReason> {
+) -> Result<(BundleEdits, GraphMapping), MutationSkipReason> {
     let (def, input_refs) = graph_node_mut(genome, node_idx)?;
     add_compute_node(
         def,
@@ -127,7 +128,7 @@ pub(super) fn add_graph_edge(
     node_idx: usize,
     context: &SensorContext,
     rng: &mut impl Rng,
-) -> Result<Option<BirthEdgeClass>, MutationSkipReason> {
+) -> Result<(Option<BirthEdgeClass>, GraphMapping), MutationSkipReason> {
     let (def, input_refs) = graph_node_mut(genome, node_idx)?;
     add_edge(
         def,
@@ -143,7 +144,7 @@ pub(super) fn remove_internal_node(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<GraphMapping, MutationSkipReason> {
     let def = graph_def_mut(genome, node_idx)?;
     remove_compute_node(def, rng)
 }
@@ -153,7 +154,7 @@ pub(super) fn retarget_graph_edge(
     node_idx: usize,
     context: &SensorContext,
     rng: &mut impl Rng,
-) -> Result<BundleEdits, MutationSkipReason> {
+) -> Result<(BundleEdits, GraphMapping), MutationSkipReason> {
     let (def, input_refs) = graph_node_mut(genome, node_idx)?;
     retarget_edge(
         def,
@@ -169,7 +170,7 @@ pub(super) fn remove_graph_edge(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-) -> Result<BundleEdits, MutationSkipReason> {
+) -> Result<(BundleEdits, GraphMapping), MutationSkipReason> {
     let def = graph_def_mut(genome, node_idx)?;
     remove_edge(def, rng)
 }
@@ -179,7 +180,7 @@ pub(super) fn apply_graph_raw_field_mutation(
     node_idx: usize,
     context: &SensorContext,
     rng: &mut impl Rng,
-) -> Result<BundleEdits, MutationSkipReason> {
+) -> Result<(BundleEdits, GraphMapping), MutationSkipReason> {
     let (def, input_refs) = graph_node_mut(genome, node_idx)?;
     raw_field_mutation(
         def,
@@ -195,7 +196,7 @@ pub(super) fn apply_copy_internal_node(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<GraphMapping, MutationSkipReason> {
     let def = graph_def_mut(genome, node_idx)?;
     copy_compute_node(def, rng)
 }
@@ -204,7 +205,7 @@ pub(super) fn apply_copy_subgraph(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<GraphMapping, MutationSkipReason> {
     let def = graph_def_mut(genome, node_idx)?;
     copy_cgp_subgraph(def, rng)
 }
@@ -213,7 +214,7 @@ pub(super) fn apply_copy_node_inputs(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<GraphMapping, MutationSkipReason> {
     let def = graph_def_mut(genome, node_idx)?;
     copy_node_inputs(def, rng)
 }
@@ -340,31 +341,33 @@ pub(crate) fn add_compute_node(
     def: &mut CgpGraphBackendDef,
     inputs: NodeInputs<'_>,
     rng: &mut impl Rng,
-) -> Result<BundleEdits, MutationSkipReason> {
+) -> Result<(BundleEdits, GraphMapping), MutationSkipReason> {
     let can_split =
         check_compute_node_capacity(def, 1).is_ok() && splittable_edge_sites(def).next().is_some();
     let forms = if can_split { 3u8 } else { 2u8 };
     match rng.gen_range(0u8..forms) {
-        0 => add_disconnected_node(def, rng).map(|()| BundleEdits::default()),
-        1 => add_bootstrap_node(def, inputs, rng).map(|()| BundleEdits::default()),
+        0 => add_disconnected_node(def, rng).map(|map| (BundleEdits::default(), map)),
+        1 => add_bootstrap_node(def, inputs, rng).map(|map| (BundleEdits::default(), map)),
         _ => split_existing_edge(def, inputs, rng),
     }
 }
 
 /// What an edge edit's detach did to the bundles (T25.F03): one detach,
 /// which removed its record when it was the last member, or nothing.
-fn detach_edits(edit: EdgeEdit) -> BundleEdits {
-    edit.detached
-        .map_or_else(BundleEdits::default, BundleEdits::detach)
+fn detach_edits((edit, map): (EdgeEdit, GraphMapping)) -> (BundleEdits, GraphMapping) {
+    (
+        edit.detached
+            .map_or_else(BundleEdits::default, BundleEdits::detach),
+        map,
+    )
 }
 
 /// Form (a): a random kind joins the graph with no inputs and no consumer.
 pub(crate) fn add_disconnected_node(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
-    def.append_compute_node(ComputeNode::new(random_compute_node_kind(rng), Vec::new()));
-    Ok(())
+) -> Result<GraphMapping, MutationSkipReason> {
+    Ok(def.append_compute_node(ComputeNode::new(random_compute_node_kind(rng), Vec::new())))
 }
 
 /// Form (b): a random kind joins the graph reading one bootstrap edge; no
@@ -374,14 +377,13 @@ pub(crate) fn add_bootstrap_node(
     def: &mut CgpGraphBackendDef,
     inputs: NodeInputs<'_>,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<GraphMapping, MutationSkipReason> {
     let compute_count = def.compute_nodes().len() as u16;
     let source = random_graph_source(compute_count, inputs, rng);
-    def.append_compute_node(ComputeNode::new(
+    Ok(def.append_compute_node(ComputeNode::new(
         random_compute_node_kind(rng),
         vec![GraphEdge::new(source, rng.gen_range(-1.0f32..=1.0))],
-    ));
-    Ok(())
+    )))
 }
 
 /// Form (c): pick one existing edge on any surface and insert an identity
@@ -397,7 +399,7 @@ pub(crate) fn split_existing_edge(
     def: &mut CgpGraphBackendDef,
     inputs: NodeInputs<'_>,
     rng: &mut impl Rng,
-) -> Result<BundleEdits, MutationSkipReason> {
+) -> Result<(BundleEdits, GraphMapping), MutationSkipReason> {
     check_compute_node_capacity(def, 1)?;
     let sites: Vec<EdgeOccurrence> = splittable_edge_sites(def).collect();
     if sites.is_empty() {
@@ -434,13 +436,12 @@ fn identity_add_node() -> ComputeNode {
 pub(crate) fn remove_compute_node(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<GraphMapping, MutationSkipReason> {
     if def.compute_nodes().is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
     let idx = rng.gen_range(0..def.compute_nodes().len());
-    def.remove_compute_node(idx);
-    Ok(())
+    Ok(def.remove_compute_node(idx))
 }
 
 /// Change a random compute node's kind to a new random kind.
@@ -464,14 +465,13 @@ pub(crate) fn swap_compute_kind(
 pub(crate) fn copy_compute_node(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<GraphMapping, MutationSkipReason> {
     if def.compute_nodes().is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
     check_compute_node_capacity(def, 1)?;
     let source_idx = rng.gen_range(0..def.compute_nodes().len());
-    def.duplicate_compute_nodes(&[source_idx]);
-    Ok(())
+    Ok(def.duplicate_compute_nodes(&[source_idx]))
 }
 
 /// Added nodes are only addressable while every resulting index stays below
@@ -495,7 +495,7 @@ const MAX_SUBGRAPH_CLUSTER: usize = 4;
 pub(crate) fn copy_cgp_subgraph(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<GraphMapping, MutationSkipReason> {
     if def.compute_nodes().len() < 2 {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
@@ -547,8 +547,7 @@ pub(crate) fn copy_cgp_subgraph(
 
     cluster.sort_unstable();
     check_compute_node_capacity(def, cluster.len())?;
-    def.duplicate_compute_nodes(&cluster);
-    Ok(())
+    Ok(def.duplicate_compute_nodes(&cluster))
 }
 
 // ─── Edge operators (across all 5 surfaces) ─────────────────────────────────
@@ -561,28 +560,30 @@ pub(crate) fn add_edge(
     def: &mut CgpGraphBackendDef,
     inputs: NodeInputs<'_>,
     rng: &mut impl Rng,
-) -> Result<Option<BirthEdgeClass>, MutationSkipReason> {
+) -> Result<(Option<BirthEdgeClass>, GraphMapping), MutationSkipReason> {
     let surface = pick_random_surface(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
     let compute_count = def.compute_nodes().len() as u16;
     let source = random_graph_source(compute_count, inputs, rng);
     let weight = rng.gen_range(-1.0f32..=1.0);
-    def.push_edge(surface, GraphEdge::new(source, weight));
-    Ok(match surface {
+    let map = def.push_edge(surface, GraphEdge::new(source, weight));
+    let class = match surface {
         EdgeSurface::SinkInput(i) => match def.output_sinks()[i].kind {
             OutputSinkKind::ActionVote(sink) => BirthEdgeClass::of_sink(sink),
             _ => None,
         },
         EdgeSurface::ComputeInput(_) => None,
-    })
+    };
+    Ok((class, map))
 }
 
 /// Remove a random edge from any surface.
 pub(crate) fn remove_edge(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<BundleEdits, MutationSkipReason> {
+) -> Result<(BundleEdits, GraphMapping), MutationSkipReason> {
     let occurrence = pick_random_edge(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
-    Ok(BundleEdits::removal(def.remove_edge(occurrence)))
+    let (removed, map) = def.remove_edge(occurrence);
+    Ok((BundleEdits::removal(removed), map))
 }
 
 /// Change the source of a random edge.
@@ -590,7 +591,7 @@ pub(crate) fn retarget_edge(
     def: &mut CgpGraphBackendDef,
     inputs: NodeInputs<'_>,
     rng: &mut impl Rng,
-) -> Result<BundleEdits, MutationSkipReason> {
+) -> Result<(BundleEdits, GraphMapping), MutationSkipReason> {
     let occurrence = pick_random_edge(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
     let compute_count = def.compute_nodes().len() as u16;
     let new_source = random_graph_source(compute_count, inputs, rng);
@@ -607,12 +608,11 @@ pub(crate) fn retarget_edge(
 pub(crate) fn alter_edge_weight_in_def(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<GraphMapping, MutationSkipReason> {
     let occurrence = pick_random_edge(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
     let mut weight = def.edge_at(occurrence).own_weight();
     perturb_weight(&mut weight, rng);
-    def.edge_mut(occurrence).set_weight(weight);
-    Ok(())
+    Ok(def.edge_mut(occurrence).set_weight(weight))
 }
 
 /// `AlterGraphEdgeWeight`'s weight law, shared with
@@ -642,7 +642,7 @@ fn bundle_source_indices(def: &CgpGraphBackendDef) -> impl Iterator<Item = usize
 pub(crate) fn copy_node_inputs(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<GraphMapping, MutationSkipReason> {
     if def.compute_nodes().len() < 2 {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
@@ -655,8 +655,7 @@ pub(crate) fn copy_node_inputs(
     if target >= source {
         target += 1;
     }
-    def.copy_edges(source, target);
-    Ok(())
+    Ok(def.copy_edges(source, target))
 }
 
 // ─── Parameter operators ────────────────────────────────────────────────────
@@ -841,7 +840,7 @@ pub(crate) fn raw_field_mutation(
     def: &mut CgpGraphBackendDef,
     inputs: NodeInputs<'_>,
     rng: &mut impl Rng,
-) -> Result<BundleEdits, MutationSkipReason> {
+) -> Result<(BundleEdits, GraphMapping), MutationSkipReason> {
     let param_count = def
         .compute_nodes()
         .iter()
@@ -856,7 +855,8 @@ pub(crate) fn raw_field_mutation(
 
     let pick = rng.gen_range(0..total);
     if pick < param_count {
-        return mutate_compute_param(def, rng).map(|()| BundleEdits::default());
+        return mutate_compute_param(def, rng)
+            .map(|()| (BundleEdits::default(), GraphMapping::Identity));
     }
 
     let occurrence = edges[pick - param_count];

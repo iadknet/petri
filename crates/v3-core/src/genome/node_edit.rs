@@ -9,6 +9,7 @@ use crate::contracts::{FieldSet, InputReference, SensorContext, SensorDescriptor
 use crate::genome::cgp::{
     bundle_capacity_admits, plans, BundleBirth, BundleId, BundleSource, GraphSource,
 };
+use crate::genome::learning::GraphMapping;
 use crate::genome::mesh_annotations::{classify_input_ref, MeshReadClass};
 use crate::genome::{BackendDef, NodeGenome, VmInstruction};
 
@@ -89,7 +90,8 @@ impl NodeGenome {
     }
 
     /// Declare `reference` and build one bundle per birth in one edit,
-    /// returning the declaration's index. On a Graph node `births` covers
+    /// returning the declaration's index and the edit's inheritance mapping
+    /// (every new bundle and member `Fresh`). On a Graph node `births` covers
     /// the sensor's field sets, each once, every wiring admissible for its
     /// set; on a VM node it is empty.
     ///
@@ -101,7 +103,7 @@ impl NodeGenome {
         reference: InputReference,
         births: &[BundleBirth],
         context: &SensorContext,
-    ) -> Result<u16, NodeEditError> {
+    ) -> Result<(u16, GraphMapping), NodeEditError> {
         let ref_idx =
             u16::try_from(self.input_refs.len()).map_err(|_| NodeEditError::DeclarationIndex)?;
         let descriptor = SensorDescriptor::of(&reference, context);
@@ -132,19 +134,23 @@ impl NodeGenome {
             }
         }
         self.input_refs.push(reference);
+        let mut map = GraphMapping::Identity;
         for &birth in births {
             let source = BundleSource::Sensor {
                 ref_idx,
                 field_set: birth.field_set,
             };
-            self.add_bundle(source, birth, context)
+            let (_, added) = self
+                .add_bundle(source, birth, context)
                 .expect("a birth checked against the declared sensor");
+            map = added.after(&map);
         }
-        Ok(ref_idx)
+        Ok((ref_idx, map))
     }
 
     /// Build one bundle reading `source` (a declared sensor's field set or a
-    /// memory bank) with `birth`'s wiring and scale.
+    /// memory bank) with `birth`'s wiring and scale, returning its id and
+    /// the edit's inheritance mapping (the bundle and its members `Fresh`).
     ///
     /// # Errors
     ///
@@ -156,7 +162,7 @@ impl NodeGenome {
         source: BundleSource,
         birth: BundleBirth,
         context: &SensorContext,
-    ) -> Result<BundleId, NodeEditError> {
+    ) -> Result<(BundleId, GraphMapping), NodeEditError> {
         let set = self
             .field_set(source, context)
             .filter(|_| birth.field_set == source.field_set())

@@ -204,7 +204,8 @@ pub fn observe(
                     ParentExecuted::Indices(&executed),
                     rng,
                     &context.sensors,
-                );
+                )
+                .0;
                 tracker.record_birth(BirthObservation {
                     lineage: lineage as u32,
                     depth: born,
@@ -432,7 +433,8 @@ mod tests {
                 ParentExecuted::Indices(&executed),
                 &mut rng,
                 &context.sensors,
-            );
+            )
+            .0;
             zero_births += u32::from(summary.applied_events == 0);
             let signature = battery.signature(
                 &genomes[0],
@@ -481,7 +483,8 @@ mod tests {
                     ParentExecuted::Indices(&next_executed),
                     &mut rng_before.clone(),
                     &context.sensors,
-                );
+                )
+                .0;
                 MutationEngine::apply_mutations_on_units(
                     &mut with,
                     FOUNDER_GENOME_SIZE_UNITS,
@@ -490,7 +493,8 @@ mod tests {
                     ParentExecuted::Indices(&next_executed),
                     &mut rng.clone(),
                     &context.sensors,
-                );
+                )
+                .0;
                 assert_eq!(with, without);
             }
         }
@@ -538,6 +542,7 @@ mod tests {
                         &mut rng,
                         &context.sensors,
                     )
+                    .0
                     .applied_events;
                 }
                 if let Some(slot) = sizes.checkpoints.iter().position(|&d| d == depth) {
@@ -625,7 +630,8 @@ mod tests {
                             ParentExecuted::Indices(&executed),
                             &mut rng,
                             &context.sensors,
-                        );
+                        )
+                        .0;
                     }
                     genome
                 })
@@ -689,7 +695,8 @@ mod tests {
                     ParentExecuted::Indices(&executed),
                     &mut rng,
                     &context.sensors,
-                );
+                )
+                .0;
             }
             replayed.push(genome);
         }

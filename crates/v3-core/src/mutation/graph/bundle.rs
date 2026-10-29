@@ -2,6 +2,7 @@
 //! policy behind the four creation operators, four that change an existing
 //! bundle through its record, and one that detaches a member.
 
+use crate::genome::learning::GraphMapping;
 use rand::Rng;
 
 use crate::contracts::votes::{DirectedVoteKind, VOTE_DIRECTION_COUNT};
@@ -203,7 +204,7 @@ pub(crate) fn add_bundle_by_law(
     law: BirthLaw,
     context: &SensorContext,
     rng: &mut impl Rng,
-) -> Result<(BundleEdits, Option<BirthEdgeClass>), MutationSkipReason> {
+) -> Result<((BundleEdits, Option<BirthEdgeClass>), GraphMapping), MutationSkipReason> {
     let (def, input_refs) = graph_node(node)?;
     let sources: Vec<_> = bundle_sources(def, input_refs, context).collect();
     if sources.is_empty() {
@@ -211,12 +212,12 @@ pub(crate) fn add_bundle_by_law(
     }
     let (source, set) = sources[rng.gen_range(0..sources.len())];
     let births = draw_births(def, &[(source.field_set(), set)], law, rng)?;
-    let id = node
+    let (id, map) = node
         .add_bundle(source, births[0], context)
         .map_err(|_| MutationSkipReason::NoApplicableTarget)?;
     let (def, _) = graph_node(node)?;
     let edits = draw_birth_learning(def, &[id], rng);
-    Ok((edits, creation_class(&[births[0].wiring])))
+    Ok(((edits, creation_class(&[births[0].wiring])), map))
 }
 
 /// `AddSensorLive` / `AddSensorSilent` on a node, after the sensor draw
@@ -231,18 +232,20 @@ pub(crate) fn add_sensor_by_law(
     law: BirthLaw,
     context: &SensorContext,
     rng: &mut impl Rng,
-) -> Result<(BundleEdits, Option<BirthEdgeClass>), MutationSkipReason> {
+) -> Result<((BundleEdits, Option<BirthEdgeClass>), GraphMapping), MutationSkipReason> {
     let BackendDef::Graph(def) = node.backend_def() else {
-        node.add_sensor(reference, &[], context)
+        let (_, map) = node
+            .add_sensor(reference, &[], context)
             .map_err(|_| MutationSkipReason::NoApplicableTarget)?;
-        return Ok((BundleEdits::default(), None));
+        return Ok(((BundleEdits::default(), None), map));
     };
     let sets: Vec<(u8, FieldSet)> = SensorDescriptor::of(&reference, context)
         .indexed_field_sets()
         .collect();
     let births = draw_births(def, &sets, law, rng)?;
     let first = def.bundles().len();
-    node.add_sensor(reference, &births, context)
+    let (_, map) = node
+        .add_sensor(reference, &births, context)
         .map_err(|_| MutationSkipReason::NoApplicableTarget)?;
     let (def, _) = graph_node(node)?;
     let ids: Vec<BundleId> = def
@@ -252,7 +255,7 @@ pub(crate) fn add_sensor_by_law(
         .collect();
     let edits = draw_birth_learning(def, &ids, rng);
     let wirings: Vec<Wiring> = births.iter().map(|birth| birth.wiring).collect();
-    Ok((edits, creation_class(&wirings)))
+    Ok(((edits, creation_class(&wirings)), map))
 }
 
 /// Whether the unit operators have a site: at least one bundle.
@@ -278,13 +281,13 @@ fn graph_node(
 pub(crate) fn detach_member(
     node: &mut NodeGenome,
     rng: &mut impl Rng,
-) -> Result<BundleEdits, MutationSkipReason> {
+) -> Result<(BundleEdits, GraphMapping), MutationSkipReason> {
     let (def, input_refs) = graph_node(node)?;
     let Target::Edge(picked) = select_eligible(def, is_member, rng)? else {
         return Err(MutationSkipReason::NoApplicableTarget);
     };
-    let (_, removed) = cgp::detach(def, picked, input_refs);
-    Ok(BundleEdits::detach(removed))
+    let (_, removed, map) = cgp::detach(def, picked, input_refs);
+    Ok((BundleEdits::detach(removed), map))
 }
 
 /// A bundle-record predicate.
@@ -326,12 +329,11 @@ fn pick(def: &CgpGraphBackendDef, rng: &mut impl Rng) -> Result<BundleId, Mutati
 pub(crate) fn alter_scale(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<GraphMapping, MutationSkipReason> {
     let id = pick(def, rng)?;
     let mut scale = def.bundles()[id.index()].scale();
     perturb_weight(&mut scale, rng);
-    def.bundle_mut(id).set_scale(scale);
-    Ok(())
+    Ok(def.bundle_mut(id).set_scale(scale))
 }
 
 /// Whether a bundle is wired geometrically (`Ring`, `DirectionPair`): the
@@ -346,7 +348,7 @@ pub(super) fn is_geometric(bundle: &cgp::Bundle) -> bool {
 pub(crate) fn shift_offset(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<GraphMapping, MutationSkipReason> {
     let id = pick_where(def, is_geometric, rng)?;
     let n = VOTE_DIRECTION_COUNT;
     let step = if rng.gen_bool(0.5) { 1 } else { n - 1 };
@@ -354,8 +356,7 @@ pub(crate) fn shift_offset(
     let (Some(kind), Some(offset)) = (wiring.kind(), wiring.offset()) else {
         unreachable!("a geometric bundle");
     };
-    def.relocate_bundle(id, wiring.rotated(kind, (offset + step) % n));
-    Ok(())
+    Ok(def.relocate_bundle(id, wiring.rotated(kind, (offset + step) % n)))
 }
 
 /// `RetargetBundle` (T25.F11 invariant 7): one bundle; a `Plain` bundle
@@ -367,7 +368,7 @@ pub(crate) fn shift_offset(
 pub(crate) fn retarget(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<GraphMapping, MutationSkipReason> {
     let id = pick(def, rng)?;
     let wiring = def.bundles()[id.index()].wiring();
     let target = match wiring {
@@ -394,16 +395,15 @@ pub(crate) fn retarget(
     if !cgp::hosts(def, &target) {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    def.relocate_bundle(id, target);
-    Ok(())
+    Ok(def.relocate_bundle(id, target))
 }
 
 /// `RemoveBundle`: the record and every member.
 pub(crate) fn remove(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
-) -> Result<BundleEdits, MutationSkipReason> {
+) -> Result<(BundleEdits, GraphMapping), MutationSkipReason> {
     let id = pick(def, rng)?;
-    def.remove_bundle(id);
-    Ok(BundleEdits::removal(true))
+    let (_, map) = def.remove_bundle(id);
+    Ok((BundleEdits::removal(true), map))
 }

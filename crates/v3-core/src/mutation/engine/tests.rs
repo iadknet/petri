@@ -44,6 +44,7 @@ fn apply_events(
         rng,
         &crate::config::test_sensor_context(1),
     )
+    .0
 }
 
 /// One topology event per birth.
@@ -142,7 +143,7 @@ fn engine_with_probability_zero_returns_zero_summary() {
     config.per_unit_rate = 0.0;
     let mut genome = v3alpha1_founder_genome();
     let mut r = rng(42);
-    let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+    let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r).0;
     assert_eq!(summary.attempted_events, 0);
     assert_eq!(summary.applied_events, 0);
     assert_eq!(summary.skipped_events, 0);
@@ -194,7 +195,8 @@ fn engine_with_food_type_count_can_introduce_non_default_food_input_refs() {
             ParentExecuted::NONE,
             &mut r,
             &crate::config::test_sensor_context(3),
-        );
+        )
+        .0;
         if summary
             .applied_by_domain
             .get(&MutationDomain::InputRef)
@@ -1125,7 +1127,7 @@ fn per_unit_supply_rate_zero_returns_zero_summary() {
     let config = per_unit_config(0.0);
     let mut genome = v3alpha1_founder_genome();
     let before = genome.clone();
-    let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut rng(7));
+    let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut rng(7)).0;
     assert_eq!(summary.attempted_events, 0);
     assert_eq!(summary.applied_events, 0);
     assert_eq!(summary.skipped_events, 0);
@@ -1155,7 +1157,7 @@ proptest::proptest! {
         let config = per_unit_config(rate);
         let founder = v3alpha1_founder_genome();
         let requested = requested_event_count(&config, founder.genome_size(), &mut rng(seed));
-        let summary = MutationEngine::apply_mutations(&mut founder.clone(), &config, &[], &mut rng(seed));
+        let summary = MutationEngine::apply_mutations(&mut founder.clone(), &config, &[], &mut rng(seed)).0;
         proptest::prop_assert_eq!(summary.attempted_events, requested);
         proptest::prop_assert_eq!(summary.attempted_events, summary.applied_events + summary.skipped_events);
     }
@@ -1172,10 +1174,10 @@ proptest::proptest! {
         let (mut own_rng, mut explicit_rng) = (rng(seed), rng(seed));
         let own_summary = MutationEngine::apply_mutations_in(
             &mut own, &config, &[], ParentExecuted::NONE, &mut own_rng, &crate::config::test_sensor_context(1),
-        );
+        ).0;
         let explicit_summary = MutationEngine::apply_mutations_on_units(
             &mut explicit, founder.genome_size(), &config, &[], ParentExecuted::NONE, &mut explicit_rng, &crate::config::test_sensor_context(1),
-        );
+        ).0;
         proptest::prop_assert_eq!(own_summary.attempted_events, explicit_summary.attempted_events);
         proptest::prop_assert_eq!(own_summary.applied_events, explicit_summary.applied_events);
         proptest::prop_assert_eq!(own_summary.events, explicit_summary.events);
@@ -1195,7 +1197,7 @@ proptest::proptest! {
         for mut genome in [v3alpha1_founder_genome(), core_and_junk_genome()] {
             let summary = MutationEngine::apply_mutations_on_units(
                 &mut genome, units, &config, &[], ParentExecuted::NONE, &mut rng(seed), &crate::config::test_sensor_context(1),
-            );
+            ).0;
             proptest::prop_assert_eq!(summary.attempted_events, expected);
         }
     }
@@ -1294,7 +1296,8 @@ fn full_executed_bias_leaves_junk_nodes_untouched_and_counts_every_target() {
             ParentExecuted::Indices(&[0, 1]),
             &mut rng(seed),
             &crate::config::test_sensor_context(1),
-        );
+        )
+        .0;
         assert_eq!(
             genome.nodes[2..],
             subject.nodes[2..],
@@ -1329,7 +1332,8 @@ fn zero_executed_bias_reaches_junk_nodes_in_the_same_fixture() {
             ParentExecuted::Indices(&[0, 1]),
             &mut rng(seed),
             &crate::config::test_sensor_context(1),
-        );
+        )
+        .0;
         junk_hits += u32::from(genome.nodes[2..] != subject.nodes[2..]);
         // The counter reports membership, so without the layer some targeted
         // events still land on the core and some land off it.
@@ -1387,7 +1391,8 @@ fn an_all_executed_eligible_set_reproduces_the_pre_feature_draw_byte_for_byte() 
                 ParentExecuted::Indices(&all_nodes),
                 &mut layer_rng,
                 &crate::config::test_sensor_context(1),
-            );
+            )
+            .0;
 
             let mut without_layer = founder.clone();
             let mut plain_rng = rng(seed);
@@ -1399,7 +1404,8 @@ fn an_all_executed_eligible_set_reproduces_the_pre_feature_draw_byte_for_byte() 
                 ParentExecuted::NONE,
                 &mut plain_rng,
                 &crate::config::test_sensor_context(1),
-            );
+            )
+            .0;
             // Same offspring *and* the same position in the RNG stream.
             let identical =
                 with_layer == without_layer && layer_rng.gen::<u64>() == plain_rng.gen::<u64>();
@@ -1455,7 +1461,8 @@ fn size_pressure_restriction_disables_the_executed_layer() {
             ParentExecuted::Indices(&[0, 1]),
             &mut restricted_rng,
             &crate::config::test_sensor_context(1),
-        );
+        )
+        .0;
         let mut reference_child = subject.clone();
         let mut reference_rng = rng(seed);
         let reference_summary = MutationEngine::apply_mutations_on_units(
@@ -1466,7 +1473,8 @@ fn size_pressure_restriction_disables_the_executed_layer() {
             ParentExecuted::Indices(&[0, 1]),
             &mut reference_rng,
             &crate::config::test_sensor_context(1),
-        );
+        )
+        .0;
         assert_eq!(
             restricted_child, reference_child,
             "seed {seed}: under restriction the executed bias is 0.0"
@@ -1487,7 +1495,8 @@ fn size_pressure_restriction_disables_the_executed_layer() {
             ParentExecuted::Indices(&[0, 1]),
             &mut rng(seed),
             &crate::config::test_sensor_context(1),
-        );
+        )
+        .0;
         differed_without_pressure += u32::from(unpressured != restricted_child);
     }
     assert!(
@@ -1515,7 +1524,8 @@ fn a_zero_event_birth_never_resolves_the_parent_dispatch_record() {
         ParentExecuted::Query(&query),
         &mut rng(1),
         &crate::config::test_sensor_context(1),
-    );
+    )
+    .0;
     assert_eq!(summary.attempted_events, 0);
     assert_eq!(summary.executed_target_events, 0);
     assert_eq!(calls.get(), 0, "a zero-event birth never calls the query");
@@ -1540,7 +1550,8 @@ fn a_birth_with_events_asks_the_parent_query_once_for_the_configured_window() {
         ParentExecuted::Query(&query),
         &mut rng(1),
         &crate::config::test_sensor_context(1),
-    );
+    )
+    .0;
     assert!(summary.attempted_events > 0);
     assert_eq!(*windows.borrow(), vec![config.executed_window_ticks]);
 }

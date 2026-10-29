@@ -120,7 +120,8 @@ fn e3_fixed_pool_selection_audit() {
                     ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                     &mut rng,
                     &setup.config.sensor_context(food_types),
-                );
+                )
+                .0;
                 if child == founder {
                     return (true, summary.applied_events, 0.0, 0.0, 0.0, 0.0);
                 }
@@ -279,7 +280,8 @@ fn e4_elite_neighbourhood_audit() {
                     ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                     &mut rng,
                     &setup.config.sensor_context(food_types),
-                );
+                )
+                .0;
                 let ops: Vec<String> = summary
                     .events
                     .iter()
@@ -353,7 +355,8 @@ fn child_of(setup: &Setup, parent: &CreatureGenome, frozen: &Frozen, seed: u64) 
         &setup
             .config
             .sensor_context(setup.config.world.food.types.len()),
-    );
+    )
+    .0;
     child
 }
 

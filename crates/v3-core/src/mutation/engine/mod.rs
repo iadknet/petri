@@ -6,6 +6,7 @@ use crate::config::MutationConfig;
 use crate::contracts::{NodeId, SensorContext};
 use crate::creature::parseability::ParseabilityGate;
 use crate::genome::cgp::validate_graph;
+use crate::genome::learning::InheritanceMapping;
 use crate::genome::{BackendDef, CreatureGenome};
 use crate::mutation::graph::{GraphMutator, GraphOperator};
 use crate::mutation::input_ref::InputRefMutator;
@@ -125,7 +126,7 @@ impl MutationEngine {
         config: &MutationConfig,
         parent_reachable_nodes: &[usize],
         rng: &mut impl Rng,
-    ) -> MutationSummary {
+    ) -> (MutationSummary, InheritanceMapping) {
         Self::apply_mutations_in(
             genome,
             config,
@@ -142,6 +143,9 @@ impl MutationEngine {
     /// Every production birth and reading comes through here: the supply draw
     /// runs on the genome's own `genome_size()`, read once before any event.
     /// The child starts as the parent's copy, so this is the parent's size.
+    /// Returns the summary beside the birth's inheritance mapping: every
+    /// committed event's mapping composed in order (T29.F01 invariant 5);
+    /// callers that only screen genomes ignore it.
     pub fn apply_mutations_in(
         genome: &mut CreatureGenome,
         config: &MutationConfig,
@@ -149,7 +153,7 @@ impl MutationEngine {
         parent_executed: ParentExecuted<'_>,
         rng: &mut impl Rng,
         context: &SensorContext,
-    ) -> MutationSummary {
+    ) -> (MutationSummary, InheritanceMapping) {
         let units = genome.genome_size();
         Self::apply_mutations_on_units(
             genome,
@@ -180,10 +184,10 @@ impl MutationEngine {
         parent_executed: ParentExecuted<'_>,
         rng: &mut impl Rng,
         context: &SensorContext,
-    ) -> MutationSummary {
+    ) -> (MutationSummary, InheritanceMapping) {
         let event_count = requested_event_count(config, units, rng);
         if event_count == 0 {
-            return MutationSummary::zero();
+            return (MutationSummary::zero(), InheritanceMapping::Identity);
         }
 
         // Genome size pressure: compute once before the event loop.
@@ -215,6 +219,9 @@ impl MutationEngine {
         );
 
         let mut summary = MutationSummary::zero();
+        // The birth's mapping: a committed event's composes in; a rejected
+        // event's vanished with its genome edits in the gate.
+        let mut inheritance = InheritanceMapping::Identity;
         // Reused across events: the ids the genome carries before each event,
         // so a selected index can be recorded as the node it named (T13.F01)
         // and membership can follow the event.
@@ -304,13 +311,14 @@ impl MutationEngine {
                     summary.record_reachability(reachability);
                     summary.record_executed_targets(executed_hits);
                     membership.observe_event(&node_ids, &genome.nodes);
+                    inheritance = report.inheritance.after(&inheritance);
                 }
                 // A skipped attempt restored the genome, so membership stands.
                 Err(reason) => summary.record_skipped(operator, reason),
             }
         }
 
-        summary
+        (summary, inheritance)
     }
 }
 
@@ -456,11 +464,11 @@ fn select_weighted_index<T: Copy>(
 }
 
 /// Apply one mutation event with the parseability and graph-invariant gate:
-/// snapshot the genome (birth seeds included), apply, and commit when the
-/// event applied, the genome still parses and every Graph backend passes
-/// `validate_graph` (T25.F03); otherwise restore the snapshot. A rejected
-/// event leaves the draft, its seeds included, exactly as it was. Shared by
-/// all four domains.
+/// snapshot the genome, apply, and commit when the event applied, the
+/// genome still parses and every Graph backend passes `validate_graph`
+/// (T25.F03); otherwise restore the snapshot. A rejected event leaves the
+/// draft exactly as it was, and its report, the inheritance mapping
+/// included, is dropped with the `Err`. Shared by all four domains.
 fn apply_gated<T>(
     genome: &mut CreatureGenome,
     apply: impl FnOnce(&mut CreatureGenome) -> Result<T, MutationSkipReason>,
@@ -539,3 +547,6 @@ mod bundle_tests;
 
 #[cfg(test)]
 mod draw_stream_tests;
+
+#[cfg(test)]
+mod inheritance_tests;

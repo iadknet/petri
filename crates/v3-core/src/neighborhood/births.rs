@@ -325,7 +325,8 @@ pub fn per_birth_reading_on_units(
                 ParentExecuted::Indices(&executed),
                 &mut rng,
                 &context.sensors,
-            );
+            )
+            .0;
             let cycle_carrying = !mesh_cycle_nodes(&genome).is_empty();
             if summary.applied_events == 0 {
                 let outcome = BirthOutcome {
@@ -490,7 +491,8 @@ mod tests {
                 ParentExecuted::Indices(&executed),
                 &mut rng,
                 &context.sensors,
-            );
+            )
+            .0;
             *expected
                 .by_requested_events
                 .entry(summary.attempted_events)

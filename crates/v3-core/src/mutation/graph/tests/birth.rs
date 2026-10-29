@@ -111,7 +111,7 @@ fn birth_learning_reports_each_creation_by_wiring_and_form() {
             wiring,
             scale: 0.0,
         };
-        let id = node.add_bundle(source, birth, &context).unwrap();
+        let id = node.add_bundle(source, birth, &context).unwrap().0;
         let BackendDef::Graph(def) = node.backend_edit().1 else {
             unreachable!()
         };
@@ -149,7 +149,7 @@ fn edge_operators_report_their_bundle_edits() {
         wiring,
         scale: 0.5,
     };
-    node.add_bundle(source, birth, &context).unwrap();
+    node.add_bundle(source, birth, &context).unwrap().0;
     let refs = node.input_refs().to_vec();
     let BackendDef::Graph(def) = node.backend_edit().1 else {
         unreachable!()
@@ -159,8 +159,9 @@ fn edge_operators_report_their_bundle_edits() {
     let mut seed = 0;
     while def.bundles().len() == 1 {
         let members = def.edges().count();
-        let edits =
-            retarget_edge(def, test_inputs(&refs), &mut SmallRng::seed_from_u64(seed)).unwrap();
+        let edits = retarget_edge(def, test_inputs(&refs), &mut SmallRng::seed_from_u64(seed))
+            .unwrap()
+            .0;
         let detached = members - def.members(BundleId::new(0)).count();
         assert_eq!(usize::from(edits.detached), detached.min(1));
         seed += 1;
@@ -170,7 +171,7 @@ fn edge_operators_report_their_bundle_edits() {
     }
     let mut removals = 0;
     while !def.bundles().is_empty() {
-        let edits = remove_edge(def, &mut SmallRng::seed_from_u64(seed)).unwrap();
+        let (edits, _) = remove_edge(def, &mut SmallRng::seed_from_u64(seed)).unwrap();
         removals += u32::from(edits.removed);
         seed += 1;
     }

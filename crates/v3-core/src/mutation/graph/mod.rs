@@ -2,6 +2,7 @@ pub(crate) mod bundle;
 pub mod hebbian;
 pub(crate) mod operators;
 
+use crate::genome::learning::{GraphMapping, InheritanceMapping};
 use rand::Rng;
 
 use crate::config::MutationConfig;
@@ -353,15 +354,15 @@ impl GraphMutator {
         _config: &MutationConfig,
         context: &SensorContext,
     ) -> Result<EventReport, MutationSkipReason> {
-        match op {
+        let (mut report, graph) = match op {
             GraphOperator::AlterGraphEdgeWeight => {
                 unreported(operators::alter_edge_weight(genome, node_idx, rng))
             }
             GraphOperator::SwapGraphOperator => {
-                unreported(operators::swap_operator(genome, node_idx, rng))
+                unmapped(operators::swap_operator(genome, node_idx, rng))
             }
             GraphOperator::MutateGraphOperatorParam => {
-                unreported(operators::mutate_operator_param(genome, node_idx, rng))
+                unmapped(operators::mutate_operator_param(genome, node_idx, rng))
             }
             GraphOperator::AddInternalGraphNode => {
                 edited(operators::add_internal_node(genome, node_idx, context, rng))
@@ -369,10 +370,17 @@ impl GraphMutator {
             GraphOperator::RemoveInternalGraphNode => {
                 unreported(operators::remove_internal_node(genome, node_idx, rng))
             }
-            GraphOperator::AddGraphEdge => Ok(EventReport {
-                class: operators::add_graph_edge(genome, node_idx, context, rng)?,
-                ..EventReport::default()
-            }),
+            GraphOperator::AddGraphEdge => {
+                operators::add_graph_edge(genome, node_idx, context, rng).map(|(class, graph)| {
+                    (
+                        EventReport {
+                            class,
+                            ..EventReport::default()
+                        },
+                        graph,
+                    )
+                })
+            }
             GraphOperator::RetargetGraphEdge => edited(operators::retarget_graph_edge(
                 genome, node_idx, context, rng,
             )),
@@ -486,44 +494,66 @@ impl GraphMutator {
                 operators::graph_def_mut(genome, node_idx)?,
                 rng,
             )),
-        }
+        }?;
+        report.inheritance = InheritanceMapping::within(node_idx, genome.nodes.len(), graph);
+        Ok(report)
     }
 }
 
-/// An event that reports nothing beside its reachability.
-fn unreported(result: Result<(), MutationSkipReason>) -> Result<EventReport, MutationSkipReason> {
-    result.map(|()| EventReport::default())
+/// An event's report beside its node's inheritance mapping.
+type NodeEdit = Result<(EventReport, GraphMapping), MutationSkipReason>;
+
+/// An event that moves no learnable and reports nothing beside its
+/// reachability.
+fn unmapped(result: Result<(), MutationSkipReason>) -> NodeEdit {
+    result.map(|()| (EventReport::default(), GraphMapping::Identity))
 }
 
-/// A learning edit reporting its reach.
-fn broadcast(
-    result: Result<Broadcast, MutationSkipReason>,
-) -> Result<EventReport, MutationSkipReason> {
-    result.map(|broadcast| EventReport {
-        broadcast: Some(broadcast),
-        ..EventReport::default()
+/// An event that reports nothing beside its reachability and mapping.
+fn unreported(result: Result<GraphMapping, MutationSkipReason>) -> NodeEdit {
+    result.map(|graph| (EventReport::default(), graph))
+}
+
+/// A learning edit reporting its reach; it moves no learnable.
+fn broadcast(result: Result<Broadcast, MutationSkipReason>) -> NodeEdit {
+    result.map(|broadcast| {
+        (
+            EventReport {
+                broadcast: Some(broadcast),
+                ..EventReport::default()
+            },
+            GraphMapping::Identity,
+        )
     })
 }
 
 /// A bundle-touching event reporting its edits.
-fn edited(
-    result: Result<BundleEdits, MutationSkipReason>,
-) -> Result<EventReport, MutationSkipReason> {
-    result.map(|bundle_edits| EventReport {
-        bundle_edits,
-        ..EventReport::default()
+fn edited(result: Result<(BundleEdits, GraphMapping), MutationSkipReason>) -> NodeEdit {
+    result.map(|(bundle_edits, graph)| {
+        (
+            EventReport {
+                bundle_edits,
+                ..EventReport::default()
+            },
+            graph,
+        )
     })
 }
 
 /// A creation reporting its bundle edits and the class of its one `Plain`
 /// bundle's sink, if any (T25.F11 invariant 8).
 fn created(
-    result: Result<(BundleEdits, Option<BirthEdgeClass>), MutationSkipReason>,
-) -> Result<EventReport, MutationSkipReason> {
-    result.map(|(bundle_edits, class)| EventReport {
-        class,
-        bundle_edits,
-        ..EventReport::default()
+    result: Result<((BundleEdits, Option<BirthEdgeClass>), GraphMapping), MutationSkipReason>,
+) -> NodeEdit {
+    result.map(|((bundle_edits, class), graph)| {
+        (
+            EventReport {
+                class,
+                bundle_edits,
+                ..EventReport::default()
+            },
+            graph,
+        )
     })
 }
 

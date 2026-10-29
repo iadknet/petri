@@ -377,7 +377,8 @@ pub(crate) fn spawn_child(
         parent_executed,
         rng,
         &sim.config.sensor_context(sim.config.world.food.types.len()),
-    );
+    )
+    .0;
 
     // Update mutation stats.
     sim.stats.mutation_events_attempted_total += summary.attempted_events as u64;

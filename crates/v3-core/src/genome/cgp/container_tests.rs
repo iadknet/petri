@@ -9,7 +9,7 @@ use crate::genome::cgp::{
     compose, detach, BundleId, BundleSource, LearningSlot, Membership, Site, Wiring,
     FIRST_ACTION_VOTE_SINK,
 };
-use crate::genome::learning::LearningLayout;
+use crate::genome::learning::{GraphMapping, LearningLayout};
 use crate::genome::{HebbianRule, MemberPolicy};
 
 /// A new def field is a compile error here until it is placed inside or
@@ -646,7 +646,7 @@ fn remove_bundle_leaves_no_member_and_renumbers_higher_bundles() {
     let first = def.add_ring_bundle(RING, DirectedVoteKind::Move, 0);
     let second = def.add_ring_bundle(RING, DirectedVoteKind::StealEnergy, 2);
     let third = def.add_ring_bundle(RING, DirectedVoteKind::Move, 5);
-    assert_eq!(def.remove_bundle(second), 8);
+    assert_eq!(def.remove_bundle(second).0, 8);
     assert_eq!(def.bundles().len(), 2);
     assert!(def.edges().all(|edge| edge.membership()
         != Some(Membership {
@@ -677,7 +677,7 @@ fn a_last_member_removed_or_detached_removes_its_bundle() {
         assert_eq!(def.bundles().len(), 1);
     }
     let last = def.members(id).next().unwrap();
-    let (_, removed) = detach(&mut def, last, &ring_refs());
+    let (_, removed, _) = detach(&mut def, last, &ring_refs());
     assert!(removed);
     assert!(def.bundles().is_empty());
     assert!(def.edges().all(|edge| edge.membership().is_none()));
@@ -709,7 +709,7 @@ fn detaching_a_later_bundles_member_ahead_of_another_member_keeps_the_edit_on_th
             credits: false
         })
     );
-    let (moved, removed) = detach(&mut def, later, &ring_refs());
+    let (moved, removed, _) = detach(&mut def, later, &ring_refs());
     assert!(!removed);
     assert_eq!(moved, sink_occurrence(sink, 0));
     def.retarget_edge(moved, leaf(9), &[]);
@@ -744,14 +744,14 @@ fn retargeting_a_member_detaches_it_inside_the_container_and_a_same_source_one_i
     let unchanged = def.clone();
     let same = def.edge_at(later).source();
     assert_eq!(
-        def.retarget_edge(later, same, &ring_refs()),
+        def.retarget_edge(later, same, &ring_refs()).0,
         EdgeEdit::in_place(later)
     );
     assert_eq!(def, unchanged);
     let mut want = def.clone();
-    let (moved, removed) = detach(&mut want, later, &ring_refs());
+    let (moved, removed, _) = detach(&mut want, later, &ring_refs());
     want.edge_slot(moved).source = leaf(9);
-    let edit = def.retarget_edge(later, leaf(9), &ring_refs());
+    let (edit, _) = def.retarget_edge(later, leaf(9), &ring_refs());
     assert_eq!(
         edit,
         EdgeEdit {
@@ -774,9 +774,9 @@ fn splitting_a_member_detaches_it_inside_the_container() {
     weigh(&mut def, bundle, 0.5, &[0.25; 8]);
     let member = def.members(bundle).next().unwrap();
     let mut want = def.clone();
-    let (moved, removed) = detach(&mut want, member, &ring_refs());
+    let (moved, removed, _) = detach(&mut want, member, &ring_refs());
     want.split_edge(moved, identity(), &[]);
-    let edit = def.split_edge(member, identity(), &ring_refs());
+    let (edit, _) = def.split_edge(member, identity(), &ring_refs());
     assert_eq!(
         edit,
         EdgeEdit {
@@ -1100,7 +1100,7 @@ proptest! {
         let occurrence = def.members(id).nth(pick).unwrap();
         let before = def.genomic_weight(occurrence, &refs);
         let source = def.edge_at(occurrence).source();
-        let (moved, _) = detach(&mut def, occurrence, &refs);
+        let (moved, _, _) = detach(&mut def, occurrence, &refs);
         let edge = def.edge_at(moved);
         prop_assert_eq!(edge.membership(), None);
         prop_assert_eq!(edge.source(), source);
@@ -1596,7 +1596,7 @@ proptest! {
         let before = def.genomic_weight(occurrence, &pair_refs());
         prop_assert_eq!(before.to_bits(), compose(own, scale, pattern).to_bits());
         let source = def.edge_at(occurrence).source();
-        let (moved, removed) = detach(&mut def, occurrence, &pair_refs());
+        let (moved, removed, _) = detach(&mut def, occurrence, &pair_refs());
         prop_assert!(!removed);
         let edge = def.edge_at(moved);
         prop_assert_eq!(edge.membership(), None);
@@ -1899,14 +1899,15 @@ proptest! {
         }
         // Two bundles, every member and record tagged.
         let tag_bundle = |def: &mut CgpGraphBackendDef, id: BundleId, fresh: &mut dyn FnMut() -> f32| {
+            let mut map = GraphMapping::Identity;
             for member in def.members(id).collect::<Vec<_>>() {
-                def.edge_mut(member).set_weight(fresh());
+                map = def.edge_mut(member).set_weight(fresh()).after(&map);
             }
-            def.bundle_mut(id).set_scale(fresh() / 1024.0);
+            def.bundle_mut(id).set_scale(fresh() / 1024.0).after(&map)
         };
         for (kind, offset) in [(DirectedVoteKind::Move, 2), (DirectedVoteKind::StealEnergy, 5)] {
             let id = def.add_ring_bundle(RING, kind, offset);
-            tag_bundle(&mut def, id, &mut fresh);
+            let _ = tag_bundle(&mut def, id, &mut fresh);
         }
         // Seed every edge and bundle with its tag.
         let tag_rows = |def: &CgpGraphBackendDef, surface_count: usize, surface: fn(usize) -> EdgeSurface| -> Vec<Vec<Option<f32>>> {
@@ -1918,6 +1919,11 @@ proptest! {
         let sinks = tag_rows(&def, def.output_sinks().len(), EdgeSurface::SinkInput);
         let bundles = def.bundles().iter().map(|bundle| Some(bundle.scale())).collect();
         def.seed_birth(BirthSeeds::Rows { compute, sinks, bundles });
+        // T29.F01 A1 step 1: the running mapping of every primitive since
+        // the seeding, applied to the seeds then, equals the rows now.
+        let initial = row_seeds(&def);
+        let mut map = GraphMapping::Identity;
+        let then = |map: &mut GraphMapping, edit: GraphMapping| *map = edit.after(map);
         for edge in def.edges() {
             seeded_tags.insert(edge.own_weight().to_bits());
         }
@@ -1932,28 +1938,28 @@ proptest! {
                 SeedOp::PushCompute(i) => {
                     let n = def.compute_nodes().len();
                     if n > 0 {
-                        def.push_edge(EdgeSurface::ComputeInput(i % n), GraphEdge::new(leaf(0), fresh()));
+                        then(&mut map, def.push_edge(EdgeSurface::ComputeInput(i % n), GraphEdge::new(leaf(0), fresh())));
                     }
                 }
                 SeedOp::PushSink(i) => {
                     let sinks = model_sinks();
-                    def.push_edge(EdgeSurface::SinkInput(sinks[i % sinks.len()]), GraphEdge::new(leaf(0), fresh()));
+                    then(&mut map, def.push_edge(EdgeSurface::SinkInput(sinks[i % sinks.len()]), GraphEdge::new(leaf(0), fresh())));
                 }
                 SeedOp::Remove(i) => {
                     if let Some(site) = pick(i) {
                         seeded_tags.remove(&def.edge_at(site).own_weight().to_bits());
-                        def.remove_edge(site);
+                        then(&mut map, def.remove_edge(site).1);
                     }
                 }
                 SeedOp::Split(i) => {
                     if let Some(site) = pick(i).filter(|&site| independent(&def, site)) {
-                        def.split_edge(site, ComputeNode::new(ComputeNodeKind::Add, Vec::new()), &[]);
+                        then(&mut map, def.split_edge(site, ComputeNode::new(ComputeNodeKind::Add, Vec::new()), &[]).1);
                     }
                 }
                 SeedOp::SetWeight(i) => {
                     if let Some(site) = pick(i).filter(|&site| independent(&def, site)) {
                         seeded_tags.remove(&def.edge_at(site).own_weight().to_bits());
-                        def.edge_mut(site).set_weight(fresh());
+                        then(&mut map, def.edge_mut(site).set_weight(fresh()));
                     }
                 }
                 SeedOp::SetSource(i, same) => {
@@ -1961,7 +1967,7 @@ proptest! {
                         let current = def.edge_at(site).source();
                         let source = if same { current } else { leaf(7) };
                         let before = def.birth_seeds().and_then(|seeds| seeds.value(site));
-                        def.retarget_edge(site, source, &[]);
+                        then(&mut map, def.retarget_edge(site, source, &[]).1);
                         let after = def.birth_seeds().and_then(|seeds| seeds.value(site));
                         if source == current {
                             prop_assert_eq!(after, before, "a same-source write keeps the seed");
@@ -1979,16 +1985,20 @@ proptest! {
                 }
                 SeedOp::AddBundle(offset) => {
                     if def.bundles().len() < 3 {
-                        let id = def.add_ring_bundle(RING, DirectedVoteKind::Move, offset);
+                        let (id, added) = def.add_ring_bundle_mapped(RING, DirectedVoteKind::Move, offset);
+                        then(&mut map, added);
                         prop_assert_eq!(def.birth_seeds().unwrap().bundle_value(id), None);
-                        tag_bundle(&mut def, id, &mut fresh);
+                        let tagged = tag_bundle(&mut def, id, &mut fresh);
+                        then(&mut map, tagged);
                     }
                 }
                 SeedOp::AddPairGene(offset) => {
                     if def.bundles().len() < 3 {
-                        let id = def.add_pair_bundle(PAIR_REF, 1, pair_layout(), DirectedVoteKind::Move, offset);
+                        let (id, added) = def.add_pair_bundle_mapped(PAIR_REF, 1, pair_layout(), DirectedVoteKind::Move, offset);
+                        then(&mut map, added);
                         prop_assert_eq!(def.birth_seeds().unwrap().bundle_value(id), None);
-                        tag_bundle(&mut def, id, &mut fresh);
+                        let tagged = tag_bundle(&mut def, id, &mut fresh);
+                        then(&mut map, tagged);
                     }
                 }
                 SeedOp::AddPlain(sink, memory) => {
@@ -2002,9 +2012,11 @@ proptest! {
                         };
                         let wiring = Wiring::Plain { sink: VoteSink::from_index(sink % 39).unwrap() };
                         let birth = crate::genome::cgp::BundleBirth { field_set: 0, wiring, scale: 0.0 };
-                        let id = def.add_bundle(source, set, birth).unwrap();
+                        let (id, added) = def.add_bundle(source, set, birth).unwrap();
+                        then(&mut map, added);
                         prop_assert_eq!(def.birth_seeds().unwrap().bundle_value(id), None);
-                        tag_bundle(&mut def, id, &mut fresh);
+                        let tagged = tag_bundle(&mut def, id, &mut fresh);
+                        then(&mut map, tagged);
                     }
                 }
                 SeedOp::Relocate(offset) => {
@@ -2015,7 +2027,7 @@ proptest! {
                             },
                             geometric => geometric.rotated(DirectedVoteKind::Reproduce, offset),
                         };
-                        def.relocate_bundle(BundleId::new(0), wiring);
+                        then(&mut map, def.relocate_bundle(BundleId::new(0), wiring));
                     }
                 }
                 SeedOp::Detach(i) => {
@@ -2028,7 +2040,8 @@ proptest! {
                         // Every member's seed composes when its edge or its
                         // bundle was seeded (T25.F11 invariant 4).
                         let seeded = edge_seeded || seeded_scales.contains(&scale.to_bits());
-                        let (detached, _) = def.detach_at(member, pattern);
+                        let (detached, _, detach) = def.detach_at(member, pattern);
+                        then(&mut map, detach);
                         let composed = def.edge_at(detached).own_weight();
                         prop_assert_eq!(composed, compose(own, scale, pattern));
                         if seeded {
@@ -2038,7 +2051,7 @@ proptest! {
                 }
                 SeedOp::RemoveBundle => {
                     if !def.bundles().is_empty() {
-                        def.remove_bundle(BundleId::new(0));
+                        then(&mut map, def.remove_bundle(BundleId::new(0)).1);
                     }
                 }
                 SeedOp::SetScope(i) => {
@@ -2057,7 +2070,7 @@ proptest! {
                 SeedOp::SetScale => {
                     if let Some(bundle) = def.bundles().first().copied() {
                         seeded_scales.remove(&bundle.scale().to_bits());
-                        def.bundle_mut(BundleId::new(0)).set_scale(fresh() / 1024.0);
+                        then(&mut map, def.bundle_mut(BundleId::new(0)).set_scale(fresh() / 1024.0));
                     }
                 }
                 SeedOp::RemoveNode(i) => {
@@ -2072,7 +2085,7 @@ proptest! {
                                 seeded_tags.remove(&edge.own_weight().to_bits());
                             }
                         }
-                        def.remove_compute_node(removed);
+                        then(&mut map, def.remove_compute_node(removed));
                     }
                 }
                 SeedOp::Clone => def = def.clone(),
@@ -2092,8 +2105,25 @@ proptest! {
                 prop_assert_eq!(seeds.value(site), expected, "{:?}", site);
             }
             prop_assert_eq!(validate_graph(&learning_node(def.clone(), refs.clone())), Ok(()));
+            prop_assert_eq!(map.apply(&initial), row_seeds(&def));
         }
     }
+}
+
+/// The seed rows `def` carries, keyed by learnable key.
+fn row_seeds(def: &CgpGraphBackendDef) -> crate::genome::learning::NodeSeeds {
+    use crate::genome::learning::LearnableKey;
+    let rows = def.birth_seeds().expect("the draft keeps its seeds");
+    def.edge_sites()
+        .filter_map(|site| {
+            rows.value(site)
+                .map(|value| (LearnableKey::Edge(site), value))
+        })
+        .chain(def.indexed_bundles().filter_map(|(id, _)| {
+            rows.bundle_value(id)
+                .map(|value| (LearnableKey::Scale(id), value))
+        }))
+        .collect()
 }
 
 /// Seed `def`'s draft: every edge row empty, `edges` and `bundles` set.
@@ -2145,7 +2175,7 @@ fn a_detached_member_composes_its_seed_with_the_learned_scale() {
     def.edge_mut(second).set_weight(-0.75);
     seed_with(&mut def, &[(first, 9.0)], &[(id, 12.0)]);
     let pattern = def.member_pattern(first, &refs);
-    let (at, removed) = def.detach_at(first, pattern);
+    let (at, removed, _) = def.detach_at(first, pattern);
     assert!(!removed);
     assert_eq!(
         def.birth_seeds().unwrap().value(at),
@@ -2159,7 +2189,7 @@ fn a_detached_member_composes_its_seed_with_the_learned_scale() {
     assert_eq!(second_at, def.members(id).next().unwrap());
     let pattern = bundle_only.member_pattern(second_at, &refs);
     let own = bundle_only.edge_at(second_at).own_weight();
-    let (at, _) = bundle_only.detach_at(second_at, pattern);
+    let (at, _, _) = bundle_only.detach_at(second_at, pattern);
     assert_eq!(
         bundle_only.birth_seeds().unwrap().value(at),
         Some(compose(own, 12.0, pattern)),
@@ -2171,7 +2201,7 @@ fn a_detached_member_composes_its_seed_with_the_learned_scale() {
     assert_eq!(neither.birth_seeds().unwrap().bundle_value(id), None);
     let member = neither.members(id).next().unwrap();
     let pattern = neither.member_pattern(member, &refs);
-    let (at, _) = neither.detach_at(member, pattern);
+    let (at, _, _) = neither.detach_at(member, pattern);
     assert_eq!(neither.birth_seeds().unwrap().value(at), None);
 
     // Detaching every member drops the bundle and its slot.
@@ -2501,7 +2531,7 @@ fn a_fact_member_detaches_by_the_one_member_law() {
     let refs = pair_refs();
     let drive = drive_sink(&def, DirectedVoteKind::Move);
 
-    let (at, removed) = detach(&mut def, found[0], &refs);
+    let (at, removed, _) = detach(&mut def, found[0], &refs);
     assert!(!removed);
     assert_eq!(at.surface, drive);
     assert_eq!(at.index, 1, "the end of the independent prefix");
@@ -2516,7 +2546,7 @@ fn a_fact_member_detaches_by_the_one_member_law() {
 
     let seeded = fact_members(&def, id)[0];
     assert_eq!(def.edge_at(seeded).own_weight(), 0.75);
-    let (at, _) = detach(&mut def, seeded, &refs);
+    let (at, _, _) = detach(&mut def, seeded, &refs);
     assert_eq!(def.edge_at(at).own_weight(), compose(0.75, 0.5, 1.0));
     assert_eq!(
         def.birth_seeds().unwrap().value(at),
@@ -2763,7 +2793,7 @@ proptest! {
             .filter(|&&m| m != at)
             .map(|&m| def.edge_at(m).membership().unwrap())
             .collect();
-        let (moved, removed) = detach(&mut def, at, &pair_refs());
+        let (moved, removed, _) = detach(&mut def, at, &pair_refs());
         prop_assert!(!removed);
         let edge = def.edge_at(moved);
         prop_assert_eq!(edge.own_weight().to_bits(), compose(own, scale, pattern).to_bits());

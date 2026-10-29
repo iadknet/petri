@@ -404,7 +404,7 @@ pub fn detach(
     def: &mut CgpGraphBackendDef,
     occurrence: EdgeOccurrence,
     input_refs: &[InputReference],
-) -> (EdgeOccurrence, bool) {
+) -> (EdgeOccurrence, bool, crate::genome::learning::GraphMapping) {
     let pattern = def.member_pattern(occurrence, input_refs);
     def.detach_at(occurrence, pattern)
 }

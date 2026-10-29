@@ -4,6 +4,7 @@
 
 use crate::contracts::votes::VoteSink;
 use crate::genome::cgp::Wiring;
+use crate::genome::learning::InheritanceMapping;
 
 /// How far a learning edit reached (T25.F12 invariant 9): its one picked
 /// target, or every member of the picked member's bundle the operator's
@@ -181,7 +182,7 @@ impl BirthEdgeClass {
 /// class of the vote-sink edge an `AddGraphEdge` or a creation pushed
 /// (T11.F30, T25.F11), how far a learning edit reached (T25.F12) and what
 /// the event did to bundles (T25.F11).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct EventReport {
     /// The class of the vote-sink edge the event pushed.
     pub class: Option<BirthEdgeClass>,
@@ -190,6 +191,9 @@ pub struct EventReport {
     pub broadcast: Option<Broadcast>,
     /// What the event did to bundles, from the container's return values.
     pub bundle_edits: BundleEdits,
+    /// Where every learnable of the genome after the event inherits from
+    /// (T29.F01 invariant 5).
+    pub inheritance: InheritanceMapping,
 }
 
 /// Whether a mutation target node is reachable from the mesh entry node.

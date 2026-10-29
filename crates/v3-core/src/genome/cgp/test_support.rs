@@ -203,6 +203,7 @@ pub(crate) fn add_first_plan_sensor(node: &mut NodeGenome, reference: InputRefer
     };
     node.add_sensor(reference, &births, &context)
         .expect("a first-plan sensor fixture")
+        .0
 }
 
 /// One silent bundle reading `source` on its set's first admissible plan
@@ -223,6 +224,7 @@ pub(crate) fn add_first_plan_bundle(node: &mut NodeGenome, source: BundleSource)
     let birth = first_plan_birth(def, source.field_set(), &set);
     node.add_bundle(source, birth, &context)
         .expect("a first-plan bundle fixture")
+        .0
 }
 
 /// `birth` reading `source` on a bare `def`, through
@@ -247,7 +249,8 @@ pub(crate) fn add_bundle_on(
     );
     let id = node
         .add_bundle(source, birth, &crate::config::test_sensor_context(1))
-        .expect("a bundle fixture");
+        .expect("a bundle fixture")
+        .0;
     let BackendDef::Graph(hosted) = node.backend_def else {
         unreachable!("the node hosts a Graph def")
     };

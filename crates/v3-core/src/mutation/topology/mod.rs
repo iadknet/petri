@@ -2,6 +2,7 @@ use rand::Rng;
 
 use crate::config::MutationConfig;
 use crate::contracts::SensorContext;
+use crate::genome::learning::InheritanceMapping;
 use crate::genome::CreatureGenome;
 use crate::mutation::event::{EventReport, MutationSkipReason, TargetReachability};
 use crate::mutation::reachability::TargetSelector;
@@ -204,10 +205,15 @@ impl TopologyMutator {
         _config: &MutationConfig,
         context: &SensorContext,
     ) -> Result<(TargetReachability, EventReport), MutationSkipReason> {
-        let reachability = match op {
+        let kept = |result: Result<TargetReachability, MutationSkipReason>| {
+            result.map(|reachability| (reachability, InheritanceMapping::Identity))
+        };
+        let (reachability, inheritance) = match op {
             TopologyOperator::AddNode => structural::apply_splice_node(genome, targets, rng),
-            TopologyOperator::ChangeEntryNode => structural::apply_change_entry_node(genome, rng)
-                .map(|()| TargetReachability::NotApplicable),
+            TopologyOperator::ChangeEntryNode => kept(
+                structural::apply_change_entry_node(genome, rng)
+                    .map(|()| TargetReachability::NotApplicable),
+            ),
             // Biased structural operators:
             TopologyOperator::RemoveNode => structural::apply_remove_node(genome, targets, rng),
             TopologyOperator::SwapNodeBackend => {
@@ -223,7 +229,7 @@ impl TopologyMutator {
             TopologyOperator::SpliceNode => structural::apply_splice_node(genome, targets, rng),
             // Biased routing operators:
             TopologyOperator::RetargetNodeTarget => {
-                routing::apply_retarget_node_target(genome, targets, rng)
+                kept(routing::apply_retarget_node_target(genome, targets, rng))
             }
             TopologyOperator::AddRouteTarget => {
                 routing::apply_add_route_target(genome, targets, rng, context)
@@ -232,16 +238,22 @@ impl TopologyMutator {
                 routing::apply_add_feedback_route(genome, targets, rng, context)
             }
             TopologyOperator::RemoveRouteTarget => {
-                routing::apply_remove_route_target(genome, targets, rng)
+                kept(routing::apply_remove_route_target(genome, targets, rng))
             }
             TopologyOperator::SwapRouteTargets => {
-                routing::apply_swap_route_targets(genome, targets, rng)
+                kept(routing::apply_swap_route_targets(genome, targets, rng))
             }
             TopologyOperator::MutateGateBias => {
-                routing::apply_mutate_gate_bias(genome, targets, rng)
+                kept(routing::apply_mutate_gate_bias(genome, targets, rng))
             }
         }?;
-        Ok((reachability, EventReport::default()))
+        Ok((
+            reachability,
+            EventReport {
+                inheritance,
+                ..EventReport::default()
+            },
+        ))
     }
 }
 

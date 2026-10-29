@@ -281,7 +281,9 @@ mod tests {
         for operation in 0..5 {
             let mut def = original.clone();
             match operation {
-                0 => alter_edge_weight_in_def(&mut def, &mut rng).unwrap(),
+                0 => {
+                    alter_edge_weight_in_def(&mut def, &mut rng).unwrap();
+                }
                 1 => {
                     retarget_edge(
                         &mut def,
@@ -301,7 +303,9 @@ mod tests {
                 3 => {
                     remove_edge(&mut def, &mut rng).unwrap();
                 }
-                _ => copy_node_inputs(&mut def, &mut rng).unwrap(),
+                _ => {
+                    copy_node_inputs(&mut def, &mut rng).unwrap();
+                }
             }
             let birth = rows(&def);
             for (idx, node) in def.compute_nodes().iter().enumerate() {
@@ -381,9 +385,9 @@ mod tests {
                 let mut changed = original.clone();
                 match field {
                     0 => changed.set_compute_kind(0, ComputeNodeKind::Constant(value)),
-                    1 => changed.push_edge(EdgeSurface::SinkInput(0), edge),
-                    2 => changed.push_edge(EdgeSurface::SinkInput(FIRST_ACTION_VOTE_SINK), edge),
-                    3 => changed.push_edge(EdgeSurface::SinkInput(FIXED_SINK_COUNT - 1), edge),
+                    1 => { changed.push_edge(EdgeSurface::SinkInput(0), edge); }
+                    2 => { changed.push_edge(EdgeSurface::SinkInput(FIRST_ACTION_VOTE_SINK), edge); }
+                    3 => { changed.push_edge(EdgeSurface::SinkInput(FIXED_SINK_COUNT - 1), edge); }
                     _ => changed.edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0)).set_learning(None),
                 }
                 proptest::prop_assert_ne!(&original, &changed);

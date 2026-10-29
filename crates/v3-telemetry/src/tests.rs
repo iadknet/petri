@@ -1313,7 +1313,8 @@ fn a_snapshot_counts_declared_wired_and_read_sensors_per_world_input() {
                 scale: 0.5,
             };
             node.add_bundle(source, birth, &SensorContext::WIDEST)
-                .expect("the default founder's entry node is a Graph node on a full catalog");
+                .expect("the default founder's entry node is a Graph node on a full catalog")
+                .0;
         },
     );
     let id = sim.creatures.keys().next().unwrap();

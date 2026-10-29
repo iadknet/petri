@@ -447,7 +447,7 @@ fn active_native_visits_and_ticks_preserve_actions_temporal_plasticity_and_costs
                 wiring,
                 scale: 0.0,
             };
-            silent.add_bundle(source, birth, &context).unwrap();
+            silent.add_bundle(source, birth, &context).unwrap().0;
         }
     }
     let genomes = [original, silent].map(|node| CreatureGenome {

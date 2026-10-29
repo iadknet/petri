@@ -6,6 +6,7 @@ use crate::genome::cgp::{
     bundle_capacity_admits, plans, test_support::edit_sinks, BundleBirth, BundleSource,
     CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind, Wiring,
 };
+use crate::genome::learning::GraphMapping;
 use crate::genome::{BackendDef, NodeEditError, NodeGenome, VmBackendDef, VmInstruction};
 
 fn graph_node(input_refs: Vec<InputReference>, def: CgpGraphBackendDef) -> NodeGenome {
@@ -103,7 +104,8 @@ fn add_sensor_declares_and_wires_one_bundle_per_field_set() {
             &[ring_birth(DirectedVoteKind::Reproduce, 3)],
             &context,
         )
-        .unwrap();
+        .unwrap()
+        .0;
     assert_eq!(ref_idx, 0);
     assert_eq!(node.input_refs, vec![barrier_ring()]);
     let BackendDef::Graph(def) = &node.backend_def else {
@@ -117,7 +119,10 @@ fn add_sensor_declares_and_wires_one_bundle_per_field_set() {
 fn add_sensor_on_a_vm_node_takes_no_births() {
     let context = test_sensor_context(1);
     let mut node = vm_node();
-    assert_eq!(node.add_sensor(barrier_ring(), &[], &context), Ok(0));
+    assert_eq!(
+        node.add_sensor(barrier_ring(), &[], &context),
+        Ok((0, GraphMapping::Identity))
+    );
     let before = node.clone();
     assert_eq!(
         node.add_sensor(

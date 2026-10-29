@@ -787,7 +787,8 @@ fn food_choice_mutation_diagnostic() {
             ParentExecuted::Indices(&executed),
             &mut rng,
             &v3_core::config::SimulationConfig::default().sensor_context(2),
-        );
+        )
+        .0;
         zero += usize::from(summary.applied_events == 0);
         let signature = battery.signature(&child, &cfg.runtime, cfg.shared_memory.decay_rate);
         let parent_executions = base.snapshots.iter().chain(base.sequences.iter().flatten());

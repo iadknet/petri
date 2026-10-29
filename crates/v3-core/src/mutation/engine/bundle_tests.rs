@@ -34,7 +34,9 @@ fn gated_graph_event(
     Option<Broadcast>,
 ) {
     let result = apply_event(genome, op.into(), targets, rng, config, context);
-    let report = result.map_or_else(|_| EventReport::default(), |(_, report)| report);
+    let report = result
+        .as_ref()
+        .map_or_else(|_| EventReport::default(), |(_, report)| report.clone());
     (result, report.bundle_edits, report.broadcast)
 }
 
@@ -747,7 +749,7 @@ fn add_bundles(node: &mut NodeGenome, bundles: &[BundleSpec]) {
                     },
                     scale: 0.0,
                 };
-                node.add_bundle(source, birth, &context).unwrap()
+                node.add_bundle(source, birth, &context).unwrap().0
             }
         };
         let def = graph_mut(node);
@@ -833,7 +835,7 @@ proptest! {
                 ParentExecuted::NONE,
                 &mut rng,
                 &crate::config::test_sensor_context(2),
-            );
+            ).0;
             // Every committed learning edit reports one reach (T25.F12).
             let attribute_events: u32 = ATTRIBUTE_OPERATORS
                 .iter()

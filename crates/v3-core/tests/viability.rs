@@ -661,7 +661,8 @@ fn mutation_accounting_invariant_in_viability() {
             ParentExecuted::NONE,
             &mut rng,
             &v3_core::config::SimulationConfig::default().sensor_context(1),
-        );
+        )
+        .0;
         assert_eq!(
             summary.attempted_events,
             summary.applied_events + summary.skipped_events,
@@ -704,7 +705,8 @@ fn mutation_reachability_telemetry_accumulates() {
             ParentExecuted::NONE,
             &mut rng,
             &v3_core::config::SimulationConfig::default().sensor_context(1),
-        );
+        )
+        .0;
         total_reachable += summary.reachable_target_events;
         total_unreachable += summary.unreachable_target_events;
         total_na += summary.not_applicable_events;

@@ -1116,4 +1116,5 @@ fn add_geometric(
     };
     node.add_bundle(source, birth, &SensorContext::WIDEST)
         .expect("a geometric fixture on a full catalog")
+        .0
 }

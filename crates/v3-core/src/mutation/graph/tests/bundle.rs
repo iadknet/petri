@@ -15,6 +15,7 @@ use crate::genome::cgp::{
     CgpGraphBackendDef, EdgeOccurrence, EdgeSurface, GraphSource, LearningSlot, OutputSinkKind,
     Site, Wiring,
 };
+use crate::genome::learning::GraphMapping;
 use crate::genome::{
     BackendDef, CreatureGenome, HebbianRule, Learning, MemberPolicy, NodeGenome,
     RewardModulationConfig, VmBackendDef,
@@ -749,13 +750,14 @@ fn add_sensor_is_unchanged_by_bundles() {
 /// Each unit operator reaches its own edit through the mutator's dispatch.
 #[test]
 fn the_mutator_dispatches_each_unit_operator_to_its_bundle_edit() {
-    type Edit = fn(&mut CgpGraphBackendDef, &mut SmallRng) -> Result<(), MutationSkipReason>;
+    type Edit =
+        fn(&mut CgpGraphBackendDef, &mut SmallRng) -> Result<GraphMapping, MutationSkipReason>;
     let cases: [(GraphOperator, Edit); 4] = [
         (GraphOperator::AlterBundleScale, bundle::alter_scale),
         (GraphOperator::ShiftBundleOffset, bundle::shift_offset),
         (GraphOperator::RetargetBundle, bundle::retarget),
         (GraphOperator::RemoveBundle, |def, rng| {
-            bundle::remove(def, rng).map(|_| ())
+            bundle::remove(def, rng).map(|(_, map)| map)
         }),
     ];
     let config = MutationConfig::default();
@@ -937,7 +939,7 @@ proptest::proptest! {
         proptest::prop_assert_eq!(rng.gen::<u64>(), expected.gen::<u64>(), "one draw");
 
         let mut want = def.clone();
-        let (at, removed) = detach(&mut want, picked, original.input_refs());
+        let (at, removed, _) = detach(&mut want, picked, original.input_refs());
         proptest::prop_assert!(!removed);
         proptest::prop_assert_eq!(graph(&node), &want);
         let pattern = def.pattern(picked, original.input_refs());
@@ -1094,7 +1096,7 @@ fn retarget_skips_after_its_draws_when_the_kind_lacks_a_site() {
         ][expected.gen_range(0..3)];
         let mut ring = gene(false);
         assert_eq!(
-            bundle::retarget(&mut ring, &mut SmallRng::seed_from_u64(seed)),
+            bundle::retarget(&mut ring, &mut SmallRng::seed_from_u64(seed)).map(|_| ()),
             Ok(())
         );
         let result = bundle::retarget(&mut def, &mut rng);
@@ -1104,7 +1106,7 @@ fn retarget_skips_after_its_draws_when_the_kind_lacks_a_site() {
             skipped = true;
             continue;
         }
-        assert_eq!(result, Ok(()));
+        assert_eq!(result.map(|_| ()), Ok(()));
         moved = true;
         assert_ne!(def, before);
         let drive = def

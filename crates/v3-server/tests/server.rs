@@ -3161,7 +3161,8 @@ async fn get_creature_brain_lists_an_action_queue_bundle_at_the_configured_width
             };
             let bundle = node
                 .add_bundle(source, birth, &context)
-                .expect("a Plain bundle");
+                .expect("a Plain bundle")
+                .0;
             (node.node_id.0, bundle.index())
         })
     };
@@ -4869,4 +4870,5 @@ fn add_geometric(
     };
     node.add_bundle(source, birth, &SensorContext::WIDEST)
         .expect("a geometric fixture on a full catalog")
+        .0
 }

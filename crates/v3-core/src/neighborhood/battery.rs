@@ -655,7 +655,8 @@ mod drift_characterization {
                     ParentExecuted::NONE,
                     &mut rng,
                     &crate::config::test_sensor_context(config.world.food.types.len()),
-                );
+                )
+                .0;
                 if let Some(index) = [50, 250, 1000].iter().position(|&g| g == generation) {
                     let mut executed = BTreeSet::new();
                     let mut routes: BTreeMap<crate::contracts::NodeId, BTreeSet<usize>> =

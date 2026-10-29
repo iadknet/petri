@@ -899,7 +899,8 @@ fn breed(arm: &Arm, lineage: &mut Lineage, members: &[Scored], order: &[usize], 
                 ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                 &mut rng,
                 &config.sensor_context(config.world.food.types.len()),
-            );
+            )
+            .0;
             let identical = child == *parent_genome;
             let birth = birth_events(&summary, identical);
             let ladder = Birth::of(
@@ -1304,7 +1305,8 @@ mod tests {
                 &arm.setup
                     .config
                     .sensor_context(arm.setup.config.world.food.types.len()),
-            );
+            )
+            .0;
             (genome, summary)
         };
         for (offset, member) in population[1..].iter().enumerate() {

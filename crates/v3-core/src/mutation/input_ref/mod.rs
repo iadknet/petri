@@ -1,3 +1,4 @@
+use crate::genome::learning::{GraphMapping, InheritanceMapping};
 use rand::seq::SliceRandom;
 use rand::Rng;
 
@@ -235,10 +236,12 @@ impl InputRefMutator {
         rng: &mut impl Rng,
         context: &SensorContext,
     ) -> Result<EventReport, MutationSkipReason> {
+        let node_count = genome.nodes.len();
         let node = &mut genome.nodes[node_idx];
-        let unreported =
-            |result: Result<(), MutationSkipReason>| result.map(|()| EventReport::default());
-        match op {
+        let unreported = |result: Result<(), MutationSkipReason>| {
+            result.map(|()| (EventReport::default(), GraphMapping::Identity))
+        };
+        let (mut report, graph) = match op {
             InputRefOperator::AddSensorLive => apply_add_sensor(node, BirthLaw::Live, rng, context),
             InputRefOperator::AddSensorSilent => {
                 apply_add_sensor(node, BirthLaw::Silent, rng, context)
@@ -248,7 +251,9 @@ impl InputRefMutator {
             InputRefOperator::RawFieldMutation => {
                 unreachable!("RawFieldMutation is genome-wide and never node-targeted")
             }
-        }
+        }?;
+        report.inheritance = InheritanceMapping::within(node_idx, node_count, graph);
+        Ok(report)
     }
 }
 
@@ -262,14 +267,17 @@ fn apply_add_sensor(
     law: BirthLaw,
     rng: &mut impl Rng,
     context: &SensorContext,
-) -> Result<EventReport, MutationSkipReason> {
+) -> Result<(EventReport, GraphMapping), MutationSkipReason> {
     let reference = sampling::random_input_reference(rng, context);
-    let (bundle_edits, class) = add_sensor_by_law(node, reference, law, context, rng)?;
-    Ok(EventReport {
-        class,
-        bundle_edits,
-        ..EventReport::default()
-    })
+    let ((bundle_edits, class), graph) = add_sensor_by_law(node, reference, law, context, rng)?;
+    Ok((
+        EventReport {
+            class,
+            bundle_edits,
+            ..EventReport::default()
+        },
+        graph,
+    ))
 }
 
 /// Delete one entry drawn uniformly among those no consumer addresses

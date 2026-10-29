@@ -334,7 +334,7 @@ fn copy_operators_skip_when_the_copy_would_exceed_the_index_space() {
         ])
         .with_output_sinks(Vec::new());
     assert_eq!(
-        copy_compute_node(&mut def, &mut SmallRng::seed_from_u64(1)),
+        copy_compute_node(&mut def, &mut SmallRng::seed_from_u64(1)).map(|_| ()),
         Ok(())
     );
     assert_eq!(def.compute_nodes().len(), u16::MAX as usize);
@@ -487,7 +487,8 @@ fn split_preserves_a_live_introspection_sink_edge_under_plasticity() {
                 &mut child,
                 crate::mutation::graph::operators::test_inputs(&[]),
                 &mut SmallRng::seed_from_u64(seed)
-            ),
+            )
+            .map(|(edits, _)| edits),
             Ok(crate::mutation::event::BundleEdits::default()),
             "seed {seed}"
         );
@@ -566,7 +567,8 @@ fn split_applies_to_every_introspection_edge_shape() {
                 &mut child,
                 crate::mutation::graph::operators::test_inputs(&[]),
                 &mut SmallRng::seed_from_u64(3)
-            ),
+            )
+            .map(|(edits, _)| edits),
             Ok(crate::mutation::event::BundleEdits::default()),
             "{label}: the split applies"
         );

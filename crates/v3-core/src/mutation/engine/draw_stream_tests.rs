@@ -26,7 +26,8 @@ fn the_default_draw_stream_is_pinned() {
             ParentExecuted::NONE,
             &mut rng,
             &crate::config::test_sensor_context(2),
-        );
+        )
+        .0;
         applied += summary.applied_events;
         let bytes = format!(
             "{}{:?}{}",
