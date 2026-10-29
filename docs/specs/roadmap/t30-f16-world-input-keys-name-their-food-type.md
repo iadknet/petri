@@ -146,7 +146,7 @@ it wrong.
 - [x] `grep` finds no `world_input_key_label`, no `WORKAROUND(T30.F13)` on
       a world-input key, and no hand-written food-typed key format in
       production code.
-- [ ] Gate: summary stored at `docs/progress/features/t30-f16.json`, local
+- [x] Gate: summary stored at `docs/progress/features/t30-f16.json`, local
       raw hash and byte count checked, series entry points to the summary,
       no new full report staged.
 
@@ -165,7 +165,11 @@ and labelled (flag 25%, severe 100%) but cannot mark the comparison severe;
 expected inside the flag threshold. A counter off 0%, or a deterministic
 block that differs, is a defect, not a cost.
 
-**Measured verdict.** Pending.
+**Measured verdict.** Gate (`make bench PROFILE=gate FEATURE=t30-f16`, outer
+exit 0, CLI exit 0): `severe=false` against `t25-f12.json`; deterministic block
+identical to the epoch's; all nine work counters at 0.000000%; wall-clock
+0.002841 vs 0.002714 ms per creature tick (+4.68%, level ok, inside the 25%
+flag). As predeclared.
 
 - Summary of the declared profile: [gate](../../progress/features/t30-f16.json).
 - Full readings: [`docs/progress/readings/t30-f16.md`](../../progress/readings/t30-f16.md).
