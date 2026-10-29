@@ -8,6 +8,5 @@ export type GraphOutputSinkTracePayload = {
 	 */
 	weighted_inputs: Array<number>;
 	weighted_sum: number;
-	applied: boolean;
 	applied_value: number;
 };

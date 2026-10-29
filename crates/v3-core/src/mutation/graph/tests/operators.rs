@@ -493,7 +493,7 @@ impl GraphTracer for RecordingTracer {
     }
     fn on_pass_end(&mut self, _delta: f32) {}
     fn on_finish(&mut self, _curr_outputs: &[f32], _temporal_committed: bool) {}
-    fn on_sink(&mut self, _: bool, _: &[f32], _: f32, _: bool, _: f32) {}
+    fn on_sink(&mut self, _: bool, _: &[f32], _: f32, _: f32) {}
     fn on_effects(&mut self) {}
 }
 

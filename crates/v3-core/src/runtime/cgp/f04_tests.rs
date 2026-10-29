@@ -460,7 +460,7 @@ fn traced_zero_compute_visit_reports_its_wired_sinks() {
     assert_eq!(wired.len(), 2);
     for sink in wired {
         assert_eq!(sink.weighted_sum, LEAF_VALUE);
-        assert!(sink.applied);
+        assert_eq!(sink.applied_value, LEAF_VALUE);
     }
 }
 

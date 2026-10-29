@@ -23,7 +23,6 @@ function props(data: Partial<GraphInternalsNodeData>): ComponentProps<typeof Gra
 			selectedTarget: null,
 			weightedSum: null,
 			appliedValue: null,
-			applied: null,
 			...data,
 		},
 		type: "graphInternal",

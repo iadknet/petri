@@ -132,7 +132,6 @@ mod tests {
             wired: len > 0,
             weighted_inputs,
             weighted_sum: 0.0,
-            applied: false,
             applied_value: 0.0,
         }
     }

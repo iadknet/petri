@@ -118,7 +118,7 @@ impl GraphTracer for GraphReads<'_> {
 
     fn on_finish(&mut self, _: &[f32], _: bool) {}
 
-    fn on_sink(&mut self, _: bool, _: &[f32], _: f32, _: bool, _: f32) {}
+    fn on_sink(&mut self, _: bool, _: &[f32], _: f32, _: f32) {}
 
     fn on_effects(&mut self) {
         self.reads.insert(ReadEvent::Sinks { node: self.node });

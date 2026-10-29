@@ -26,7 +26,6 @@ pub(crate) trait GraphTracer {
         wired: bool,
         weighted_inputs: &[f32],
         weighted_sum: f32,
-        applied: bool,
         applied_value: f32,
     );
     /// The effects pass ran: the visit committed.
@@ -56,7 +55,7 @@ impl GraphTracer for NoopTracer {
     #[inline]
     fn on_finish(&mut self, _: &[f32], _: bool) {}
     #[inline]
-    fn on_sink(&mut self, _: bool, _: &[f32], _: f32, _: bool, _: f32) {}
+    fn on_sink(&mut self, _: bool, _: &[f32], _: f32, _: f32) {}
     #[inline]
     fn on_effects(&mut self) {}
 }

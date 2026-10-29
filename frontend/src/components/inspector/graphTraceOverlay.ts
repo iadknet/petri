@@ -8,7 +8,6 @@ export interface NodeTraceData {
 	// Output sinks
 	weightedSum?: number;
 	appliedValue?: number;
-	applied?: boolean;
 }
 
 const STATEFUL_KINDS = new Set(["DecayIntegrator", "Momentum", "Oscillator", "AdaptiveGain"]);
@@ -54,7 +53,6 @@ export function buildOutputTraceOverlay(trace: GraphTracePayload): Map<string, N
 		result.set(`sink:${i}`, {
 			weightedSum: sink.weighted_sum,
 			appliedValue: sink.applied_value,
-			applied: sink.applied,
 		});
 	}
 

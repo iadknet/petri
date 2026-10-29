@@ -92,14 +92,12 @@ impl GraphTracer for RecordingTracer {
         wired: bool,
         weighted_inputs: &[f32],
         weighted_sum: f32,
-        applied: bool,
         applied_value: f32,
     ) {
         self.output_sinks.push(GraphOutputSinkTrace {
             wired,
             weighted_inputs: weighted_inputs.to_vec(),
             weighted_sum,
-            applied,
             applied_value,
         });
     }

@@ -209,7 +209,6 @@ pub struct GraphOutputSinkTracePayload {
     /// empty for an unwired sink.
     pub weighted_inputs: Vec<f32>,
     pub weighted_sum: f32,
-    pub applied: bool,
     pub applied_value: f32,
 }
 

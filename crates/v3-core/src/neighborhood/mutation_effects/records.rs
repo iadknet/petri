@@ -99,7 +99,7 @@ fn hop_record(hop: &MeshHopTrace) -> HopRecord {
             .output_sinks
             .iter()
             .enumerate()
-            .filter(|(_, sink)| sink.applied)
+            .filter(|(_, sink)| sink.wired)
             .map(|(position, sink)| Write::Sink {
                 position: position as u16,
                 value: sink.applied_value.to_bits(),

@@ -2,7 +2,7 @@
 
 use crate::contracts::votes::{VoteVector, VOTE_SINK_COUNT};
 use crate::contracts::OUTPUT_SLOT_COUNT;
-use crate::contracts::{InputReference, MAX_GATE_SLOTS, SHARED_MEMORY_SLOTS};
+use crate::contracts::{InputReference, SHARED_MEMORY_SLOTS};
 use crate::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge, OutputSinkKind};
 use crate::runtime::action_decode::ActionParams;
 use crate::runtime::cgp::sources::resolve_source_post_convergence;
@@ -103,7 +103,7 @@ pub(crate) fn apply_cgp_graph_effects<T: GraphTracer>(
             "the weight table is the genome's: rebuild runtime state after editing the genome"
         );
         if sink.inputs.is_empty() {
-            tracer.on_sink(false, &[], 0.0, false, 0.0);
+            tracer.on_sink(false, &[], 0.0, 0.0);
             continue;
         }
 
@@ -122,63 +122,47 @@ pub(crate) fn apply_cgp_graph_effects<T: GraphTracer>(
             learner.as_deref_mut(),
             buf,
         );
-        let mut applied = false;
-        let mut applied_value = 0.0;
-
-        match sink.kind {
+        let applied_value = match sink.kind {
             OutputSinkKind::CustomOutput(s) => {
-                if (s as usize) < OUTPUT_SLOT_COUNT {
-                    applied_value = sanitize_f32(wsum);
-                    output_slots[s as usize] = applied_value;
-                    applied = true;
-                }
+                let value = sanitize_f32(wsum);
+                output_slots[s as usize] = value;
+                value
             }
             OutputSinkKind::RouterGate(slot) => {
-                let s = slot as usize;
-                if s < MAX_GATE_SLOTS {
-                    let val = sanitize_f32(wsum);
-                    route_gates.scores[s] = val;
-                    applied_value = val;
-                    applied = true;
-                }
+                let value = sanitize_f32(wsum);
+                route_gates.scores[slot as usize] = value;
+                value
             }
             OutputSinkKind::WriteSlot(s) => {
-                if (s as usize) < 16 {
-                    applied_value = sanitize_f32(wsum);
-                    *shared_memory_writes_changed += u32::from(shared_memory_write_changed(
-                        shared_memory[s as usize],
-                        applied_value,
-                    ));
-                    shared_memory[s as usize] = applied_value;
-                    applied = true;
-                }
+                let value = sanitize_f32(wsum);
+                *shared_memory_writes_changed += u32::from(shared_memory_write_changed(
+                    shared_memory[s as usize],
+                    value,
+                ));
+                shared_memory[s as usize] = value;
+                value
             }
             OutputSinkKind::ClearSlot(s) => {
-                if (s as usize) < 16 {
-                    *shared_memory_writes_changed +=
-                        u32::from(shared_memory_write_changed(shared_memory[s as usize], 0.0));
-                    shared_memory[s as usize] = 0.0;
-                    applied_value = 0.0;
-                    applied = true;
-                }
+                *shared_memory_writes_changed +=
+                    u32::from(shared_memory_write_changed(shared_memory[s as usize], 0.0));
+                shared_memory[s as usize] = 0.0;
+                0.0
             }
             // The vote surface: the visit's contribution and the parameter
             // surface, which the pass end reads (T19.F04). Neither counts work.
             OutputSinkKind::ActionVote(sink) => {
-                if let Some(entry) = contribution.get_mut(sink.index()) {
-                    applied_value = sanitize_f32(wsum);
-                    *entry = applied_value;
-                    applied = true;
-                }
+                let value = sanitize_f32(wsum);
+                contribution[sink.index()] = value;
+                value
             }
             OutputSinkKind::ActionParam(field) => {
-                applied_value = sanitize_f32(wsum);
-                action_params[field.index()] = applied_value;
-                applied = true;
+                let value = sanitize_f32(wsum);
+                action_params[field.index()] = value;
+                value
             }
-        }
+        };
 
-        tracer.on_sink(true, buf, sanitize_f32(wsum), applied, applied_value);
+        tracer.on_sink(true, buf, sanitize_f32(wsum), applied_value);
     }
 
     (NodeResult::halted(output_slots, route_gates), contribution)

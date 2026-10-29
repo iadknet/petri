@@ -24,7 +24,6 @@ export interface GraphInternalsNodeData extends Record<string, unknown> {
 	// Output sink trace
 	weightedSum: number | null;
 	appliedValue: number | null;
-	applied: boolean | null;
 }
 
 export const CATEGORY_COLORS: Record<

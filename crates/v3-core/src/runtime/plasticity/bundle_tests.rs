@@ -706,7 +706,7 @@ impl GraphTracer for SinkRecorder {
     }
     fn on_pass_end(&mut self, _: f32) {}
     fn on_finish(&mut self, _: &[f32], _: bool) {}
-    fn on_sink(&mut self, _: bool, weighted_inputs: &[f32], _: f32, _: bool, _: f32) {
+    fn on_sink(&mut self, _: bool, weighted_inputs: &[f32], _: f32, _: f32) {
         self.sinks.push(weighted_inputs.to_vec());
     }
     fn on_effects(&mut self) {}

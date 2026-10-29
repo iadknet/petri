@@ -729,10 +729,10 @@ mod tests {
             crate::genome::cgp::FIXED_SINK_COUNT
         );
         let sink = |kind: OutputSinkKind| &graph.output_sinks[kind.catalog_index()];
-        assert!(sink(OutputSinkKind::CustomOutput(0)).applied);
+        assert!(sink(OutputSinkKind::CustomOutput(0)).wired);
         assert!((sink(OutputSinkKind::CustomOutput(0)).applied_value - 1.0).abs() < 1e-6);
         assert!(!sink(OutputSinkKind::RouterGate(0)).wired);
-        assert!(sink(OutputSinkKind::ActionVote(VoteSink::Eat)).applied);
+        assert!(sink(OutputSinkKind::ActionVote(VoteSink::Eat)).wired);
         assert_eq!(
             sink(OutputSinkKind::ActionParam(ActionParamField::EatFoodType)).applied_value,
             1_000_000_000.0

@@ -182,7 +182,6 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> MeshHopTracePayload {
                             wired: s.wired,
                             weighted_inputs: s.weighted_inputs,
                             weighted_sum: s.weighted_sum,
-                            applied: s.applied,
                             applied_value: s.applied_value,
                         })
                         .collect(),
@@ -341,7 +340,6 @@ mod tests {
                             wired: true,
                             weighted_inputs: vec![1.0],
                             weighted_sum: 1.0,
-                            applied: true,
                             applied_value: 1.0,
                         }],
                     }),
@@ -394,7 +392,6 @@ mod tests {
         };
         assert_eq!(graph.output_sinks.len(), 1);
         assert!(graph.output_sinks[0].wired);
-        assert!(graph.output_sinks[0].applied);
         let tick = &assembled.ticks[0];
         assert_eq!(tick.passes.len(), 2);
         assert!(matches!(

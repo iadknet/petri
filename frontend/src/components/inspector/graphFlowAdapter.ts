@@ -59,7 +59,6 @@ export function buildGraphFlowScene(input: {
 				// Output trace data
 				weightedSum: trace?.weightedSum ?? null,
 				appliedValue: trace?.appliedValue ?? null,
-				applied: trace?.applied ?? null,
 			},
 		});
 	}
