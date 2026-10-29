@@ -145,7 +145,7 @@ Base path: `/v3`.
 
 ### 4.1 `POST /v3/simulation/startup`
 
-Request (conceptual v3alpha14 shape):
+Request (conceptual v3alpha18 shape):
 
 ```json
 {
@@ -280,7 +280,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha14",
+  "protocol_version": "v3alpha18",
   "state": "idle",
   "tick": 0,
   "config_digest": "sha256:<hex>",
@@ -301,7 +301,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha14",
+  "protocol_version": "v3alpha18",
   "state": "running",
   "tick": 123
 }
@@ -316,7 +316,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha14",
+  "protocol_version": "v3alpha18",
   "state": "paused",
   "tick": 123
 }
@@ -345,7 +345,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha14",
+  "protocol_version": "v3alpha18",
   "state": "paused",
   "tick": 124,
   "steps_applied": 1
@@ -358,7 +358,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha14",
+  "protocol_version": "v3alpha18",
   "state": "running",
   "tick": 124,
   "population": 48,
@@ -412,7 +412,7 @@ Response (full sparse frame):
 
 ```json
 {
-  "protocol_version": "v3alpha14",
+  "protocol_version": "v3alpha18",
   "state": "running",
   "tick": 124,
   "width": 1600,
@@ -461,7 +461,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha14",
+  "protocol_version": "v3alpha18",
   "state": "paused",
   "config": {
     "population": {
@@ -604,7 +604,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha14",
+  "protocol_version": "v3alpha18",
   "state": "paused",
   "config": { "...": "effective config" }
 }
@@ -635,7 +635,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha14",
+  "protocol_version": "v3alpha18",
   "status": "recording",
   "ticks_requested": 5,
   "include_perception_debug": false
@@ -648,7 +648,7 @@ Recording response:
 
 ```json
 {
-  "protocol_version": "v3alpha14",
+  "protocol_version": "v3alpha18",
   "status": "recording",
   "ticks_completed": 2,
   "ticks_remaining": 3
@@ -659,7 +659,7 @@ Complete response:
 
 ```json
 {
-  "protocol_version": "v3alpha14",
+  "protocol_version": "v3alpha18",
   "status": "complete",
   "sample": {
     "creature_id": 7,
@@ -757,7 +757,7 @@ Response (full, no query parameters):
 
 ```json
 {
-  "protocol_version": "v3alpha14",
+  "protocol_version": "v3alpha18",
   "id": 7,
   "position": { "x": 10, "y": 22 },
   "energy": 41.0,
@@ -797,7 +797,7 @@ Field definitions:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `protocol_version` | string | Always `"v3alpha14"`. |
+| `protocol_version` | string | Always `"v3alpha18"`. |
 | `id` | u64 | Creature FFI ID. |
 | `position` | `{x, y}` | Current grid position. |
 | `energy` | f32 | Current energy level. |
@@ -853,7 +853,7 @@ Event envelope:
 
 ```json
 {
-  "protocol_version": "v3alpha14",
+  "protocol_version": "v3alpha18",
   "event": "status",
   "tick": 124,
   "payload": {}
@@ -961,7 +961,7 @@ Envelope/payload consistency rules:
 Emission frequency:
 - Events are emitted once per completed tick while the simulation is `running`.
 - Implementations may throttle emission (for example emit every Nth tick) for
-  performance, but must document the throttle policy. The default v3alpha14
+  performance, but must document the throttle policy. The default v3alpha18
   behavior is per-tick emission.
 
 Ordering rules:
@@ -978,7 +978,7 @@ All non-2xx HTTP responses use:
 
 ```json
 {
-  "protocol_version": "v3alpha14",
+  "protocol_version": "v3alpha18",
   "error": {
     "code": "validation_rejected",
     "message": "startup request failed validation",
@@ -1004,7 +1004,7 @@ Required error codes:
 
 ---
 
-## 7. Out-of-Scope API Surfaces (v3alpha14)
+## 7. Out-of-Scope API Surfaces (v3alpha18)
 
 Not part of this version:
 - `GET /v3/simulation/snapshot`
@@ -1026,7 +1026,7 @@ Snapshot import/export contracts require a follow-up spec.
 - Required observability semantics: `v3-evolution-observability-spec.md`
 - Local runner NDJSON output contract: `v3-cli-contract-spec.md`
 
-This file remains canonical for v3alpha14 server transport/API semantics.
+This file remains canonical for v3alpha18 server transport/API semantics.
 
 ---
 
