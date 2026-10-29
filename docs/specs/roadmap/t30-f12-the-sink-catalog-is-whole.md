@@ -134,7 +134,7 @@ regression past its threshold would show it wrong.
 
 ## Implementation Tasks
 
-- [ ] Before any edit: record the comparator digests on `768dde1fc`
+- [x] Before any edit: record the comparator digests on `768dde1fc`
       (Verification) in the readings.
 - [ ] Catalog map (audit rows 4, 8): one `OutputSinkKind` ↔ index map in
       `genome/cgp/mod.rs`; `new_with_fixed_outputs` builds from it; the
