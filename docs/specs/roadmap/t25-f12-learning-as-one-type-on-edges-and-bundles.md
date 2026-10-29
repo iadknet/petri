@@ -146,11 +146,13 @@ compute cost outside the predeclaration.
 
 ## Verification
 
-- [ ] Track guard: each learning-edit operator applied on its lone-edge, member and both slot targets, checking the broadcast (one, members) and that unaffected settings, siblings and the other slot do not change; runtime construction, census and structural classification agree with the layout, including bundle-only learners and scales without contributors.
-- [ ] Note's cases: a bundle-only learner learns; an `Inherit` member under a learning scale moves only through it; `member_default` serves `Inherit` and leaves `Own` and `Static`; the slots evolve independently; a member that learns and credits updates both from one visit; disabling one member leaves siblings and the scale's credit; a child whose last contributor was switched off keeps, decays and passes on the scale; each detach row; Lamarckian seeding of a scale and a modifier; the layout built once per birth, with `Inherit` never resolved during a visit (invariant 5: `runtime::plasticity` names no `MemberPolicy`, `credits` or slot).
-- [ ] Proptests (v3-core): detach preserves the composed weight bitwise and yields the table's `Learning` for any policy and slots; the layout's effective `Learning` is the override when `Own`, `member_default` or none when `Inherit`, none when `Static`.
+- [x] Track guard: each learning-edit operator applied on its lone-edge, member and both slot targets, checking the broadcast (one, members) and that unaffected settings, siblings and the other slot do not change; runtime construction, census and structural classification agree with the layout, including bundle-only learners and scales without contributors.
+- [x] Note's cases: a bundle-only learner learns; an `Inherit` member under a learning scale moves only through it; `member_default` serves `Inherit` and leaves `Own` and `Static`; the slots evolve independently; a member that learns and credits updates both from one visit; disabling one member leaves siblings and the scale's credit; a child whose last contributor was switched off keeps, decays and passes on the scale; each detach row; Lamarckian seeding of a scale and a modifier; the layout built once per birth, with `Inherit` never resolved during a visit (invariant 5: `runtime::plasticity` names no `MemberPolicy`, `credits` or slot).
+- [x] Proptests (v3-core): detach preserves the composed weight bitwise and yields the table's `Learning` for any policy and slots; the layout's effective `Learning` is the override when `Own`, `member_default` or none when `Inherit`, none when `Static`.
 - [ ] `make check`; `make rust-test-slow`.
 - [ ] Gate and goal summaries at `docs/progress/features/t25-f12.json` and `t25-f12-goal.json`, raw hash, byte count and time checked, series entries, no full report staged.
+
+Each checked clause's tests and the commands run with their results are in [readings](../../progress/readings/t25-f12.md#verification-2026-10-28).
 
 ## Performance and Goal Impact
 

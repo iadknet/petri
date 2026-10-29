@@ -1,6 +1,6 @@
 # V3 Server API and Protocol Spec
 
-Reference specification for canonical v3alpha14 server HTTP/WebSocket contracts,
+Reference specification for canonical v3alpha18 server HTTP/WebSocket contracts,
 lifecycle transitions, and error semantics.
 
 Status: Active
@@ -21,7 +21,7 @@ Related references:
 ## 1. Purpose and Scope
 
 This document defines:
-- v3alpha14 protocol-version posture;
+- v3alpha18 protocol-version posture;
 - canonical HTTP endpoint contracts for simulation lifecycle, status/frame, and
   config read/patch surfaces;
 - canonical WebSocket event envelope and payload mapping;
@@ -50,8 +50,14 @@ Current viewport-transport addenda:
 Version contract:
 - `protocol_version` is required in all top-level HTTP responses and WebSocket
   event envelopes.
-- Canonical value: `"v3alpha14"`.
-- Breaking payload changes require protocol-version bump. `v3alpha14`
+- Canonical value: `"v3alpha18"`.
+- Breaking payload changes require protocol-version bump. `v3alpha18`
+  (T25.F12) replaced the brain's member `scope` with `policy` and `credits`,
+  made an edge learner carry one wire `Learning` and its `source`, and gave
+  each bundle `scale_learning` and `member_default` slots (section 4.11).
+  `v3alpha17` (T30.F14) made each bundle coordinate carry its member's
+  location in place of `present` and the brain context an opaque identity.
+  `v3alpha14`
   (T30.F01) replaced the creature detail's `genome`, `mesh_annotations` and
   `graph_weights` with `brain` and `learning` (section 4.11), made a sampler
   hop's `input_refs` flat records `{family, key, food_type?, slot?}`, added
