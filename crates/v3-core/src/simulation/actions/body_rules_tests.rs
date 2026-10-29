@@ -45,15 +45,7 @@ fn sim_with(creatures_at: &[(Position, f32)]) -> (Simulation, Vec<CreatureId>) {
                     v3alpha1_founder_genome(),
                     HeritableBody::founder(3, 77, 200.0, 0.2),
                 )
-                .finalize(
-                    id,
-                    crate::creature::birth::BirthPlace {
-                        position,
-                        heading: crate::contracts::Direction::N,
-                        energy,
-                    },
-                )
-                .creature;
+                .born_at(id, position, energy);
                 // A fixture keeps its requested energy past the body cap.
                 founder.energy = energy;
                 founder

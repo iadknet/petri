@@ -529,15 +529,7 @@ mod pair {
                 give_share: 0.2,
             },
         )
-        .finalize(
-            id,
-            crate::creature::birth::BirthPlace {
-                position,
-                heading: crate::contracts::Direction::N,
-                energy: 50.0,
-            },
-        )
-        .creature
+        .born_at(id, position, 50.0)
     }
 
     /// The perception of an observer at `ORIGIN` on a 20×20 wrapped world

@@ -194,29 +194,13 @@ mod tests {
 
         let attacker_id = creatures.insert_with_key(|id| {
             crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
-                .finalize(
-                    id,
-                    crate::creature::birth::BirthPlace {
-                        position: pos_a,
-                        heading: crate::contracts::Direction::N,
-                        energy: energy_a,
-                    },
-                )
-                .creature
+                .born_at(id, pos_a, energy_a)
         });
         world.place_creature(pos_a, attacker_id);
 
         let victim_id = creatures.insert_with_key(|id| {
             crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
-                .finalize(
-                    id,
-                    crate::creature::birth::BirthPlace {
-                        position: pos_v,
-                        heading: crate::contracts::Direction::N,
-                        energy: energy_v,
-                    },
-                )
-                .creature
+                .born_at(id, pos_v, energy_v)
         });
         world.place_creature(pos_v, victim_id);
 
@@ -245,15 +229,7 @@ mod tests {
 
         let id = creatures.insert_with_key(|id| {
             crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
-                .finalize(
-                    id,
-                    crate::creature::birth::BirthPlace {
-                        position: pos,
-                        heading: crate::contracts::Direction::N,
-                        energy,
-                    },
-                )
-                .creature
+                .born_at(id, pos, energy)
         });
         world.place_creature(pos, id);
 

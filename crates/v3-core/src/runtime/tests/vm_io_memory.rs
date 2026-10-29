@@ -539,15 +539,7 @@ fn vm_eats_when_food_here() {
             give_share: 0.2,
         },
     )
-    .finalize(
-        id,
-        crate::creature::birth::BirthPlace {
-            position: pos,
-            heading: crate::contracts::Direction::N,
-            energy: 30.0,
-        },
-    )
-    .creature;
+    .born_at(id, pos, 30.0);
 
     let local = assemble_static_inputs(
         &world,
@@ -647,15 +639,7 @@ fn vm_noop_when_no_food() {
             give_share: 0.2,
         },
     )
-    .finalize(
-        id,
-        crate::creature::birth::BirthPlace {
-            position: pos,
-            heading: crate::contracts::Direction::N,
-            energy: 30.0,
-        },
-    )
-    .creature;
+    .born_at(id, pos, 30.0);
     let local = assemble_static_inputs(
         &world,
         &creature.sensed_body(&EnergyConfig::default().capacity),

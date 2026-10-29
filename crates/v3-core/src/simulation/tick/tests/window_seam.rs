@@ -55,15 +55,7 @@ fn with_vm_founders(mut sim: Simulation) -> Simulation {
                 crate::genome::learning::Seeds::default(),
                 old.shared_memory,
             ))
-            .finalize(
-                id,
-                crate::creature::birth::BirthPlace {
-                    position: old.position,
-                    heading: crate::contracts::Direction::N,
-                    energy: old.energy,
-                },
-            )
-            .creature;
+            .born_at(id, old.position, old.energy);
             born.generation = old.generation;
             born
         };

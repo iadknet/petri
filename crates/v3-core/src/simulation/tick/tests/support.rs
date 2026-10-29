@@ -156,15 +156,7 @@ pub(super) fn make_sim_two_with_genomes(
     let a_id = creatures.insert_with_key(|id| {
         {
             let mut founder = crate::creature::birth::Zygote::founder(genome_a, founder_body())
-                .finalize(
-                    id,
-                    crate::creature::birth::BirthPlace {
-                        position: Position::new(5, 5),
-                        heading: crate::contracts::Direction::N,
-                        energy: energy_a,
-                    },
-                )
-                .creature;
+                .born_at(id, Position::new(5, 5), energy_a);
             // A fixture keeps its requested energy past the body cap.
             founder.energy = energy_a;
             founder
@@ -175,15 +167,7 @@ pub(super) fn make_sim_two_with_genomes(
     let b_id = creatures.insert_with_key(|id| {
         {
             let mut founder = crate::creature::birth::Zygote::founder(genome_b, founder_body())
-                .finalize(
-                    id,
-                    crate::creature::birth::BirthPlace {
-                        position: Position::new(5, 4),
-                        heading: crate::contracts::Direction::N,
-                        energy: energy_b,
-                    },
-                )
-                .creature;
+                .born_at(id, Position::new(5, 4), energy_b);
             // A fixture keeps its requested energy past the body cap.
             founder.energy = energy_b;
             founder
@@ -216,15 +200,7 @@ pub(super) fn make_sim_with_one_creature(energy: f32) -> (Simulation, CreatureId
         {
             let mut founder =
                 crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
-                    .finalize(
-                        id,
-                        crate::creature::birth::BirthPlace {
-                            position: pos,
-                            heading: crate::contracts::Direction::N,
-                            energy,
-                        },
-                    )
-                    .creature;
+                    .born_at(id, pos, energy);
             // A fixture keeps its requested energy past the body cap.
             founder.energy = energy;
             founder
@@ -259,15 +235,7 @@ pub(super) fn make_sim_with_custom_genome(
     let id = creatures.insert_with_key(|id| {
         {
             let mut founder = crate::creature::birth::Zygote::founder(genome, founder_body())
-                .finalize(
-                    id,
-                    crate::creature::birth::BirthPlace {
-                        position: pos,
-                        heading: crate::contracts::Direction::N,
-                        energy,
-                    },
-                )
-                .creature;
+                .born_at(id, pos, energy);
             // A fixture keeps its requested energy past the body cap.
             founder.energy = energy;
             founder

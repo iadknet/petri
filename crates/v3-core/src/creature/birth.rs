@@ -233,5 +233,22 @@ impl Zygote {
 }
 
 #[cfg(test)]
+impl Zygote {
+    /// A fixture's creature: this zygote finalized at `position`, facing
+    /// north, given `energy`, its overflow dropped.
+    pub(crate) fn born_at(self, id: CreatureId, position: Position, energy: f32) -> CreatureState {
+        self.finalize(
+            id,
+            BirthPlace {
+                position,
+                heading: Direction::N,
+                energy,
+            },
+        )
+        .creature
+    }
+}
+
+#[cfg(test)]
 #[path = "birth_tests.rs"]
 mod tests;

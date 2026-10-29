@@ -102,14 +102,6 @@ fn insert_test_creature(
                 give_share: 0.2,
             },
         )
-        .finalize(
-            id,
-            crate::creature::birth::BirthPlace {
-                position,
-                heading: crate::contracts::Direction::N,
-                energy: 50.0,
-            },
-        )
-        .creature
+        .born_at(id, position, 50.0)
     })
 }

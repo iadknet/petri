@@ -446,15 +446,7 @@ mod tests {
                 give_share: 0.2,
             },
         )
-        .finalize(
-            id,
-            crate::creature::birth::BirthPlace {
-                position: pos,
-                heading: crate::contracts::Direction::N,
-                energy,
-            },
-        )
-        .creature
+        .born_at(id, pos, energy)
         .sensed_body(&EnergyCapacityConfig::default())
     }
 
