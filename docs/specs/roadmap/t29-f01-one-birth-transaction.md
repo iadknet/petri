@@ -119,22 +119,22 @@ gate wall-clock flag shows the mapping or capture costs more than predeclared.
 
 ## Implementation Tasks
 
-- [ ] Viability first: `cargo test -p v3-core --test viability` before and after (founder construction changes).
-- [ ] Decisions A6, A8, A9: private node fields, `NodeGenome::new`, accessors, the split-borrow accessor at both mutation sites (the `WORKAROUND(T30.F11)` at `graph/operators.rs:36` goes), routing in place, the bench injection.
+- [x] Viability first: `cargo test -p v3-core --test viability` before and after (founder construction changes).
+- [x] Decisions A6, A8, A9: private node fields, `NodeGenome::new`, accessors, the split-borrow accessor at both mutation sites (the `WORKAROUND(T30.F11)` at `graph/operators.rs:36` goes), routing in place, the bench injection.
 - [ ] Decision A12: one container retarget operation that detaches a member before a source change (a same-source draw stays a no-op) and an owner-complete `split_edge` that detaches first, each returning its bundle effects and mapping, with split's weight, seed and draw behavior unchanged; `detached` and its `WORKAROUND(T30.F11)` go; at closure the T30.F11 note drops the split borrow, retarget and split items F01 paid.
-- [ ] Decision A7: the genome mesh operations; `structural.rs` keeps only draws and eligibility.
-- [ ] Decision A1, step 1: mappings and learnable keys beside today's seed rows, with a property test over the Graph, InputRef and Topology catalogs that applying an event's mapping to the parent's seeds equals the rows the container kept; then the payload, the zygote and finalization (A2, A4).
-- [ ] Decision A1, step 2: delete `BirthSeeds`, the `birth_seeds` field, `take_birth_seeds`, `capture_birth_seeds` and the step-1 equivalence test; seeds reach the runtime only through finalization.
-- [ ] Decision A3: one `SimStats` operation folds a `MutationSummary`; `spawn_child`'s `too_many_lines` allow goes.
-- [ ] Decision A5: the mutation body policy and `HeritableBody`'s deterministic application; `WORKAROUND(G5)` at the gate (A10).
-- [ ] Deferred A11: `WORKAROUND(T29.F01): CreatureGenome.nodes private behind owner operations` at the field.
+- [x] Decision A7: the genome mesh operations; `structural.rs` keeps only draws and eligibility.
+- [x] Decision A1, step 1: mappings and learnable keys beside today's seed rows, with a property test over the Graph, InputRef and Topology catalogs that applying an event's mapping to the parent's seeds equals the rows the container kept; then the payload, the zygote and finalization (A2, A4).
+- [x] Decision A1, step 2: delete `BirthSeeds`, the `birth_seeds` field, `take_birth_seeds`, `capture_birth_seeds` and the step-1 equivalence test; seeds reach the runtime only through finalization.
+- [x] Decision A3: one `SimStats` operation folds a `MutationSummary`; `spawn_child`'s `too_many_lines` allow goes.
+- [x] Decision A5: the mutation body policy and `HeritableBody`'s deterministic application; `WORKAROUND(G5)` at the gate (A10).
+- [x] Deferred A11: `WORKAROUND(T29.F01): CreatureGenome.nodes private behind owner operations` at the field.
 - [ ] Remove the three `WORKAROUND(G4)` markers; update the three reference specs; at closure delete G4 and the G5 import clause in `docs/architecture.md` and the debt line.
-- [ ] Acceptance guard: shared finalization assertions through the founder, unchanged-child and mutated-child paths (inherited learning, per-life initialization, provisioning and cap); committed and rejected edits exercised against the mapping contract through the existing operator catalogs; a proptest that applying a composed mapping equals applying each mapping in turn.
+- [x] Acceptance guard: shared finalization assertions through the founder, unchanged-child and mutated-child paths (inherited learning, per-life initialization, provisioning and cap); committed and rejected edits exercised against the mapping contract through the existing operator catalogs; a proptest that applying a composed mapping equals applying each mapping in turn.
 
 ## Verification
 
-- [ ] Focused tests: `cargo test -p v3-core --test viability` -> pass, digests unchanged; acceptance-guard tests -> pass.
-- [ ] `cargo test --workspace` -> every pin in invariant 11 unchanged.
+- [x] Focused tests: `cargo test -p v3-core --test viability` -> pass (30/30), digests unchanged before and after; acceptance-guard tests (`cargo test -p v3-core --lib -- creature::birth`) -> pass (18/18).
+- [x] `cargo test --workspace` -> pass, every pin in invariant 11 unchanged; `cargo check --workspace --all-targets` and `cargo clippy --workspace --all-targets` -> clean.
 - [ ] `make rust-test-slow` -> pass, readings unchanged.
 - [ ] Gate profile: summary at `docs/progress/features/t29-f01.json`, deterministic blocks identical to the epoch, raw hash and byte count checked, series entry points to the summary, no full report staged.
 
