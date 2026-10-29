@@ -153,8 +153,7 @@ mod tests {
             .with_sink_inputs(
                 OutputSinkKind::CustomOutput(0),
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-            )
-            .with_sink_inputs(OutputSinkKind::RouterGate(0), Vec::new());
+            );
         let input_refs = vec![InputReference::World(WorldInputKey::FoodHere {
             type_idx: OrdinaryFoodTypeId::default(),
         })];

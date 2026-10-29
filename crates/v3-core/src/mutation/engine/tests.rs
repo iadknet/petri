@@ -2,7 +2,7 @@ use super::*;
 use crate::config::SimulationConfig;
 use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
-use crate::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind};
+use crate::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge, GraphSource};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::graph::GraphOperator;
 use crate::mutation::input_ref::InputRefOperator;
@@ -91,11 +91,7 @@ fn single_graph_genome_with_inputs(input_refs: Vec<InputReference>) -> CreatureG
         nodes: vec![NodeGenome::new(
             NodeId::new(0),
             input_refs,
-            BackendDef::Graph(
-                CgpGraphBackendDef::new_with_fixed_outputs()
-                    .with_compute_nodes(Vec::new())
-                    .with_sink_inputs(OutputSinkKind::CustomOutput(0), Vec::new()),
-            ),
+            BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
             Vec::new(),
         )],
     }
@@ -220,11 +216,7 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
             NodeGenome::new(
                 NodeId::new(0),
                 vec![],
-                BackendDef::Graph(
-                    CgpGraphBackendDef::new_with_fixed_outputs()
-                        .with_compute_nodes(Vec::new())
-                        .with_sink_inputs(OutputSinkKind::CustomOutput(0), Vec::new()),
-                ),
+                BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
                 vec![RouteTarget {
                     target_id: NodeId::new(1),
                     slot: 0,
@@ -234,11 +226,7 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
             NodeGenome::new(
                 NodeId::new(1),
                 vec![],
-                BackendDef::Graph(
-                    CgpGraphBackendDef::new_with_fixed_outputs()
-                        .with_compute_nodes(Vec::new())
-                        .with_sink_inputs(OutputSinkKind::CustomOutput(0), Vec::new()),
-                ),
+                BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
                 vec![],
             ),
         ],

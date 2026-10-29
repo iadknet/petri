@@ -122,19 +122,17 @@ pub(crate) fn apply_cgp_graph_effects<T: GraphTracer>(
             learner.as_deref_mut(),
             buf,
         );
+        let value = sanitize_f32(wsum);
         let applied_value = match sink.kind {
             OutputSinkKind::CustomOutput(s) => {
-                let value = sanitize_f32(wsum);
                 output_slots[s as usize] = value;
                 value
             }
             OutputSinkKind::RouterGate(slot) => {
-                let value = sanitize_f32(wsum);
                 route_gates.scores[slot as usize] = value;
                 value
             }
             OutputSinkKind::WriteSlot(s) => {
-                let value = sanitize_f32(wsum);
                 *shared_memory_writes_changed += u32::from(shared_memory_write_changed(
                     shared_memory[s as usize],
                     value,
@@ -151,18 +149,16 @@ pub(crate) fn apply_cgp_graph_effects<T: GraphTracer>(
             // The vote surface: the visit's contribution and the parameter
             // surface, which the pass end reads (T19.F04). Neither counts work.
             OutputSinkKind::ActionVote(sink) => {
-                let value = sanitize_f32(wsum);
                 contribution[sink.index()] = value;
                 value
             }
             OutputSinkKind::ActionParam(field) => {
-                let value = sanitize_f32(wsum);
                 action_params[field.index()] = value;
                 value
             }
         };
 
-        tracer.on_sink(true, buf, sanitize_f32(wsum), applied_value);
+        tracer.on_sink(true, buf, value, applied_value);
     }
 
     (NodeResult::halted(output_slots, route_gates), contribution)

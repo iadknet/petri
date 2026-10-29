@@ -60,14 +60,6 @@ fn genome_size_charges_no_wired_sink_unit() {
         0,
     );
     assert_eq!(wired.genome_size(), 2 + 2);
-
-    let empty_sink = graph_genome(
-        CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_sink_inputs(OutputSinkKind::CustomOutput(0), Vec::new()),
-        1,
-        0,
-    );
-    assert_eq!(empty_sink.genome_size(), 2);
 }
 
 /// T25.F10 invariant 1: a `Ring` gene costs one unit, a pair gene with its

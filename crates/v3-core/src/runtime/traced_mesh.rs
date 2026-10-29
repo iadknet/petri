@@ -591,8 +591,7 @@ mod tests {
                     .with_sink_inputs(
                         OutputSinkKind::CustomOutput(5),
                         vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                    )
-                    .with_sink_inputs(OutputSinkKind::RouterGate(0), vec![]),
+                    ),
             ),
             wrap_targets(vec![id_vm]),
         );
@@ -673,7 +672,6 @@ mod tests {
                             OutputSinkKind::CustomOutput(0),
                             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
                         )
-                        .with_sink_inputs(OutputSinkKind::RouterGate(0), vec![])
                         .with_sink_inputs(
                             OutputSinkKind::ActionVote(VoteSink::Eat),
                             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
