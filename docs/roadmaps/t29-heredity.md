@@ -1,7 +1,7 @@
 # T29 — Heredity
 
-**Status**: Planned
-**Last updated**: 2026-10-27
+**Status**: In Progress
+**Last updated**: 2026-10-28
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
