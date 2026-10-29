@@ -1,6 +1,6 @@
 # T30.F14 — The Inspector Reads Resolved Views
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-28
 **Feature**: T30.F14
 **Track**: [T30 — Core Boundaries](../../roadmaps/t30-core-boundaries.md)
@@ -102,8 +102,8 @@ today's for a valid genome would show it wrong.
 - [x] Server: `cargo test -p v3-server` (wire-type test without `PETRI_WRITE_TS_TYPES`) -> pass.
 - [x] Frontend: `npm test`, `npm run lint` and `npx tsc -b` in `frontend/` -> pass (lint warnings only in files F14 does not touch).
 - [x] `cargo fmt --all -- --check` and `make rust-clippy` -> pass.
-- [ ] `make check` -> exit 0, viability and baseline-world digests unchanged.
-- [ ] Benchmark profiles: `Not run: Verification Plan`.
+- [x] `make check` -> exit 0 at tested commit `a0ce47056`, viability and baseline-world digests unchanged.
+- [x] Benchmark profiles: `Not run: Verification Plan`.
 
 ## Performance and Goal Impact
 
@@ -116,7 +116,7 @@ compute cost, indicator or threshold applies; no profile runs.
 
 - [x] `http/creature.rs` contains no walk over a node's program or edges; its slot lists come from the genome API.
 - [x] `EdgeBundleList.tsx` contains no coordinate join and `useCreatureDetailResource.ts` no field of the brain context.
-- [ ] Invariants 1–6 hold and the Verification items pass.
+- [x] Invariants 1–6 hold and the Verification items pass.
 
 ## Notes for AI Agents
 
