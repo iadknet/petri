@@ -17,7 +17,7 @@
 //! relaxes toward it (invariant 3).
 
 use super::rules::{activity, hebbian_delta, relax, three_factor};
-use super::{OutcomeSignalBank, PlasticityKind};
+use super::OutcomeSignalBank;
 use crate::contracts::InputReference;
 use crate::genome::cgp::{
     compose, BirthSeeds, BundleId, CgpGraphBackendDef, EdgeOccurrence, EdgeSurface,
@@ -128,6 +128,17 @@ pub(crate) struct BackendLearning {
 /// `value` bounded by `config`'s clamp.
 fn bounded(value: f32, config: &Learning) -> f32 {
     value.clamp(-config.weight_clamp, config.weight_clamp)
+}
+
+/// One sample's change under `config`: the rule's activity for a
+/// reward-modulated learner (the trace takes it without the rate), its
+/// Hebbian delta at the learner's rate otherwise.
+fn sample_change(config: &Learning, pre: f32, post: f32, w: f32) -> f32 {
+    if config.modulation.is_some() {
+        activity(config.rule, pre, post, w)
+    } else {
+        hebbian_delta(config.rule, config.learning_rate, pre, post, w)
+    }
 }
 
 /// One learner's scalar update from its visit's aggregate `change`: a
@@ -392,12 +403,7 @@ impl BackendLearning {
                         let at = contributor.dynamic;
                         let w = self.applied(self.order[at].1);
                         let (pre, post) = (samples.pre[at], samples.post[at]);
-                        let change = if config.modulation.is_some() {
-                            activity(config.rule, pre, post, w)
-                        } else {
-                            hebbian_delta(config.rule, config.learning_rate, pre, post, w)
-                        };
-                        sum + contributor.pattern * change
+                        sum + contributor.pattern * sample_change(&config, pre, post, w)
                     })
                 })
             })
@@ -410,11 +416,7 @@ impl BackendLearning {
             // applied weight.
             let w = self.learner_applied(index);
             let config = learner.config;
-            let change = if config.modulation.is_some() {
-                activity(config.rule, pre, post, w)
-            } else {
-                hebbian_delta(config.rule, config.learning_rate, pre, post, w)
-            };
+            let change = sample_change(&config, pre, post, w);
             let learner = &mut self.edges[index];
             update(
                 &config,
@@ -496,7 +498,6 @@ impl BackendLearning {
             occurrence: learner.occurrence,
             genomic: learner.genomic,
             birth: learner.birth,
-            retention: learner.config.retention,
             learned: initialized.then_some(learner.value),
             applied: self.learner_applied(index),
             trace: learner
@@ -504,12 +505,9 @@ impl BackendLearning {
                 .modulation
                 .filter(|_| initialized)
                 .map(|_| learner.trace),
-            bound: learner.config.weight_clamp,
-            kind: PlasticityKind::of(&learner.config),
             learning: learner.config,
             source: learner.source,
             initialized,
-            inherits: learner.config.lamarckian,
         }
     }
 }
@@ -545,8 +543,6 @@ pub struct LearnedEdge {
     pub genomic: f32,
     /// The own quantity's birth value (T25.F09).
     pub birth: f32,
-    /// The effective learning's retention.
-    pub retention: f32,
     /// The learned own quantity, `Some` once initialized.
     pub learned: Option<f32>,
     /// The weight in force: `own + scale × pattern`.
@@ -554,18 +550,12 @@ pub struct LearnedEdge {
     /// The eligibility trace, `Some` only for an initialized
     /// reward-modulated learner.
     pub trace: Option<f32>,
-    /// The effective learning's clamp.
-    pub bound: f32,
-    pub kind: PlasticityKind,
     /// The effective learning the learner runs.
     pub learning: Learning,
     /// Where the effective learning is stored.
     pub source: LearnerSource,
     /// Whether the learner is initialized (visited or seeded).
     pub initialized: bool,
-    /// Whether a child inherits what it learns: the effective learning's
-    /// `lamarckian`, as `capture` reads it.
-    pub inherits: bool,
 }
 
 /// One bundle's learned scale as the readers see it, in `BundleId` order.
@@ -576,15 +566,10 @@ pub struct LearnedScale {
     pub genomic: f32,
     /// The scale's birth value (T25.F09).
     pub birth: f32,
-    /// The scale's retention.
-    pub retention: f32,
     /// The learned scale, `Some` only when initialized.
     pub learned: Option<f32>,
-    /// The scale's clamp.
-    pub bound: f32,
-    /// Whether a child inherits the learned scale (its learning's
-    /// `lamarckian`).
-    pub lamarckian: bool,
+    /// The learning the scale runs.
+    pub learning: Learning,
 }
 
 impl LearnedState {
@@ -697,10 +682,8 @@ impl LearnedState {
                 bundle: scale.bundle,
                 genomic: scale.genomic,
                 birth: scale.birth,
-                retention: scale.config.retention,
                 learned: backend.initialized(scale.seeded).then_some(scale.value),
-                bound: scale.config.weight_clamp,
-                lamarckian: scale.config.lamarckian,
+                learning: scale.config,
             })
         })
     }

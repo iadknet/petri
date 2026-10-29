@@ -183,7 +183,10 @@ fn an_out_of_bound_genomic_scale_starts_at_its_bound() {
     );
     let mut learned = state(&def, None);
     let view = scale(&learned);
-    assert_eq!((view.genomic, view.birth, view.retention), (7.0, 2.0, 1.0));
+    assert_eq!(
+        (view.genomic, view.birth, view.learning.retention),
+        (7.0, 2.0, 1.0)
+    );
     drive(&mut learned, &def, 1.0, 1.0);
     assert_eq!(scale(&learned).learned, Some(2.0));
 }
@@ -300,7 +303,7 @@ fn a_scale_decays_by_its_retention_and_a_static_contributor_has_none() {
     );
     let mut learned = state(&def, None);
     assert_eq!(
-        (scale(&learned).birth, scale(&learned).retention),
+        (scale(&learned).birth, scale(&learned).learning.retention),
         (0.5, 0.5)
     );
     learned.set_scale(0, 0, 2.5);

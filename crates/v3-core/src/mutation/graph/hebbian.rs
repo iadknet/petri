@@ -25,7 +25,9 @@
 use rand::{Rng, RngCore};
 
 use crate::contracts::OutcomeChannel;
-use crate::genome::cgp::{BundleId, CgpGraphBackendDef, EdgeOccurrence, EdgeRole, LearningSlot};
+use crate::genome::cgp::{
+    BundleId, CgpGraphBackendDef, EdgeOccurrence, EdgeRole, LearningSlot, Membership,
+};
 use crate::genome::{
     retention_decays, HebbianRule, Learning, MemberPolicy, RewardModulationConfig,
 };
@@ -63,15 +65,17 @@ fn stored(def: &CgpGraphBackendDef, target: Target) -> Option<Learning> {
     }
 }
 
-/// The member policy at `target`, `None` for a lone edge or a slot.
-fn policy(def: &CgpGraphBackendDef, target: Target) -> Option<MemberPolicy> {
+/// The membership at `target`, `None` for a lone edge or a slot.
+fn membership(def: &CgpGraphBackendDef, target: Target) -> Option<Membership> {
     match target {
-        Target::Edge(occurrence) => def
-            .edge_at(occurrence)
-            .membership()
-            .map(|membership| membership.policy),
+        Target::Edge(occurrence) => def.edge_at(occurrence).membership(),
         Target::Slot(..) => None,
     }
+}
+
+/// The member policy at `target`, `None` for a lone edge or a slot.
+fn policy(def: &CgpGraphBackendDef, target: Target) -> Option<MemberPolicy> {
+    membership(def, target).map(|membership| membership.policy)
 }
 
 /// `EnableHebbian`: a lone edge without learning that may learn, a member
@@ -171,14 +175,7 @@ pub(super) fn broadcast_targets(
     admits: TargetPredicate,
     rng: &mut impl Rng,
 ) -> (Broadcast, Vec<Target>) {
-    let bundle = match picked {
-        Target::Edge(occurrence) => def
-            .edge_at(occurrence)
-            .membership()
-            .map(|membership| membership.bundle),
-        Target::Slot(..) => None,
-    };
-    match bundle {
+    match membership(def, picked).map(|membership| membership.bundle) {
         Some(bundle) if rng.gen_bool(0.5) => (
             Broadcast::Members,
             def.members(bundle)
@@ -359,12 +356,7 @@ pub(crate) fn toggle_credits_in_def(
     rng: &mut impl Rng,
 ) -> Result<Broadcast, MutationSkipReason> {
     let picked = select_eligible(def, is_member, rng)?;
-    let Target::Edge(at) = picked else {
-        return Err(MutationSkipReason::NoApplicableTarget);
-    };
-    let credits = !def
-        .edge_at(at)
-        .membership()
+    let credits = !membership(def, picked)
         .ok_or(MutationSkipReason::NoApplicableTarget)?
         .credits;
     let (broadcast, targets) = broadcast_targets(def, picked, is_member, rng);

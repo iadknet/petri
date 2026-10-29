@@ -21,7 +21,7 @@
 use crate::genome::cgp::EdgeSurface;
 use crate::genome::learning::LearnerSource;
 use crate::genome::HebbianRule;
-use crate::runtime::plasticity::{LearnedState, RULES};
+use crate::runtime::plasticity::{LearnedState, PlasticityKind, RULES};
 
 /// The `petri.plasticity_rule` key of `rule`.
 #[must_use]
@@ -241,7 +241,7 @@ impl PlasticityCensus {
         for &node_idx in reachable {
             for edge in learned.edges(node_idx) {
                 carries = true;
-                let kind = edge.kind;
+                let kind = PlasticityKind::of(&edge.learning);
                 let surface = match edge.occurrence.surface {
                     EdgeSurface::ComputeInput(_) => 0,
                     EdgeSurface::SinkInput(_) => 1,
@@ -249,10 +249,10 @@ impl PlasticityCensus {
                 self.edges_by_rule[kind.rule_index()] += 1;
                 self.edges_by_inheritance[usize::from(kind.lamarckian)] += 1;
                 self.edges_by_source[edge.source.index()] += 1;
-                self.edges_by_retention[retention_index(edge.retention)].add(
+                self.edges_by_retention[retention_index(edge.learning.retention)].add(
                     edge.learned,
                     edge.birth,
-                    edge.bound,
+                    edge.learning.weight_clamp,
                 );
                 let cell = &mut self.edges[usize::from(kind.reward_modulated)][surface];
                 cell.edges += 1;
@@ -260,24 +260,24 @@ impl PlasticityCensus {
                     continue;
                 };
                 add_drift(&mut cell.drift_sum, weight, edge.birth);
-                cell.at_clamp += u64::from(weight.abs() >= edge.bound);
+                cell.at_clamp += u64::from(weight.abs() >= edge.learning.weight_clamp);
             }
             // A carrier has a learner, an edge's or a scale's, on a
             // reachable node (T25.F12 invariant 11).
             for scale in learned.scales(node_idx) {
                 carries = true;
-                self.scales_by_retention[retention_index(scale.retention)].add(
+                self.scales_by_retention[retention_index(scale.learning.retention)].add(
                     scale.learned,
                     scale.birth,
-                    scale.bound,
+                    scale.learning.weight_clamp,
                 );
-                let cell = &mut self.scales[usize::from(scale.lamarckian)];
+                let cell = &mut self.scales[usize::from(scale.learning.lamarckian)];
                 cell.scales += 1;
                 let Some(value) = scale.learned else {
                     continue;
                 };
                 add_drift(&mut cell.drift_sum, value, scale.birth);
-                cell.at_bound += u64::from(value.abs() >= scale.bound);
+                cell.at_bound += u64::from(value.abs() >= scale.learning.weight_clamp);
             }
         }
         self.carriers += u64::from(carries);

@@ -217,6 +217,50 @@ fn a_bundle_is_a_live_component_reading_its_ring_and_writing_action() {
     assert!(!stateful);
 }
 
+/// T25.F12 invariant 11: a bundle-only learner (`scale_learning` present,
+/// every member `Static` and none crediting) carries learning for the
+/// structural classifiers too: the annotations mark the node stateful and
+/// the companions report plasticity, as the layout does.
+#[test]
+fn a_bundle_only_learner_is_classified_as_learning() {
+    use crate::genome::cgp::LearningSlot;
+    use crate::genome::companions::structural_companions;
+    use crate::genome::learning::LearningLayout;
+    use crate::genome::{HebbianRule, Learning};
+
+    let ring = InputReference::World(WorldInputKey::NeighborOccupiedRing);
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    let id = def.add_ring_bundle(0, DirectedVoteKind::Move, 0);
+    def.bundle_mut(id).set_slot(
+        LearningSlot::Scale,
+        Some(Learning {
+            rule: HebbianRule::Classic,
+            learning_rate: 0.1,
+            weight_clamp: 2.0,
+            lamarckian: false,
+            modulation: None,
+            retention: 1.0,
+        }),
+    );
+    let refs = vec![ring];
+    let layout = LearningLayout::of(&def, &refs);
+    assert!(layout.edges.is_empty());
+    assert_eq!(layout.scales.len(), 1);
+    assert!(layout.scales[0].contributors.is_empty());
+    let (_, _, stateful, _) = derive_cgp_annotations(&def, &refs);
+    assert!(stateful);
+    let genome = CreatureGenome {
+        entry_node_id: crate::contracts::NodeId(0),
+        nodes: vec![NodeGenome {
+            node_id: crate::contracts::NodeId(0),
+            input_refs: refs,
+            backend_def: BackendDef::Graph(def),
+            targets: Vec::new(),
+        }],
+    };
+    assert!(structural_companions(&genome).has_plasticity);
+}
+
 /// The ring offset is `(d − channel) mod 8` for every `u8` pair, not only
 /// for the eight directions and channels the census reads.
 #[test]

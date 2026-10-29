@@ -451,7 +451,10 @@ fn member_default_serves_inherit_members_alone() {
             (all[1], LearnerSource::Own)
         ]
     );
-    assert_eq!(view_edge(&learned, all[0]).bound, default.weight_clamp);
+    assert_eq!(
+        view_edge(&learned, all[0]).learning.weight_clamp,
+        default.weight_clamp
+    );
     let counts = drive(&mut learned, &def, |_| 1.0, 2.0);
     assert_eq!(view_edge(&learned, all[0]).learned, Some(0.125 * 2.0));
     assert_eq!(view_edge(&learned, all[1]).learned, Some(-0.25 * 2.0));
@@ -572,16 +575,16 @@ fn a_scale_and_a_modifier_seed_by_their_own_lamarckian() {
     slots(&mut def, id, Some(lamarckian(classic)), Some(classic));
     let child = state(&def, Some(parent(&def)));
     assert_eq!(scale(&child).learned, Some(1.5));
-    assert!(scale(&child).lamarckian);
+    assert!(scale(&child).learning.lamarckian);
     let edge = view_edge(&child, all[0]);
-    assert_eq!((edge.learned, edge.inherits), (None, false));
+    assert_eq!((edge.learned, edge.learning.lamarckian), (None, false));
     assert_eq!(edge.applied, 0.25 + 1.5);
 
     slots(&mut def, id, Some(classic), Some(lamarckian(classic)));
     let child = state(&def, Some(parent(&def)));
     assert_eq!(scale(&child).learned, None);
     let edge = view_edge(&child, all[0]);
-    assert_eq!((edge.learned, edge.inherits), (Some(0.75), true));
+    assert_eq!((edge.learned, edge.learning.lamarckian), (Some(0.75), true));
     assert_eq!(edge.applied, 0.75 + 0.5);
     let captured = child.capture(0, &def).expect("a seeded modifier");
     assert_eq!(captured.value(all[0]), Some(0.75));
@@ -686,7 +689,7 @@ fn initialization_is_per_learner_across_edges_and_scales() {
     assert_eq!(scale(&edge_seeded).learned, None);
     let edge = view_edge(&edge_seeded, all[1]);
     assert_eq!((edge.learned, edge.trace), (Some(0.75), Some(0.0)));
-    assert!(edge.initialized && edge.inherits);
+    assert!(edge.initialized && edge.learning.lamarckian);
     let mut rewarded = edge_seeded.clone();
     rewarded.apply_reward(&signals(1.0));
     assert_eq!(scale(&rewarded).learned, None);

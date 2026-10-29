@@ -393,11 +393,7 @@ impl BundleMut<'_> {
             learning.is_none_or(|learning| learning.in_range()),
             "set_slot: a learning is in range (I1)"
         );
-        let record = &mut self.def.bundles[self.bundle.index()];
-        match slot {
-            LearningSlot::Scale => record.scale_learning = learning,
-            LearningSlot::MemberDefault => record.member_default = learning,
-        }
+        *self.def.bundles[self.bundle.index()].slot_mut(slot) = learning;
     }
 }
 

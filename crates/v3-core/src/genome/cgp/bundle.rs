@@ -385,6 +385,14 @@ impl Bundle {
             LearningSlot::MemberDefault => self.member_default,
         }
     }
+
+    /// The storage of `slot`, for the container's one slot writer.
+    pub(super) fn slot_mut(&mut self, slot: LearningSlot) -> &mut Option<Learning> {
+        match slot {
+            LearningSlot::Scale => &mut self.scale_learning,
+            LearningSlot::MemberDefault => &mut self.member_default,
+        }
+    }
 }
 
 /// Detach the member at `occurrence` (an edit that changes its source

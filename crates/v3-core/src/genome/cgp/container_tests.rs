@@ -1670,6 +1670,39 @@ fn a_node_level_plasticity_key_is_refused() {
 
 /// The layout lists every lone edge with learning on both surfaces in
 /// canonical order, and nothing else (T25.F12 invariant 4).
+/// T25.F12 invariant 4: `clear_learning` leaves an empty layout: lone
+/// learners, an `Own` member, an `Inherit` member under `member_default`
+/// and a bundle-only scale learner all stop learning, and no seed or weight
+/// changes.
+#[test]
+fn clear_learning_empties_the_layout_and_keeps_weights_and_seeds() {
+    let mut def = seeded();
+    let id = def.add_ring_bundle(0, DirectedVoteKind::Move, 0);
+    def.bundle_mut(id).set_slot(LearningSlot::Scale, plastic());
+    def.bundle_mut(id)
+        .set_slot(LearningSlot::MemberDefault, plastic());
+    let members: Vec<EdgeOccurrence> = def.members(id).collect();
+    def.edge_mut(members[0])
+        .set_policy(MemberPolicy::Own(plastic().unwrap()));
+    def.edge_mut(members[1]).set_policy(MemberPolicy::Inherit);
+    let refs = [InputReference::World(
+        crate::contracts::WorldInputKey::NeighborOccupiedRing,
+    )];
+    assert!(!LearningLayout::of(&def, &refs).is_empty());
+    let weights: Vec<f32> = def
+        .edge_sites()
+        .map(|at| def.genomic_weight(at, &refs))
+        .collect();
+    let seeds = def.birth_seeds().cloned();
+    def.clear_learning();
+    assert!(LearningLayout::of(&def, &refs).is_empty());
+    assert!(def
+        .edge_sites()
+        .map(|at| def.genomic_weight(at, &refs))
+        .eq(weights));
+    assert_eq!(def.birth_seeds().cloned(), seeds);
+}
+
 #[test]
 fn the_layout_lists_lone_learners_on_both_surfaces_in_canonical_order() {
     let mut def = seeded();
