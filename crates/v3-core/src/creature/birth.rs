@@ -20,6 +20,7 @@ use crate::creature::state::CreatureState;
 use crate::genome::learning::{InheritanceMapping, Seeds};
 use crate::genome::CreatureGenome;
 use crate::ledger::applied_debit;
+use crate::mutation::body::sample_body_draws;
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::{BirthEdgeClass, MutationEngine, MutationOperator, MutationSummary};
 
@@ -163,17 +164,8 @@ impl Zygote {
             rng,
             &config.sensor_context(config.world.food.types.len()),
         );
-        // Phenotype then kin-tag mutation, drawn only when at least one
-        // genome event was applied, then the capacity, the steal share and
-        // the give share draws on every birth.
-        let body = HeritableBody::inherit(
-            &parent.body,
-            summary.applied_events > 0,
-            &config.mutation,
-            &config.energy,
-            &config.exchange,
-            rng,
-        );
+        let draws = sample_body_draws(summary.applied_events > 0, &config.mutation, rng);
+        let body = HeritableBody::inherit(&parent.body, &draws, &config.energy, &config.exchange);
         let provenance = Provenance::of_child(parent.generation, &summary);
         (
             Self {

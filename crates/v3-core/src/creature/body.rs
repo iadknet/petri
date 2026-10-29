@@ -4,22 +4,17 @@
 //! [`HeritableBody`] carries the six-channel colour [`Phenotype`], the kin
 //! [`CreatureIdentityState`], the energy `capacity` and the two exchange
 //! shares (T27.F03). Seeding builds it with
-//! [`HeritableBody::founder`], reproduction with [`HeritableBody::inherit`],
-//! and the creature constructors take it as one argument. The record owns the
-//! order of the inheritance draws and the capacity's body rules
+//! [`HeritableBody::founder`], conception with [`HeritableBody::inherit`]
+//! from the draws the body policy sampled (`mutation::body`, T29.F01), and
+//! the birth transaction carries it to the creature. The record applies the
+//! sampled choices deterministically and owns the capacity's body rules
 //! ([`HeritableBody::move_factor`], [`HeritableBody::upkeep`],
-//! [`HeritableBody::energy_scale`]); `mutation::phenotype` and
-//! `creature::identity` own how the other two parts mutate.
+//! [`HeritableBody::energy_scale`]).
 
-use rand::Rng;
-
-use crate::config::{
-    EnergyCapacityConfig, EnergyConfig, ExchangeConfig, LogStepMutationConfig, MutationConfig,
-    SensorScale,
-};
+use crate::config::{EnergyCapacityConfig, EnergyConfig, ExchangeConfig, SensorScale};
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::phenotype::Phenotype;
-use crate::mutation::phenotype::mutate_phenotype;
+use crate::mutation::body::BodyDraws;
 
 /// Everything a creature inherits beside its genome and shared memory.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -54,38 +49,35 @@ impl HeritableBody {
         }
     }
 
-    /// The child's body: a copy of `parent`'s with the capacity clamped to
-    /// the range in force at this birth, `[capacity.min,
-    /// lifecycle.max_energy]`, so a live patch of the bounds reaches the next
-    /// generation without a draw; when the birth `mutated` (at least one
-    /// genome mutation event applied), a phenotype mutation followed by a
-    /// kin-tag mutation; then, on every birth, the capacity, `steal_share`
-    /// and `give_share` in that order by [`inherit_scalar`], the capacity
-    /// under `mutation.capacity` over `[capacity.min, lifecycle.max_energy]`
-    /// and the shares under `mutation.share` over `[exchange.share_min, 1]`.
+    /// The child's body: a copy of `parent`'s with the sampled `draws`
+    /// (`mutation::body`) applied, deterministically: the phenotype step and
+    /// the kin-bit flip when drawn, then the capacity, `steal_share` and
+    /// `give_share` by [`inherit_scalar`], the capacity over `[capacity.min,
+    /// lifecycle.max_energy]` and the shares over `[exchange.share_min, 1]`,
+    /// so a live patch of the bounds reaches the next generation without a
+    /// draw.
     #[must_use]
     pub fn inherit(
         parent: &Self,
-        mutated: bool,
-        mutation: &MutationConfig,
+        draws: &BodyDraws,
         energy: &EnergyConfig,
         exchange: &ExchangeConfig,
-        rng: &mut impl Rng,
     ) -> Self {
         let mut child = Self {
             identity: CreatureIdentityState::inherit(&parent.identity),
             ..*parent
         };
-        if mutated {
-            child.phenotype = mutate_phenotype(child.phenotype, &mutation.phenotype, rng);
-            child.identity.mutate_kin_tag(rng);
+        if let Some(phenotype) = &draws.phenotype {
+            child.phenotype = child.phenotype.mutated(phenotype);
+        }
+        if let Some(bit) = draws.kin_bit {
+            child.identity.flip_kin_bit(bit);
         }
         let (min, max) = (energy.capacity.min, energy.lifecycle.max_energy);
-        child.capacity = inherit_scalar(parent.capacity, &mutation.capacity, min, max, rng);
+        child.capacity = inherit_scalar(parent.capacity, draws.capacity, min, max);
         let share_min = exchange.share_min;
-        child.steal_share =
-            inherit_scalar(parent.steal_share, &mutation.share, share_min, 1.0, rng);
-        child.give_share = inherit_scalar(parent.give_share, &mutation.share, share_min, 1.0, rng);
+        child.steal_share = inherit_scalar(parent.steal_share, draws.steal_share, share_min, 1.0);
+        child.give_share = inherit_scalar(parent.give_share, draws.give_share, share_min, 1.0);
         child
     }
 
@@ -124,26 +116,18 @@ impl HeritableBody {
 /// then one `f32` draw against `config.chance` and, when it fires, a uniform
 /// log-space step `δ ∈ [-log_step, log_step]` with the child
 /// `(parent × e^δ)` clamped to the same range.
-fn inherit_scalar(
-    parent: f32,
-    config: &LogStepMutationConfig,
-    min: f32,
-    max: f32,
-    rng: &mut impl Rng,
-) -> f32 {
-    if rng.gen::<f32>() < config.chance {
-        let step = config.log_step;
-        let delta = rng.gen_range(-step..=step);
-        (parent * delta.exp()).clamp(min, max)
-    } else {
-        parent.clamp(min, max)
+fn inherit_scalar(parent: f32, log_step: Option<f32>, min: f32, max: f32) -> f32 {
+    match log_step {
+        Some(delta) => (parent * delta.exp()).clamp(min, max),
+        None => parent.clamp(min, max),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{LogStepMutationConfig, PhenotypeConfig};
+    use crate::config::{LogStepMutationConfig, MutationConfig, PhenotypeConfig};
+    use crate::mutation::body::sample_body_draws;
     use proptest::prelude::*;
     use rand::rngs::SmallRng;
     use rand::{Rng, SeedableRng};
@@ -161,6 +145,59 @@ mod tests {
             share: LogStepMutationConfig { chance, log_step },
             ..MutationConfig::default()
         }
+    }
+
+    /// The body draws pinned (T29.F01 invariant 8): over seeds, parents and
+    /// both gate values, the FNV-1a hash of every child body and the next
+    /// draw after it. Any change to a body draw, its order, its gate or its
+    /// arithmetic moves it.
+    #[test]
+    fn the_body_draw_stream_is_pinned() {
+        let energy = EnergyConfig::default();
+        let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+        for seed in 0u64..512 {
+            let mut parent_rng = SmallRng::seed_from_u64(seed ^ 0x5eed);
+            let parent = HeritableBody {
+                phenotype: Phenotype {
+                    channels: parent_rng.gen(),
+                    active_channel: parent_rng.gen_range(0..6),
+                    polarity: parent_rng.gen(),
+                },
+                identity: CreatureIdentityState {
+                    lineage_id: parent_rng.gen(),
+                    kin_tag: parent_rng.gen(),
+                },
+                capacity: parent_rng.gen_range(10.0f32..=900.0),
+                steal_share: parent_rng.gen_range(0.0f32..=1.0),
+                give_share: parent_rng.gen_range(0.0f32..=1.0),
+            };
+            for mutated in [false, true] {
+                let mut rng = SmallRng::seed_from_u64(seed);
+                let config = mutation(0.5, 0.3);
+                let child = inherit_with(&parent, mutated, &config, &energy, &mut rng);
+                let bytes = format!("{child:?}{}", rng.gen::<u64>());
+                for byte in bytes.bytes() {
+                    hash = (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3);
+                }
+            }
+        }
+        assert_eq!(hash, 5_930_375_763_980_946_700);
+    }
+
+    /// A child of `parent` through today's inheritance.
+    fn inherit_with(
+        parent: &HeritableBody,
+        mutated: bool,
+        config: &MutationConfig,
+        energy: &EnergyConfig,
+        rng: &mut SmallRng,
+    ) -> HeritableBody {
+        HeritableBody::inherit(
+            parent,
+            &sample_body_draws(mutated, config, rng),
+            energy,
+            &EXCHANGE,
+        )
     }
 
     const EXCHANGE: ExchangeConfig = ExchangeConfig {
@@ -282,20 +319,16 @@ mod tests {
         let energy = EnergyConfig::default();
         let child = HeritableBody::inherit(
             &parent,
-            false,
-            &mutation(0.0, 0.25),
+            &sample_body_draws(false, &mutation(0.0, 0.25), &mut ZeroRng),
             &energy,
             &EXCHANGE,
-            &mut ZeroRng,
         );
         assert_eq!(child, parent);
         let fired = HeritableBody::inherit(
             &parent,
-            false,
-            &mutation(f32::MIN_POSITIVE, 0.25),
+            &sample_body_draws(false, &mutation(f32::MIN_POSITIVE, 0.25), &mut ZeroRng),
             &energy,
             &EXCHANGE,
-            &mut ZeroRng,
         );
         assert_eq!(fired.capacity, 200.0 * (-0.25f32).exp());
         assert_eq!(fired.steal_share, 0.2 * (-0.25f32).exp());
@@ -313,11 +346,9 @@ mod tests {
         // ZeroRng steps by -log_step: 0.011 × e^-1 is below 0.01.
         let low = HeritableBody::inherit(
             &parent,
-            false,
-            &mutation(1.0, 1.0),
+            &sample_body_draws(false, &mutation(1.0, 1.0), &mut ZeroRng),
             &energy,
             &EXCHANGE,
-            &mut ZeroRng,
         );
         assert_eq!(low.steal_share, 0.01);
         // A step up from 0.99 by up to e^1 clamps at 1 for any draw above
@@ -328,11 +359,9 @@ mod tests {
         for _ in 0..64 {
             let child = HeritableBody::inherit(
                 &parent,
-                false,
-                &mutation(1.0, 1.0),
+                &sample_body_draws(false, &mutation(1.0, 1.0), &mut rng),
                 &energy,
                 &EXCHANGE,
-                &mut rng,
             );
             assert!((0.01..=1.0).contains(&child.give_share));
             hit_one |= child.give_share == 1.0;
@@ -344,11 +373,9 @@ mod tests {
         };
         let child = HeritableBody::inherit(
             &parent,
-            false,
-            &mutation(1.0, 0.0),
+            &sample_body_draws(false, &mutation(1.0, 0.0), &mut rng),
             &energy,
             &unit,
-            &mut rng,
         );
         assert_eq!((child.steal_share, child.give_share), (1.0, 1.0));
     }
@@ -370,11 +397,9 @@ mod tests {
         for _ in 0..64 {
             let child = HeritableBody::inherit(
                 &parent,
-                false,
-                &cfg.mutation,
+                &sample_body_draws(false, &cfg.mutation, &mut rng),
                 &cfg.energy,
                 &cfg.exchange,
-                &mut rng,
             );
             assert!((1.0..=f32::MAX).contains(&child.capacity));
         }
@@ -400,11 +425,9 @@ mod tests {
         for _ in 0..64 {
             let child = HeritableBody::inherit(
                 &parent,
-                false,
-                &cfg.mutation,
+                &sample_body_draws(false, &cfg.mutation, &mut rng),
                 &cfg.energy,
                 &cfg.exchange,
-                &mut rng,
             );
             assert!((1.0e-40..=1.0).contains(&child.steal_share));
             assert!((1.0e-40..=1.0).contains(&child.give_share));
@@ -428,7 +451,7 @@ mod tests {
             let energy = EnergyConfig::default();
             let mut rng = SmallRng::seed_from_u64(seed);
             let child =
-                HeritableBody::inherit(&parent, mutated, &mutation, &energy, &EXCHANGE, &mut rng);
+                HeritableBody::inherit(&parent, &sample_body_draws(mutated, &mutation, &mut rng), &energy, &EXCHANGE);
 
             let mut expected_rng = SmallRng::seed_from_u64(seed);
             let mut expected = HeritableBody {
@@ -436,9 +459,15 @@ mod tests {
                 ..parent
             };
             if mutated {
-                expected.phenotype =
-                    mutate_phenotype(parent.phenotype, &mutation.phenotype, &mut expected_rng);
-                expected.identity.mutate_kin_tag(&mut expected_rng);
+                expected.phenotype = parent.phenotype.mutated(
+                    &crate::mutation::phenotype::sample_phenotype_draw(
+                        &mutation.phenotype,
+                        &mut expected_rng,
+                    ),
+                );
+                expected
+                    .identity
+                    .flip_kin_bit(expected_rng.gen_range(0..32u32));
             }
             let mut draw = |value: f32, min: f32, max: f32| {
                 if expected_rng.gen::<f32>() < chance {
@@ -461,9 +490,7 @@ mod tests {
         #[test]
         fn an_unmutated_missed_inheritance_copies_the_parent(parent in body(), seed in any::<u64>()) {
             let mut rng = SmallRng::seed_from_u64(seed);
-            let child = HeritableBody::inherit(
-                &parent, false, &mutation(0.0, 0.25), &EnergyConfig::default(), &EXCHANGE, &mut rng,
-            );
+            let child = HeritableBody::inherit(&parent, &sample_body_draws(false, &mutation(0.0, 0.25), &mut rng), &EnergyConfig::default(), &EXCHANGE);
             prop_assert_eq!(child, parent);
             let mut expected_rng = SmallRng::seed_from_u64(seed);
             let _: [f32; 3] = expected_rng.gen();
@@ -483,9 +510,7 @@ mod tests {
             energy.capacity.min = min;
             energy.lifecycle.max_energy = min + span;
             let mut rng = SmallRng::seed_from_u64(seed);
-            let child = HeritableBody::inherit(
-                &parent, false, &mutation(0.0, 0.25), &energy, &EXCHANGE, &mut rng,
-            );
+            let child = HeritableBody::inherit(&parent, &sample_body_draws(false, &mutation(0.0, 0.25), &mut rng), &energy, &EXCHANGE);
             prop_assert_eq!(child.capacity, parent.capacity.clamp(min, min + span));
         }
 
@@ -505,9 +530,7 @@ mod tests {
             let exchange = ExchangeConfig { share_min, ..EXCHANGE };
             let log_step = log_step.min(share_min.ln().abs());
             let mut rng = SmallRng::seed_from_u64(seed);
-            let child = HeritableBody::inherit(
-                &parent, false, &mutation(chance, log_step), &EnergyConfig::default(), &exchange, &mut rng,
-            );
+            let child = HeritableBody::inherit(&parent, &sample_body_draws(false, &mutation(chance, log_step), &mut rng), &EnergyConfig::default(), &exchange);
             prop_assert!((share_min..=1.0).contains(&child.steal_share));
             prop_assert!((share_min..=1.0).contains(&child.give_share));
         }
@@ -516,9 +539,7 @@ mod tests {
         #[test]
         fn a_mutated_inheritance_keeps_lineage_and_flips_one_kin_bit(parent in body(), seed in any::<u64>()) {
             let mut rng = SmallRng::seed_from_u64(seed);
-            let child = HeritableBody::inherit(
-                &parent, true, &mutation(0.1, 0.25), &EnergyConfig::default(), &EXCHANGE, &mut rng,
-            );
+            let child = HeritableBody::inherit(&parent, &sample_body_draws(true, &mutation(0.1, 0.25), &mut rng), &EnergyConfig::default(), &EXCHANGE);
             prop_assert_eq!(child.identity.lineage_id, parent.identity.lineage_id);
             prop_assert_eq!((child.identity.kin_tag ^ parent.identity.kin_tag).count_ones(), 1);
         }
@@ -533,9 +554,7 @@ mod tests {
         ) {
             let energy = EnergyConfig::default();
             let mut rng = SmallRng::seed_from_u64(seed);
-            let child = HeritableBody::inherit(
-                &parent, false, &mutation(1.0, log_step), &energy, &EXCHANGE, &mut rng,
-            );
+            let child = HeritableBody::inherit(&parent, &sample_body_draws(false, &mutation(1.0, log_step), &mut rng), &energy, &EXCHANGE);
             prop_assert!(child.capacity >= energy.capacity.min);
             prop_assert!(child.capacity <= energy.lifecycle.max_energy);
             let lo = (parent.capacity * (-log_step).exp()).max(energy.capacity.min);

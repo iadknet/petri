@@ -30,20 +30,17 @@ impl CreatureIdentityState {
     ///
     /// - `lineage_id` is inherited unchanged.
     /// - `kin_tag` is inherited unchanged; `HeritableBody::inherit`
-    ///   (`creature::body`) applies `mutate_kin_tag` when
-    ///   `MutationSummary.applied_events > 0`.
+    ///   (`creature::body`) flips the bit the body policy drew
+    ///   (`mutation::body`) when `MutationSummary.applied_events > 0`.
     #[must_use]
     pub fn inherit(parent: &Self) -> Self {
         *parent
     }
 
-    /// Mutate kin_tag by flipping exactly one uniformly random bit.
-    ///
-    /// Per v3-creature-identity-spec.md Section 5:
-    /// - flip exactly one uniformly random bit in the 32-bit kin_tag
-    /// - called only when `MutationSummary.applied_events > 0`
-    pub fn mutate_kin_tag(&mut self, rng: &mut impl rand::Rng) {
-        let bit = rng.gen_range(0..32u32);
+    /// Flip bit `bit` (in `0..32`) of `kin_tag`: the one kin-tag mutation
+    /// (v3-creature-identity-spec.md Section 5), its bit drawn uniformly by
+    /// the body policy (`mutation::body`).
+    pub fn flip_kin_bit(&mut self, bit: u32) {
         self.kin_tag ^= 1 << bit;
     }
 }
@@ -52,7 +49,7 @@ impl CreatureIdentityState {
 mod tests {
     use super::*;
     use rand::rngs::SmallRng;
-    use rand::SeedableRng;
+    use rand::{Rng, SeedableRng};
 
     #[test]
     fn founder_identity_deterministic_for_same_seed() {
@@ -102,7 +99,7 @@ mod tests {
         let mut rng = SmallRng::seed_from_u64(42);
         let original = CreatureIdentityState::founder(0, 42);
         let mut mutated = original;
-        mutated.mutate_kin_tag(&mut rng);
+        mutated.flip_kin_bit(rng.gen_range(0..32u32));
         // Exactly one bit should differ
         let diff = original.kin_tag ^ mutated.kin_tag;
         assert_eq!(diff.count_ones(), 1);
@@ -113,7 +110,7 @@ mod tests {
         let mut rng = SmallRng::seed_from_u64(42);
         let mut identity = CreatureIdentityState::founder(7, 42);
         let original_lineage = identity.lineage_id;
-        identity.mutate_kin_tag(&mut rng);
+        identity.flip_kin_bit(rng.gen_range(0..32u32));
         assert_eq!(identity.lineage_id, original_lineage);
     }
 }
