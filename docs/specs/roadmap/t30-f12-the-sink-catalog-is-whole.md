@@ -136,29 +136,29 @@ regression past its threshold would show it wrong.
 
 - [x] Before any edit: record the comparator digests on `768dde1fc`
       (Verification) in the readings.
-- [ ] Catalog map (audit rows 4, 8): one `OutputSinkKind` ↔ index map in
+- [x] Catalog map (audit rows 4, 8): one `OutputSinkKind` ↔ index map in
       `genome/cgp/mod.rs`; `new_with_fixed_outputs` builds from it; the
       offset constants derive from or are checked against it; a property
       test that the map round-trips over every catalog index and that an
       out-of-catalog kind panics.
-- [ ] Validation (rows 1, 2): delete `with_output_sinks`; the sink list
+- [x] Validation (rows 1, 2): delete `with_output_sinks`; the sink list
       deserializes through a validating conversion (invariant 2); tests
       that a missing, extra, reordered, duplicated and out-of-catalog list
       is rejected and that a founder genome round-trips byte-identically.
-- [ ] Total lookups (row 4): `sink`, `sink_surface`, `site_sink` and
+- [x] Total lookups (row 4): `sink`, `sink_surface`, `site_sink` and
       `insert_member` by index; `relocate_bundle`'s panic clause for a
       missing sink deleted; callers in `creature/cgp_founder.rs`,
       `neighborhood/census.rs`, `neighborhood/drives.rs`, `genome/mod.rs`,
       `v3-lab/src/controllers.rs` and fixtures in every crate drop their
       `expect`, `unwrap` and `if let`.
-- [ ] Hosting layer (row 3): delete `hosts` and `hosts_kind`; `plans(set)`;
+- [x] Hosting layer (row 3): delete `hosts` and `hosts_kind`; `plans(set)`;
       callers in `genome/node_edit.rs`, `genome/cgp/container.rs`,
       `mutation/graph/bundle.rs`, `v3-cli/src/bench/census_pins.rs` and
       `genome/cgp/test_support.rs`.
-- [ ] Skip paths (rows 5, 6): invariant 6's deletions; `draw_births` and
+- [x] Skip paths (rows 5, 6): invariant 6's deletions; `draw_births` and
       `pick_random_surface` become total; `MutationSkipReason` keeps its
       variants that other paths use.
-- [ ] Fixtures (row 7): `test_support::edit_sinks` edits inputs only, kinds
+- [x] Fixtures (row 7): `test_support::edit_sinks` edits inputs only, kinds
       fixed; every `with_output_sinks` fixture in `v3-core`, `v3-cli` and
       `v3-lab` starts from the full catalog, addressing a sink by its
       catalog index; tests of partial catalogs (`container_tests.rs:944-964`,
@@ -170,12 +170,15 @@ regression past its threshold would show it wrong.
 
 ## Verification
 
-- [ ] Focused tests: `cargo test -p v3-core genome::cgp` and
-      `cargo test -p v3-core mutation::graph` -> pass; the catalog-map and
-      deserialization tests named in the tasks exist.
+- [x] Focused tests: `cargo test -p v3-core genome::cgp` (103 passed) and
+      `cargo test -p v3-core mutation::graph` (119 passed) -> pass; the
+      catalog-map tests (`catalog_map_round_trips`,
+      `a_kind_outside_the_catalog_has_no_index`) and deserialization tests
+      (`any_other_sink_list_is_rejected_at_deserialization`,
+      `a_founder_def_round_trips_byte_identically`) exist.
 - [ ] `make check` -> exit 0, reproducibility and draw-stream pins unchanged.
-- [ ] Invariant 7's grep -> no match; output in readings.
-- [ ] Lab comparator hashes, T30.F09 invariant 2's method: the SHA-256 of
+- [x] Invariant 7's grep -> no match; output in readings.
+- [x] Lab comparator hashes, T30.F09 invariant 2's method: the SHA-256 of
       each comparator genome's canonical JSON on `768dde1fc`, taken before
       any edit, equals the one on the final code; both in readings.
 - [ ] `make rust-test-slow` -> exit 0.
