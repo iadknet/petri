@@ -231,3 +231,7 @@ impl Zygote {
         Newborn { creature, overflow }
     }
 }
+
+#[cfg(test)]
+#[path = "birth_tests.rs"]
+mod tests;
