@@ -5,9 +5,8 @@
 use super::census_pins::frame_of;
 use super::*;
 use v3_core::config::OrdinaryFoodTypeId;
-use v3_core::contracts::{
-    CreatureId, InputReference, NodeId, Position, WorldInputKey, SHARED_MEMORY_SLOTS,
-};
+use v3_core::contracts::{CreatureId, Direction, InputReference, NodeId, Position, WorldInputKey};
+use v3_core::creature::birth::{BirthPlace, Zygote};
 use v3_core::creature::body::HeritableBody;
 use v3_core::creature::state::CreatureState;
 use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
@@ -36,10 +35,10 @@ fn two_food_reader(id: CreatureId, config: &SimulationConfig) -> CreatureState {
     };
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![InputReference::World(FOOD_0), InputReference::World(FOOD_1)],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![InputReference::World(FOOD_0), InputReference::World(FOOD_1)],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 4,
                 constants: vec![],
                 program: vec![
@@ -60,23 +59,21 @@ fn two_food_reader(id: CreatureId, config: &SimulationConfig) -> CreatureState {
                     },
                 ],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     };
-    CreatureState::new(
-        id,
-        genome,
-        Position::new(0, 0),
-        10.0,
+    let body = HeritableBody::founder(
         0,
-        HeritableBody::founder(
-            0,
-            1,
-            config.energy.capacity.founder,
-            config.exchange.founder_share,
-        ),
-        [0.0; SHARED_MEMORY_SLOTS],
-    )
+        1,
+        config.energy.capacity.founder,
+        config.exchange.founder_share,
+    );
+    let place = BirthPlace {
+        position: Position::new(0, 0),
+        heading: Direction::N,
+        energy: 10.0,
+    };
+    Zygote::founder(genome, body).finalize(id, place).creature
 }
 
 #[test]
