@@ -9,7 +9,7 @@ use v3_core::mutation::{
     BirthEdgeClass, MutationAddedNodeInputClass, MutationDomain, MutationOperator,
     MutationOperatorFunnel, MutationSkipReason,
 };
-use v3_core::neighborhood::sensor_census::{world_input_key_label, SensorUseRow};
+use v3_core::neighborhood::sensor_census::SensorUseRow;
 use v3_core::simulation::actions::{
     BarrierReaderState, MoveBlockedCause, PredationActionResult, ReproductionActionResult,
     ReproductionInvalidTargetCause,
@@ -563,11 +563,14 @@ fn mutation_families(families: &mut Vec<Family>) {
                 "petri.world_input",
                 strings(
                     [
-                        "FoodHere",
-                        "NeighborFoodRing",
+                        "FoodHere:0",
+                        "FoodHere:1",
+                        "NeighborFoodRing:0",
+                        "NeighborFoodRing:1",
                         "NeighborBarrierRing",
                         "NeighborOccupiedRing",
-                        "AreaFoodSummary",
+                        "AreaFoodSummary:0",
+                        "AreaFoodSummary:1",
                         "AreaBarrierSummary",
                         "AreaOccupancySummary",
                         "NearbyCreature",
@@ -789,10 +792,7 @@ fn tick_families(families: &mut Vec<Family>) {
             Gauge,
             vec![(
                 "petri.world_input",
-                sensor_rows()
-                    .iter()
-                    .map(|row| world_input_key_label(row.key))
-                    .collect(),
+                sensor_rows().iter().map(|row| row.key.as_key()).collect(),
             )],
         ));
     }
@@ -955,7 +955,7 @@ fn every_family_is_encoded_with_its_name_kind_attributes_and_keys_and_nothing_el
 fn sensor_families_carry_each_rows_counts_per_food_typed_label() {
     let snapshot = encoded(&populated());
     for row in sensor_rows() {
-        let label = world_input_key_label(row.key);
+        let label = row.key.as_key();
         for (name, count) in [
             ("petri.tick.sensor_declared", row.declared),
             ("petri.tick.sensor_wired", row.wired),
@@ -1010,16 +1010,28 @@ fn encoded_values_units_and_descriptions_follow_the_contract() {
         ),
         PointValue::Double(1.5)
     );
-    // Both food types' `FoodHere` keys share one `as_key()` value and sum.
+    // Each food type's `FoodHere` key is its own series with its own count.
+    for food_here in ["FoodHere:0", "FoodHere:1"] {
+        assert_eq!(
+            value(
+                "petri.run.mutation_added_node_world_inputs_by_operator",
+                &[
+                    ("petri.operator", "Topology.AddNode"),
+                    ("petri.world_input", food_here)
+                ]
+            ),
+            PointValue::Int(1)
+        );
+    }
     assert_eq!(
-        value(
+        snapshot.value(
             "petri.run.mutation_added_node_world_inputs_by_operator",
             &[
                 ("petri.operator", "Topology.AddNode"),
                 ("petri.world_input", "FoodHere")
             ]
         ),
-        PointValue::Int(2)
+        None
     );
     assert_eq!(
         value(

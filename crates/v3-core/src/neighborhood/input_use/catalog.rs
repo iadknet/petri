@@ -4,7 +4,7 @@
 //! under `runtime::inputs::resolve_input`.
 
 use crate::contracts::{
-    DynamicIntrospectionKey, InputReference, SensorContext, SensorDescriptor,
+    DynamicIntrospectionKey, InputReference, OrdinaryFoodTypeId, SensorContext, SensorDescriptor,
     StaticIntrospectionKey, WorldInputKey,
 };
 
@@ -89,15 +89,49 @@ impl Family {
         matches!(self, Self::SharedMemory | Self::SharedMemoryPrevious)
     }
 
-    /// Report label: the variant name, with the food type appended.
+    /// The world input key of a world family, the inverse of [`Family::of`]
+    /// on `InputReference::World`; `None` for every other family.
+    #[must_use]
+    pub const fn world_key(self) -> Option<WorldInputKey> {
+        Some(match self {
+            Self::FoodHere(t) => WorldInputKey::food_here(OrdinaryFoodTypeId::new(t)),
+            Self::NeighborFoodRing(t) => {
+                WorldInputKey::neighbor_food_ring(OrdinaryFoodTypeId::new(t))
+            }
+            Self::NeighborBarrierRing => WorldInputKey::NeighborBarrierRing,
+            Self::NeighborOccupiedRing => WorldInputKey::NeighborOccupiedRing,
+            Self::AreaFoodSummary(t) => {
+                WorldInputKey::area_food_summary(OrdinaryFoodTypeId::new(t))
+            }
+            Self::AreaBarrierSummary => WorldInputKey::AreaBarrierSummary,
+            Self::AreaOccupancySummary => WorldInputKey::AreaOccupancySummary,
+            Self::NearbyCreature => WorldInputKey::NearbyCreature,
+            Self::AgeTicks
+            | Self::OwnRed
+            | Self::OwnGreen
+            | Self::OwnBlue
+            | Self::EnergyCurrent
+            | Self::EnergyConsumedThisTick
+            | Self::ActionQueue
+            | Self::ActionVotes
+            | Self::PreviousPassVotes
+            | Self::CommitCounts
+            | Self::HopsThisTick
+            | Self::PreviousOutcome
+            | Self::UpstreamSlot
+            | Self::UpstreamBus
+            | Self::SharedMemory
+            | Self::SharedMemoryPrevious => return None,
+        })
+    }
+
+    /// Report label: a world family's `WorldInputKey::as_key`, every other
+    /// family's variant name.
     #[must_use]
     pub fn label(self) -> String {
-        let food = |name: &str, type_idx: u16| format!("{name}:{type_idx}");
-        match self {
-            Self::FoodHere(t) => food("FoodHere", t),
-            Self::NeighborFoodRing(t) => food("NeighborFoodRing", t),
-            Self::AreaFoodSummary(t) => food("AreaFoodSummary", t),
-            other => format!("{other:?}"),
+        match self.world_key() {
+            Some(key) => key.as_key(),
+            None => format!("{self:?}"),
         }
     }
 }
@@ -196,6 +230,31 @@ mod tests {
             sub_idx,
             &crate::config::test_sensor_context(1),
         )
+    }
+
+    proptest::proptest! {
+        /// `world_key` inverts `Family::of` on world references, so a world
+        /// family's label is its key's `as_key`.
+        #[test]
+        fn a_world_familys_key_and_label_are_its_world_input_keys(
+            key in crate::contracts::world_key_strategy(),
+        ) {
+            let family = Family::of(&InputReference::World(key));
+            proptest::prop_assert_eq!(family.world_key(), Some(key));
+            proptest::prop_assert_eq!(family.label(), key.as_key());
+        }
+    }
+
+    #[test]
+    fn non_world_families_have_no_world_key_and_keep_their_variant_name() {
+        for family in [
+            Family::AgeTicks,
+            Family::UpstreamBus,
+            Family::SharedMemoryPrevious,
+        ] {
+            assert_eq!(family.world_key(), None);
+            assert_eq!(family.label(), format!("{family:?}"));
+        }
     }
 
     #[test]

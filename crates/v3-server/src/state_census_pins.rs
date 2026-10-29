@@ -11,7 +11,7 @@ use super::*;
 use crate::query::cache::build_food_fertility_u8;
 use v3_core::simulation::run_tick;
 
-fn frame_of(sim: Simulation) -> WsFrame {
+pub(super) fn frame_of(sim: Simulation) -> WsFrame {
     let cached_fertility_u8 = build_food_fertility_u8(sim.world.food());
     let handle = SimHandle {
         sim,

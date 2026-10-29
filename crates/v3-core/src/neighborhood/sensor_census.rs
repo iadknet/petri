@@ -1,7 +1,7 @@
 //! The live sensor-use census: per catalog key, how many creatures declare,
 //! wire and read it, from the birth caches the genome's sensor analysis
 //! computes (`genome::sensor_analysis`) and each creature's most
-//! recent mesh reads; and the report label of a world input key.
+//! recent mesh reads.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -67,16 +67,6 @@ pub fn sensor_use_census<'a>(
             read,
         })
         .collect()
-}
-
-/// Report label for a world input key: the transport key, with the food type
-/// appended for the food-parameterized families so they stay distinct.
-#[must_use]
-pub fn world_input_key_label(key: WorldInputKey) -> String {
-    match key.food_type_idx() {
-        Some(type_idx) => format!("{}:{}", key.as_key(), type_idx.get()),
-        None => key.as_key().to_string(),
-    }
 }
 
 /// The structural sensor census of one population (T14.F08, T19.F05): per
@@ -152,27 +142,6 @@ mod tests {
     const FOOD_0: OrdinaryFoodTypeId = OrdinaryFoodTypeId::new(0);
     const FOOD_1: OrdinaryFoodTypeId = OrdinaryFoodTypeId::new(1);
 
-    #[test]
-    fn the_key_universe_is_five_plus_three_per_food_type_with_labelled_families() {
-        let one = WorldInputKey::universe([FOOD_0]);
-        assert_eq!(one.len(), 8);
-
-        let two = WorldInputKey::universe([FOOD_0, FOOD_1]);
-        assert_eq!(two.len(), 11);
-        assert!(two.is_superset(&one));
-
-        assert_eq!(
-            world_input_key_label(WorldInputKey::food_here(FOOD_1)),
-            "FoodHere:1"
-        );
-        assert_eq!(
-            world_input_key_label(WorldInputKey::AreaBarrierSummary),
-            "AreaBarrierSummary"
-        );
-        let labels: BTreeSet<String> = two.iter().copied().map(world_input_key_label).collect();
-        assert_eq!(labels.len(), two.len(), "no two keys share a label");
-    }
-
     fn key_set(keys: &[WorldInputKey]) -> WorldKeySet {
         let reads = WorldReads::default();
         for key in keys {
@@ -218,25 +187,6 @@ mod tests {
                 prop_assert_eq!(row.wired, count(1));
                 prop_assert_eq!(row.read, count(2));
             }
-        }
-
-        /// The key universe holds every key the label map distinguishes, and
-        /// contains every food-parameterized family exactly once per type.
-        #[test]
-        fn the_key_universe_covers_every_food_type_once(count in 1usize..6) {
-            let types: Vec<OrdinaryFoodTypeId> =
-                (0..count).map(|i| OrdinaryFoodTypeId::new(i as u16)).collect();
-            let universe = WorldInputKey::universe(types.iter().copied());
-
-            prop_assert_eq!(universe.len(), 5 + 3 * count);
-            for type_idx in types {
-                prop_assert!(universe.contains(&WorldInputKey::food_here(type_idx)));
-                prop_assert!(universe.contains(&WorldInputKey::neighbor_food_ring(type_idx)));
-                prop_assert!(universe.contains(&WorldInputKey::area_food_summary(type_idx)));
-            }
-            let labels: BTreeSet<String> =
-                universe.iter().copied().map(world_input_key_label).collect();
-            prop_assert_eq!(labels.len(), universe.len());
         }
     }
 }

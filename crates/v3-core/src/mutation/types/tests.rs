@@ -54,18 +54,18 @@ fn world_input_key_keys_are_stable() {
         crate::contracts::WorldInputKey::FoodHere {
             type_idx: crate::config::OrdinaryFoodTypeId::default()
         }
-        .as_key(),
+        .family_name(),
         "FoodHere"
     );
     assert_eq!(
         crate::contracts::WorldInputKey::AreaFoodSummary {
             type_idx: crate::config::OrdinaryFoodTypeId::default()
         }
-        .as_key(),
+        .family_name(),
         "AreaFoodSummary"
     );
     assert_eq!(
-        crate::contracts::WorldInputKey::NearbyCreature.as_key(),
+        crate::contracts::WorldInputKey::NearbyCreature.family_name(),
         "NearbyCreature"
     );
 }

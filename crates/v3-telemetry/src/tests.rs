@@ -1357,7 +1357,6 @@ fn a_snapshot_counts_declared_wired_and_read_sensors_per_world_input() {
 #[test]
 fn an_extinct_snapshot_keeps_every_sensor_series_at_zero() {
     use v3_core::contracts::WorldInputKey;
-    use v3_core::neighborhood::sensor_census::world_input_key_label;
 
     let receiver = Receiver::start();
     let telemetry = Telemetry::start_with(options(receiver.endpoint(), Limits::default()));
@@ -1378,7 +1377,7 @@ fn an_extinct_snapshot_keeps_every_sensor_series_at_zero() {
     );
     assert!(!catalog.is_empty());
     for key in catalog {
-        let label = world_input_key_label(key);
+        let label = key.as_key();
         for name in [
             "petri.tick.sensor_declared",
             "petri.tick.sensor_wired",

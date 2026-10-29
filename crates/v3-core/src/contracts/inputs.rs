@@ -266,9 +266,23 @@ impl WorldInputKey {
         Self::AreaFoodSummary { type_idx }
     }
 
-    /// Stable string key used by transport/API boundaries.
+    /// The key's transport key, used by every count that leaves core (server
+    /// wire, telemetry, benchmark, lab): the family name, followed by
+    /// `:<food type index>` for the three food-parameterized families
+    /// (`FoodHere:1`, `AreaBarrierSummary`). Distinct keys never share one.
     #[must_use]
-    pub const fn as_key(self) -> &'static str {
+    pub fn as_key(self) -> String {
+        match self.food_type_idx() {
+            Some(type_idx) => format!("{}:{}", self.family_name(), type_idx.get()),
+            None => self.family_name().to_owned(),
+        }
+    }
+
+    /// The family name without the food type: a family-level key, shared by
+    /// every food type of a food-parameterized family (the inspector's
+    /// `directionPairs.json` fixture names families this way).
+    #[must_use]
+    pub const fn family_name(self) -> &'static str {
         match self {
             Self::FoodHere { .. } => "FoodHere",
             Self::NeighborFoodRing { .. } => "NeighborFoodRing",
@@ -843,7 +857,7 @@ mod tests {
         let declaring = every_world_key()
             .into_iter()
             .filter(|key| !key.direction_pairs().is_empty())
-            .map(WorldInputKey::as_key)
+            .map(WorldInputKey::family_name)
             .collect::<std::collections::BTreeSet<_>>();
         assert_eq!(
             declaring,
@@ -903,7 +917,7 @@ mod tests {
         for key in every_world_key() {
             if !key.direction_pairs().is_empty() {
                 declared.insert(
-                    key.as_key().to_owned(),
+                    key.family_name().to_owned(),
                     serde_json::to_value(key.direction_pairs()).expect("serializes"),
                 );
             }
@@ -1022,9 +1036,9 @@ mod tests {
             type_idx: OrdinaryFoodTypeId::default(),
         };
 
-        assert_eq!(here.as_key(), "FoodHere");
-        assert_eq!(ring.as_key(), "NeighborFoodRing");
-        assert_eq!(area.as_key(), "AreaFoodSummary");
+        assert_eq!(here.family_name(), "FoodHere");
+        assert_eq!(ring.family_name(), "NeighborFoodRing");
+        assert_eq!(area.family_name(), "AreaFoodSummary");
         assert_eq!(here.compound_width(), 1);
         assert_eq!(ring.compound_width(), 8);
         assert_eq!(area.compound_width(), 7);
@@ -1073,7 +1087,58 @@ mod tests {
         })
     }
 
+    #[test]
+    fn the_key_universe_is_five_plus_three_per_food_type_with_food_typed_keys() {
+        let food_0 = OrdinaryFoodTypeId::new(0);
+        let food_1 = OrdinaryFoodTypeId::new(1);
+        let one = WorldInputKey::universe([food_0]);
+        assert_eq!(one.len(), 8);
+
+        let two = WorldInputKey::universe([food_0, food_1]);
+        assert_eq!(two.len(), 11);
+        assert!(two.is_superset(&one));
+
+        assert_eq!(WorldInputKey::food_here(food_1).as_key(), "FoodHere:1");
+        assert_eq!(
+            WorldInputKey::neighbor_food_ring(food_0).as_key(),
+            "NeighborFoodRing:0"
+        );
+        assert_eq!(
+            WorldInputKey::area_food_summary(food_1).as_key(),
+            "AreaFoodSummary:1"
+        );
+        assert_eq!(
+            WorldInputKey::AreaBarrierSummary.as_key(),
+            "AreaBarrierSummary"
+        );
+        let keys: std::collections::BTreeSet<String> = two.iter().map(|key| key.as_key()).collect();
+        assert_eq!(keys.len(), two.len(), "no two keys share a transport key");
+    }
+
     proptest::proptest! {
+        /// The key universe contains every food-parameterized family exactly
+        /// once per type, and `as_key` is injective over it.
+        #[test]
+        fn the_key_universe_covers_every_food_type_once_under_distinct_keys(count in 1usize..6) {
+            let types: Vec<OrdinaryFoodTypeId> =
+                (0..count).map(|i| OrdinaryFoodTypeId::new(i as u16)).collect();
+            let universe = WorldInputKey::universe(types.iter().copied());
+
+            proptest::prop_assert_eq!(universe.len(), 5 + 3 * count);
+            for type_idx in types {
+                proptest::prop_assert!(universe.contains(&WorldInputKey::food_here(type_idx)));
+                proptest::prop_assert!(
+                    universe.contains(&WorldInputKey::neighbor_food_ring(type_idx))
+                );
+                proptest::prop_assert!(
+                    universe.contains(&WorldInputKey::area_food_summary(type_idx))
+                );
+            }
+            let keys: std::collections::BTreeSet<String> =
+                universe.iter().map(|key| key.as_key()).collect();
+            proptest::prop_assert_eq!(keys.len(), universe.len());
+        }
+
         /// Union is a join: commutative, idempotent, `NONE` its identity and
         /// `ALL` absorbing; no key requires both snapshots.
         #[test]

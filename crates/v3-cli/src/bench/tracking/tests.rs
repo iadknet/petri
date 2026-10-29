@@ -58,7 +58,7 @@ fn census_for(population: u64) -> SensorCensus {
         world_inputs: WorldInputKey::universe([OrdinaryFoodTypeId::new(0)])
             .into_iter()
             .map(|key| WorldInputCensusRow {
-                key: world_input_key_label(key),
+                key: key.as_key(),
                 creatures: if key == food_here { population } else { 0 },
             })
             .collect(),

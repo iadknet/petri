@@ -10,7 +10,6 @@ use super::tracking::{OccupancyGrid, SampleBlocks, SensorCensus, WorldTracking};
 use v3_core::contracts::WorldInputKey;
 use v3_core::neighborhood::occupancy::OCCUPANCY_CELLS_PER_AXIS;
 use v3_core::neighborhood::occupancy::OCCUPANCY_CELL_COUNT;
-use v3_core::neighborhood::sensor_census::world_input_key_label;
 use v3_core::simulation::{run_tick, seed_simulation};
 
 #[test]
@@ -262,7 +261,7 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
             .map(|food_type| food_type.id),
     )
     .into_iter()
-    .map(world_input_key_label)
+    .map(WorldInputKey::as_key)
     .collect();
     assert!(!run.persistence.samples.is_empty());
     for sample in &run.persistence.samples {

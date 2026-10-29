@@ -116,31 +116,31 @@ it wrong.
 
 ## Implementation Tasks
 
-- [ ] Write the failing tests first: with two food types, both server maps
+- [x] Write the failing tests first: with two food types, both server maps
       and the telemetry mutation family carry `FoodHere:0` and `FoodHere:1`
       with their own counts (invariant 3).
-- [ ] A1: rename `WorldInputKey::as_key` to `family_name` and fix every
+- [x] A1: rename `WorldInputKey::as_key` to `family_name` and fix every
       caller the compiler lists; then add `as_key` returning the transport
       key (invariant 1), move `world_input_key_label`'s tests and property
       test to contracts, and switch each lossy caller to `as_key`.
-- [ ] A2: delete `world_input_key_label`; `ring_rules.rs`,
+- [x] A2: delete `world_input_key_label`; `ring_rules.rs`,
       `bench/tracking.rs` and `metrics.rs`'s sensor gauges call `as_key`.
-- [ ] A6: `Family::label` takes a world family's key from `as_key`.
-- [ ] A3–A5: key both server maps and the telemetry mutation family by
+- [x] A6: `Family::label` takes a world family's key from `as_key`.
+- [x] A3–A5: key both server maps and the telemetry mutation family by
       `as_key`; delete the `WORKAROUND(T30.F13)` marker.
-- [ ] Move the pin in the readings' pin table and update doc comments that
+- [x] Move the pin in the readings' pin table and update doc comments that
       describe the old key (`as_key`, `WorldInputCensusRow::key`).
 
 ## Verification
 
-- [ ] Focused tests: the new invariant-3 tests, the moved contracts tests
+- [x] Focused tests: the new invariant-3 tests, the moved contracts tests
       and property test, and the existing ring-row and input-use label
       tests (`bench/ring_rules.rs`, `bench/input_use/tests.rs`,
       `v3-lab/src/readings/tests.rs`) unchanged, via
       `cargo test -p v3-core -p v3-server -p v3-telemetry -p v3-cli -p v3-lab` -> pass;
       recorded in the readings.
-- [ ] Pins: only the readings' pin-table entry moves.
-- [ ] `grep` finds no `world_input_key_label`, no `WORKAROUND(T30.F13)` on
+- [x] Pins: only the readings' pin-table entry moves.
+- [x] `grep` finds no `world_input_key_label`, no `WORKAROUND(T30.F13)` on
       a world-input key, and no hand-written food-typed key format in
       production code.
 - [ ] Gate: summary stored at `docs/progress/features/t30-f16.json`, local

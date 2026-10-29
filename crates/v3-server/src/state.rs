@@ -564,7 +564,7 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
                     operator.as_key().to_string(),
                     inputs
                         .iter()
-                        .map(|(input, count)| (input.as_key().to_string(), *count))
+                        .map(|(input, count)| (input.as_key(), *count))
                         .collect(),
                 )
             })
@@ -572,11 +572,7 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
         vm_live_read_world_inputs_current: census
             .live_vm_world_inputs()
             .into_iter()
-            // WORKAROUND(T30.F13): `as_key()` drops the food type, so two
-            // food types' counts collide here and one survives. Intended
-            // design: wire keys carry the food type (`world_input_key_label`),
-            // so food-parameterized inputs never share a key.
-            .map(|(key, count)| (key.as_key().to_string(), count))
+            .map(|(key, count)| (key.as_key(), count))
             .collect(),
         mutation_target_reachability_total: MutationTargetReachabilityTotalPayload {
             reachable: stats.mutation_reachable_target_total,
@@ -713,3 +709,6 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
 #[cfg(test)]
 #[path = "state_census_pins.rs"]
 mod census_pins;
+#[cfg(test)]
+#[path = "state_world_input_keys.rs"]
+mod world_input_keys;

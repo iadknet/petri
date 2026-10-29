@@ -30,9 +30,7 @@ use v3_core::neighborhood::distributions::capacity_distribution;
 use v3_core::neighborhood::drives::DriveCensus;
 use v3_core::neighborhood::plasticity_census::{LearnedScales, PlasticityCensus};
 use v3_core::neighborhood::population::PopulationCensus;
-use v3_core::neighborhood::sensor_census::{
-    sensor_use_census, world_input_catalog, world_input_key_label, SensorUseRow,
-};
+use v3_core::neighborhood::sensor_census::{sensor_use_census, world_input_catalog, SensorUseRow};
 use v3_core::simulation::birth_age::{BirthOrder, BIRTH_PARENT_AGE_BOUNDS};
 use v3_core::simulation::reproductive_success::{CognitiveClass, ReproductiveSuccessTotals};
 use v3_core::simulation::stats::MutationValueTotals;
@@ -782,7 +780,7 @@ fn mutations(f: &mut Families, s: &SimStats) {
         |inputs| {
             inputs
                 .iter()
-                .map(|(input, count)| (input.as_key().to_owned(), *count))
+                .map(|(input, count)| (input.as_key(), *count))
                 .collect()
         },
     );
@@ -1059,7 +1057,7 @@ fn tick_values(f: &mut Families, s: &SimStats, census: &Census) {
             "",
             census.sensors.iter().map(|row| {
                 (
-                    vec![("petri.world_input", world_input_key_label(row.key))],
+                    vec![("petri.world_input", row.key.as_key())],
                     count(row).into(),
                 )
             }),

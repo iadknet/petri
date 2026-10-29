@@ -16,7 +16,6 @@ use v3_core::neighborhood::clades::surviving_clade_profiles;
 pub(super) use v3_core::neighborhood::clades::CladeMemberReading;
 use v3_core::neighborhood::occupancy::{occupancy_grid, OCCUPANCY_CELLS_PER_AXIS};
 use v3_core::neighborhood::population::PopulationCensus;
-use v3_core::neighborhood::sensor_census::world_input_key_label;
 use v3_core::neighborhood::sensor_census::ReferenceCensus;
 
 /// The applied-behavior integer sums of
@@ -1032,8 +1031,7 @@ impl OccupancyGrid {
 /// One world input key's row in a checkpoint census.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorldInputCensusRow {
-    /// `WorldInputKey::as_key()`, with `:<food_type_idx>` appended for the
-    /// food-parameterized families.
+    /// `WorldInputKey::as_key()`: the food-typed transport key.
     pub key: String,
     /// Living creatures holding at least one live reference to this key. A
     /// creature counts once however many instructions or edges reference it.
@@ -1081,7 +1079,7 @@ impl SensorCensus {
                 .world_inputs
                 .into_iter()
                 .map(|(key, creatures)| WorldInputCensusRow {
-                    key: world_input_key_label(key),
+                    key: key.as_key(),
                     creatures,
                 })
                 .collect(),

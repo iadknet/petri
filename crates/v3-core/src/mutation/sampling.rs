@@ -306,7 +306,7 @@ mod tests {
                 let InputReference::World(world) = reference else {
                     panic!("index {index}: {reference:?}");
                 };
-                assert_eq!(world.as_key(), key);
+                assert_eq!(world.family_name(), key);
                 assert_eq!(taken, draws, "index {index}");
             }
         }

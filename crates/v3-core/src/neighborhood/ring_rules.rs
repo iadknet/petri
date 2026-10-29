@@ -28,7 +28,6 @@ use crate::genome::cgp::{
 };
 use crate::genome::{BackendDef, CreatureGenome};
 use crate::neighborhood::bundles::{CreatureBundles, RING};
-use crate::neighborhood::sensor_census::world_input_key_label;
 
 /// The census version the goal summary records.
 pub const RING_RULES_VERSION: &str = "ring-rules-v3";
@@ -278,7 +277,7 @@ impl RingRuleCensus {
             .map(|(&(family, kind, offset), counts)| {
                 format!(
                     "{} {kind:?} {offset} {} {} {} {}",
-                    world_input_key_label(family),
+                    family.as_key(),
                     counts.count,
                     counts.positive,
                     counts.negative,
@@ -298,7 +297,7 @@ impl RingRuleCensus {
                 let counts: Vec<String> = counts.iter().map(u64::to_string).collect();
                 format!(
                     "{} {:?} {} {} {}",
-                    world_input_key_label(rule.family),
+                    rule.family.as_key(),
                     rule.kind,
                     rule.offset,
                     if rule.positive { "+" } else { "-" },
