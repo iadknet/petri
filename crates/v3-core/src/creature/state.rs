@@ -594,8 +594,7 @@ mod tests {
     }
 
     /// A founder of a drawn profile after `rounds` births' worth of mutation
-    /// at a raised rate, carrying its parent's birth seeds when the drawn
-    /// parent learned: VM beside Graph nodes, unreachable nodes and emptied
+    /// at a raised rate: VM beside Graph nodes, unreachable nodes and emptied
     /// sinks all occur.
     fn mutated_genome() -> impl Strategy<Value = CreatureGenome> {
         use crate::config::{FounderProfile, MutationConfig};

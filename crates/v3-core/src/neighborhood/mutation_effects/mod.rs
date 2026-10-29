@@ -52,8 +52,7 @@ pub const PARENT_SEED_MULTIPLIER: u64 = 1_000;
 pub const SELECTED_SEED_BASE: u64 = 24_000_000;
 
 /// The genome identity every T11.F26 comparison uses: the `Debug`
-/// rendering, which distinguishes `-0.0`, renders every NaN alike, and omits
-/// the birth-only `BirthSeeds` (see `CgpGraphBackendDef`'s `Debug`).
+/// rendering, which distinguishes `-0.0` and renders every NaN alike.
 #[must_use]
 pub fn genome_identity(genome: &CreatureGenome) -> String {
     format!("{genome:?}")
