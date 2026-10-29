@@ -138,7 +138,10 @@ it wrong.
       tests (`bench/ring_rules.rs`, `bench/input_use/tests.rs`,
       `v3-lab/src/readings/tests.rs`) unchanged, via
       `cargo test -p v3-core -p v3-server -p v3-telemetry -p v3-cli -p v3-lab` -> pass;
-      recorded in the readings.
+      recorded in the readings. After the simplify pass (test-only edits in
+      v3-core and v3-server): `cargo test -p v3-core -p v3-server` -> pass,
+      `cargo fmt --all --check` -> clean,
+      `cargo check --workspace --all-targets` -> clean.
 - [x] Pins: only the readings' pin-table entry moves.
 - [x] `grep` finds no `world_input_key_label`, no `WORKAROUND(T30.F13)` on
       a world-input key, and no hand-written food-typed key format in

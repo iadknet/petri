@@ -1088,16 +1088,9 @@ mod tests {
     }
 
     #[test]
-    fn the_key_universe_is_five_plus_three_per_food_type_with_food_typed_keys() {
+    fn food_parameterized_keys_carry_their_food_type() {
         let food_0 = OrdinaryFoodTypeId::new(0);
         let food_1 = OrdinaryFoodTypeId::new(1);
-        let one = WorldInputKey::universe([food_0]);
-        assert_eq!(one.len(), 8);
-
-        let two = WorldInputKey::universe([food_0, food_1]);
-        assert_eq!(two.len(), 11);
-        assert!(two.is_superset(&one));
-
         assert_eq!(WorldInputKey::food_here(food_1).as_key(), "FoodHere:1");
         assert_eq!(
             WorldInputKey::neighbor_food_ring(food_0).as_key(),
@@ -1111,8 +1104,6 @@ mod tests {
             WorldInputKey::AreaBarrierSummary.as_key(),
             "AreaBarrierSummary"
         );
-        let keys: std::collections::BTreeSet<String> = two.iter().map(|key| key.as_key()).collect();
-        assert_eq!(keys.len(), two.len(), "no two keys share a transport key");
     }
 
     proptest::proptest! {

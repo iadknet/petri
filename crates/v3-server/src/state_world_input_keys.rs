@@ -5,8 +5,9 @@
 use super::census_pins::frame_of;
 use super::*;
 use v3_core::config::OrdinaryFoodTypeId;
-use v3_core::contracts::SHARED_MEMORY_SLOTS;
-use v3_core::contracts::{CreatureId, InputReference, NodeId, Position, WorldInputKey};
+use v3_core::contracts::{
+    CreatureId, InputReference, NodeId, Position, WorldInputKey, SHARED_MEMORY_SLOTS,
+};
 use v3_core::creature::body::HeritableBody;
 use v3_core::creature::state::CreatureState;
 use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
