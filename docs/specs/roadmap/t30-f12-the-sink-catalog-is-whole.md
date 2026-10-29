@@ -251,3 +251,7 @@ acceptance. No indicator can move; the goal profile is not run
   `with_sink_inputs(kind, inputs)` builder (audit row 1's one fixture
   builder), unchecked like `with_compute_nodes`; it never adds, removes or
   reorders a sink.
+- Deferred: final review lens 3 P2 — the widest-queue fixture at
+  `genome/cgp/container_tests.rs:2740` still duplicates `add_bundle`'s
+  private writes to bypass insertion cost; pre-existing, already marked
+  `WORKAROUND(T30.F11)`, and paid by T30.F11's ordered bulk construction.
