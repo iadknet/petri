@@ -645,11 +645,14 @@ mod clock_tests {
             ComputeNodeKind::DecayIntegrator(0.5),
             vec![GraphEdge::new(GraphSource::ComputeNode(0), 2.0)],
         ));
-        def.edge_mut(crate::genome::cgp::EdgeOccurrence::new(
-            crate::genome::cgp::EdgeSurface::SinkInput(0),
-            0,
-        ))
-        .set_source(GraphSource::ComputeNode(1));
+        def.retarget_edge(
+            crate::genome::cgp::EdgeOccurrence::new(
+                crate::genome::cgp::EdgeSurface::SinkInput(0),
+                0,
+            ),
+            GraphSource::ComputeNode(1),
+            &[],
+        );
         let mut ordinary = crate::genome::cgp::test_support::runtime_for(&def);
         let mut traced = ordinary.clone();
         for expected_delta in [1.0, 0.5, 0.25] {

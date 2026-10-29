@@ -217,13 +217,19 @@ mod tests {
     #[test]
     fn birth_source_deletion_and_input_pruning_keep_occurrence_alignment() {
         let mut def = tracked_def_rewired(|def| {
-            def.edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(1), 0))
-                .set_source(GraphSource::ComputeNode(0));
-            def.edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(1), 1))
-                .set_source(GraphSource::InputLeaf {
+            def.retarget_edge(
+                EdgeOccurrence::new(EdgeSurface::ComputeInput(1), 0),
+                GraphSource::ComputeNode(0),
+                &[],
+            );
+            def.retarget_edge(
+                EdgeOccurrence::new(EdgeSurface::ComputeInput(1), 1),
+                GraphSource::InputLeaf {
                     ref_idx: 2,
                     sub_idx: 2,
-                });
+                },
+                &[],
+            );
         });
         // The edge reading the removed node loses its seed.
         def.remove_compute_node(0);
@@ -409,8 +415,11 @@ mod tests {
         use crate::mutation::graph::operators::add_disconnected_node;
         use rand::SeedableRng;
         let mut def = tracked_def_rewired(|def| {
-            def.edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0))
-                .set_source(GraphSource::ComputeNode(3));
+            def.retarget_edge(
+                EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0),
+                GraphSource::ComputeNode(3),
+                &[],
+            );
         });
         add_disconnected_node(&mut def, &mut rand::rngs::SmallRng::seed_from_u64(11)).unwrap();
         assert_eq!(
@@ -427,10 +436,16 @@ mod tests {
         };
         use rand::SeedableRng;
         let base = tracked_def_rewired(|def| {
-            def.edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(1), 0))
-                .set_source(GraphSource::ComputeNode(0));
-            def.edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(2), 0))
-                .set_source(GraphSource::ComputeNode(1));
+            def.retarget_edge(
+                EdgeOccurrence::new(EdgeSurface::ComputeInput(1), 0),
+                GraphSource::ComputeNode(0),
+                &[],
+            );
+            def.retarget_edge(
+                EdgeOccurrence::new(EdgeSurface::ComputeInput(2), 0),
+                GraphSource::ComputeNode(1),
+                &[],
+            );
         });
         for copy in [copy_compute_node, copy_cgp_subgraph] {
             let mut def = base.clone();

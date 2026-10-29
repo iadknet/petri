@@ -148,8 +148,7 @@ fn activate_copies(def: &mut CgpGraphBackendDef, sources: &[usize]) {
         })
         .collect();
     for (occurrence, copy) in rewired {
-        def.edge_mut(occurrence)
-            .set_source(GraphSource::ComputeNode(copy));
+        def.retarget_edge(occurrence, GraphSource::ComputeNode(copy), &[]);
     }
 }
 

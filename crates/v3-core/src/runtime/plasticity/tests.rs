@@ -293,11 +293,14 @@ fn a_recurrent_hebbian_edge_learns_from_the_value_its_evaluation_read() {
 #[test]
 fn activity_uses_evaluation_energy_beside_pure_hebbian_learning() {
     let mut def = graph(HebbianRule::Classic, 1.0, 0.0);
-    def.edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0))
-        .set_source(GraphSource::InputLeaf {
+    def.retarget_edge(
+        EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0),
+        GraphSource::InputLeaf {
             ref_idx: 0,
             sub_idx: 0,
-        });
+        },
+        &[],
+    );
     def.append_compute_node(def.compute_nodes()[0].clone());
     edit_config(&mut def, 1, |config| config.modulation = None);
     let runtime = RuntimeConfig {

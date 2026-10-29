@@ -339,9 +339,9 @@ fn seeds_stay_out_of_identity_and_travel_with_clones() {
 #[test]
 fn a_same_source_set_keeps_the_seed_and_a_changed_one_clears_it() {
     let mut def = seeded();
-    def.edge_mut(compute(0, 0)).set_source(leaf(0));
+    def.retarget_edge(compute(0, 0), leaf(0), &[]);
     assert_eq!(rows(&def)[0], vec![Some(1.0), Some(2.0)]);
-    def.edge_mut(compute(0, 0)).set_source(leaf(5));
+    def.retarget_edge(compute(0, 0), leaf(5), &[]);
     assert_eq!(rows(&def)[0], vec![None, Some(2.0)]);
     def.edge_mut(compute(0, 1)).set_weight(0.25);
     assert_eq!(rows(&def)[0], vec![None, None]);
@@ -408,7 +408,7 @@ fn a_split_keeps_the_consumers_seed_and_starts_the_identity_edge_without_one() {
     let identity = || ComputeNode::new(ComputeNodeKind::Add, Vec::new());
     // Compute consumer: the identity node is inserted at the consumer's index.
     let mut def = seeded();
-    def.split_edge(compute(1, 0), identity());
+    def.split_edge(compute(1, 0), identity(), &[]);
     assert_eq!(
         rows(&def),
         vec![vec![Some(1.0), Some(2.0)], vec![None], vec![Some(3.0)]]
@@ -433,6 +433,7 @@ fn a_split_keeps_the_consumers_seed_and_starts_the_identity_edge_without_one() {
     def.split_edge(
         EdgeOccurrence::new(EdgeSurface::SinkInput(0), 0),
         identity(),
+        &[],
     );
     assert_eq!(rows(&def)[2], vec![None]);
     assert_eq!(
@@ -711,7 +712,7 @@ fn detaching_a_later_bundles_member_ahead_of_another_member_keeps_the_edit_on_th
     let (moved, removed) = detach(&mut def, later, &ring_refs());
     assert!(!removed);
     assert_eq!(moved, sink_occurrence(sink, 0));
-    def.edge_mut(moved).set_source(leaf(9));
+    def.retarget_edge(moved, leaf(9), &[]);
     let edge = def.edge_at(moved);
     assert_eq!(
         (edge.source(), edge.own_weight(), edge.membership()),
@@ -726,6 +727,69 @@ fn detaching_a_later_bundles_member_ahead_of_another_member_keeps_the_edit_on_th
         })
     );
     assert_eq!(def.members(second).count(), 7);
+}
+
+/// The container's retarget detaches a member itself (T29.F01 A12): the
+/// edge leaves its bundle at its genomic weight and then reads the new
+/// source, exactly as a detach followed by a source write; a same-source
+/// retarget of a member changes nothing.
+#[test]
+fn retargeting_a_member_detaches_it_inside_the_container_and_a_same_source_one_is_a_no_op() {
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    let first = def.add_ring_bundle(RING, DirectedVoteKind::Move, 0);
+    let second = def.add_ring_bundle(RING, DirectedVoteKind::Move, 0);
+    weigh(&mut def, second, 0.5, &[0.25; 8]);
+    let sink = vote_sink(DirectedVoteKind::Move, 0);
+    let later = sink_occurrence(sink, 1);
+    let unchanged = def.clone();
+    let same = def.edge_at(later).source();
+    assert_eq!(
+        def.retarget_edge(later, same, &ring_refs()),
+        EdgeEdit::in_place(later)
+    );
+    assert_eq!(def, unchanged);
+    let mut want = def.clone();
+    let (moved, removed) = detach(&mut want, later, &ring_refs());
+    want.edge_slot(moved).source = leaf(9);
+    let edit = def.retarget_edge(later, leaf(9), &ring_refs());
+    assert_eq!(
+        edit,
+        EdgeEdit {
+            occurrence: moved,
+            detached: Some(removed)
+        }
+    );
+    assert_eq!(def, want);
+    assert_eq!(def.edge_at(moved).membership(), None);
+    assert_eq!(def.members(first).count(), 8);
+}
+
+/// The container's split detaches a member itself (T29.F01 A12) and then
+/// splits the detached edge, as a detach followed by the split did.
+#[test]
+fn splitting_a_member_detaches_it_inside_the_container() {
+    let identity = || ComputeNode::new(ComputeNodeKind::Add, Vec::new());
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
+    let bundle = def.add_ring_bundle(RING, DirectedVoteKind::Move, 0);
+    weigh(&mut def, bundle, 0.5, &[0.25; 8]);
+    let member = def.members(bundle).next().unwrap();
+    let mut want = def.clone();
+    let (moved, removed) = detach(&mut want, member, &ring_refs());
+    want.split_edge(moved, identity(), &[]);
+    let edit = def.split_edge(member, identity(), &ring_refs());
+    assert_eq!(
+        edit,
+        EdgeEdit {
+            occurrence: moved,
+            detached: Some(removed)
+        }
+    );
+    assert_eq!(def, want);
+    assert_eq!(
+        def.edge_at(moved).source(),
+        GraphSource::ComputeNode(0),
+        "the detached edge reads the appended identity node"
+    );
 }
 
 /// `plans` admits a geometric kind only with every sink it needs (T25.F11
@@ -1883,7 +1947,7 @@ proptest! {
                 }
                 SeedOp::Split(i) => {
                     if let Some(site) = pick(i).filter(|&site| independent(&def, site)) {
-                        def.split_edge(site, ComputeNode::new(ComputeNodeKind::Add, Vec::new()));
+                        def.split_edge(site, ComputeNode::new(ComputeNodeKind::Add, Vec::new()), &[]);
                     }
                 }
                 SeedOp::SetWeight(i) => {
@@ -1897,7 +1961,7 @@ proptest! {
                         let current = def.edge_at(site).source();
                         let source = if same { current } else { leaf(7) };
                         let before = def.birth_seeds().and_then(|seeds| seeds.value(site));
-                        def.edge_mut(site).set_source(source);
+                        def.retarget_edge(site, source, &[]);
                         let after = def.birth_seeds().and_then(|seeds| seeds.value(site));
                         if source == current {
                             prop_assert_eq!(after, before, "a same-source write keeps the seed");

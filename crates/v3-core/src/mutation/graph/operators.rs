@@ -8,7 +8,7 @@ use rand::Rng;
 
 use crate::contracts::{InputReference, SensorContext, SensorDescriptor};
 use crate::genome::cgp::{
-    detach, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeEdit, EdgeOccurrence, EdgeSurface,
     GraphEdge, GraphSource, OutputSinkKind,
 };
 use crate::genome::{BackendDef, CreatureGenome};
@@ -351,21 +351,11 @@ pub(crate) fn add_compute_node(
     }
 }
 
-/// Detach the edge at `occurrence` when it is a bundle member (T25.F03), so
-/// an edit that changes its source keeps its genomic weight and leaves its
-/// bundle; returns the occurrence the edit continues on. No draw.
-// WORKAROUND(T30.F11): source changes and splits detach inside the container's owner operations
-fn detached(
-    def: &mut CgpGraphBackendDef,
-    occurrence: EdgeOccurrence,
-    inputs: NodeInputs<'_>,
-) -> (EdgeOccurrence, BundleEdits) {
-    if def.edge_at(occurrence).membership().is_some() {
-        let (occurrence, removed) = detach(def, occurrence, inputs.refs);
-        (occurrence, BundleEdits::detach(removed))
-    } else {
-        (occurrence, BundleEdits::default())
-    }
+/// What an edge edit's detach did to the bundles (T25.F03): one detach,
+/// which removed its record when it was the last member, or nothing.
+fn detach_edits(edit: EdgeEdit) -> BundleEdits {
+    edit.detached
+        .map_or_else(BundleEdits::default, BundleEdits::detach)
 }
 
 /// Form (a): a random kind joins the graph with no inputs and no consumer.
@@ -414,10 +404,12 @@ pub(crate) fn split_existing_edge(
         return Err(MutationSkipReason::NoApplicableTarget);
     }
     let occurrence = sites[rng.gen_range(0..sites.len())];
-    // A member is detached before its split: the split rewires its source.
-    let (occurrence, edits) = detached(def, occurrence, inputs);
-    def.split_edge(occurrence, identity_add_node());
-    Ok(edits)
+    // A member is detached inside the split: the split rewires its source.
+    Ok(detach_edits(def.split_edge(
+        occurrence,
+        identity_add_node(),
+        inputs.refs,
+    )))
 }
 
 /// The edges `split_existing_edge` can split: every edge except one whose
@@ -604,12 +596,11 @@ pub(crate) fn retarget_edge(
     let new_source = random_graph_source(compute_count, inputs, rng);
     // A same-source draw changes nothing; a changed source detaches a member
     // first (T25.F03).
-    if def.edge_at(occurrence).source() == new_source {
-        return Ok(BundleEdits::default());
-    }
-    let (occurrence, edits) = detached(def, occurrence, inputs);
-    def.edge_mut(occurrence).set_source(new_source);
-    Ok(edits)
+    Ok(detach_edits(def.retarget_edge(
+        occurrence,
+        new_source,
+        inputs.refs,
+    )))
 }
 
 /// Alter the weight of a random edge.
@@ -875,9 +866,11 @@ pub(crate) fn raw_field_mutation(
     apply_edge_field_move(&mut source, chosen);
     // A raw-field step always changes the source, so a member detaches first
     // (T25.F03).
-    let (occurrence, edits) = detached(def, occurrence, inputs);
-    def.edge_mut(occurrence).set_source(source);
-    Ok(edits)
+    Ok(detach_edits(def.retarget_edge(
+        occurrence,
+        source,
+        inputs.refs,
+    )))
 }
 
 // ─── Applicability predicates ───────────────────────────────────────────────

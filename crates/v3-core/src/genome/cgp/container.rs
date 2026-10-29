@@ -156,6 +156,27 @@ impl EdgeOccurrence {
     }
 }
 
+/// Where an edge edit left the edge it changed (T25.F03, T25.F11): its
+/// occurrence after the edit and, when the edit detached a bundle member
+/// first, whether that detach removed the bundle (it was the last member).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EdgeEdit {
+    pub occurrence: EdgeOccurrence,
+    /// `Some(bundle_removed)` when the edit detached a member.
+    pub detached: Option<bool>,
+}
+
+impl EdgeEdit {
+    /// An edit on `occurrence` that detached nothing.
+    #[must_use]
+    pub const fn in_place(occurrence: EdgeOccurrence) -> Self {
+        Self {
+            occurrence,
+            detached: None,
+        }
+    }
+}
+
 // ── Birth seeds ─────────────────────────────────────────────────────────────
 
 /// The birth payload a reproduction draft carries (T25.F01, design note D1,
@@ -277,8 +298,9 @@ impl PartialEq for CgpGraphBackendDef {
     }
 }
 
-/// A handle on one edge through which its source and weight change with the
-/// seed rule of each write.
+/// A handle on one edge through which its weight and learning change with
+/// the seed rule of each write; its source changes through
+/// [`CgpGraphBackendDef::retarget_edge`].
 pub struct EdgeMut<'a> {
     def: &'a mut CgpGraphBackendDef,
     occurrence: EdgeOccurrence,
@@ -289,22 +311,6 @@ impl EdgeMut<'_> {
     #[must_use]
     pub fn edge(&self) -> GraphEdge {
         *self.def.edge_at(self.occurrence)
-    }
-
-    /// Point the edge at `source`; its seed is cleared only when the source
-    /// changes.
-    pub fn set_source(&mut self, source: GraphSource) {
-        let edge = self.def.edge_slot(self.occurrence);
-        let changed = edge.source != source;
-        debug_assert!(
-            !changed || edge.membership().is_none(),
-            "a member's source changes only through its bundle or after a detach"
-        );
-        edge.source = source;
-        if changed {
-            self.def.clear_seed(self.occurrence);
-        }
-        self.def.debug_assert_seed_shape();
     }
 
     /// Set the edge's weight; its seed is cleared.
@@ -1040,17 +1046,26 @@ impl CgpGraphBackendDef {
     }
 
     /// Split the edge at `occurrence` with `identity`, an identity node with
-    /// no inputs: the identity node reads the edge's source at weight 1.0 and
-    /// the edge reads the identity node, keeping its weight and seed. A
-    /// compute consumer gets the identity node inserted at its own index
+    /// no inputs: a member is detached first ([`Self::detach_at`] at its
+    /// pattern under `input_refs`), since the split rewires its source; then
+    /// the identity node reads the edge's source at weight 1.0 and the edge
+    /// reads the identity node, keeping its weight and seed. A compute
+    /// consumer gets the identity node inserted at its own index
     /// ([`Self::insert_compute_node`]), so evaluation order is preserved; a
     /// sink consumer gets it appended. The identity node's edge has no seed.
-    pub fn split_edge(&mut self, occurrence: EdgeOccurrence, mut identity: ComputeNode) {
+    /// Returns where the split edge ended and what the detach did.
+    pub fn split_edge(
+        &mut self,
+        occurrence: EdgeOccurrence,
+        mut identity: ComputeNode,
+        input_refs: &[InputReference],
+    ) -> EdgeEdit {
         debug_assert!(
             identity.inputs.is_empty(),
             "split_edge: the identity node arrives without inputs"
         );
-        let EdgeOccurrence { surface, index } = occurrence;
+        let edit = self.detach_member(occurrence, input_refs);
+        let EdgeOccurrence { surface, index } = edit.occurrence;
         match surface {
             EdgeSurface::ComputeInput(consumer) => {
                 // Insert first so the index remap (which also shifts the
@@ -1068,10 +1083,6 @@ impl CgpGraphBackendDef {
                     GraphSource::ComputeNode(consumer as u16);
             }
             EdgeSurface::SinkInput(sink) => {
-                debug_assert!(
-                    self.output_sinks[sink].inputs[index].membership().is_none(),
-                    "split_edge: a member is detached before its split"
-                );
                 let new_idx = self.compute_nodes.len() as u16;
                 let source = self.output_sinks[sink].inputs[index].source;
                 identity.inputs.0.push(GraphEdge::new(source, 1.0));
@@ -1081,9 +1092,49 @@ impl CgpGraphBackendDef {
             }
         }
         self.debug_assert_seed_shape();
+        edit
     }
 
-    /// A handle for changing the source or weight of the edge at `occurrence`.
+    /// Point the edge at `occurrence` at `source`. A same-source write
+    /// changes nothing; a changed source detaches a member first
+    /// ([`Self::detach_at`] at its pattern under `input_refs`), so it keeps
+    /// its genomic weight and leaves its bundle, and clears the edge's seed.
+    /// Returns where the edge ended and what the detach did.
+    pub fn retarget_edge(
+        &mut self,
+        occurrence: EdgeOccurrence,
+        source: GraphSource,
+        input_refs: &[InputReference],
+    ) -> EdgeEdit {
+        if self.edge_at(occurrence).source == source {
+            return EdgeEdit::in_place(occurrence);
+        }
+        let edit = self.detach_member(occurrence, input_refs);
+        self.edge_slot(edit.occurrence).source = source;
+        self.clear_seed(edit.occurrence);
+        self.debug_assert_seed_shape();
+        edit
+    }
+
+    /// Detach the edge at `occurrence` when it is a bundle member, at its
+    /// pattern under `input_refs`; an ungrouped edge stays in place.
+    fn detach_member(
+        &mut self,
+        occurrence: EdgeOccurrence,
+        input_refs: &[InputReference],
+    ) -> EdgeEdit {
+        if self.edge_at(occurrence).membership().is_none() {
+            return EdgeEdit::in_place(occurrence);
+        }
+        let pattern = self.member_pattern(occurrence, input_refs);
+        let (occurrence, removed) = self.detach_at(occurrence, pattern);
+        EdgeEdit {
+            occurrence,
+            detached: Some(removed),
+        }
+    }
+
+    /// A handle for changing the weight or learning of the edge at `occurrence`.
     pub fn edge_mut(&mut self, occurrence: EdgeOccurrence) -> EdgeMut<'_> {
         EdgeMut {
             def: self,
