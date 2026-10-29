@@ -963,7 +963,8 @@ impl CgpGraphBackendDef {
     /// consumer gets the identity node inserted at its own index
     /// ([`Self::insert_compute_node`]), so evaluation order is preserved; a
     /// sink consumer gets it appended. The identity node's edge inherits
-    /// nothing. Returns where the split edge ended and what the detach did.
+    /// nothing. Returns where the split edge ended (a compute consumer's
+    /// edge one node later) and what the detach did.
     pub fn split_edge(
         &mut self,
         occurrence: EdgeOccurrence,
@@ -975,7 +976,7 @@ impl CgpGraphBackendDef {
             "split_edge: the identity node arrives without inputs"
         );
         self.mapped(|def, map| {
-            let edit = def.detach_member(occurrence, input_refs, map);
+            let mut edit = def.detach_member(occurrence, input_refs, map);
             let EdgeOccurrence { surface, index } = edit.occurrence;
             match surface {
                 EdgeSurface::ComputeInput(consumer) => {
@@ -993,6 +994,8 @@ impl CgpGraphBackendDef {
                     );
                     def.compute_nodes.0[shifted].inputs.0[index].source =
                         GraphSource::ComputeNode(consumer as u16);
+                    edit.occurrence =
+                        EdgeOccurrence::new(EdgeSurface::ComputeInput(shifted), index);
                 }
                 EdgeSurface::SinkInput(sink) => {
                     let new_idx = def.compute_nodes.len() as u16;

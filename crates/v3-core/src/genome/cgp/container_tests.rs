@@ -546,7 +546,12 @@ fn a_split_keeps_the_consumers_seed_and_starts_the_identity_edge_without_one() {
     let identity = || ComputeNode::new(ComputeNodeKind::Add, Vec::new());
     // Compute consumer: the identity node is inserted at the consumer's index.
     let mut def = seeded();
-    def.split_edge(compute(1, 0), identity(), &[]);
+    let edit = def.split_edge(compute(1, 0), identity(), &[]);
+    assert_eq!(
+        edit,
+        EdgeEdit::in_place(compute(2, 0)),
+        "the consumer moved"
+    );
     assert_eq!(
         def.rows(),
         vec![vec![Some(1.0), Some(2.0)], vec![None], vec![Some(3.0)]]
@@ -565,6 +570,15 @@ fn a_split_keeps_the_consumers_seed_and_starts_the_identity_edge_without_one() {
             consumer.stored_learning()
         ),
         (GraphSource::ComputeNode(1), 1.5, plastic())
+    );
+    // A later input of the consumer: the returned occurrence addresses it.
+    let mut def = seeded();
+    let edit = def.split_edge(compute(0, 1), identity(), &[]);
+    assert_eq!(edit, EdgeEdit::in_place(compute(1, 1)));
+    let split = def.def.edge_at(edit.occurrence);
+    assert_eq!(
+        (split.source(), split.own_weight()),
+        (GraphSource::ComputeNode(0), 0.25)
     );
     // Sink consumer: the identity node is appended.
     let mut def = seeded();
