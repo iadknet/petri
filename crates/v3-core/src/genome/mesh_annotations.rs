@@ -627,6 +627,7 @@ mod bus_slot_tests {
         OutputSinkKind,
     };
     use crate::genome::VmInstruction;
+    use proptest::prelude::{any, Strategy};
 
     /// `node`'s bus slots under its own annotation, as a reachable node.
     fn slots_of(node: &NodeGenome) -> NodeBusSlots {
@@ -810,6 +811,67 @@ mod bus_slot_tests {
         // Assert
         assert_eq!(within.payload_written, BTreeSet::from([4]));
         assert!(beyond.payload_written.is_empty(), "{beyond:?}");
+    }
+
+    /// The payload slots a lone wired write to `slot` reaches: `slot` when it
+    /// is on the bus, none past it.
+    fn expected_payload(slot: u8) -> BTreeSet<usize> {
+        let slot = usize::from(slot);
+        if slot < OUTPUT_SLOT_COUNT {
+            BTreeSet::from([slot])
+        } else {
+            BTreeSet::new()
+        }
+    }
+
+    proptest::proptest! {
+        /// A live `UpstreamSlot(k)` read, through any sub-index, and a live
+        /// `UpstreamBus[k]` read both read upstream slot `k` on either backend.
+        #[test]
+        fn a_live_upstream_slot_read_and_its_bus_field_twin_read_one_slot(
+            slot in 0..OUTPUT_SLOT_COUNT,
+            any_sub in any::<u16>(),
+        ) {
+            let bus_field = u16::try_from(slot).expect("a small bus");
+            for build in [graph_reading, vm_reading] {
+                let via_slot =
+                    slots_of(&build(InputReference::UpstreamSlot(slot), any_sub)).upstream_read;
+                let via_bus = slots_of(&build(InputReference::UpstreamBus, bus_field)).upstream_read;
+
+                proptest::prop_assert_eq!(&via_slot, &BTreeSet::from([slot]));
+                proptest::prop_assert_eq!(&via_bus, &via_slot);
+            }
+        }
+
+        /// A live `UpstreamBus` read past the bus reads no slot on either
+        /// backend.
+        #[test]
+        fn a_live_bus_field_read_past_the_bus_reads_no_slot(
+            sub_idx in (OUTPUT_SLOT_COUNT..=usize::from(u16::MAX))
+                .prop_map(|sub| u16::try_from(sub).expect("a u16 range")),
+        ) {
+            for build in [graph_reading, vm_reading] {
+                let slots = slots_of(&build(InputReference::UpstreamBus, sub_idx));
+
+                proptest::prop_assert!(slots.upstream_read.is_empty(), "{:?}", slots);
+            }
+        }
+
+        /// A live payload write reaches its slot below `OUTPUT_SLOT_COUNT`
+        /// and no slot at or above it, on either backend.
+        #[test]
+        fn a_live_payload_write_reaches_only_on_bus_slots(slot in any::<u8>()) {
+            let vm = slots_of(&vm_payload_write(Vec::new(), slot));
+            let graph = slots_of(&graph_node(
+                vec![InputReference::UpstreamSlot(0)],
+                CgpGraphBackendDef::new_with_fixed_outputs()
+                    .with_compute_nodes(Vec::new())
+                    .with_output_sinks(vec![sink(slot, vec![leaf(0)])]),
+            ));
+
+            proptest::prop_assert_eq!(&vm.payload_written, &expected_payload(slot));
+            proptest::prop_assert_eq!(&graph.payload_written, &expected_payload(slot));
+        }
     }
 
     #[test]
