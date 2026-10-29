@@ -58,7 +58,6 @@ pub(super) fn run_phase_2(
                 continue;
             }
             if sim.tick >= pending.deliver_tick {
-                // WORKAROUND(G4): the birth transaction of T29.F01 takes world context, not the simulation
                 if let BirthDelivery::Delivered(cell) =
                     deliver_pending_birth(id, sim, reproduce_rng)
                 {
@@ -186,7 +185,6 @@ fn commit(
     if let (Some(conception), WorldAction::Reproduce { direction, .. }) =
         (applied.conceived, *action)
     {
-        // WORKAROUND(G4): the birth transaction of T29.F01 takes world context, not the simulation
         spawn_child(
             id,
             sim,

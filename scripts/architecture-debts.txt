@@ -6,5 +6,4 @@
 
 G2 mutation/topology/routing.rs runtime::routing
 G2 mutation/vm/operators.rs runtime::vm
-G5 mutation/phenotype.rs creature::phenotype
 G12 mutation/engine/mod.rs creature::parseability

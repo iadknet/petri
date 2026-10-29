@@ -93,15 +93,18 @@ Canonical rules:
 
 Carrier: the identity travels in the creature's heritable body record
 (`HeritableBody`, `crates/v3-core/src/creature/body.rs`) beside the
-phenotype, and one call, `HeritableBody::inherit(parent_body, applied_events
-> 0, config, rng)`, inherits both: when mutated, the phenotype mutates first
-(`v3-phenotype-spec.md` Section 5) and the `kin_tag` second; otherwise
-nothing is drawn.
+phenotype. At conception the body policy (`mutation::body`,
+`sample_body_draws(applied_events > 0, config, rng)`) samples every body
+draw from config alone: when mutated, the phenotype step first
+(`v3-phenotype-spec.md` Section 5) and the `kin_tag` bit second; otherwise
+neither is drawn. `HeritableBody::inherit(parent_body, draws, ...)` applies
+the sampled choices without a draw.
 
 Ownership split:
 - reproduction owns **when** this trigger is evaluated;
-- the body record owns the **order** of the phenotype and kin-tag draws;
-- creature identity owns **how** `kin_tag` mutates.
+- the body policy owns every draw and its **order**;
+- creature identity owns **how** a drawn bit changes `kin_tag`
+  (`CreatureIdentityState::flip_kin_bit`).
 
 This keeps the generic mutation engine free of lifecycle-specific side effects.
 

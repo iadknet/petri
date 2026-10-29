@@ -88,8 +88,9 @@ Core rule:
 
 Trigger semantics:
 - After the `MutationEngine` processes the offspring genome and returns a
-  `MutationSummary`, the reproduction flow calls
-  `HeritableBody::inherit(parent_body, applied_events > 0, config, rng)`.
+  `MutationSummary`, conception samples the body draws
+  (`mutation::body::sample_body_draws(applied_events > 0, config, rng)`) and
+  applies them with `HeritableBody::inherit(parent_body, draws, ...)`.
 - If `MutationSummary.applied_events > 0` (at least one genome mutation event
   was applied), the phenotype mutates using the algorithm in Section 5, and
   then the kin tag mutates (`v3-creature-identity-spec.md` Section 5): the
@@ -99,8 +100,10 @@ Trigger semantics:
 
 Ownership boundary:
 - Reproduction evaluates the trigger after `MutationEngine` returns, not
-  inside the mutation engine itself; the body record owns the order of the
-  phenotype and kin-tag draws; this file owns how the phenotype mutates.
+  inside the mutation engine itself; the body policy (`mutation::body`,
+  `mutation::phenotype`) owns every draw and its order from config alone;
+  `Phenotype::mutated` (`creature::phenotype`) applies a sampled step without
+  a draw; this file owns how the phenotype mutates.
 - The mutation engine has no knowledge of phenotype state.
 - Canonical reproduction action flow is in `v3-reproduction-spec.md`.
 
@@ -112,7 +115,7 @@ When the trigger condition is met (`applied_events > 0`), phenotype mutates as
 follows:
 
 ```text
-mutate_phenotype(parent: Phenotype, config, rng) -> Phenotype:
+sample_phenotype_draw(config, rng) then Phenotype::mutated(draw):
   1. if rng.gen::<f32>() < config.channel_change_chance:
        child.active_channel = pick uniformly from the other 5 channels
      else:

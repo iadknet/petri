@@ -240,6 +240,7 @@ impl NodeGenome {
 pub struct CreatureGenome {
     /// Node to begin mesh execution from each tick.
     pub entry_node_id: NodeId,
+    // WORKAROUND(T29.F01): CreatureGenome.nodes private behind owner operations
     pub nodes: Vec<NodeGenome>,
 }
 

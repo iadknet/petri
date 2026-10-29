@@ -127,32 +127,34 @@ Constraints:
 - Newborn temporal state, eligibility traces (zero), visited flags and
   dispatch history start empty. Shared memory follows the separate memory
   rule above.
-- Before mutation the parent's learned state captures the draft's
-  `BirthSeeds` (T25.F06, T25.F12): nothing for a backend with no initialized
-  learner, else one row per compute node and one per sink, each sized to its
-  inputs, the value of each initialized edge learner at its occurrence
-  (`None` elsewhere), and one bundle slot per bundle record with the learned
-  scale of each initialized scale learner. Parent flags do not restrict the
-  capture.
-- Seeds follow their edge occurrence through the entire birth mutation
-  sequence, including mesh and compute-node moves and faithful copies, on
-  both surfaces: a pushed edge gets an empty seed at its insertion position
-  (the end of a sink's independent prefix), a removed edge loses its seed, a
-  group relocation moves its members' seeds with them, and an identity split
-  keeps the consumer's seed while the new identity edge has none. Group
-  slots follow their records: a new group gets an empty slot, dropping a
-  record (`RemoveGroup`, a last member's removal or detach) removes its
-  slot, and a relocation, a policy, `credits` or slot write (T25.F12)
-  keeps it.
-- A detached member's seed is composed (T25.F07): when the edge or its group
-  has a seed, `compose(edge seed or own weight, group seed or scale,
-  pattern)`, reading no flag and clamping nothing; with neither, none.
+- Before mutation the parent's learned state captures the birth payload's
+  seeds (T25.F06, T25.F12, T29.F01): the value of each initialized edge
+  learner and each initialized scale learner, keyed by its learnable
+  identity (mesh node index and `Edge(occurrence)` or `Scale(bundle)`);
+  nothing for a backend with no initialized learner. Parent flags do not
+  restrict the capture. The payload also carries the parent's shared memory;
+  no genome type holds a seed.
+- Every structural edit returns its inheritance mapping (T29.F01): for each
+  learnable of the edited genome, `Keep`, `Copy` (a duplicated edge, node or
+  whole mesh node), `Compose` or `Fresh`. The engine composes a committed
+  event's mapping into the birth's; a rejected event's vanishes with its
+  edits. A pushed edge, node or bundle is `Fresh`, a removed one drops, a
+  group relocation moves its members' identities with them, and an identity
+  split keeps the consumer's identity while the new identity edge is
+  `Fresh`. A mesh node removal shifts later nodes' identities, a node or
+  slice copy copies every learnable of a copied Graph backend, and a swapped
+  or appended backend is `Fresh`.
+- A detached member is `Compose` (T25.F07): when the edge or its group
+  carries a value, `compose(edge value or own weight, group value or
+  scale, pattern)`, reading no flag and clamping nothing; with neither,
+  none.
 - A weight write, a source-changing retarget and an edge reading a removed
-  compute node clear the edge's seed and a scale write clears the group's;
-  a same-source retarget, a kind change, a learning-attribute change (an
-  `retention` write included, T25.F09) and a policy or `credits` change keep
-  it.
-- The child's constructor reads the child's own learning layout, built once
+  compute node are `Fresh` and a scale write makes the group's scale
+  `Fresh`; a same-source retarget, a kind change, a learning-attribute change
+  (a `retention` write included, T25.F09) and a policy or `credits` change
+  keep it.
+- Finalization applies the birth's mapping to the payload's seeds; the
+  child's constructor then reads the child's own learning layout, built once
   after its mutation (T25.F12): an edge learner whose effective learning is
   Lamarckian and that has a seed starts at the seed clamped by its clamp and
   counts as initialized; every other edge learner, a Darwinian one with a
@@ -282,7 +284,8 @@ runtime config contract: `v3-runtime-config-spec.md`.
   9. call MutationEngine unconditionally on child genome -> MutationSummary
      (MutationEngine internally draws the requested event count;
       see v3-mutation-spec.md Section 4.1)
- 10. inherit the child's body in one call, HeritableBody::inherit
+ 10. sample the child's body draws in one call, mutation::body::
+     sample_body_draws, and apply them with HeritableBody::inherit
      (creature/body.rs), copying the parent's phenotype, identity
      (lineage_id unchanged), capacity and exchange shares; only if
      MutationSummary.applied_events > 0:
@@ -294,10 +297,12 @@ runtime config contract: `v3-runtime-config-spec.md`.
        the kin-tag draw and are the only draws T26.F02 adds; then, on every
        birth, steal_share then give_share by the same rule under
        mutation.share over [exchange.share_min, 1] (T27.F03)
- 12. spawn child immediately with the whole litter; occupy cell now
- 13. cap the child's energy at its own capacity; the excess is booked to
+ 12. finalize the zygote (creature::birth, Zygote::finalize) with the whole
+     litter on the cell, which caps the child's energy at its own capacity
+     and returns the excess, booked to
      energy_flows.offspring_capacity_overflow (the cap is not observed as
      an energy change of the child)
+ 13. place the child: occupy the cell now and open its action log
  14. book the capped energy to energy_flows.offspring_energy_credit
 ```
 
