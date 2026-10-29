@@ -451,7 +451,7 @@ fn e7_two_step_and_sterility() {
 // and never start a lineage, enter selection or seed an arm.
 
 fn graph_mut(genome: &mut CreatureGenome, node: usize) -> &mut CgpGraphBackendDef {
-    match &mut genome.nodes[node].backend_def {
+    match genome.nodes[node].backend_edit().1 {
         BackendDef::Graph(def) => def,
         BackendDef::Vm(_) => panic!("node {node} is not a Graph node"),
     }
@@ -483,7 +483,9 @@ fn silenced(genome: &CreatureGenome) -> CreatureGenome {
 fn repointed(genome: &CreatureGenome, pairs: &[(usize, usize)]) -> CreatureGenome {
     let mut g = genome.clone();
     for &(idx, slot) in pairs {
-        g.nodes[1].input_refs[idx] = InputReference::UpstreamSlot(slot);
+        v3_lab::controllers::edit_declarations(&mut g.nodes[1], |refs| {
+            refs[idx] = InputReference::UpstreamSlot(slot);
+        });
     }
     g
 }

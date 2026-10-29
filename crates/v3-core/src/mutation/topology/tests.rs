@@ -257,14 +257,14 @@ fn copy_node_deep_copies_vm_backend() {
         )
         .unwrap();
         let new_node = genome.nodes.last().unwrap();
-        if matches!(&new_node.backend_def, BackendDef::Vm(_)) {
+        if matches!(new_node.backend_def(), BackendDef::Vm(_)) {
             // Find which source node has matching backend.
             let has_match = genome
                 .nodes
                 .iter()
                 .rev()
                 .skip(1)
-                .any(|n| n.backend_def == new_node.backend_def);
+                .any(|n| n.backend_def() == new_node.backend_def());
             if has_match {
                 found = true;
                 break;
@@ -286,7 +286,7 @@ fn copy_node_deep_copies_graph_backend() {
     for seed in 0u64..100 {
         let mut genome = v3alpha1_founder_genome();
         // Swap node 1 to CGP Graph backend.
-        genome.nodes[1].backend_def =
+        *genome.nodes[1].backend_edit().1 =
             BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs());
         let mut r = rng(seed);
         apply(
@@ -297,13 +297,13 @@ fn copy_node_deep_copies_graph_backend() {
         )
         .unwrap();
         let new_node = genome.nodes.last().unwrap();
-        if matches!(&new_node.backend_def, BackendDef::Graph(_)) {
+        if matches!(new_node.backend_def(), BackendDef::Graph(_)) {
             let has_match = genome
                 .nodes
                 .iter()
                 .rev()
                 .skip(1)
-                .any(|n| n.backend_def == new_node.backend_def);
+                .any(|n| n.backend_def() == new_node.backend_def());
             if has_match {
                 found = true;
                 break;
@@ -321,36 +321,36 @@ fn copy_mesh_backward_slice_duplicates_feeding_pipeline() {
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![
-            NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: wrap_targets(vec![NodeId::new(1)]),
-            },
-            NodeGenome {
-                node_id: NodeId::new(1),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+                wrap_targets(vec![NodeId::new(1)]),
+            ),
+            NodeGenome::new(
+                NodeId::new(1),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: wrap_targets(vec![NodeId::new(2)]),
-            },
-            NodeGenome {
-                node_id: NodeId::new(2),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+                wrap_targets(vec![NodeId::new(2)]),
+            ),
+            NodeGenome::new(
+                NodeId::new(2),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![],
-            },
+                vec![],
+            ),
         ],
     };
     let before = genome.nodes.len();
@@ -380,26 +380,26 @@ fn copy_mesh_backward_slice_remaps_internal_targets() {
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![
-            NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: wrap_targets(vec![NodeId::new(1)]),
-            },
-            NodeGenome {
-                node_id: NodeId::new(1),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+                wrap_targets(vec![NodeId::new(1)]),
+            ),
+            NodeGenome::new(
+                NodeId::new(1),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![],
-            },
+                vec![],
+            ),
         ],
     };
     for seed in 0u64..200 {
@@ -444,36 +444,36 @@ fn copy_mesh_forward_slice_duplicates_downstream_subtree() {
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![
-            NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: wrap_targets(vec![NodeId::new(1)]),
-            },
-            NodeGenome {
-                node_id: NodeId::new(1),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+                wrap_targets(vec![NodeId::new(1)]),
+            ),
+            NodeGenome::new(
+                NodeId::new(1),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: wrap_targets(vec![NodeId::new(2)]),
-            },
-            NodeGenome {
-                node_id: NodeId::new(2),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+                wrap_targets(vec![NodeId::new(2)]),
+            ),
+            NodeGenome::new(
+                NodeId::new(2),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![],
-            },
+                vec![],
+            ),
         ],
     };
     let before = genome.nodes.len();
@@ -505,16 +505,16 @@ fn copy_mesh_forward_slice_duplicates_downstream_subtree() {
 fn copy_mesh_operators_single_node_genome_returns_single_copy() {
     let mut genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program: vec![VmInstruction::Halt],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     };
     let mut r = rng(42);
     apply(
@@ -535,16 +535,16 @@ fn swap_route_targets_changes_target_order() {
     // Create a genome with a node that has multiple targets.
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program: vec![VmInstruction::Halt],
             }),
-            targets: wrap_targets(vec![NodeId::new(1), NodeId::new(2), NodeId::new(3)]),
-        }],
+            wrap_targets(vec![NodeId::new(1), NodeId::new(2), NodeId::new(3)]),
+        )],
     };
     let original_targets = genome.nodes[0].targets.clone();
     let mut changed = false;
@@ -570,16 +570,16 @@ fn swap_route_targets_changes_target_order() {
 fn swap_route_targets_preserves_target_set() {
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program: vec![VmInstruction::Halt],
             }),
-            targets: wrap_targets(vec![NodeId::new(1), NodeId::new(2), NodeId::new(3)]),
-        }],
+            wrap_targets(vec![NodeId::new(1), NodeId::new(2), NodeId::new(3)]),
+        )],
     };
     let mut original_ids: Vec<NodeId> = genome.nodes[0]
         .targets
@@ -610,16 +610,16 @@ fn swap_route_targets_preserves_target_set() {
 fn swap_route_targets_requires_at_least_two_targets() {
     let mut genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program: vec![VmInstruction::Halt],
             }),
-            targets: wrap_targets(vec![NodeId::new(1)]),
-        }],
+            wrap_targets(vec![NodeId::new(1)]),
+        )],
     };
     let mut r = rng(0);
     let result = apply(
@@ -638,26 +638,26 @@ fn splice_node_increases_node_count_by_one() {
     let mut genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![
-            NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: wrap_targets(vec![NodeId::new(1)]),
-            },
-            NodeGenome {
-                node_id: NodeId::new(1),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+                wrap_targets(vec![NodeId::new(1)]),
+            ),
+            NodeGenome::new(
+                NodeId::new(1),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![],
-            },
+                vec![],
+            ),
         ],
     };
     let before = genome.nodes.len();
@@ -677,26 +677,26 @@ fn splice_node_creates_a_to_c_to_b_chain() {
     let mut genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![
-            NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: wrap_targets(vec![NodeId::new(1)]),
-            },
-            NodeGenome {
-                node_id: NodeId::new(1),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+                wrap_targets(vec![NodeId::new(1)]),
+            ),
+            NodeGenome::new(
+                NodeId::new(1),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![],
-            },
+                vec![],
+            ),
         ],
     };
     let b_id = NodeId::new(1);
@@ -728,16 +728,16 @@ fn splice_node_creates_a_to_c_to_b_chain() {
 fn splice_node_new_node_is_blank() {
     let mut genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program: vec![VmInstruction::Halt],
             }),
-            targets: wrap_targets(vec![NodeId::new(1)]),
-        }],
+            wrap_targets(vec![NodeId::new(1)]),
+        )],
     };
     genome.nodes.push(crate::mutation::topology::birth::detour(
         NodeId::new(1),
@@ -756,15 +756,15 @@ fn splice_node_new_node_is_blank() {
     .unwrap();
     let c = genome.nodes.last().unwrap();
     assert!(
-        c.input_refs.is_empty(),
+        c.input_refs().is_empty(),
         "spliced node must have no input_refs"
     );
-    if let BackendDef::Vm(ref vm) = c.backend_def {
+    if let BackendDef::Vm(ref vm) = c.backend_def() {
         assert_eq!(vm.register_count, 1);
         assert!(vm.constants.is_empty());
         assert_eq!(vm.program, vec![VmInstruction::Halt]);
     } else {
-        assert_eq!(c.backend_def, super::birth::blank_graph_backend());
+        assert_eq!(c.backend_def(), &super::birth::blank_graph_backend());
     }
 }
 
@@ -772,16 +772,16 @@ fn splice_node_new_node_is_blank() {
 fn splice_node_no_targets_returns_skip() {
     let mut genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program: vec![VmInstruction::Halt],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     };
     let mut r = rng(0);
     let result = apply(
@@ -944,16 +944,16 @@ fn removal_prefers_unreachable_even_with_reachable_bias() {
     let mut genome = v3alpha1_founder_genome();
     // Add a third node so there's a non-reachable removable node too.
     let id2 = NodeId::new(99);
-    genome.nodes.push(NodeGenome {
-        node_id: id2,
-        input_refs: vec![],
-        backend_def: BackendDef::Vm(VmBackendDef {
+    genome.nodes.push(NodeGenome::new(
+        id2,
+        vec![],
+        BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: vec![],
             program: vec![VmInstruction::Halt],
         }),
-        targets: vec![],
-    });
+        vec![],
+    ));
     // Reachable = [1] (index 1 only). Index 2 is unreachable.
     let reachable = [1usize];
     for seed in 0u64..20 {
@@ -1031,20 +1031,20 @@ fn mutate_gate_bias_changes_bias() {
     use crate::contracts::RouteTarget;
     let mut genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(crate::genome::VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(crate::genome::VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program: vec![crate::genome::VmInstruction::Halt],
             }),
-            targets: vec![RouteTarget {
+            vec![RouteTarget {
                 target_id: NodeId::new(0),
                 slot: 0,
                 gate_bias: 0.0,
             }],
-        }],
+        )],
     };
     let mut r = rng(42);
     let result = apply(
@@ -1066,16 +1066,16 @@ fn mutate_gate_bias_changes_bias() {
 fn mutate_gate_bias_noop_on_empty_targets() {
     let mut genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(crate::genome::VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(crate::genome::VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program: vec![crate::genome::VmInstruction::Halt],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     };
     let mut r = rng(0);
     let result = apply(
@@ -1093,20 +1093,20 @@ fn mutate_gate_bias_clamps_to_range() {
     // Set gate_bias near the upper boundary.
     let mut genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(crate::genome::VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(crate::genome::VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program: vec![crate::genome::VmInstruction::Halt],
             }),
-            targets: vec![RouteTarget {
+            vec![RouteTarget {
                 target_id: NodeId::new(0),
                 slot: 0,
                 gate_bias: 3.9,
             }],
-        }],
+        )],
     };
     // Apply multiple times -- at least one should push toward the boundary.
     let mut clamped_high = false;
@@ -1169,15 +1169,17 @@ fn ring_genome(n: u32) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: (0..n)
-            .map(|i| NodeGenome {
-                node_id: NodeId::new(i),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
-                    register_count: 1,
-                    constants: vec![],
-                    program: vec![VmInstruction::Halt],
-                }),
-                targets: wrap_targets(vec![NodeId::new((i + 1) % n)]),
+            .map(|i| {
+                NodeGenome::new(
+                    NodeId::new(i),
+                    vec![],
+                    BackendDef::Vm(VmBackendDef {
+                        register_count: 1,
+                        constants: vec![],
+                        program: vec![VmInstruction::Halt],
+                    }),
+                    wrap_targets(vec![NodeId::new((i + 1) % n)]),
+                )
             })
             .collect(),
     }
@@ -1240,8 +1242,8 @@ fn f15_inline_growth_redirects_existing_edge_through_halt() {
         assert_eq!(genome.nodes[0].targets[0].gate_bias, old.gate_bias);
         assert_eq!(new.targets[0].target_id, old.target_id);
         assert!(
-            new.backend_def == super::birth::minimal_vm_backend()
-                || new.backend_def == super::birth::blank_graph_backend()
+            *new.backend_def() == super::birth::minimal_vm_backend()
+                || *new.backend_def() == super::birth::blank_graph_backend()
         );
     }
 }
@@ -1284,7 +1286,7 @@ fn f15_branch_addition_pairs_a_gate_write_with_tied_detour() {
     assert_eq!(branch.gate_bias, old.gate_bias);
     assert_eq!(branch.target_id, genome.nodes[2].node_id);
     assert_eq!(genome.nodes[2].targets[0].target_id, old.target_id);
-    match &genome.nodes[0].backend_def {
+    match genome.nodes[0].backend_def() {
         BackendDef::Graph(g) => assert!(g.output_sinks().iter().any(
             |s| matches!(s.kind, OutputSinkKind::RouterGate(slot) if slot == branch.slot)
                 && !s.inputs.is_empty()
@@ -1308,7 +1310,7 @@ fn f15_backend_growth_preserves_every_original_node() {
     .unwrap();
     assert_eq!(genome.nodes.len(), 3);
     assert_eq!(genome.nodes[1], before.nodes[1]);
-    assert_eq!(genome.nodes[0].backend_def, before.nodes[0].backend_def);
+    assert_eq!(genome.nodes[0].backend_def(), before.nodes[0].backend_def());
     assert_eq!(
         genome.nodes[0].targets[1].target_id,
         genome.nodes[2].node_id

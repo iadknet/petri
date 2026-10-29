@@ -29,6 +29,19 @@ fn test_state() -> AppState {
 /// Rebuild `creature` from its genome after `edit`, under the same id,
 /// position, energy, generation, body, shared memory, age and heading, so
 /// its derived state and brain runtime follow the edited genome.
+/// Rebuild `node` declaring `reference` after its declarations (a fixture,
+/// through `NodeGenome::new`).
+fn declare(node: &mut v3_core::genome::NodeGenome, reference: v3_core::contracts::InputReference) {
+    let mut input_refs = node.input_refs().to_vec();
+    input_refs.push(reference);
+    *node = v3_core::genome::NodeGenome::new(
+        node.node_id,
+        input_refs,
+        node.backend_def().clone(),
+        node.targets.clone(),
+    );
+}
+
 fn rebuild_with<R>(
     creature: &mut v3_core::creature::state::CreatureState,
     edit: impl FnOnce(&mut v3_core::genome::CreatureGenome) -> R,
@@ -2697,13 +2710,15 @@ async fn get_creature_brain_resolves_ring_members_and_their_bundle() {
             let node = genome
                 .nodes
                 .iter_mut()
-                .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+                .find(|node| matches!(node.backend_def(), BackendDef::Graph(_)))
                 .expect("a Graph node");
-            let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
-            node.input_refs
-                .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
+            let ring_ref = u16::try_from(node.input_refs().len()).unwrap();
+            declare(
+                node,
+                InputReference::World(WorldInputKey::NeighborBarrierRing),
+            );
             let bundle = add_geometric(node, ring_ref, 0, DirectedVoteKind::Move, 0);
-            let BackendDef::Graph(def) = &mut node.backend_def else {
+            let BackendDef::Graph(def) = node.backend_edit().1 else {
                 unreachable!()
             };
             def.bundle_mut(bundle).set_scale(0.5);
@@ -2801,15 +2816,17 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
             let node_idx = genome
                 .nodes
                 .iter()
-                .position(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+                .position(|node| matches!(node.backend_def(), BackendDef::Graph(_)))
                 .expect("a Graph node");
             let node = &mut genome.nodes[node_idx];
-            let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
-            node.input_refs
-                .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
+            let ring_ref = u16::try_from(node.input_refs().len()).unwrap();
+            declare(
+                node,
+                InputReference::World(WorldInputKey::NeighborBarrierRing),
+            );
             let node_id = node.node_id.0;
             let bundle = add_geometric(node, ring_ref, 0, DirectedVoteKind::Move, 0);
-            let BackendDef::Graph(def) = &mut node.backend_def else {
+            let BackendDef::Graph(def) = node.backend_edit().1 else {
                 unreachable!()
             };
             let members: Vec<_> = def.members(bundle).collect();
@@ -2968,15 +2985,17 @@ async fn get_creature_learning_lists_learned_scales_and_passive_members() {
             let node_idx = genome
                 .nodes
                 .iter()
-                .position(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+                .position(|node| matches!(node.backend_def(), BackendDef::Graph(_)))
                 .expect("a Graph node");
             let node = &mut genome.nodes[node_idx];
-            let ring_ref = u16::try_from(node.input_refs.len()).unwrap();
-            node.input_refs
-                .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
+            let ring_ref = u16::try_from(node.input_refs().len()).unwrap();
+            declare(
+                node,
+                InputReference::World(WorldInputKey::NeighborBarrierRing),
+            );
             let node_id = node.node_id.0;
             let id = add_geometric(node, ring_ref, 0, DirectedVoteKind::Move, 0);
-            let BackendDef::Graph(def) = &mut node.backend_def else {
+            let BackendDef::Graph(def) = node.backend_edit().1 else {
                 unreachable!()
             };
             def.bundle_mut(id).set_scale(0.5);
@@ -3125,10 +3144,10 @@ async fn get_creature_brain_lists_an_action_queue_bundle_at_the_configured_width
             let node = genome
                 .nodes
                 .iter_mut()
-                .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+                .find(|node| matches!(node.backend_def(), BackendDef::Graph(_)))
                 .expect("a Graph node");
-            let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
-            node.input_refs.push(InputReference::ActionQueue);
+            let ref_idx = u16::try_from(node.input_refs().len()).unwrap();
+            declare(node, InputReference::ActionQueue);
             let birth = BundleBirth {
                 field_set: 0,
                 wiring: Wiring::Plain {
@@ -3190,25 +3209,27 @@ async fn live_circuit_slot_lists_are_the_reachable_live_bus_slots() {
     // (`CustomOutput(6)` unwired) and routes to VM node 3, which writes
     // payload slot 4; VM node 2, routed to by no one, reads upstream slot 9
     // into payload slot 11.
-    let vm = |id: u32, read: usize, write: u8| NodeGenome {
-        node_id: NodeId::new(id),
-        input_refs: vec![InputReference::UpstreamSlot(read)],
-        targets: Vec::new(),
-        backend_def: BackendDef::Vm(VmBackendDef {
-            register_count: 1,
-            constants: Vec::new(),
-            program: vec![
-                VmInstruction::ReadInput {
-                    dst: 0,
-                    ref_idx: 0,
-                    sub_idx: 0,
-                },
-                VmInstruction::WriteInternalPayload {
-                    slot_idx: write,
-                    src: 0,
-                },
-            ],
-        }),
+    let vm = |id: u32, read: usize, write: u8| {
+        NodeGenome::new(
+            NodeId::new(id),
+            vec![InputReference::UpstreamSlot(read)],
+            BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                constants: Vec::new(),
+                program: vec![
+                    VmInstruction::ReadInput {
+                        dst: 0,
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    },
+                    VmInstruction::WriteInternalPayload {
+                        slot_idx: write,
+                        src: 0,
+                    },
+                ],
+            }),
+            Vec::new(),
+        )
     };
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     let sink = def
@@ -3219,16 +3240,16 @@ async fn live_circuit_slot_lists_are_the_reachable_live_bus_slots() {
         sub_idx: 0,
     };
     def.push_edge(sink, GraphEdge::new(leaf, 1.0));
-    let entry = NodeGenome {
-        node_id: NodeId::new(1),
-        input_refs: vec![InputReference::UpstreamSlot(2)],
-        targets: vec![RouteTarget {
+    let entry = NodeGenome::new(
+        NodeId::new(1),
+        vec![InputReference::UpstreamSlot(2)],
+        BackendDef::Graph(def),
+        vec![RouteTarget {
             target_id: NodeId::new(3),
             slot: 0,
             gate_bias: 0.0,
         }],
-        backend_def: BackendDef::Graph(def),
-    };
+    );
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(1),
         nodes: vec![entry, vm(2, 9, 11), vm(3, 0, 4)],
@@ -3340,13 +3361,13 @@ async fn get_creature_brain_resolves_pair_coordinates_and_fact_members() {
             let node = genome
                 .nodes
                 .iter_mut()
-                .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+                .find(|node| matches!(node.backend_def(), BackendDef::Graph(_)))
                 .expect("a Graph node");
-            let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
-            node.input_refs.push(area);
+            let ref_idx = u16::try_from(node.input_refs().len()).unwrap();
+            declare(node, area);
             let node_id = node.node_id.0;
             let bundle = add_geometric(node, ref_idx, 0, DirectedVoteKind::Move, 0);
-            let BackendDef::Graph(def) = &mut node.backend_def else {
+            let BackendDef::Graph(def) = node.backend_edit().1 else {
                 unreachable!()
             };
             def.bundle_mut(bundle).set_scale(2.0);

@@ -22,7 +22,7 @@ fn rng(seed: u64) -> SmallRng {
 fn vm_constant_mutation_changes_constant_value() {
     let genome = v3alpha1_founder_genome();
     // Node 1 (VM) has constants [0.5, 1.0, 2.0, 3.0, 20.0].
-    let before: Vec<f32> = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let before: Vec<f32> = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.constants.clone()
     } else {
         panic!("expected VM backend on node 1");
@@ -39,7 +39,7 @@ fn vm_constant_mutation_changes_constant_value() {
             &MutationConfig::default(),
         )
         .unwrap();
-        let after: Vec<f32> = if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+        let after: Vec<f32> = if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def() {
             vm.constants.clone()
         } else {
             panic!()
@@ -56,7 +56,7 @@ fn vm_constant_mutation_changes_constant_value() {
 fn vm_constant_mutation_on_node_with_empty_constants_adds_constant() {
     let mut genome = v3alpha1_founder_genome();
     // Clear constants from node 1 VM.
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.constants.clear();
     }
     let mut r = rng(0);
@@ -68,7 +68,7 @@ fn vm_constant_mutation_on_node_with_empty_constants_adds_constant() {
         &MutationConfig::default(),
     )
     .unwrap();
-    if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         assert_eq!(vm.constants.len(), 1, "one constant added");
     }
 }
@@ -112,7 +112,7 @@ fn vm_constant_mutation_on_empty_pool_draws_the_constant_from_the_signed_unit_ra
 
 /// The constant pool of the founder's VM node (node 1).
 fn founder_vm_constants(genome: &mut CreatureGenome) -> &mut Vec<f32> {
-    let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def else {
+    let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 else {
         panic!("expected VM backend on node 1")
     };
     &mut vm.constants
@@ -265,7 +265,7 @@ proptest! {
 #[test]
 fn vm_instruction_mutation_changes_program() {
     let mut genome = v3alpha1_founder_genome();
-    let before_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let before_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.program.len()
     } else {
         panic!()
@@ -282,7 +282,7 @@ fn vm_instruction_mutation_changes_program() {
             &MutationConfig::default(),
         )
         .unwrap();
-        let after_len = if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+        let after_len = if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def() {
             vm.program.len()
         } else {
             panic!()
@@ -313,7 +313,7 @@ fn vm_instruction_mutation_reaches_insert_replace_and_delete() {
         VmInstruction::AddVote { sink: 0, src: 0 },
         VmInstruction::Halt,
     ]);
-    let original = match &genome.nodes[0].backend_def {
+    let original = match genome.nodes[0].backend_def() {
         BackendDef::Vm(vm) => vm.program.clone(),
         _ => unreachable!("fixture must be a VM"),
     };
@@ -330,7 +330,7 @@ fn vm_instruction_mutation_reaches_insert_replace_and_delete() {
             &MutationConfig::default(),
         )
         .expect("the nonempty VM fixture is applicable");
-        let BackendDef::Vm(vm) = &mut mutated.nodes[0].backend_def else {
+        let BackendDef::Vm(vm) = mutated.nodes[0].backend_edit().1 else {
             unreachable!("fixture must remain a VM");
         };
         match vm.program.len().cmp(&original.len()) {
@@ -348,7 +348,7 @@ fn vm_instruction_mutation_reaches_insert_replace_and_delete() {
 #[test]
 fn vm_delete_instruction_removes_one_instruction() {
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program = vec![
             VmInstruction::Noop,
             VmInstruction::Halt,
@@ -356,7 +356,7 @@ fn vm_delete_instruction_removes_one_instruction() {
         ];
     }
 
-    let before_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let before_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.program.len()
     } else {
         panic!()
@@ -371,7 +371,7 @@ fn vm_delete_instruction_removes_one_instruction() {
     );
     assert!(result.is_ok());
 
-    let after_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let after_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.program.len()
     } else {
         panic!()
@@ -382,7 +382,7 @@ fn vm_delete_instruction_removes_one_instruction() {
 #[test]
 fn vm_delete_instruction_skips_single_instruction_program() {
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program = vec![VmInstruction::Noop];
     }
 
@@ -401,14 +401,12 @@ fn vm_delete_instruction_skips_single_instruction_program() {
 fn vm_mutator_on_graph_only_genome_returns_no_applicable_target() {
     let mut genome = v3alpha1_founder_genome();
     // Replace all nodes with Graph-backend nodes.
-    genome.nodes = vec![NodeGenome {
-        node_id: NodeId::new(0),
-        input_refs: vec![],
-        backend_def: BackendDef::Graph(
-            crate::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs(),
-        ),
-        targets: vec![],
-    }];
+    genome.nodes = vec![NodeGenome::new(
+        NodeId::new(0),
+        vec![],
+        BackendDef::Graph(crate::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs()),
+        vec![],
+    )];
     let mut r = rng(0);
     let result = VmMutator::apply(
         &mut genome,
@@ -469,7 +467,7 @@ fn vm_insert_produces_non_noop() {
             &MutationConfig::default(),
         )
         .unwrap();
-        if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+        if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
             if vm.program.iter().any(|i| !matches!(i, VmInstruction::Noop)) {
                 found_non_noop = true;
                 break;
@@ -489,7 +487,7 @@ fn vm_replace_produces_non_noop() {
     for seed in 0u64..100 {
         let mut genome = v3alpha1_founder_genome();
         // Set program to all Halt instructions.
-        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+        if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
             vm.program = vec![VmInstruction::Halt; 10];
         }
         let mut r = rng(seed);
@@ -501,7 +499,7 @@ fn vm_replace_produces_non_noop() {
             &MutationConfig::default(),
         )
         .unwrap();
-        if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+        if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
             // Check if any instruction changed to something other than Halt or Noop.
             if vm
                 .program
@@ -663,7 +661,7 @@ fn random_vm_instruction_generates_slot_opcodes() {
 #[test]
 fn raw_field_mutation_nudges_a_single_u8_field_at_zero_up_by_one() {
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program = vec![VmInstruction::ClearSlot { slot_idx: 0 }];
     }
 
@@ -678,7 +676,7 @@ fn raw_field_mutation_nudges_a_single_u8_field_at_zero_up_by_one() {
             &MutationConfig::default(),
         )
         .unwrap();
-        if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+        if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def() {
             assert!(matches!(
                 vm.program[0],
                 VmInstruction::ClearSlot { slot_idx: 1 }
@@ -690,7 +688,7 @@ fn raw_field_mutation_nudges_a_single_u8_field_at_zero_up_by_one() {
 #[test]
 fn raw_field_mutation_can_change_slot_idx() {
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program = vec![VmInstruction::LoadSlotImm {
             dst: 0,
             slot_idx: 0,
@@ -709,7 +707,7 @@ fn raw_field_mutation_can_change_slot_idx() {
             &MutationConfig::default(),
         )
         .unwrap();
-        if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+        if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def() {
             if let VmInstruction::LoadSlotImm { slot_idx, .. } = vm.program[0] {
                 if slot_idx != 0 {
                     saw_changed = true;
@@ -728,7 +726,7 @@ fn raw_field_mutation_can_change_slot_idx() {
 fn vm_instruction_mutation_program_never_empty() {
     // Genome with a single-instruction program — delete path must not empty it.
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program = vec![VmInstruction::Halt];
     }
     // Run many times to trigger the delete path.
@@ -743,7 +741,7 @@ fn vm_instruction_mutation_program_never_empty() {
             &MutationConfig::default(),
         )
         .unwrap();
-        if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+        if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def() {
             assert!(!vm.program.is_empty(), "program must not be emptied");
         }
     }
@@ -767,7 +765,7 @@ fn vm_register_count_increments_and_decrements() {
         )
         .is_ok()
         {
-            let new_rc = if let BackendDef::Vm(ref vm) = g.nodes[0].backend_def {
+            let new_rc = if let BackendDef::Vm(ref vm) = g.nodes[0].backend_def() {
                 vm.register_count
             } else {
                 original_rc
@@ -791,7 +789,7 @@ fn vm_register_count_increments_and_decrements() {
 fn vm_register_count_clamps_to_bounds() {
     // Test lower bound: register_count=1 should not go below 1.
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.register_count = 1;
     }
     for seed in 0u64..100 {
@@ -804,12 +802,12 @@ fn vm_register_count_clamps_to_bounds() {
             &mut r,
             &MutationConfig::default(),
         );
-        if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+        if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def() {
             assert!(vm.register_count >= 1, "register_count must be >= 1");
         }
     }
     // Test upper bound: register_count=32 should not go above 32.
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.register_count = 32;
     }
     for seed in 0u64..100 {
@@ -822,7 +820,7 @@ fn vm_register_count_clamps_to_bounds() {
             &mut r,
             &MutationConfig::default(),
         );
-        if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+        if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def() {
             assert!(vm.register_count <= 32, "register_count must be <= 32");
         }
     }
@@ -833,7 +831,7 @@ fn vm_register_count_clamps_to_bounds() {
 #[test]
 fn copy_instruction_block_increases_program_length() {
     let mut genome = v3alpha1_founder_genome();
-    let before = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let before = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.program.len()
     } else {
         panic!()
@@ -847,7 +845,7 @@ fn copy_instruction_block_increases_program_length() {
         &MutationConfig::default(),
     );
     assert!(result.is_ok());
-    let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.program.len()
     } else {
         panic!()
@@ -858,7 +856,7 @@ fn copy_instruction_block_increases_program_length() {
 #[test]
 fn copy_instruction_block_on_empty_returns_no_applicable_target() {
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program.clear();
     }
     let mut r = rng(0);
@@ -876,7 +874,7 @@ fn copy_instruction_block_on_empty_returns_no_applicable_target() {
 fn copy_instruction_block_preserves_content() {
     // All original instruction identities must remain in order after copy.
     let mut genome = v3alpha1_founder_genome();
-    let original = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let original = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.program.clone()
     } else {
         panic!()
@@ -890,7 +888,7 @@ fn copy_instruction_block_preserves_content() {
         &MutationConfig::default(),
     )
     .unwrap();
-    let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.program.clone()
     } else {
         panic!()
@@ -919,7 +917,7 @@ fn copy_instruction_block_preserves_content() {
 fn copy_instruction_block_respects_max_32() {
     // With a small program, block size is clamped.
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program = vec![VmInstruction::Noop; 3];
     }
     let mut r = rng(0);
@@ -931,7 +929,7 @@ fn copy_instruction_block_respects_max_32() {
         &MutationConfig::default(),
     )
     .unwrap();
-    let after_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let after_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.program.len()
     } else {
         panic!()
@@ -946,14 +944,14 @@ fn copy_instruction_block_respects_max_32() {
 #[test]
 fn copy_instruction_block_remapped_shifts_registers() {
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program = vec![
             VmInstruction::Add { dst: 0, a: 1, b: 2 },
             VmInstruction::Sub { dst: 1, a: 2, b: 3 },
         ];
         vm.register_count = 8;
     }
-    let before = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let before = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.program.len()
     } else {
         panic!()
@@ -967,7 +965,7 @@ fn copy_instruction_block_remapped_shifts_registers() {
         &MutationConfig::default(),
     )
     .unwrap();
-    let after_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let after_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.program.len()
     } else {
         panic!()
@@ -979,7 +977,7 @@ fn copy_instruction_block_remapped_shifts_registers() {
 fn copy_instruction_block_remapped_wraps_registers() {
     // Register remapping must wrap within register_count.
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program = vec![VmInstruction::Move { dst: 3, src: 3 }];
         vm.register_count = 4;
     }
@@ -993,7 +991,7 @@ fn copy_instruction_block_remapped_wraps_registers() {
             &mut r,
             &MutationConfig::default(),
         );
-        if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+        if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def() {
             for instr in &vm.program {
                 if let VmInstruction::Move { dst, src } = instr {
                     assert!(*dst < 4, "dst must be < register_count");
@@ -1010,7 +1008,7 @@ fn copy_instruction_block_remapped_cyclically_shifts_every_register_field() {
         for instruction in register_bearing_instructions(raw) {
             let field_count = register_fields(&instruction).len();
             let mut genome = slot_program_genome(vec![instruction]);
-            let BackendDef::Vm(vm) = &mut genome.nodes[0].backend_def else {
+            let BackendDef::Vm(vm) = genome.nodes[0].backend_edit().1 else {
                 unreachable!("fixture must be a VM");
             };
             vm.register_count = 4;
@@ -1024,7 +1022,7 @@ fn copy_instruction_block_remapped_cyclically_shifts_every_register_field() {
                     &MutationConfig::default(),
                 )
                 .expect("the one-instruction VM fixture is applicable");
-                let BackendDef::Vm(vm) = &mut mutated.nodes[0].backend_def else {
+                let BackendDef::Vm(vm) = mutated.nodes[0].backend_edit().1 else {
                     unreachable!("fixture must remain a VM");
                 };
                 assert_eq!(vm.program.len(), 2);
@@ -1057,7 +1055,7 @@ fn copy_instruction_block_remapped_cyclically_shifts_every_register_field() {
 fn copy_instruction_block_remapped_preserves_non_register_fields() {
     // Non-register fields (const_idx, sink, etc.) must not change.
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program = vec![VmInstruction::AddVote { sink: 42, src: 0 }];
         vm.register_count = 4;
     }
@@ -1069,7 +1067,7 @@ fn copy_instruction_block_remapped_preserves_non_register_fields() {
         &mut r,
         &MutationConfig::default(),
     );
-    if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         // The original instruction must still exist unchanged.
         assert!(
             vm.program
@@ -1083,7 +1081,7 @@ fn copy_instruction_block_remapped_preserves_non_register_fields() {
 #[test]
 fn copy_instruction_block_remapped_adjusts_jump_offsets() {
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program = vec![VmInstruction::Jump { offset: 5 }, VmInstruction::Noop];
         vm.register_count = 4;
     }
@@ -1098,7 +1096,7 @@ fn copy_instruction_block_remapped_adjusts_jump_offsets() {
             &mut r,
             &MutationConfig::default(),
         );
-        if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+        if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def() {
             for instr in &vm.program {
                 if let VmInstruction::Jump { offset } = instr {
                     if *offset != 5 {
@@ -1121,7 +1119,7 @@ fn copy_instruction_block_remapped_adjusts_jump_offsets() {
 #[test]
 fn copy_instruction_block_remapped_on_empty_returns_no_applicable_target() {
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program.clear();
     }
     let mut r = rng(0);
@@ -1140,7 +1138,7 @@ fn copy_instruction_block_remapped_on_empty_returns_no_applicable_target() {
 #[test]
 fn copy_constant_block_increases_length() {
     let mut genome = v3alpha1_founder_genome();
-    let before = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let before = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.constants.len()
     } else {
         panic!()
@@ -1154,7 +1152,7 @@ fn copy_constant_block_increases_length() {
         &MutationConfig::default(),
     )
     .unwrap();
-    let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.constants.len()
     } else {
         panic!()
@@ -1165,7 +1163,7 @@ fn copy_constant_block_increases_length() {
 #[test]
 fn copy_constant_block_on_empty_returns_no_applicable_target() {
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.constants.clear();
     }
     let mut r = rng(0);
@@ -1182,7 +1180,7 @@ fn copy_constant_block_on_empty_returns_no_applicable_target() {
 #[test]
 fn copy_constant_block_preserves_original() {
     let mut genome = v3alpha1_founder_genome();
-    let original = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let original = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.constants.clone()
     } else {
         panic!()
@@ -1196,7 +1194,7 @@ fn copy_constant_block_preserves_original() {
         &MutationConfig::default(),
     )
     .unwrap();
-    let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.constants.clone()
     } else {
         panic!()
@@ -1208,7 +1206,7 @@ fn copy_constant_block_preserves_original() {
 #[test]
 fn copy_constant_block_copies_correct_values() {
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.constants = vec![10.0, 20.0, 30.0];
     }
     let mut r = rng(0);
@@ -1220,7 +1218,7 @@ fn copy_constant_block_copies_correct_values() {
         &MutationConfig::default(),
     )
     .unwrap();
-    let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.constants.clone()
     } else {
         panic!()
@@ -1241,7 +1239,7 @@ fn copy_constant_block_copies_correct_values() {
 fn copy_gene_backward_slice_increases_program_length() {
     let mut genome = v3alpha1_founder_genome();
     // Ensure program has an output instruction.
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program = vec![
             VmInstruction::ReadInput {
                 dst: 0,
@@ -1266,7 +1264,7 @@ fn copy_gene_backward_slice_increases_program_length() {
         &MutationConfig::default(),
     )
     .unwrap();
-    let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.program.len()
     } else {
         panic!()
@@ -1281,7 +1279,7 @@ fn copy_gene_backward_slice_increases_program_length() {
 fn copy_gene_backward_slice_no_output_returns_no_applicable_target() {
     let mut genome = v3alpha1_founder_genome();
     // Program with no output instructions.
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program = vec![
             VmInstruction::Noop,
             VmInstruction::Add { dst: 0, a: 1, b: 2 },
@@ -1301,7 +1299,7 @@ fn copy_gene_backward_slice_no_output_returns_no_applicable_target() {
 #[test]
 fn copy_gene_backward_slice_captures_dependency_chain() {
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program = vec![
             VmInstruction::ReadInput {
                 dst: 0,
@@ -1325,7 +1323,7 @@ fn copy_gene_backward_slice_captures_dependency_chain() {
         &MutationConfig::default(),
     )
     .unwrap();
-    let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.program.clone()
     } else {
         panic!()
@@ -1344,7 +1342,7 @@ fn copy_gene_backward_slice_captures_dependency_chain() {
 #[test]
 fn copy_gene_forward_slice_increases_program_length() {
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program = vec![
             VmInstruction::ReadInput {
                 dst: 0,
@@ -1369,7 +1367,7 @@ fn copy_gene_forward_slice_increases_program_length() {
         &MutationConfig::default(),
     )
     .unwrap();
-    let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+    let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
         vm.program.len()
     } else {
         panic!()
@@ -1381,7 +1379,7 @@ fn copy_gene_forward_slice_increases_program_length() {
 fn copy_gene_forward_slice_no_dst_returns_no_applicable_target() {
     let mut genome = v3alpha1_founder_genome();
     // Program with no register-writing instructions.
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program = vec![
             VmInstruction::Noop,
             VmInstruction::Noop,
@@ -1405,7 +1403,7 @@ fn copy_gene_forward_slice_captures_dependency_chain() {
     let mut max_growth = 0usize;
     for seed in 0u64..100 {
         let mut genome = v3alpha1_founder_genome();
-        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+        if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
             vm.program = vec![
                 VmInstruction::ReadInput {
                     dst: 0,
@@ -1426,7 +1424,7 @@ fn copy_gene_forward_slice_captures_dependency_chain() {
             &MutationConfig::default(),
         )
         .unwrap();
-        let after_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+        let after_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def() {
             vm.program.len()
         } else {
             panic!()
@@ -1522,7 +1520,7 @@ fn vm_insert_read_store_motif_inserts_read_input_and_store_slot_pair() {
         )
         .is_ok()
         {
-            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def() {
                 // Look for consecutive ReadInput + StoreSlotImm.
                 for w in vm.program.windows(2) {
                     if matches!(w[0], VmInstruction::ReadInput { .. })
@@ -1557,7 +1555,7 @@ fn vm_insert_read_store_motif_inserts_read_input_and_store_slot_pair() {
 fn vm_insert_read_store_motif_keeps_the_generated_pair_adjacent_for_each_seed() {
     use crate::contracts::InputReference;
     let mut genome = slot_program_genome(vec![VmInstruction::Noop]);
-    genome.nodes[0].input_refs = vec![InputReference::UpstreamSlot(0)];
+    *genome.nodes[0].input_refs_mut() = vec![InputReference::UpstreamSlot(0)];
     for seed in 0..128 {
         let mut mutated = genome.clone();
         VmMutator::apply(
@@ -1568,7 +1566,7 @@ fn vm_insert_read_store_motif_keeps_the_generated_pair_adjacent_for_each_seed() 
             &MutationConfig::default(),
         )
         .expect("the fixture has an input reference");
-        let BackendDef::Vm(vm) = &mut mutated.nodes[0].backend_def else {
+        let BackendDef::Vm(vm) = mutated.nodes[0].backend_edit().1 else {
             unreachable!("fixture must remain a VM");
         };
         assert_eq!(vm.program.len(), 3);
@@ -1599,7 +1597,7 @@ fn vm_insert_read_bid_motif_inserts_read_input_and_priority_bid_pair() {
         )
         .is_ok()
         {
-            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def() {
                 for w in vm.program.windows(3) {
                     if let [VmInstruction::ReadInput { dst, .. }, VmInstruction::SetPriorityBid { src }, VmInstruction::Halt] =
                         w
@@ -1626,16 +1624,17 @@ fn vm_insert_read_bid_motif_inserts_read_input_and_priority_bid_pair() {
 fn vm_insert_read_store_motif_skips_on_empty_input_refs() {
     let mut genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![], // empty — no valid ref_idx targets
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            // empty — no valid ref_idx targets
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 2,
                 constants: vec![],
                 program: vec![VmInstruction::Halt],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     };
     let mut r = rng(42);
     let result = VmMutator::apply(
@@ -1668,7 +1667,7 @@ fn vm_insert_load_compare_motif_inserts_load_slot_and_cmp_gt_pair() {
         )
         .is_ok()
         {
-            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def() {
                 for w in vm.program.windows(2) {
                     if matches!(w[0], VmInstruction::LoadSlotImm { .. })
                         && matches!(w[1], VmInstruction::CmpGt { .. })
@@ -1710,7 +1709,7 @@ fn vm_insert_load_compare_motif_keeps_the_generated_pair_adjacent_for_each_seed(
             &MutationConfig::default(),
         )
         .expect("the nonempty VM fixture is applicable");
-        let BackendDef::Vm(vm) = &mut mutated.nodes[0].backend_def else {
+        let BackendDef::Vm(vm) = mutated.nodes[0].backend_edit().1 else {
             unreachable!("fixture must remain a VM");
         };
         assert_eq!(vm.program.len(), 3);
@@ -1729,7 +1728,7 @@ fn vm_insert_load_compare_motif_keeps_the_generated_pair_adjacent_for_each_seed(
 fn vm_mutate_slot_address_changes_slot_idx() {
     // Build a genome with slot opcodes.
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program.push(VmInstruction::LoadSlotImm {
             dst: 0,
             slot_idx: 5,
@@ -1752,7 +1751,7 @@ fn vm_mutate_slot_address_changes_slot_idx() {
         )
         .is_ok()
         {
-            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def() {
                 for instr in &vm.program {
                     match instr {
                         VmInstruction::LoadSlotImm { slot_idx, .. }
@@ -1793,7 +1792,7 @@ fn vm_mutate_slot_address_nudges_register_indirect_slot_fields() {
             &MutationConfig::default(),
         )
         .expect("the register-indirect slot instruction is applicable");
-        let BackendDef::Vm(vm) = &mut mutated.nodes[0].backend_def else {
+        let BackendDef::Vm(vm) = mutated.nodes[0].backend_edit().1 else {
             unreachable!("fixture must remain a VM");
         };
         let [VmInstruction::LoadSlot { dst, slot_reg }] = &vm.program[..] else {
@@ -1809,7 +1808,7 @@ fn vm_mutate_slot_address_nudges_register_indirect_slot_fields() {
 #[test]
 fn vm_mutate_paired_slot_address_co_mutates_load_and_store() {
     let mut genome = v3alpha1_founder_genome();
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program.push(VmInstruction::LoadSlotImm {
             dst: 0,
             slot_idx: 7,
@@ -1832,7 +1831,7 @@ fn vm_mutate_paired_slot_address_co_mutates_load_and_store() {
         )
         .is_ok()
         {
-            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def() {
                 // Find the load and store that were originally slot 7.
                 let mut new_load_slot = None;
                 let mut new_store_slot = None;
@@ -1885,7 +1884,7 @@ fn paired_slot_address_handles_maximum_encoded_slot_after_single_field_nudge() {
     )
     .expect("paired macro must handle a slot value produced by a standalone nudge");
 
-    let BackendDef::Vm(vm) = &genome.nodes[0].backend_def else {
+    let BackendDef::Vm(vm) = genome.nodes[0].backend_def() else {
         panic!("expected VM backend");
     };
     let [VmInstruction::LoadSlotImm { slot_idx: load, .. }, VmInstruction::StoreSlotImm {
@@ -1931,7 +1930,7 @@ fn vm_raw_field_mutation_ref_idx_bounded() {
     use crate::contracts::{InputReference, WorldInputKey};
     let mut genome = v3alpha1_founder_genome();
     // Node 1 (VM) has input_refs — ensure ReadInput instructions exist.
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program = vec![VmInstruction::ReadInput {
             dst: 0,
             ref_idx: 0,
@@ -1939,14 +1938,14 @@ fn vm_raw_field_mutation_ref_idx_bounded() {
         }];
     }
     // Also add a few more input_refs to make the range non-trivial.
-    genome.nodes[1].input_refs = vec![
+    *genome.nodes[1].input_refs_mut() = vec![
         InputReference::UpstreamSlot(0),
         InputReference::World(WorldInputKey::FoodHere {
             type_idx: crate::config::OrdinaryFoodTypeId::default(),
         }),
         InputReference::UpstreamSlot(1),
     ];
-    let num_refs = genome.nodes[1].input_refs.len();
+    let num_refs = genome.nodes[1].input_refs().len();
     let config = MutationConfig::default();
     for seed in 0u64..512 {
         let mut g = genome.clone();
@@ -1958,7 +1957,7 @@ fn vm_raw_field_mutation_ref_idx_bounded() {
             &mut r,
             &config,
         );
-        if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+        if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def() {
             for instr in &vm.program {
                 if let VmInstruction::ReadInput { ref_idx, .. } = instr {
                     assert!(
@@ -1979,7 +1978,7 @@ fn vm_raw_field_mutation_sub_idx_bounded() {
     use crate::contracts::{InputReference, WorldInputKey};
     let mut genome = v3alpha1_founder_genome();
     // Set up a compound ring sensor so sub_idx has a meaningful bound (8).
-    genome.nodes[1].input_refs = vec![
+    *genome.nodes[1].input_refs_mut() = vec![
         InputReference::World(WorldInputKey::NeighborFoodRing {
             type_idx: crate::config::OrdinaryFoodTypeId::default(),
         }),
@@ -1987,7 +1986,7 @@ fn vm_raw_field_mutation_sub_idx_bounded() {
             type_idx: crate::config::OrdinaryFoodTypeId::default(),
         }),
     ];
-    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+    if let BackendDef::Vm(vm) = genome.nodes[1].backend_edit().1 {
         vm.program = vec![VmInstruction::ReadInput {
             dst: 0,
             ref_idx: 0,
@@ -2005,14 +2004,14 @@ fn vm_raw_field_mutation_sub_idx_bounded() {
             &mut r,
             &config,
         );
-        if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+        if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def() {
             for instr in &vm.program {
                 if let VmInstruction::ReadInput {
                     ref_idx, sub_idx, ..
                 } = instr
                 {
                     let width = g.nodes[1]
-                        .input_refs
+                        .input_refs()
                         .get(*ref_idx as usize)
                         .map(|reference| {
                             u16::try_from(
@@ -2045,16 +2044,16 @@ fn vm_raw_field_mutation_sub_idx_bounded() {
 fn slot_program_genome(program: Vec<VmInstruction>) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 2,
                 constants: vec![],
                 program,
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     }
 }
 
@@ -2149,7 +2148,7 @@ fn raw_field_mutation_changes_exactly_one_encoded_field() {
     .unwrap();
 
     // Assert
-    let BackendDef::Vm(vm) = &genome.nodes[0].backend_def else {
+    let BackendDef::Vm(vm) = genome.nodes[0].backend_def() else {
         panic!("expected VM backend");
     };
     let VmInstruction::LoadConst { dst, const_idx } = vm.program[0] else {
@@ -2626,7 +2625,7 @@ fn register_count_mutation_skips_runtime_out_of_range_widths() {
     for register_count in [0, 33] {
         // Arrange
         let mut genome = slot_program_genome(vec![VmInstruction::Move { dst: 0, src: 0 }]);
-        let BackendDef::Vm(vm) = &mut genome.nodes[0].backend_def else {
+        let BackendDef::Vm(vm) = genome.nodes[0].backend_edit().1 else {
             panic!("expected VM backend");
         };
         vm.register_count = register_count;
@@ -2833,7 +2832,7 @@ proptest! {
         for instruction in register_bearing_instructions(raw) {
             let register_field_count = register_fields(&instruction).len();
             let mut original = slot_program_genome(vec![instruction]);
-            let BackendDef::Vm(vm) = &mut original.nodes[0].backend_def else {
+            let BackendDef::Vm(vm) = original.nodes[0].backend_edit().1 else {
                 unreachable!("fixture must contain a VM");
             };
             vm.register_count = 4;
@@ -2843,7 +2842,7 @@ proptest! {
                 let mut r = rng(seed);
                 let result = apply_register_count_mutation(&mut genome, 0, &mut r);
                 prop_assert_eq!(result, Ok(()));
-                let BackendDef::Vm(vm) = &genome.nodes[0].backend_def else {
+                let BackendDef::Vm(vm) = genome.nodes[0].backend_def() else {
                     unreachable!("fixture must remain a VM");
                 };
                 if expected == 3 {
@@ -2869,7 +2868,7 @@ fn register_count_result_for_seed(
     seed: u64,
 ) -> (CreatureGenome, Result<(), MutationSkipReason>) {
     let mut genome = slot_program_genome(program);
-    let BackendDef::Vm(vm) = &mut genome.nodes[0].backend_def else {
+    let BackendDef::Vm(vm) = genome.nodes[0].backend_edit().1 else {
         unreachable!("fixture must contain a VM");
     };
     vm.register_count = 4;
@@ -2888,14 +2887,14 @@ fn register_count_grows_when_shrink_is_blocked_and_shrinks_otherwise() {
         .find(|&seed| {
             let (genome, result) = register_count_result_for_seed(neutral.clone(), seed);
             matches!(result, Ok(()))
-                && matches!(genome.nodes[0].backend_def, BackendDef::Vm(ref vm) if vm.register_count == 3)
+                && matches!(genome.nodes[0].backend_def(), BackendDef::Vm(ref vm) if vm.register_count == 3)
         })
         .expect("bounded calibration must find a decrement seed");
     let grow_seed = (0..128)
         .find(|&seed| {
             let (genome, result) = register_count_result_for_seed(neutral.clone(), seed);
             matches!(result, Ok(()))
-                && matches!(genome.nodes[0].backend_def, BackendDef::Vm(ref vm) if vm.register_count == 5)
+                && matches!(genome.nodes[0].backend_def(), BackendDef::Vm(ref vm) if vm.register_count == 5)
         })
         .expect("bounded calibration must find an increment seed");
 
@@ -2904,7 +2903,7 @@ fn register_count_grows_when_shrink_is_blocked_and_shrinks_otherwise() {
     let raw7 = vec![VmInstruction::Move { dst: 7, src: 7 }];
     let (blocked, blocked_result) = register_count_result_for_seed(raw7.clone(), shrink_seed);
     assert_eq!(blocked_result, Ok(()));
-    let BackendDef::Vm(blocked_vm) = &blocked.nodes[0].backend_def else {
+    let BackendDef::Vm(blocked_vm) = blocked.nodes[0].backend_def() else {
         unreachable!();
     };
     assert_eq!(blocked_vm.register_count, 5);
@@ -2915,7 +2914,7 @@ fn register_count_grows_when_shrink_is_blocked_and_shrinks_otherwise() {
 
     let (grown, grown_result) = register_count_result_for_seed(raw7, grow_seed);
     assert_eq!(grown_result, Ok(()));
-    let BackendDef::Vm(grown_vm) = &grown.nodes[0].backend_def else {
+    let BackendDef::Vm(grown_vm) = grown.nodes[0].backend_def() else {
         unreachable!();
     };
     assert_eq!(grown_vm.register_count, 5);
@@ -2927,7 +2926,7 @@ fn register_count_grows_when_shrink_is_blocked_and_shrinks_otherwise() {
     let (shrunk, shrunk_result) =
         register_count_result_for_seed(vec![VmInstruction::Move { dst: 6, src: 6 }], shrink_seed);
     assert_eq!(shrunk_result, Ok(()));
-    let BackendDef::Vm(shrunk_vm) = &shrunk.nodes[0].backend_def else {
+    let BackendDef::Vm(shrunk_vm) = shrunk.nodes[0].backend_def() else {
         unreachable!();
     };
     assert_eq!(shrunk_vm.register_count, 3);
@@ -2943,7 +2942,7 @@ fn register_count_grows_when_shrink_is_blocked_and_shrinks_otherwise() {
 #[test]
 fn register_count_grows_when_shrink_is_blocked_and_preserves_register_identity() {
     let mut blocked = slot_program_genome(vec![VmInstruction::Move { dst: 7, src: 6 }]);
-    let BackendDef::Vm(vm) = &mut blocked.nodes[0].backend_def else {
+    let BackendDef::Vm(vm) = blocked.nodes[0].backend_edit().1 else {
         panic!("expected VM backend");
     };
     vm.register_count = 4;
@@ -2961,14 +2960,14 @@ fn register_count_grows_when_shrink_is_blocked_and_preserves_register_identity()
             result.is_ok(),
             "seed {seed}: blocked shrink must grow, not skip"
         );
-        let BackendDef::Vm(vm) = &genome.nodes[0].backend_def else {
+        let BackendDef::Vm(vm) = genome.nodes[0].backend_def() else {
             panic!("expected VM backend");
         };
         assert_eq!(vm.register_count, 5, "seed {seed}: only growth is feasible");
     }
 
     let mut permitted = slot_program_genome(vec![VmInstruction::Move { dst: 6, src: 6 }]);
-    let BackendDef::Vm(vm) = &mut permitted.nodes[0].backend_def else {
+    let BackendDef::Vm(vm) = permitted.nodes[0].backend_edit().1 else {
         panic!("expected VM backend");
     };
     vm.register_count = 4;
@@ -2984,7 +2983,7 @@ fn register_count_grows_when_shrink_is_blocked_and_preserves_register_identity()
             &MutationConfig::default(),
         )
         .ok();
-        let BackendDef::Vm(vm) = &genome.nodes[0].backend_def else {
+        let BackendDef::Vm(vm) = genome.nodes[0].backend_def() else {
             panic!("expected VM backend");
         };
         if vm.register_count == 3 {
@@ -3026,7 +3025,7 @@ fn motif_insertion_keeps_old_jump_target_identity() {
         .unwrap();
 
         // Assert
-        let BackendDef::Vm(vm) = &genome.nodes[0].backend_def else {
+        let BackendDef::Vm(vm) = genome.nodes[0].backend_def() else {
             panic!("expected VM backend");
         };
         let (jump_pc, offset) = vm
@@ -3411,7 +3410,7 @@ proptest! {
             &MutationConfig::default(),
         )
         .expect("the paired immediate-slot fixture is always eligible");
-        let BackendDef::Vm(vm) = &genome.nodes[0].backend_def else {
+        let BackendDef::Vm(vm) = genome.nodes[0].backend_def() else {
             panic!("fixture must remain a VM backend");
         };
         let [VmInstruction::LoadSlotImm { slot_idx: load, .. }, VmInstruction::StoreSlotImm { slot_idx: store, .. }] = &vm.program[..] else {

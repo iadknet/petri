@@ -135,11 +135,11 @@ fn visit_with(
 }
 
 fn graph_node(id: u32, def: CgpGraphBackendDef, targets: &[(u32, u8)]) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(id),
-        input_refs: input_refs(),
-        backend_def: BackendDef::Graph(def),
-        targets: targets
+    NodeGenome::new(
+        NodeId::new(id),
+        input_refs(),
+        BackendDef::Graph(def),
+        targets
             .iter()
             .map(|(target, slot)| RouteTarget {
                 target_id: NodeId::new(*target),
@@ -147,7 +147,7 @@ fn graph_node(id: u32, def: CgpGraphBackendDef, targets: &[(u32, u8)]) -> NodeGe
                 gate_bias: 0.0,
             })
             .collect(),
-    }
+    )
 }
 
 fn run_mesh(

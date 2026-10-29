@@ -350,7 +350,7 @@ impl Battery {
         let mut knockout_count = 0;
         let mut contributing = BTreeSet::new();
         for node in &genome.nodes {
-            let counts = match node.backend_def {
+            let counts = match node.backend_def() {
                 BackendDef::Graph(_) => &mut backends.graph,
                 BackendDef::Vm(_) => &mut backends.vm,
             };
@@ -411,10 +411,10 @@ mod tests {
     /// so the pass that commits the `Eat` ends at it.
     fn node(id: u32, targets: &[u32], action: bool) -> NodeGenome {
         use crate::contracts::votes::VoteSink;
-        NodeGenome {
-            node_id: NodeId::new(id),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        NodeGenome::new(
+            NodeId::new(id),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![1.0],
                 program: if action {
@@ -437,7 +437,7 @@ mod tests {
                     vec![VmInstruction::Halt]
                 },
             }),
-            targets: targets
+            targets
                 .iter()
                 .enumerate()
                 .map(|(slot, &id)| RouteTarget {
@@ -446,7 +446,7 @@ mod tests {
                     gate_bias: 0.0,
                 })
                 .collect(),
-        }
+        )
     }
     fn genome(nodes: Vec<NodeGenome>) -> CreatureGenome {
         CreatureGenome {
@@ -465,8 +465,8 @@ mod tests {
             let mut unreachable = node(2, &[], false);
             if graph {
                 let blank = crate::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs();
-                silent.backend_def = BackendDef::Graph(blank.clone());
-                unreachable.backend_def = BackendDef::Graph(blank);
+                *silent.backend_edit().1 = BackendDef::Graph(blank.clone());
+                *unreachable.backend_edit().1 = BackendDef::Graph(blank);
             }
             let r = reading(&genome(vec![silent, node(1, &[], true), unreachable]));
             assert_eq!(r.backends.graph.total, if graph { 2 } else { 0 });
@@ -486,7 +486,7 @@ mod tests {
             OutputSinkKind,
         };
         let mut producer = node(0, &[1], false);
-        producer.input_refs = vec![InputReference::World(WorldInputKey::FoodHere {
+        *producer.input_refs_mut() = vec![InputReference::World(WorldInputKey::FoodHere {
             type_idx: Default::default(),
         })];
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
@@ -502,10 +502,10 @@ mod tests {
         ));
         let surface = graph.sink_surface(OutputSinkKind::CustomOutput(0)).unwrap();
         graph.push_edge(surface, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
-        producer.backend_def = BackendDef::Graph(graph);
+        *producer.backend_edit().1 = BackendDef::Graph(graph);
         let mut consumer = node(1, &[], false);
-        consumer.input_refs = vec![InputReference::UpstreamSlot(0)];
-        if let BackendDef::Vm(vm) = &mut consumer.backend_def {
+        *consumer.input_refs_mut() = vec![InputReference::UpstreamSlot(0)];
+        if let BackendDef::Vm(vm) = consumer.backend_edit().1 {
             vm.program = vec![
                 VmInstruction::ReadInput {
                     dst: 0,
@@ -687,7 +687,7 @@ mod tests {
         // A self-looping voter without `Decide` revisits and is productive:
         // both of its passes cap, and the capped pass keeps its votes.
         let mut looping_voter = genome(vec![node(0, &[0], true)]);
-        if let BackendDef::Vm(def) = &mut looping_voter.nodes[0].backend_def {
+        if let BackendDef::Vm(def) = looping_voter.nodes[0].backend_edit().1 {
             def.program[2] = VmInstruction::Halt;
         }
         let r = battery.mesh_execution(&looping_voter, &config, 0.0);
@@ -750,10 +750,10 @@ mod tests {
     fn conditional_routes_use_positions_even_when_destinations_match() {
         use crate::contracts::{InputReference, WorldInputKey};
         let mut router = node(0, &[1, 1], false);
-        router.input_refs = vec![InputReference::World(WorldInputKey::FoodHere {
+        *router.input_refs_mut() = vec![InputReference::World(WorldInputKey::FoodHere {
             type_idx: Default::default(),
         })];
-        if let BackendDef::Vm(vm) = &mut router.backend_def {
+        if let BackendDef::Vm(vm) = router.backend_edit().1 {
             vm.program = vec![
                 VmInstruction::ReadInput {
                     dst: 0,
@@ -782,8 +782,8 @@ mod tests {
     /// position 1 (node 2, silent) once it is positive.
     fn gated_router(input: crate::contracts::InputReference, sub_idx: u16) -> NodeGenome {
         let mut router = node(0, &[1, 2], false);
-        router.input_refs = vec![input];
-        if let BackendDef::Vm(vm) = &mut router.backend_def {
+        *router.input_refs_mut() = vec![input];
+        if let BackendDef::Vm(vm) = router.backend_edit().1 {
             vm.program = vec![
                 VmInstruction::ReadInput {
                     dst: 0,
@@ -1012,7 +1012,7 @@ mod tests {
             OutputSinkKind,
         };
         let mut reader = node(0, &[1], false);
-        if let BackendDef::Vm(vm) = &mut reader.backend_def {
+        if let BackendDef::Vm(vm) = reader.backend_edit().1 {
             vm.program = vec![
                 VmInstruction::LoadSlotImm {
                     dst: 0,
@@ -1027,7 +1027,7 @@ mod tests {
             ];
         }
         let mut writer = node(1, &[], false);
-        if let BackendDef::Vm(vm) = &mut writer.backend_def {
+        if let BackendDef::Vm(vm) = writer.backend_edit().1 {
             vm.constants = vec![3.0];
             vm.program = vec![
                 VmInstruction::LoadConst {
@@ -1062,14 +1062,14 @@ mod tests {
                 7.0,
             )],
         )]);
-        let graph_writer = NodeGenome {
-            node_id: NodeId::new(1),
-            input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
+        let graph_writer = NodeGenome::new(
+            NodeId::new(1),
+            vec![InputReference::World(WorldInputKey::FoodHere {
                 type_idx: Default::default(),
             })],
-            backend_def: BackendDef::Graph(graph),
-            targets: vec![],
-        };
+            BackendDef::Graph(graph),
+            vec![],
+        );
         let graph_genome = genome(vec![reader, graph_writer]);
         let r = reading(&graph_genome);
         assert_eq!(r.knockout_count, 0);
@@ -1089,7 +1089,7 @@ mod tests {
     fn bypass_forwards_predecessor_upstream_and_compares_action_payloads() {
         use crate::contracts::InputReference;
         let mut producer = node(0, &[1], false);
-        if let BackendDef::Vm(vm) = &mut producer.backend_def {
+        if let BackendDef::Vm(vm) = producer.backend_edit().1 {
             vm.constants = vec![1.0];
             vm.program = vec![
                 VmInstruction::LoadConst {
@@ -1106,14 +1106,14 @@ mod tests {
         let mut middle = producer.clone();
         middle.node_id = NodeId::new(1);
         middle.targets[0].target_id = NodeId::new(2);
-        if let BackendDef::Vm(vm) = &mut middle.backend_def {
+        if let BackendDef::Vm(vm) = middle.backend_edit().1 {
             vm.constants[0] = -1.0;
         }
         // The consumer steals the bus value: it writes upstream slot 0 into
         // the `StealEffort` field and votes one steal.
         let mut consumer = node(2, &[], false);
-        consumer.input_refs = vec![InputReference::UpstreamSlot(0)];
-        if let BackendDef::Vm(vm) = &mut consumer.backend_def {
+        *consumer.input_refs_mut() = vec![InputReference::UpstreamSlot(0)];
+        if let BackendDef::Vm(vm) = consumer.backend_edit().1 {
             vm.program = vec![
                 VmInstruction::ReadInput {
                     dst: 0,
@@ -1169,7 +1169,7 @@ mod tests {
             for graph_parity in [0, 1] {
             let g = genome(targets.iter().enumerate().map(|(i,t)| {
                 let mut n = node(i as u32,t,false);
-                if i % 2 == graph_parity { n.backend_def = BackendDef::Graph(crate::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs()); }
+                if i % 2 == graph_parity { *n.backend_edit().1 = BackendDef::Graph(crate::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs()); }
                 n
             }).collect());
             let before = g.clone();
@@ -1192,8 +1192,8 @@ mod tests {
             for original in &g.nodes {
                 if original.node_id != NodeId::new(removed) {
                     let retained = bypass.nodes.iter().find(|n| n.node_id == original.node_id).unwrap();
-                    prop_assert_eq!(&retained.backend_def, &original.backend_def);
-                    prop_assert_eq!(&retained.input_refs, &original.input_refs);
+                    prop_assert_eq!(retained.backend_def(), original.backend_def());
+                    prop_assert_eq!(retained.input_refs(), original.input_refs());
                     prop_assert_eq!(retained.targets.len(), original.targets.len());
                     for (a,b) in retained.targets.iter().zip(&original.targets) {
                         prop_assert_eq!((a.slot,a.gate_bias), (b.slot,b.gate_bias));

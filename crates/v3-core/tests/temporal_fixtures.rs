@@ -124,16 +124,16 @@ fn reactive_control_vm_genome() -> CreatureGenome {
     ];
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![food_here_ref()],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![food_here_ref()],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 4,
                 constants: vec![0.0, MOVE_VOTE],
                 program,
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     }
 }
 
@@ -186,16 +186,16 @@ fn delayed_cue_vm_genome() -> CreatureGenome {
     ];
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![food_here_ref()],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![food_here_ref()],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 8,
                 constants: vec![0.0, 1.0, MOVE_VOTE],
                 program,
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     }
 }
 
@@ -270,16 +270,16 @@ fn previous_slot_cue_vm_genome() -> CreatureGenome {
     ];
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![age_ticks_ref()],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![age_ticks_ref()],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 11,
                 constants: vec![age_target(1), age_target(2), age_eps(), 0.0, MOVE_VOTE],
                 program,
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     }
 }
 
@@ -321,16 +321,16 @@ fn slot_write_once_vm_genome(slot: u8, value: f32) -> CreatureGenome {
     ];
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![age_ticks_ref()],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![age_ticks_ref()],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 5,
                 constants: vec![age_target(1), age_eps(), value],
                 program,
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     }
 }
 
@@ -353,12 +353,12 @@ fn slot_write_and_previous_read_graph_genome() -> CreatureGenome {
     wire_custom_write_slot(&mut def, OutputSinkKind::WriteSlot(1), 1);
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Graph(def),
-            targets: vec![],
-        }],
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Graph(def),
+            vec![],
+        )],
     }
 }
 
@@ -382,12 +382,12 @@ fn decay_integrator_graph_genome() -> CreatureGenome {
     ));
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Graph(def),
-            targets: vec![],
-        }],
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Graph(def),
+            vec![],
+        )],
     }
 }
 
@@ -395,7 +395,7 @@ fn decay_integrator_graph_genome() -> CreatureGenome {
 /// consumers (a structurally disconnected perturbation).
 fn decay_integrator_with_disconnected_oscillator_graph_genome() -> CreatureGenome {
     let mut genome = decay_integrator_graph_genome();
-    let BackendDef::Graph(def) = &mut genome.nodes[0].backend_def else {
+    let BackendDef::Graph(def) = genome.nodes[0].backend_edit().1 else {
         unreachable!("constructed as a graph backend");
     };
     def.append_compute_node(ComputeNode::new(
@@ -421,12 +421,12 @@ fn backward_edge_recurrence_graph_genome() -> CreatureGenome {
     wire_custom_write_slot(&mut def, OutputSinkKind::WriteSlot(0), 1);
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Graph(def),
-            targets: vec![],
-        }],
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Graph(def),
+            vec![],
+        )],
     }
 }
 
@@ -484,12 +484,12 @@ fn reward_modulated_node_genome_impl(
     }
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Graph(def),
-            targets: vec![],
-        }],
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Graph(def),
+            vec![],
+        )],
     }
 }
 
@@ -523,15 +523,15 @@ fn conditional_route_vm_node(
         VmInstruction::Noop,                         // idx7: skip branch
         VmInstruction::Halt, // idx8: routes to the alt target, never the graph node
     ];
-    NodeGenome {
+    NodeGenome::new(
         node_id,
-        input_refs: vec![food_here_ref()],
-        backend_def: BackendDef::Vm(VmBackendDef {
+        vec![food_here_ref()],
+        BackendDef::Vm(VmBackendDef {
             register_count: 4,
             constants: vec![0.0, 1000.0],
             program,
         }),
-        targets: vec![
+        vec![
             RouteTarget {
                 target_id: graph_target,
                 slot: 0,
@@ -543,20 +543,20 @@ fn conditional_route_vm_node(
                 gate_bias: 0.0,
             },
         ],
-    }
+    )
 }
 
 fn noop_vm_node(node_id: NodeId) -> NodeGenome {
-    NodeGenome {
+    NodeGenome::new(
         node_id,
-        input_refs: vec![],
-        backend_def: BackendDef::Vm(VmBackendDef {
+        vec![],
+        BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: vec![],
             program: vec![VmInstruction::Noop, VmInstruction::Halt],
         }),
-        targets: vec![],
-    }
+        vec![],
+    )
 }
 
 /// Build a one-creature `Simulation` at production runtime settings (plus
@@ -919,10 +919,10 @@ fn d3_backward_edge_recurrence() {
 /// slot 0 against a constant 0.5 on `exit`'s slot 1), so `module` is
 /// dispatched exactly `visits` times per tick when it routes back here.
 fn revisit_entry_node(node_id: NodeId, module: NodeId, exit: NodeId, visits: f32) -> NodeGenome {
-    NodeGenome {
+    NodeGenome::new(
         node_id,
-        input_refs: vec![],
-        backend_def: BackendDef::Vm(VmBackendDef {
+        vec![],
+        BackendDef::Vm(VmBackendDef {
             register_count: 3,
             constants: vec![1.0, visits + 1.0, 0.5],
             program: vec![
@@ -953,7 +953,7 @@ fn revisit_entry_node(node_id: NodeId, module: NodeId, exit: NodeId, visits: f32
                 VmInstruction::Halt,
             ],
         }),
-        targets: vec![
+        vec![
             RouteTarget {
                 target_id: module,
                 slot: 0,
@@ -965,16 +965,16 @@ fn revisit_entry_node(node_id: NodeId, module: NodeId, exit: NodeId, visits: f32
                 gate_bias: 0.0,
             },
         ],
-    }
+    )
 }
 
 /// The D4/E4 exit node: clears the per-tick visit counter and ends the tick
 /// with an empty queue (`NoOp`).
 fn revisit_exit_node(node_id: NodeId) -> NodeGenome {
-    NodeGenome {
+    NodeGenome::new(
         node_id,
-        input_refs: vec![],
-        backend_def: BackendDef::Vm(VmBackendDef {
+        vec![],
+        BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: vec![],
             program: vec![
@@ -982,8 +982,8 @@ fn revisit_exit_node(node_id: NodeId) -> NodeGenome {
                 VmInstruction::Halt,
             ],
         }),
-        targets: vec![],
-    }
+        vec![],
+    )
 }
 
 /// Wrap a single-node graph genome's module as node 1 of a revisit mesh:
@@ -1159,24 +1159,22 @@ fn e3_skipped_module_visits() {
     let id_graph = NodeId::new(1);
     let id_alt = NodeId::new(2);
 
-    let BackendDef::Graph(graph_def) =
-        reward_modulated_node_genome_inert(OutcomeChannel::EnergyDelta)
-            .nodes
-            .remove(0)
-            .backend_def
-    else {
+    let node = reward_modulated_node_genome_inert(OutcomeChannel::EnergyDelta)
+        .nodes
+        .remove(0);
+    let BackendDef::Graph(graph_def) = node.backend_def() else {
         unreachable!("constructed as a graph backend");
     };
     let genome = CreatureGenome {
         entry_node_id: id_vm,
         nodes: vec![
             conditional_route_vm_node(id_vm, id_graph, id_alt),
-            NodeGenome {
-                node_id: id_graph,
-                input_refs: vec![],
-                backend_def: BackendDef::Graph(graph_def),
-                targets: vec![],
-            },
+            NodeGenome::new(
+                id_graph,
+                vec![],
+                BackendDef::Graph(graph_def.clone()),
+                vec![],
+            ),
             noop_vm_node(id_alt),
         ],
     };
@@ -1341,12 +1339,12 @@ fn one_step_stateful_genome(node1_kind: ComputeNodeKind, input: f32) -> Creature
     ));
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Graph(def),
-            targets: vec![],
-        }],
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Graph(def),
+            vec![],
+        )],
     }
 }
 

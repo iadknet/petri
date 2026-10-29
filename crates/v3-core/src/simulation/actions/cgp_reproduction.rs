@@ -17,7 +17,7 @@ pub(crate) fn capture_birth_seeds(genome: &mut CreatureGenome, parent: &LearnedS
         return;
     }
     for (idx, node) in genome.nodes.iter_mut().enumerate() {
-        if let BackendDef::Graph(def) = &mut node.backend_def {
+        if let BackendDef::Graph(def) = node.backend_edit().1 {
             if let Some(seeds) = parent.capture(idx, def) {
                 def.seed_birth(seeds);
             }
@@ -47,12 +47,12 @@ mod tests {
     fn genome_of(def: &CgpGraphBackendDef) -> CreatureGenome {
         CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: Vec::new(),
-                backend_def: BackendDef::Graph(def.clone()),
-                targets: Vec::new(),
-            }],
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                Vec::new(),
+                BackendDef::Graph(def.clone()),
+                Vec::new(),
+            )],
         }
     }
 
@@ -119,7 +119,7 @@ mod tests {
         let parent = GraphRuntimeState::for_genome(&genome_of(&def), Vec::new());
         let mut draft = genome_of(&def);
         capture_birth_seeds(&mut draft, parent.learned());
-        let BackendDef::Graph(captured) = &draft.nodes[0].backend_def else {
+        let BackendDef::Graph(captured) = draft.nodes[0].backend_def() else {
             unreachable!()
         };
         assert!(captured.birth_seeds().is_none());
@@ -144,7 +144,7 @@ mod tests {
         let parent = parent_with(&def, &[0.9, 0.7, -1.25]);
         let mut draft = genome_of(&def);
         capture_birth_seeds(&mut draft, parent.learned());
-        let BackendDef::Graph(captured) = &draft.nodes[0].backend_def else {
+        let BackendDef::Graph(captured) = draft.nodes[0].backend_def() else {
             unreachable!()
         };
         let seeds = captured.birth_seeds().expect("seeds");

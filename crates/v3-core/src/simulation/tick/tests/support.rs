@@ -70,16 +70,16 @@ pub(super) fn small_config() -> SimulationConfig {
 pub(super) fn vm_raw_program_genome(program: Vec<VmInstruction>) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program,
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     }
 }
 
@@ -113,16 +113,16 @@ pub(super) fn vm_program_genome(program: Vec<VmInstruction>) -> CreatureGenome {
     with_unit.extend(program);
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![1.0],
                 program: with_unit,
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     }
 }
 

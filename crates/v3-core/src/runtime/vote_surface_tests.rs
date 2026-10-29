@@ -53,10 +53,10 @@ fn targets(ids: &[u32]) -> Vec<RouteTarget> {
 
 /// A VM node that loads `value` and votes it into `sink`, then halts.
 fn voting_vm_node(id: u32, value: f32, sink: u8, target_ids: &[u32]) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(id),
-        input_refs: vec![],
-        backend_def: BackendDef::Vm(VmBackendDef {
+    NodeGenome::new(
+        NodeId::new(id),
+        vec![],
+        BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: vec![value],
             program: vec![
@@ -68,8 +68,8 @@ fn voting_vm_node(id: u32, value: f32, sink: u8, target_ids: &[u32]) -> NodeGeno
                 VmInstruction::Halt,
             ],
         }),
-        targets: targets(target_ids),
-    }
+        targets(target_ids),
+    )
 }
 
 /// A graph node whose wired sinks are `sinks`, each fed by one constant
@@ -80,10 +80,10 @@ fn voting_graph_node(
     sinks: &[OutputSinkKind],
     target_ids: &[u32],
 ) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(id),
-        input_refs: vec![],
-        backend_def: BackendDef::Graph(
+    NodeGenome::new(
+        NodeId::new(id),
+        vec![],
+        BackendDef::Graph(
             CgpGraphBackendDef::new_with_fixed_outputs()
                 .with_compute_nodes(vec![ComputeNode::new(
                     ComputeNodeKind::Constant(value),
@@ -101,8 +101,8 @@ fn voting_graph_node(
                         .collect(),
                 ),
         ),
-        targets: targets(target_ids),
-    }
+        targets(target_ids),
+    )
 }
 
 /// A tick's output beside its first pass's final vote vector.
@@ -174,10 +174,10 @@ fn run_with(genome: &CreatureGenome, energy: f32, config: RuntimeConfig) -> Run 
 fn a_vm_dispatch_sums_its_own_votes_and_commits_them() {
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![1.5],
                 program: vec![
@@ -196,8 +196,8 @@ fn a_vm_dispatch_sums_its_own_votes_and_commits_them() {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     };
     let output = run(&genome, 100.0, 4);
     assert_eq!(
@@ -271,10 +271,10 @@ fn a_saturating_vm_vote_is_clamped_when_the_dispatch_commits() {
     // 1e30 * 1e30 overflows to +inf, which sanitizes to the clamp.
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 2,
                 constants: vec![f32::MAX],
                 program: vec![
@@ -290,8 +290,8 @@ fn a_saturating_vm_vote_is_clamped_when_the_dispatch_commits() {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     };
     let output = run(&genome, 100.0, 4);
     assert_eq!(
@@ -315,16 +315,16 @@ fn an_invalid_add_vote_sink_writes_nothing_and_still_costs() {
     };
     let make = |sink: u8| CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![3.0],
                 program: program(sink),
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     };
     let valid = run(&make(VOTE_SINK_COUNT as u8 - 1), 100.0, 4);
     let invalid = run(&make(VOTE_SINK_COUNT as u8), 100.0, 4);
@@ -340,10 +340,10 @@ fn an_exhausted_vm_dispatch_commits_nothing() {
         nodes: vec![
             voting_vm_node(0, 7.0, VoteSink::Eat.index() as u8, &[1]),
             // Node 1 votes, then runs out of energy before it can halt.
-            NodeGenome {
-                node_id: NodeId::new(1),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            NodeGenome::new(
+                NodeId::new(1),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![9.0],
                     program: vec![
@@ -358,8 +358,8 @@ fn an_exhausted_vm_dispatch_commits_nothing() {
                         VmInstruction::Halt,
                     ],
                 }),
-                targets: vec![],
-            },
+                vec![],
+            ),
         ],
     };
     // Node 0 spends 0.27; node 1 executes its vote and then exhausts on the
@@ -407,13 +407,14 @@ fn the_parameter_surface_takes_the_last_visit_s_value_and_an_unwired_sink_leaves
 
     let param_sink = OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction);
     let mut visit = |value: f32, sinks: &[OutputSinkKind], node_idx: usize| {
-        let BackendDef::Graph(def) = voting_graph_node(0, value, sinks, &[]).backend_def else {
+        let node = voting_graph_node(0, value, sinks, &[]);
+        let BackendDef::Graph(def) = node.backend_def() else {
             unreachable!("voting_graph_node builds a graph backend")
         };
         let mut energy = 100.0;
         let mut memory = [0.0; 16];
         let mut state =
-            crate::genome::cgp::test_support::runtime_for_defs(&vec![&def; node_idx + 1]);
+            crate::genome::cgp::test_support::runtime_for_defs(&vec![def; node_idx + 1]);
         let _ = crate::runtime::cgp::execute_graph_node(
             &def,
             &[],

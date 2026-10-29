@@ -107,7 +107,7 @@ pub fn votes_move(genome: &CreatureGenome, executed: &BTreeSet<NodeId>) -> bool 
         .nodes
         .iter()
         .filter(|node| executed.contains(&node.node_id))
-        .any(|node| match &node.backend_def {
+        .any(|node| match node.backend_def() {
             BackendDef::Vm(vm) => vm.program.iter().any(|instruction| {
                 matches!(instruction, VmInstruction::AddVote { sink, .. }
                     if is_move(VoteSink::from_index(usize::from(*sink))))
@@ -239,12 +239,12 @@ mod tests {
             def.add_ring_bundle(0, kind, 0);
             CreatureGenome {
                 entry_node_id: NodeId::new(0),
-                nodes: vec![NodeGenome {
-                    node_id: NodeId::new(0),
-                    input_refs: vec![ring.clone()],
-                    backend_def: BackendDef::Graph(def),
-                    targets: vec![],
-                }],
+                nodes: vec![NodeGenome::new(
+                    NodeId::new(0),
+                    vec![ring.clone()],
+                    BackendDef::Graph(def),
+                    vec![],
+                )],
             }
         };
         let executed = BTreeSet::from([NodeId::new(0)]);
@@ -270,12 +270,12 @@ mod tests {
             def.add_pair_bundle(0, 0, crate::contracts::pair_layout(&area, 0), kind, 2);
             CreatureGenome {
                 entry_node_id: NodeId::new(0),
-                nodes: vec![NodeGenome {
-                    node_id: NodeId::new(0),
-                    input_refs: vec![area.clone()],
-                    backend_def: BackendDef::Graph(def),
-                    targets: vec![],
-                }],
+                nodes: vec![NodeGenome::new(
+                    NodeId::new(0),
+                    vec![area.clone()],
+                    BackendDef::Graph(def),
+                    vec![],
+                )],
             }
         };
         let executed = BTreeSet::from([NodeId::new(0)]);
@@ -292,12 +292,7 @@ mod tests {
         use crate::genome::{VmBackendDef, VmInstruction};
         let node = |backend_def| CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def,
-                targets: vec![],
-            }],
+            nodes: vec![NodeGenome::new(NodeId::new(0), vec![], backend_def, vec![])],
         };
         let graph_into = |kind: DirectedVoteKind| {
             let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
@@ -446,12 +441,12 @@ mod tests {
         );
         CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![FOOD_RING, BARRIER_RING],
-                backend_def: BackendDef::Graph(graph),
-                targets: Vec::new(),
-            }],
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![FOOD_RING, BARRIER_RING],
+                BackendDef::Graph(graph),
+                Vec::new(),
+            )],
         }
     }
 
@@ -465,7 +460,7 @@ mod tests {
     /// `graph_mover` with one edge `ring[d] * weight -> Move(d)`.
     fn graph_mover_with_edge(scalar: u8, ring: u16, d: u8, weight: f32) -> CreatureGenome {
         let mut genome = graph_mover(scalar);
-        let BackendDef::Graph(graph) = &mut genome.nodes[0].backend_def else {
+        let BackendDef::Graph(graph) = genome.nodes[0].backend_edit().1 else {
             unreachable!()
         };
         wire(
@@ -487,9 +482,9 @@ mod tests {
     fn founder_with_edge(ring: InputReference, d: u8, weight: f32) -> CreatureGenome {
         let mut genome = founder();
         let node = &mut genome.nodes[1];
-        let ref_idx = node.input_refs.len() as u16;
-        node.input_refs.push(ring);
-        let BackendDef::Graph(graph) = &mut node.backend_def else {
+        let ref_idx = node.input_refs().len() as u16;
+        node.input_refs_mut().push(ring);
+        let BackendDef::Graph(graph) = node.backend_edit().1 else {
             unreachable!()
         };
         wire(
@@ -583,7 +578,7 @@ mod tests {
         assert!(!votes_move(&graph_mover(2), &BTreeSet::new()));
         // A graph voting only `Eat` does not.
         let mut eater = graph_mover(2);
-        let BackendDef::Graph(graph) = &mut eater.nodes[0].backend_def else {
+        let BackendDef::Graph(graph) = eater.nodes[0].backend_edit().1 else {
             unreachable!()
         };
         let mover = OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2));
@@ -595,16 +590,16 @@ mod tests {
         // catalog does not.
         let vm = |sink: u8| CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(crate::genome::VmBackendDef {
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Vm(crate::genome::VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::AddVote { sink, src: 0 }],
                 }),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         };
         assert!(votes_move(
             &vm(VoteSink::Directed(DirectedVoteKind::Move, 7).index() as u8),

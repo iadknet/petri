@@ -34,7 +34,7 @@ fn full_assembly_matches_production_for_a_genome_reading_every_input() {
     assert!(!genome_uses_extended_perception(&donor));
     assert!(!genome_uses_typed_local_food(&donor));
     let mut reader = vm_raw_program_genome(Vec::new());
-    reader.nodes[0].input_refs = vec![
+    *reader.nodes[0].input_refs_mut() = vec![
         InputReference::World(WorldInputKey::AreaBarrierSummary),
         InputReference::World(WorldInputKey::NeighborFoodRing {
             type_idx: OrdinaryFoodTypeId::new(1),
@@ -59,12 +59,12 @@ fn an_added_sensor_triggers_native_declaration_driven_sensor_assembly() {
     use crate::genome::{BackendDef, NodeGenome};
     let parent = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
-            targets: vec![],
-        }],
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
+            vec![],
+        )],
     };
     for (key, extended, typed) in [
         (

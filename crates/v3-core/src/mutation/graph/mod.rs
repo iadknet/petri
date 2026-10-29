@@ -286,11 +286,11 @@ impl GraphMutator {
             .nodes
             .iter()
             .enumerate()
-            .filter(|(_, n)| match &n.backend_def {
+            .filter(|(_, n)| match n.backend_def() {
                 BackendDef::Graph(def) => op.applies_to(
                     def,
                     operators::NodeInputs {
-                        refs: &n.input_refs,
+                        refs: n.input_refs(),
                         context,
                     },
                 ),

@@ -130,12 +130,7 @@ proptest! {
             let ring_ref = bundle.source().ref_idx().expect("a sensor source");
             prop_assert_eq!(&after_refs[usize::from(ring_ref)], reference);
         }
-        let node = NodeGenome {
-            node_id: crate::contracts::NodeId(0),
-            input_refs: after_refs,
-            backend_def: BackendDef::Graph(def),
-            targets: Vec::new(),
-        };
+        let node = NodeGenome::new(crate::contracts::NodeId(0), after_refs, BackendDef::Graph(def), Vec::new());
         prop_assert!(validate_graph(&node).is_ok());
     }
 
@@ -251,12 +246,12 @@ fn a_bundle_only_learner_is_classified_as_learning() {
     assert!(stateful);
     let genome = CreatureGenome {
         entry_node_id: crate::contracts::NodeId(0),
-        nodes: vec![NodeGenome {
-            node_id: crate::contracts::NodeId(0),
-            input_refs: refs,
-            backend_def: BackendDef::Graph(def),
-            targets: Vec::new(),
-        }],
+        nodes: vec![NodeGenome::new(
+            crate::contracts::NodeId(0),
+            refs,
+            BackendDef::Graph(def),
+            Vec::new(),
+        )],
     };
     assert!(structural_companions(&genome).has_plasticity);
 }

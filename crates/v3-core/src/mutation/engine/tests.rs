@@ -89,10 +89,10 @@ fn classify_expected_added_input_classes(
 fn single_graph_genome_with_inputs(input_refs: Vec<InputReference>) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
             input_refs,
-            backend_def: BackendDef::Graph(
+            BackendDef::Graph(
                 CgpGraphBackendDef::new_with_fixed_outputs()
                     .with_compute_nodes(Vec::new())
                     .with_output_sinks(vec![OutputSink::new(
@@ -100,14 +100,14 @@ fn single_graph_genome_with_inputs(input_refs: Vec<InputReference>) -> CreatureG
                         Vec::new(),
                     )]),
             ),
-            targets: Vec::new(),
-        }],
+            Vec::new(),
+        )],
     }
 }
 
 fn genome_has_non_default_food_input_ref(genome: &CreatureGenome) -> bool {
     genome.nodes.iter().any(|node| {
-        node.input_refs.iter().any(|input_ref| match input_ref {
+        node.input_refs().iter().any(|input_ref| match input_ref {
             InputReference::World(WorldInputKey::FoodHere { type_idx })
             | InputReference::World(WorldInputKey::NeighborFoodRing { type_idx })
             | InputReference::World(WorldInputKey::AreaFoodSummary { type_idx }) => {
@@ -161,7 +161,7 @@ fn engine_records_added_input_classes_for_topology_add_node() {
             .contains_key(&MutationOperator::Topology(TopologyOperator::AddNode))
         {
             let newborn = genome.nodes.last().expect("newborn node should exist");
-            let expected = classify_expected_added_input_classes(&newborn.input_refs);
+            let expected = classify_expected_added_input_classes(newborn.input_refs());
             let recorded = summary
                 .added_node_input_classes_by_operator
                 .get(&MutationOperator::Topology(TopologyOperator::AddNode))
@@ -220,10 +220,10 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
     let base_genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![
-            NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Graph(
+            NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Graph(
                     CgpGraphBackendDef::new_with_fixed_outputs()
                         .with_compute_nodes(Vec::new())
                         .with_output_sinks(vec![OutputSink::new(
@@ -231,16 +231,16 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
                             Vec::new(),
                         )]),
                 ),
-                targets: vec![RouteTarget {
+                vec![RouteTarget {
                     target_id: NodeId::new(1),
                     slot: 0,
                     gate_bias: 0.0,
                 }],
-            },
-            NodeGenome {
-                node_id: NodeId::new(1),
-                input_refs: vec![],
-                backend_def: BackendDef::Graph(
+            ),
+            NodeGenome::new(
+                NodeId::new(1),
+                vec![],
+                BackendDef::Graph(
                     CgpGraphBackendDef::new_with_fixed_outputs()
                         .with_compute_nodes(Vec::new())
                         .with_output_sinks(vec![OutputSink::new(
@@ -248,8 +248,8 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
                             Vec::new(),
                         )]),
                 ),
-                targets: vec![],
-            },
+                vec![],
+            ),
         ],
     };
 
@@ -262,7 +262,7 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
             .contains_key(&MutationOperator::Topology(TopologyOperator::SpliceNode))
         {
             let newborn = genome.nodes.last().expect("spliced node should exist");
-            let expected = classify_expected_added_input_classes(&newborn.input_refs);
+            let expected = classify_expected_added_input_classes(newborn.input_refs());
             let recorded = summary
                 .added_node_input_classes_by_operator
                 .get(&MutationOperator::Topology(TopologyOperator::SpliceNode))
@@ -369,18 +369,20 @@ fn graph_add_internal_node_reads_inputs_of_the_graph_that_grew_not_the_first_gra
         type_idx: crate::config::OrdinaryFoodTypeId::default(),
     });
     let barrier = InputReference::World(WorldInputKey::NeighborBarrierRing);
-    let graph_node = |id: u32, input_ref: InputReference| NodeGenome {
-        node_id: NodeId::new(id),
-        input_refs: vec![input_ref],
-        backend_def: BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
-        targets: Vec::new(),
+    let graph_node = |id: u32, input_ref: InputReference| {
+        NodeGenome::new(
+            NodeId::new(id),
+            vec![input_ref],
+            BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
+            Vec::new(),
+        )
     };
     let before = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![graph_node(0, food), graph_node(1, barrier)],
     };
     let mut after = before.clone();
-    let BackendDef::Graph(grown) = &mut after.nodes[1].backend_def else {
+    let BackendDef::Graph(grown) = after.nodes[1].backend_edit().1 else {
         unreachable!("node 1 is a Graph node");
     };
     grown.append_compute_node(crate::genome::cgp::ComputeNode::new(
@@ -483,7 +485,7 @@ fn vm_variety_test_non_noop_instructions_after_mutations() {
         apply_events(&mut genome, &config, &[], &mut r, 3);
     }
     let has_non_noop = genome.nodes.iter().any(|n| {
-        if let BackendDef::Vm(ref vm) = n.backend_def {
+        if let BackendDef::Vm(ref vm) = n.backend_def() {
             vm.program.iter().any(|i| !matches!(i, VmInstruction::Noop))
         } else {
             false
@@ -707,14 +709,14 @@ fn apply_topology_event_adds_pass_through_detour() {
     assert_eq!(genome.nodes.len(), before_nodes + 1);
 
     let newborn = genome.nodes.last().expect("newborn node must exist");
-    match &newborn.backend_def {
+    match newborn.backend_def() {
         BackendDef::Vm(vm) => assert_eq!(vm.program, vec![crate::genome::VmInstruction::Halt]),
         BackendDef::Graph(graph) => assert_eq!(
             graph,
             &crate::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs()
         ),
     }
-    assert!(newborn.input_refs.is_empty());
+    assert!(newborn.input_refs().is_empty());
 }
 
 #[test]
@@ -940,40 +942,40 @@ fn engine_with_bias_1_targets_only_reachable_vm_nodes() {
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![
-            NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![1.0],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![RouteTarget {
+                vec![RouteTarget {
                     target_id: NodeId::new(1),
                     slot: 0,
                     gate_bias: 0.0,
                 }],
-            },
-            NodeGenome {
-                node_id: NodeId::new(1),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            ),
+            NodeGenome::new(
+                NodeId::new(1),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![2.0],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![],
-            },
-            NodeGenome {
-                node_id: NodeId::new(2),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+                vec![],
+            ),
+            NodeGenome::new(
+                NodeId::new(2),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![99.0],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![],
-            },
+                vec![],
+            ),
         ],
     };
 
@@ -1018,40 +1020,40 @@ fn engine_pressure_restricted_deletions_bias_toward_unreachable_nodes() {
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![
-            NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![1.0],
                     program: vec![VmInstruction::Noop, VmInstruction::Halt],
                 }),
-                targets: vec![RouteTarget {
+                vec![RouteTarget {
                     target_id: NodeId::new(1),
                     slot: 0,
                     gate_bias: 0.0,
                 }],
-            },
-            NodeGenome {
-                node_id: NodeId::new(1),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            ),
+            NodeGenome::new(
+                NodeId::new(1),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![2.0],
                     program: vec![VmInstruction::Noop, VmInstruction::Halt],
                 }),
-                targets: vec![],
-            },
-            NodeGenome {
-                node_id: NodeId::new(2),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+                vec![],
+            ),
+            NodeGenome::new(
+                NodeId::new(2),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![99.0],
                     program: vec![VmInstruction::Noop, VmInstruction::Halt],
                 }),
-                targets: vec![],
-            },
+                vec![],
+            ),
         ],
     };
 
@@ -1225,29 +1227,31 @@ fn rate_one_on_n_units_requests_exactly_n_events() {
 /// A two-node executed core (entry chained to one successor) plus three
 /// disconnected junk nodes carrying distinct VM constants.
 fn core_and_junk_genome() -> CreatureGenome {
-    let vm_node = |id: u32, constant: f32, target: Option<u32>| NodeGenome {
-        node_id: NodeId::new(id),
-        input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
-            type_idx: crate::config::OrdinaryFoodTypeId::default(),
-        })],
-        backend_def: BackendDef::Vm(crate::genome::VmBackendDef {
-            register_count: 4,
-            constants: vec![constant],
-            program: vec![
-                crate::genome::VmInstruction::LoadConst {
-                    dst: 0,
-                    const_idx: 0,
-                },
-                crate::genome::VmInstruction::Halt,
-            ],
-        }),
-        targets: target.map_or_else(Vec::new, |id| {
-            vec![RouteTarget {
-                target_id: NodeId::new(id),
-                slot: 0,
-                gate_bias: 0.0,
-            }]
-        }),
+    let vm_node = |id: u32, constant: f32, target: Option<u32>| {
+        NodeGenome::new(
+            NodeId::new(id),
+            vec![InputReference::World(WorldInputKey::FoodHere {
+                type_idx: crate::config::OrdinaryFoodTypeId::default(),
+            })],
+            BackendDef::Vm(crate::genome::VmBackendDef {
+                register_count: 4,
+                constants: vec![constant],
+                program: vec![
+                    crate::genome::VmInstruction::LoadConst {
+                        dst: 0,
+                        const_idx: 0,
+                    },
+                    crate::genome::VmInstruction::Halt,
+                ],
+            }),
+            target.map_or_else(Vec::new, |id| {
+                vec![RouteTarget {
+                    target_id: NodeId::new(id),
+                    slot: 0,
+                    gate_bias: 0.0,
+                }]
+            }),
+        )
     };
     CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -1637,7 +1641,7 @@ fn an_edge_operator_selects_the_module_that_has_an_edge() {
     let mut genome = single_graph_genome_with_inputs(vec![]);
     let mut edged = genome.nodes[0].clone();
     edged.node_id = NodeId::new(1);
-    let BackendDef::Graph(ref mut def) = edged.backend_def else {
+    let BackendDef::Graph(def) = edged.backend_edit().1 else {
         panic!("fixture must be a Graph module");
     };
     def.push_edge(
@@ -1686,16 +1690,16 @@ fn an_event_with_no_eligible_node_records_no_target() {
     let config = single_node_internal_event_config();
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: Vec::new(),
-            backend_def: BackendDef::Vm(crate::genome::VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            Vec::new(),
+            BackendDef::Vm(crate::genome::VmBackendDef {
                 register_count: 1,
                 constants: Vec::new(),
                 program: vec![crate::genome::VmInstruction::Halt],
             }),
-            targets: Vec::new(),
-        }],
+            Vec::new(),
+        )],
     };
     let summary = first_event_in_domain(&genome, &config, MutationDomain::Graph);
     let [event] = &summary.events[..] else {
@@ -1862,7 +1866,7 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
     use crate::genome::cgp::{ComputeNode, ComputeNodeKind};
     use rand::RngCore;
     let mut original = single_graph_genome_with_inputs(vec![]);
-    let BackendDef::Graph(def) = &mut original.nodes[0].backend_def else {
+    let BackendDef::Graph(def) = original.nodes[0].backend_edit().1 else {
         unreachable!()
     };
     def.append_compute_node(ComputeNode::new(
@@ -1880,7 +1884,7 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
     for seed in 0..32 {
         let mut plain = original.clone();
         let mut tracked = original.clone();
-        let BackendDef::Graph(def) = &mut tracked.nodes[0].backend_def else {
+        let BackendDef::Graph(def) = tracked.nodes[0].backend_edit().1 else {
             unreachable!()
         };
         def.seed_compute_rows(vec![vec![Some(0.75)]]);
@@ -1897,7 +1901,7 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
         );
         assert_eq!(plain_rng.next_u64(), tracked_rng.next_u64());
         for node in &tracked.nodes {
-            if let BackendDef::Graph(def) = &node.backend_def {
+            if let BackendDef::Graph(def) = node.backend_def() {
                 if let Some(seeds) = def.birth_seeds() {
                     assert_eq!(seeds.compute_rows().len(), def.compute_nodes().len());
                     for (row, node) in seeds.compute_rows().iter().zip(def.compute_nodes()) {
@@ -1912,7 +1916,7 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
         }
     }
     original.nodes.push(original.nodes[0].clone());
-    let BackendDef::Graph(def) = &mut original.nodes[0].backend_def else {
+    let BackendDef::Graph(def) = original.nodes[0].backend_edit().1 else {
         unreachable!()
     };
     def.seed_compute_rows(vec![vec![Some(0.75)]]);
@@ -1929,7 +1933,7 @@ fn birth_tracking_preserves_mutation_rng_events_and_rollback() {
         Err(MutationSkipReason::ParseabilityViolation)
     );
     assert_eq!(original, before);
-    let BackendDef::Graph(def) = &original.nodes[0].backend_def else {
+    let BackendDef::Graph(def) = original.nodes[0].backend_def() else {
         unreachable!()
     };
     assert_eq!(

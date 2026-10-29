@@ -232,7 +232,7 @@ pub(crate) fn add_sensor_by_law(
     context: &SensorContext,
     rng: &mut impl Rng,
 ) -> Result<(BundleEdits, Option<BirthEdgeClass>), MutationSkipReason> {
-    let BackendDef::Graph(def) = &node.backend_def else {
+    let BackendDef::Graph(def) = node.backend_def() else {
         node.add_sensor(reference, &[], context)
             .map_err(|_| MutationSkipReason::NoApplicableTarget)?;
         return Ok((BundleEdits::default(), None));
@@ -263,9 +263,9 @@ pub(super) fn has_bundle(def: &CgpGraphBackendDef) -> bool {
 fn graph_node(
     node: &mut NodeGenome,
 ) -> Result<(&mut CgpGraphBackendDef, &[InputReference]), MutationSkipReason> {
-    match &mut node.backend_def {
-        BackendDef::Graph(def) => Ok((def, &node.input_refs)),
-        BackendDef::Vm(_) => Err(MutationSkipReason::NoApplicableTarget),
+    match node.backend_edit() {
+        (input_refs, BackendDef::Graph(def)) => Ok((def, input_refs)),
+        (_, BackendDef::Vm(_)) => Err(MutationSkipReason::NoApplicableTarget),
     }
 }
 

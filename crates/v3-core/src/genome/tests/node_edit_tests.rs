@@ -9,25 +9,20 @@ use crate::genome::cgp::{
 use crate::genome::{BackendDef, NodeEditError, NodeGenome, VmBackendDef, VmInstruction};
 
 fn graph_node(input_refs: Vec<InputReference>, def: CgpGraphBackendDef) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(0),
-        input_refs,
-        backend_def: BackendDef::Graph(def),
-        targets: vec![],
-    }
+    NodeGenome::new(NodeId::new(0), input_refs, BackendDef::Graph(def), vec![])
 }
 
 fn vm_node() -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(0),
-        input_refs: vec![],
-        backend_def: BackendDef::Vm(VmBackendDef {
+    NodeGenome::new(
+        NodeId::new(0),
+        vec![],
+        BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: vec![],
             program: vec![VmInstruction::Halt],
         }),
-        targets: vec![],
-    }
+        vec![],
+    )
 }
 
 fn barrier_ring() -> InputReference {

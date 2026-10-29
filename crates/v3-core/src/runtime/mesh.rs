@@ -164,10 +164,10 @@ impl MeshExecutionMode for UntracedMeshExecution {
         config: &RuntimeConfig,
         side_outputs: &mut MeshSideOutputs,
     ) -> (crate::runtime::types::NodeResult, ()) {
-        let result = match &node.backend_def {
+        let result = match node.backend_def() {
             BackendDef::Vm(def) => execute_vm_node(
                 def,
-                &node.input_refs,
+                node.input_refs(),
                 upstream_slots,
                 energy,
                 energy_consumed,
@@ -179,7 +179,7 @@ impl MeshExecutionMode for UntracedMeshExecution {
             ),
             BackendDef::Graph(def) => execute_graph_node(
                 def,
-                &node.input_refs,
+                node.input_refs(),
                 upstream_slots,
                 energy,
                 energy_consumed,
@@ -411,7 +411,7 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
 
                 // Attribute energy delta to the correct backend.
                 let node_cost = (node_energy_before - *energy).max(0.0);
-                match &node.backend_def {
+                match node.backend_def() {
                     BackendDef::Vm(_) => report.vm_cost += node_cost,
                     BackendDef::Graph(_) => report.graph_cost += node_cost,
                 }
@@ -785,7 +785,7 @@ mod tests {
             }),
         ));
         let mut vm = vm_halt_with_route(NodeId::new(0), 1.0, vec![NodeId::new(1)]);
-        if let BackendDef::Vm(def) = &mut vm.backend_def {
+        if let BackendDef::Vm(def) = vm.backend_edit().1 {
             def.program.splice(
                 2..2,
                 [
@@ -805,12 +805,12 @@ mod tests {
             entry_node_id: NodeId::new(0),
             nodes: vec![
                 vm,
-                NodeGenome {
-                    node_id: NodeId::new(1),
-                    input_refs: vec![],
-                    backend_def: BackendDef::Graph(graph),
-                    targets: wrap_targets(vec![NodeId::new(1)]),
-                },
+                NodeGenome::new(
+                    NodeId::new(1),
+                    vec![],
+                    BackendDef::Graph(graph),
+                    wrap_targets(vec![NodeId::new(1)]),
+                ),
             ],
         };
         for starting_energy in [0.0, 0.01, 2.0, 100.0] {
@@ -970,25 +970,25 @@ mod tests {
             });
         }
         program.push(VmInstruction::Halt);
-        NodeGenome {
+        NodeGenome::new(
             node_id,
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![1.0],
                 program,
             }),
-            targets: wrap_targets(targets),
-        }
+            wrap_targets(targets),
+        )
     }
 
     /// Build a VM node that halts (no action) and routes with a given constant
     /// `route_value`.
     fn vm_halt_with_route(node_id: NodeId, route_value: f32, targets: Vec<NodeId>) -> NodeGenome {
-        NodeGenome {
+        NodeGenome::new(
             node_id,
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![route_value],
                 program: vec![
@@ -1000,8 +1000,8 @@ mod tests {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: wrap_targets(targets),
-        }
+            wrap_targets(targets),
+        )
     }
 
     // ── Test 1: missing_entry_node_returns_noop ───────────────────────────────
@@ -1053,10 +1053,10 @@ mod tests {
     /// against a constant 0.5 on the exit's slot 1).
     fn counted_cycle_node(limit: f32, exit: NodeId) -> NodeGenome {
         let id0 = NodeId::new(0);
-        NodeGenome {
-            node_id: id0,
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        NodeGenome::new(
+            id0,
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 3,
                 constants: vec![1.0, limit, 0.5],
                 program: vec![
@@ -1088,8 +1088,8 @@ mod tests {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: wrap_targets(vec![id0, exit]),
-        }
+            wrap_targets(vec![id0, exit]),
+        )
     }
 
     // ── Test 3: empty_targets_returns_noop ───────────────────────────────────
@@ -1100,16 +1100,17 @@ mod tests {
         let id0 = NodeId::new(0);
         let genome = CreatureGenome {
             entry_node_id: id0,
-            nodes: vec![NodeGenome {
-                node_id: id0,
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            nodes: vec![NodeGenome::new(
+                id0,
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![], // no targets
-            }],
+                // no targets
+                vec![],
+            )],
         };
         let ss = empty_sensor_snapshot();
         let mut energy = 100.0f32;
@@ -1140,16 +1141,16 @@ mod tests {
         // Noop costs 0.05; with energy=0.01 the first opcode exhausts energy.
         let genome = CreatureGenome {
             entry_node_id: id0,
-            nodes: vec![NodeGenome {
-                node_id: id0,
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            nodes: vec![NodeGenome::new(
+                id0,
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::Noop, VmInstruction::Halt],
                 }),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         };
         let ss = empty_sensor_snapshot();
         let mut energy = 0.01f32; // way below the Noop cost of 0.05
@@ -1340,10 +1341,10 @@ mod tests {
         let id0 = NodeId::new(0);
         let genome = CreatureGenome {
             entry_node_id: id0,
-            nodes: vec![NodeGenome {
-                node_id: id0,
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            nodes: vec![NodeGenome::new(
+                id0,
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![3.0, 1.0],
                     program: vec![
@@ -1363,8 +1364,8 @@ mod tests {
                         VmInstruction::Halt,
                     ],
                 }),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         };
         let ss = empty_sensor_snapshot();
         let mut energy = 100.0f32;
@@ -1428,16 +1429,16 @@ mod tests {
             VmInstruction::SetPriorityBid { src: 0 },
         ];
         program.extend(tail);
-        NodeGenome {
+        NodeGenome::new(
             node_id,
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![bid, 1.0],
                 program,
             }),
-            targets: wrap_targets(targets),
-        }
+            wrap_targets(targets),
+        )
     }
 
     /// A bid at or above the creature's energy is an all-in: energy lands on
@@ -1548,10 +1549,10 @@ mod tests {
         let id1 = NodeId::new(1);
 
         // First node: bid 5.0, then halt and route to id1
-        let node0 = NodeGenome {
-            node_id: id0,
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        let node0 = NodeGenome::new(
+            id0,
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![5.0],
                 program: vec![
@@ -1563,14 +1564,14 @@ mod tests {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: wrap_targets(vec![id1]),
-        };
+            wrap_targets(vec![id1]),
+        );
 
         // Second node: bid 2.0, then emit Eat
-        let node1 = NodeGenome {
-            node_id: id1,
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        let node1 = NodeGenome::new(
+            id1,
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![2.0],
                 program: vec![
@@ -1586,8 +1587,8 @@ mod tests {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: vec![],
-        };
+            vec![],
+        );
 
         let genome = CreatureGenome {
             entry_node_id: id0,
@@ -1659,10 +1660,10 @@ mod tests {
         let id0 = NodeId::new(0);
         let id1 = NodeId::new(1);
 
-        let node0 = NodeGenome {
-            node_id: id0,
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        let node0 = NodeGenome::new(
+            id0,
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![5.0],
                 program: vec![
@@ -1674,13 +1675,13 @@ mod tests {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: wrap_targets(vec![id1]),
-        };
+            wrap_targets(vec![id1]),
+        );
 
-        let node1 = NodeGenome {
-            node_id: id1,
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        let node1 = NodeGenome::new(
+            id1,
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![2.0],
                 program: vec![
@@ -1692,8 +1693,8 @@ mod tests {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: vec![],
-        };
+            vec![],
+        );
 
         let genome = CreatureGenome {
             entry_node_id: id0,
@@ -1892,12 +1893,12 @@ mod tests {
                 entry_node_id: NodeId::new(0),
                 nodes: vec![
                     vm_halt_with_route(NodeId::new(0), 1.0, vec![NodeId::new(1)]),
-                    NodeGenome {
-                        node_id: NodeId::new(1),
-                        input_refs: vec![crate::contracts::InputReference::DynamicIntrospection(
+                    NodeGenome::new(
+                        NodeId::new(1),
+                        vec![crate::contracts::InputReference::DynamicIntrospection(
                             crate::contracts::DynamicIntrospectionKey::EnergyConsumedThisTick,
                         )],
-                        backend_def: BackendDef::Vm(VmBackendDef {
+                        BackendDef::Vm(VmBackendDef {
                             register_count: 1,
                             constants: vec![],
                             program: vec![
@@ -1913,8 +1914,8 @@ mod tests {
                                 VmInstruction::Halt,
                             ],
                         }),
-                        targets: wrap_targets(vec![]),
-                    },
+                        wrap_targets(vec![]),
+                    ),
                 ],
             };
             let config = RuntimeConfig {
@@ -2068,10 +2069,10 @@ mod tests {
         use crate::genome::cgp::{
             CgpGraphBackendDef, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
         };
-        NodeGenome {
+        NodeGenome::new(
             node_id,
-            input_refs: vec![InputReference::World(key)],
-            backend_def: BackendDef::Graph(
+            vec![InputReference::World(key)],
+            BackendDef::Graph(
                 CgpGraphBackendDef::new_with_fixed_outputs()
                     .with_compute_nodes(Vec::new())
                     .with_output_sinks(vec![OutputSink::new(
@@ -2085,21 +2086,21 @@ mod tests {
                         )],
                     )]),
             ),
-            targets: vec![],
-        }
+            vec![],
+        )
     }
 
     #[test]
     fn an_executed_vm_read_is_recorded_and_one_past_halt_is_not() {
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![
                     InputReference::World(WorldInputKey::NearbyCreature),
                     InputReference::World(WorldInputKey::AreaBarrierSummary),
                 ],
-                backend_def: BackendDef::Vm(VmBackendDef {
+                BackendDef::Vm(VmBackendDef {
                     register_count: 2,
                     constants: vec![],
                     program: vec![
@@ -2116,8 +2117,8 @@ mod tests {
                         },
                     ],
                 }),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         };
 
         let reads = reads_after_run(&genome);
@@ -2157,12 +2158,12 @@ mod tests {
         def.bundle_mut(id).set_scale(0.5);
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![InputReference::World(WorldInputKey::NeighborOccupiedRing)],
-                backend_def: BackendDef::Graph(def),
-                targets: vec![],
-            }],
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![InputReference::World(WorldInputKey::NeighborOccupiedRing)],
+                BackendDef::Graph(def),
+                vec![],
+            )],
         };
 
         let reads = reads_after_run(&genome);
@@ -2183,10 +2184,10 @@ mod tests {
         let key = WorldInputKey::NearbyCreature;
         let vm = CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![InputReference::World(key)],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![InputReference::World(key)],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 2,
                     constants: vec![],
                     program: vec![
@@ -2198,15 +2199,15 @@ mod tests {
                         VmInstruction::Halt,
                     ],
                 }),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         };
         let graph = CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![InputReference::World(key)],
-                backend_def: BackendDef::Graph(
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![InputReference::World(key)],
+                BackendDef::Graph(
                     CgpGraphBackendDef::new_with_fixed_outputs()
                         .with_compute_nodes(vec![ComputeNode::new(
                             ComputeNodeKind::Add,
@@ -2220,8 +2221,8 @@ mod tests {
                         )])
                         .with_output_sinks(Vec::new()),
                 ),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         };
         for genome in [vm, graph] {
             let reachable = mesh_reachable_nodes(&genome);

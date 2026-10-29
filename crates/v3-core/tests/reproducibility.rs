@@ -73,16 +73,16 @@ fn seeded_fixture(seed: u64) -> Simulation {
             })
             .collect();
         program.push(VmInstruction::Halt);
-        genome.nodes.push(NodeGenome {
-            node_id: vm_id,
-            input_refs: vec![],
-            targets: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        genome.nodes.push(NodeGenome::new(
+            vm_id,
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program,
             }),
-        });
+            vec![],
+        ));
     })
 }
 

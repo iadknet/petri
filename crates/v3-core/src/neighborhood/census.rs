@@ -43,7 +43,7 @@ pub struct OneEdgeCensus {
 /// Every input-leaf source of `node`, in reference then sub-value order.
 fn input_leaves(genome: &CreatureGenome, node: usize, context: &SensorContext) -> Vec<GraphSource> {
     genome.nodes[node]
-        .input_refs
+        .input_refs()
         .iter()
         .enumerate()
         .flat_map(|(ref_idx, reference)| {
@@ -69,7 +69,7 @@ fn with_edge(
     sink: VoteSink,
 ) -> CreatureGenome {
     let mut edited = genome.clone();
-    let BackendDef::Graph(graph) = &mut edited.nodes[node].backend_def else {
+    let BackendDef::Graph(graph) = edited.nodes[node].backend_edit().1 else {
         panic!("the one-edge census reads a Graph node");
     };
     let surface = graph

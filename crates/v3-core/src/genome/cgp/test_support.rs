@@ -135,11 +135,13 @@ pub(crate) fn runtime_for_defs(defs: &[&CgpGraphBackendDef]) -> GraphRuntimeStat
         nodes: defs
             .iter()
             .enumerate()
-            .map(|(id, def)| NodeGenome {
-                node_id: NodeId(id as u32),
-                input_refs: Vec::new(),
-                backend_def: BackendDef::Graph((*def).clone()),
-                targets: Vec::new(),
+            .map(|(id, def)| {
+                NodeGenome::new(
+                    NodeId(id as u32),
+                    Vec::new(),
+                    BackendDef::Graph((*def).clone()),
+                    Vec::new(),
+                )
             })
             .collect(),
     };
@@ -237,12 +239,12 @@ pub(crate) fn add_bundle_on(
     birth: BundleBirth,
 ) -> BundleId {
     let hosted = std::mem::replace(def, CgpGraphBackendDef::new_with_fixed_outputs());
-    let mut node = NodeGenome {
-        node_id: NodeId::new(0),
-        input_refs: refs.to_vec(),
-        backend_def: BackendDef::Graph(hosted),
-        targets: Vec::new(),
-    };
+    let mut node = NodeGenome::new(
+        NodeId::new(0),
+        refs.to_vec(),
+        BackendDef::Graph(hosted),
+        Vec::new(),
+    );
     let id = node
         .add_bundle(source, birth, &crate::config::test_sensor_context(1))
         .expect("a bundle fixture");

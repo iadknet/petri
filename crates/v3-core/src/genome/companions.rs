@@ -104,28 +104,28 @@ mod tests {
     fn vm_genome(program: Vec<VmInstruction>) -> CreatureGenome {
         CreatureGenome {
             entry_node_id: NodeId::new(1),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(1),
-                input_refs: vec![],
-                targets: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            nodes: vec![NodeGenome::new(
+                NodeId::new(1),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 2,
                     constants: vec![],
                     program,
                 }),
-            }],
+                vec![],
+            )],
         }
     }
 
     fn graph_genome(graph: CgpGraphBackendDef) -> CreatureGenome {
         CreatureGenome {
             entry_node_id: NodeId::new(1),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(1),
-                input_refs: vec![],
-                targets: vec![],
-                backend_def: BackendDef::Graph(graph),
-            }],
+            nodes: vec![NodeGenome::new(
+                NodeId::new(1),
+                vec![],
+                BackendDef::Graph(graph),
+                vec![],
+            )],
         }
     }
 

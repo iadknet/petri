@@ -502,10 +502,10 @@ fn vm_eats_when_food_here() {
     })];
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: input_refs.clone(),
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            input_refs.clone(),
+            BackendDef::Vm(VmBackendDef {
                 register_count: 2,
                 constants: vec![],
                 program: vec![
@@ -523,8 +523,8 @@ fn vm_eats_when_food_here() {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     };
     let creature = CreatureState::new(
         id,
@@ -605,10 +605,10 @@ fn vm_noop_when_no_food() {
     })];
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: input_refs.clone(),
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            input_refs.clone(),
+            BackendDef::Vm(VmBackendDef {
                 register_count: 2,
                 constants: vec![],
                 program: vec![
@@ -625,8 +625,8 @@ fn vm_noop_when_no_food() {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     };
     let creature = CreatureState::new(
         id,

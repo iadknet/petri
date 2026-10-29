@@ -162,7 +162,7 @@ impl CreatureBundles {
     ) -> Self {
         let mut reading = Self::default();
         for (index, node) in genome.nodes.iter().enumerate() {
-            let BackendDef::Graph(def) = &node.backend_def else {
+            let BackendDef::Graph(def) = node.backend_def() else {
                 continue;
             };
             if !reachable.contains(&index) {
@@ -289,7 +289,7 @@ mod tests {
         let node = genome
             .nodes
             .iter_mut()
-            .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+            .find(|node| matches!(node.backend_def(), BackendDef::Graph(_)))
             .expect("the founder carries a Graph node");
         for kind in DirectedVoteKind::ALL {
             for offset in 0..8 {

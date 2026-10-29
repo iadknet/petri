@@ -31,7 +31,7 @@ fn native_run(genome: &CreatureGenome) {
     let snapshot = sensors();
     let result = execute_graph_node(
         graph(node),
-        &node.input_refs,
+        node.input_refs(),
         &[0.0; OUTPUT_SLOT_COUNT],
         &mut energy,
         0.0,

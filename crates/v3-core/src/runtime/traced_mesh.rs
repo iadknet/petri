@@ -279,11 +279,11 @@ impl MeshExecutionMode for RecordingMeshExecution {
             energy_consumed,
             side_outputs,
         ));
-        match &node.backend_def {
+        match node.backend_def() {
             BackendDef::Vm(def) => {
                 let (result, trace) = execute_vm_node_traced(
                     def,
-                    &node.input_refs,
+                    node.input_refs(),
                     upstream_slots,
                     energy,
                     energy_consumed,
@@ -298,7 +298,7 @@ impl MeshExecutionMode for RecordingMeshExecution {
             BackendDef::Graph(def) => {
                 let (result, trace) = execute_graph_node_traced(
                     def,
-                    &node.input_refs,
+                    node.input_refs(),
                     upstream_slots,
                     energy,
                     energy_consumed,
@@ -359,7 +359,7 @@ impl MeshExecutionMode for RecordingMeshExecution {
             hop_index,
             pass_index,
             node_id: node.node_id,
-            input_refs: node.input_refs.clone(),
+            input_refs: node.input_refs().to_vec(),
             upstream_slots,
             energy_before,
             energy_after,
@@ -459,10 +459,10 @@ mod tests {
 
     /// A VM node voting 1.0 for `Eat`, so a tick commits one `Eat`.
     fn vm_emit_node(node_id: NodeId, targets: Vec<NodeId>) -> NodeGenome {
-        NodeGenome {
+        NodeGenome::new(
             node_id,
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![1.0],
                 program: vec![
@@ -477,8 +477,8 @@ mod tests {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: wrap_targets(targets),
-        }
+            wrap_targets(targets),
+        )
     }
 
     /// Multi-hop mesh (Graph → VM → Eat) produces same action and correct hop trace.
@@ -488,10 +488,10 @@ mod tests {
         let id_vm = NodeId::new(1);
 
         // CGP graph: Constant(0.0) → RouterGate(0) sink (routes to target 0)
-        let graph_node = NodeGenome {
-            node_id: id_graph,
-            input_refs: vec![],
-            backend_def: BackendDef::Graph(
+        let graph_node = NodeGenome::new(
+            id_graph,
+            vec![],
+            BackendDef::Graph(
                 CgpGraphBackendDef::new_with_fixed_outputs()
                     .with_compute_nodes(vec![ComputeNode::new(
                         ComputeNodeKind::Constant(0.0),
@@ -502,8 +502,8 @@ mod tests {
                         vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
                     )]),
             ),
-            targets: wrap_targets(vec![id_vm]),
-        };
+            wrap_targets(vec![id_vm]),
+        );
 
         let vm_node = vm_emit_node(id_vm, vec![]);
 
@@ -578,10 +578,10 @@ mod tests {
         let id_vm = NodeId::new(1);
 
         // CGP graph writes 9.0 to CustomOutput(5), RouterGate(0) unwired (default route)
-        let graph_node = NodeGenome {
-            node_id: id_graph,
-            input_refs: vec![],
-            backend_def: BackendDef::Graph(
+        let graph_node = NodeGenome::new(
+            id_graph,
+            vec![],
+            BackendDef::Graph(
                 CgpGraphBackendDef::new_with_fixed_outputs()
                     .with_compute_nodes(vec![ComputeNode::new(
                         ComputeNodeKind::Constant(9.0),
@@ -595,14 +595,14 @@ mod tests {
                         OutputSink::new(OutputSinkKind::RouterGate(0), vec![]),
                     ]),
             ),
-            targets: wrap_targets(vec![id_vm]),
-        };
+            wrap_targets(vec![id_vm]),
+        );
 
         // VM reads upstream slot 5
-        let vm_node = NodeGenome {
-            node_id: id_vm,
-            input_refs: vec![InputReference::UpstreamSlot(5)],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        let vm_node = NodeGenome::new(
+            id_vm,
+            vec![InputReference::UpstreamSlot(5)],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program: vec![
@@ -620,8 +620,8 @@ mod tests {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: vec![],
-        };
+            vec![],
+        );
 
         let genome = CreatureGenome {
             entry_node_id: id_graph,
@@ -660,10 +660,10 @@ mod tests {
         let id0 = NodeId::new(0);
         let genome = CreatureGenome {
             entry_node_id: id0,
-            nodes: vec![NodeGenome {
-                node_id: id0,
-                input_refs: vec![],
-                backend_def: BackendDef::Graph(
+            nodes: vec![NodeGenome::new(
+                id0,
+                vec![],
+                BackendDef::Graph(
                     CgpGraphBackendDef::new_with_fixed_outputs()
                         .with_compute_nodes(vec![ComputeNode::new(
                             ComputeNodeKind::Constant(1.0),
@@ -689,8 +689,8 @@ mod tests {
                             ),
                         ]),
                 ),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         };
 
         let ss = empty_ss();
@@ -742,16 +742,16 @@ mod tests {
         let id0 = NodeId::new(0);
         let genome = CreatureGenome {
             entry_node_id: id0,
-            nodes: vec![NodeGenome {
-                node_id: id0,
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            nodes: vec![NodeGenome::new(
+                id0,
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::Noop, VmInstruction::Halt],
                 }),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         };
         let ss = empty_ss();
         // Boost opcode cost multiplier so Noop actually exhausts energy
@@ -786,10 +786,10 @@ mod tests {
         let id0 = NodeId::new(0);
         let genome = CreatureGenome {
             entry_node_id: id0,
-            nodes: vec![NodeGenome {
-                node_id: id0,
-                input_refs: vec![],
-                backend_def: BackendDef::Graph(
+            nodes: vec![NodeGenome::new(
+                id0,
+                vec![],
+                BackendDef::Graph(
                     CgpGraphBackendDef::new_with_fixed_outputs()
                         .with_compute_nodes(vec![ComputeNode::new(
                             ComputeNodeKind::Constant(1.0),
@@ -797,8 +797,8 @@ mod tests {
                         )])
                         .with_output_sinks(vec![]),
                 ),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         };
 
         let ss = empty_ss();
@@ -837,10 +837,10 @@ mod tests {
         let id0 = NodeId::new(0);
         let genome = CreatureGenome {
             entry_node_id: id0,
-            nodes: vec![NodeGenome {
-                node_id: id0,
-                input_refs: vec![],
-                backend_def: BackendDef::Graph(
+            nodes: vec![NodeGenome::new(
+                id0,
+                vec![],
+                BackendDef::Graph(
                     CgpGraphBackendDef::new_with_fixed_outputs()
                         .with_compute_nodes(vec![crate::genome::cgp::test_support::plastic_node(
                             ComputeNodeKind::Constant(1.0),
@@ -865,8 +865,8 @@ mod tests {
                             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
                         )]),
                 ),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         };
 
         let ss = empty_ss();
@@ -911,10 +911,10 @@ mod tests {
         // Genome that loads 3.0, sets priority bid, then emits Eat.
         let genome = CreatureGenome {
             entry_node_id: id0,
-            nodes: vec![NodeGenome {
-                node_id: id0,
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            nodes: vec![NodeGenome::new(
+                id0,
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![3.0],
                     program: vec![
@@ -931,8 +931,8 @@ mod tests {
                         VmInstruction::Halt,
                     ],
                 }),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         };
 
         let ss = empty_ss();
@@ -997,12 +997,12 @@ mod tests {
         let id0 = NodeId::new(0);
         let genome = CreatureGenome {
             entry_node_id: id0,
-            nodes: vec![NodeGenome {
-                node_id: id0,
-                input_refs: vec![InputReference::DynamicIntrospection(
+            nodes: vec![NodeGenome::new(
+                id0,
+                vec![InputReference::DynamicIntrospection(
                     DynamicIntrospectionKey::EnergyCurrent,
                 )],
-                backend_def: BackendDef::Vm(VmBackendDef {
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![
@@ -1018,8 +1018,8 @@ mod tests {
                         VmInstruction::Halt,
                     ],
                 }),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         };
         let ss = empty_ss();
         let config = default_config();
@@ -1115,15 +1115,17 @@ mod tests {
     fn traced_and_untraced_paths_match_for_every_mesh_termination() {
         let id = NodeId::new(0);
         let missing = NodeId::new(99);
-        let halt_node = |targets| NodeGenome {
-            node_id: id,
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
-                register_count: 1,
-                constants: vec![],
-                program: vec![VmInstruction::Halt],
-            }),
-            targets,
+        let halt_node = |targets| {
+            NodeGenome::new(
+                id,
+                vec![],
+                BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::Halt],
+                }),
+                targets,
+            )
         };
 
         let config = default_config();
@@ -1202,16 +1204,16 @@ mod tests {
             "energy exhausted",
             &CreatureGenome {
                 entry_node_id: id,
-                nodes: vec![NodeGenome {
-                    node_id: id,
-                    input_refs: vec![],
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                nodes: vec![NodeGenome::new(
+                    id,
+                    vec![],
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],
                         program: vec![VmInstruction::Noop],
                     }),
-                    targets: vec![],
-                }],
+                    vec![],
+                )],
             },
             &exhaustion_config,
             0.01,
@@ -1248,16 +1250,16 @@ mod tests {
             sub_idx,
         };
         let decide = VoteSink::Decide.index() as u16;
-        let reader = NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![
+        let reader = NodeGenome::new(
+            NodeId::new(0),
+            vec![
                 InputReference::ActionVotes,
                 InputReference::PreviousPassVotes,
                 InputReference::CommitCounts,
                 InputReference::DynamicIntrospection(DynamicIntrospectionKey::HopsThisTick),
                 InputReference::PreviousOutcome,
             ],
-            backend_def: BackendDef::Vm(VmBackendDef {
+            BackendDef::Vm(VmBackendDef {
                 register_count: 7,
                 constants: vec![],
                 program: vec![
@@ -1271,10 +1273,10 @@ mod tests {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: wrap_targets(vec![NodeId::new(1)]),
-        };
+            wrap_targets(vec![NodeId::new(1)]),
+        );
         let mut voter = vm_emit_node(NodeId::new(1), vec![NodeId::new(0)]);
-        if let BackendDef::Vm(vm) = &mut voter.backend_def {
+        if let BackendDef::Vm(vm) = voter.backend_edit().1 {
             vm.program.insert(
                 2,
                 VmInstruction::AddVote {
@@ -1358,15 +1360,17 @@ mod tests {
 
         let id = NodeId::new(0);
         let missing = NodeId::new(99);
-        let node = |program: Vec<VmInstruction>, target: NodeId| NodeGenome {
-            node_id: id,
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
-                register_count: 1,
-                constants: vec![],
-                program,
-            }),
-            targets: wrap_targets(vec![target]),
+        let node = |program: Vec<VmInstruction>, target: NodeId| {
+            NodeGenome::new(
+                id,
+                vec![],
+                BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program,
+                }),
+                wrap_targets(vec![target]),
+            )
         };
         let genome = |node| CreatureGenome {
             entry_node_id: id,
@@ -1415,10 +1419,10 @@ mod tests {
         let id = NodeId::new(0);
         CreatureGenome {
             entry_node_id: id,
-            nodes: vec![NodeGenome {
-                node_id: id,
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            nodes: vec![NodeGenome::new(
+                id,
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![1.0],
                     program: vec![
@@ -1431,8 +1435,8 @@ mod tests {
                         VmInstruction::Halt,
                     ],
                 }),
-                targets: wrap_targets(vec![id]),
-            }],
+                wrap_targets(vec![id]),
+            )],
         }
     }
 

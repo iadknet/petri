@@ -66,7 +66,7 @@ fn motor_sink(sink: VoteSink) -> bool {
 /// at least one input edge, or a VM `AddVote` naming such a sink.
 #[must_use]
 pub fn motor_node(node: &NodeGenome) -> bool {
-    match &node.backend_def {
+    match node.backend_def() {
         BackendDef::Graph(graph) => graph.output_sinks().iter().any(|sink| {
             matches!(sink.kind, OutputSinkKind::ActionVote(vote) if motor_sink(vote))
                 && !sink.inputs.is_empty()

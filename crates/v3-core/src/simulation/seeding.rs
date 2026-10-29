@@ -9,7 +9,7 @@ use crate::creature::action_log::ActionLog;
 use crate::creature::body::HeritableBody;
 use crate::creature::founder::founder_genome_with_age_gate;
 use crate::creature::state::CreatureState;
-use crate::genome::CreatureGenome;
+use crate::genome::{CreatureGenome, NodeGenome};
 use crate::kernel::WorldState;
 use crate::patterns::generate_pattern_seeded;
 use crate::simulation::simulation::Simulation;
@@ -141,20 +141,29 @@ fn inject_extended_perception_input(genome: &mut CreatureGenome) {
     let marker = InputReference::World(WorldInputKey::AreaFoodSummary {
         type_idx: OrdinaryFoodTypeId::default(),
     });
-    if genome
-        .nodes
-        .iter()
-        .any(|node| node.input_refs.iter().any(|input_ref| input_ref == &marker))
-    {
+    if genome.nodes.iter().any(|node| {
+        node.input_refs()
+            .iter()
+            .any(|input_ref| input_ref == &marker)
+    }) {
         return;
     }
 
+    // The bench workload's node 0 reads `marker` in its first declaration's
+    // place (or as its only one): a width change no owner operation admits
+    // (`NodeGenome::swap` keeps width), so the node is rebuilt whole.
     if let Some(node) = genome.nodes.first_mut() {
-        if let Some(first_input_ref) = node.input_refs.first_mut() {
-            *first_input_ref = marker;
-        } else {
-            node.input_refs.push(marker);
+        let mut input_refs = node.input_refs().to_vec();
+        match input_refs.first_mut() {
+            Some(first) => *first = marker,
+            None => input_refs.push(marker),
         }
+        *node = NodeGenome::new(
+            node.node_id,
+            input_refs,
+            node.backend_def().clone(),
+            node.targets.clone(),
+        );
     }
 }
 
@@ -347,7 +356,7 @@ mod tests {
         let sim = seed_simulation_with_perception_mix(small_config(), 42, 1);
         let creature = sim.creatures.values().next().expect("seeded creature");
         assert_eq!(
-            creature.genome().nodes[0].input_refs[0],
+            creature.genome().nodes[0].input_refs()[0],
             InputReference::World(WorldInputKey::AreaFoodSummary {
                 type_idx: OrdinaryFoodTypeId::default(),
             })
@@ -470,7 +479,7 @@ mod tests {
         cfg.energy.lifecycle.age_reference_ticks = 1_000;
         let sim = seed_simulation(cfg, 42);
         let founder = sim.creatures.values().next().expect("seeded founder");
-        let BackendDef::Graph(graph) = &founder.genome().nodes[0].backend_def else {
+        let BackendDef::Graph(graph) = founder.genome().nodes[0].backend_def() else {
             panic!("node 0 should be graph backend");
         };
         assert_eq!(

@@ -16,12 +16,7 @@ use proptest::prelude::*;
 fn genome(backend_def: BackendDef) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def,
-            targets: vec![],
-        }],
+        nodes: vec![NodeGenome::new(NodeId::new(0), vec![], backend_def, vec![])],
     }
 }
 
@@ -83,7 +78,7 @@ fn run_both(
     assert_eq!(energy_plain, energy_traced);
     assert_eq!(memory, traced_memory);
     assert_eq!(state.learned(), traced_state.learned());
-    if matches!(genome.nodes[0].backend_def, BackendDef::Vm(_)) {
+    if matches!(genome.nodes[0].backend_def(), BackendDef::Vm(_)) {
         let writes: usize = hops
             .iter()
             .map(|hop| match &hop.backend_trace {
@@ -194,7 +189,7 @@ fn memory_changed_write_preserves_epsilon_boundary_and_sanitizes_values() {
 #[test]
 fn graph_invalid_and_unwired_sinks_do_not_count_as_writes() {
     let mut g = graph_writes(&[], false);
-    let BackendDef::Graph(def) = &mut g.nodes[0].backend_def else {
+    let BackendDef::Graph(def) = g.nodes[0].backend_edit().1 else {
         unreachable!()
     };
     let edge = GraphEdge::new(GraphSource::ComputeNode(0), 1.0);
@@ -229,7 +224,7 @@ fn vm_counts_executed_writes_before_exhaustion_but_not_the_unaffordable_write() 
     );
 
     let mut stopped = vm_writes(&[1.0], false);
-    let BackendDef::Vm(def) = &mut stopped.nodes[0].backend_def else {
+    let BackendDef::Vm(def) = stopped.nodes[0].backend_edit().1 else {
         unreachable!()
     };
     def.program.insert(0, VmInstruction::Halt);

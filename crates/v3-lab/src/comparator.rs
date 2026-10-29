@@ -27,7 +27,7 @@ pub fn area_food(founder: &CreatureGenome) -> CreatureGenome {
 pub fn barrier_comparator(founder: &CreatureGenome) -> CreatureGenome {
     let mut genome = area_food(founder);
     assert_eq!(
-        genome.nodes[VOTE_NODE].input_refs.len(),
+        genome.nodes[VOTE_NODE].input_refs().len(),
         usize::from(RING_REF),
         "the area-food controller's vote node holds eight references"
     );
@@ -60,7 +60,7 @@ mod tests {
 
     /// The reference the comparator reads at `index` on the vote node.
     fn vote_reference(genome: &CreatureGenome, index: usize) -> Option<&InputReference> {
-        genome.nodes.get(VOTE_NODE)?.input_refs.get(index)
+        genome.nodes.get(VOTE_NODE)?.input_refs().get(index)
     }
 
     fn founder() -> CreatureGenome {
@@ -72,18 +72,19 @@ mod tests {
     fn the_barrier_comparator_appends_the_ring_to_the_area_food_controller() {
         let founder = founder();
         let genome = barrier_comparator(&founder);
-        let refs = &genome.nodes[VOTE_NODE].input_refs;
+        let refs = genome.nodes[VOTE_NODE].input_refs();
         assert_eq!(refs.len(), 9);
-        assert_eq!(refs[..7], founder.nodes[VOTE_NODE].input_refs[..]);
+        assert_eq!(refs[..7], founder.nodes[VOTE_NODE].input_refs()[..]);
         assert_eq!(
             vote_reference(&genome, 7),
             Some(&Family::Vector.reference())
         );
         assert_eq!(vote_reference(&genome, 8), Some(&Family::Ring.reference()));
-        let BackendDef::Graph(graph) = &genome.nodes[VOTE_NODE].backend_def else {
+        let BackendDef::Graph(graph) = genome.nodes[VOTE_NODE].backend_def() else {
             panic!("graph vote node");
         };
-        let BackendDef::Graph(vector) = &area_food(&founder).nodes[VOTE_NODE].backend_def else {
+        let area = area_food(&founder);
+        let BackendDef::Graph(vector) = area.nodes[VOTE_NODE].backend_def() else {
             panic!("graph vote node");
         };
         assert_eq!(graph.compute_nodes(), vector.compute_nodes());

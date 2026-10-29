@@ -380,7 +380,7 @@ fn craft(index: usize, genome: &mut CreatureGenome, config: &SimulationConfig) {
     let node = genome
         .nodes
         .iter_mut()
-        .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+        .find(|node| matches!(node.backend_def(), BackendDef::Graph(_)))
         .expect("the founder carries a Graph node");
     let scale = 0.25 * (index as f32 + 1.0) * if index.is_multiple_of(2) { 1.0 } else { -1.0 };
     match index % 3 {
@@ -413,7 +413,7 @@ fn craft(index: usize, genome: &mut CreatureGenome, config: &SimulationConfig) {
         }
         1 => {
             let area = InputReference::World(WorldInputKey::AreaBarrierSummary);
-            let BackendDef::Graph(def) = &node.backend_def else {
+            let BackendDef::Graph(def) = node.backend_def() else {
                 unreachable!("a Graph node");
             };
             let births: Vec<BundleBirth> =
@@ -433,7 +433,7 @@ fn craft(index: usize, genome: &mut CreatureGenome, config: &SimulationConfig) {
                 .expect("an area summary sensor");
         }
         _ => {
-            let BackendDef::Graph(def) = &mut node.backend_def else {
+            let BackendDef::Graph(def) = node.backend_edit().1 else {
                 unreachable!("a Graph node");
             };
             for sink in 0..def.output_sinks().len() {

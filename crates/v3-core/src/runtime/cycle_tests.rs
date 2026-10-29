@@ -35,10 +35,10 @@ fn sensors() -> SensorSnapshot {
     }
 }
 fn node(id: u32, targets: &[u32]) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(id),
-        input_refs: vec![],
-        backend_def: BackendDef::Vm(VmBackendDef {
+    NodeGenome::new(
+        NodeId::new(id),
+        vec![],
+        BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: vec![2.0],
             program: vec![
@@ -60,8 +60,8 @@ fn node(id: u32, targets: &[u32]) -> NodeGenome {
                 VmInstruction::Halt,
             ],
         }),
-        targets: self::targets(targets),
-    }
+        self::targets(targets),
+    )
 }
 fn targets(targets: &[u32]) -> Vec<RouteTarget> {
     targets
@@ -76,10 +76,10 @@ fn targets(targets: &[u32]) -> Vec<RouteTarget> {
 }
 /// A one-constant graph node with no sinks: it routes to its first target.
 fn graph_node(id: u32, target_ids: &[u32]) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(id),
-        input_refs: vec![],
-        backend_def: BackendDef::Graph(
+    NodeGenome::new(
+        NodeId::new(id),
+        vec![],
+        BackendDef::Graph(
             CgpGraphBackendDef::new_with_fixed_outputs()
                 .with_compute_nodes(vec![ComputeNode::new(
                     ComputeNodeKind::Constant(1.0),
@@ -87,8 +87,8 @@ fn graph_node(id: u32, target_ids: &[u32]) -> NodeGenome {
                 )])
                 .with_output_sinks(vec![]),
         ),
-        targets: targets(target_ids),
-    }
+        targets(target_ids),
+    )
 }
 fn observe(g: &CreatureGenome, cap: u32) -> (MeshOutput, MeshObservation) {
     let config = RuntimeConfig {

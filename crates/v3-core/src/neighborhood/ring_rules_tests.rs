@@ -26,12 +26,7 @@ fn leaf(ref_idx: u16, sub_idx: u16, weight: f32) -> GraphEdge {
 }
 
 fn node(id: u32, refs: Vec<InputReference>, def: CgpGraphBackendDef) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(id),
-        input_refs: refs,
-        backend_def: BackendDef::Graph(def),
-        targets: vec![],
-    }
+    NodeGenome::new(NodeId::new(id), refs, BackendDef::Graph(def), vec![])
 }
 
 fn wire(def: &mut CgpGraphBackendDef, kind: OutputSinkKind, edge: GraphEdge) {

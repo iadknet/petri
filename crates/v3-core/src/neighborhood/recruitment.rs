@@ -259,11 +259,11 @@ impl Module {
             lineage,
             node: node.node_id,
             created_depth,
-            backend: ModuleBackend::from(&node.backend_def),
+            backend: ModuleBackend::from(node.backend_def()),
             provenance,
             deleted_depth: None,
             copy_source,
-            birth_payload_hash: payload_hash(&node.backend_def),
+            birth_payload_hash: payload_hash(node.backend_def()),
             later_copies: 0,
             exposure: Exposure::default(),
             scenes_dispatched: 0,
@@ -689,8 +689,8 @@ impl RecruitmentTracker {
         let state = &mut self.lineages[lineage as usize];
         for node in nodes {
             if let Some(&index) = state.live.get(&node.node_id) {
-                state.payloads[index].clone_from(&node.backend_def);
-                state.modules[index].birth_payload_hash = payload_hash(&node.backend_def);
+                state.payloads[index].clone_from(node.backend_def());
+                state.modules[index].birth_payload_hash = payload_hash(node.backend_def());
             }
         }
     }
@@ -726,7 +726,7 @@ impl RecruitmentTracker {
         state
             .modules
             .push(Module::new(lineage, node, depth, provenance, copy_source));
-        state.payloads.push(node.backend_def.clone());
+        state.payloads.push(node.backend_def().clone());
         state.live.insert(node.node_id, index);
     }
 
@@ -773,7 +773,7 @@ impl RecruitmentTracker {
                     named.extend(node.targets.iter().map(|target| target.target_id));
                     let mut matches = previous
                         .values()
-                        .filter(|existing| existing.backend_def == node.backend_def);
+                        .filter(|existing| existing.backend_def() == node.backend_def());
                     let source = copy_applied.then(|| matches.next()).flatten();
                     let (provenance, copy_source) = match source {
                         Some(existing) => {

@@ -44,7 +44,7 @@ fn genome_for(class: CognitiveClass) -> CreatureGenome {
                     retention: 1.0,
                 }),
             ));
-            genome.nodes[0].backend_def = BackendDef::Graph(graph);
+            *genome.nodes[0].backend_edit().1 = BackendDef::Graph(graph);
         }
     }
     genome

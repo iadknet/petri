@@ -8,10 +8,10 @@ pub(crate) use crate::common::{graph_hop, insert_creature, run_one_traced_tick, 
 pub(crate) fn vm_emit_noop_genome() -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 // A `Terminate` vote commits nothing: the tick is `NoOp`.
@@ -20,8 +20,8 @@ pub(crate) fn vm_emit_noop_genome() -> CreatureGenome {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     }
 }
 

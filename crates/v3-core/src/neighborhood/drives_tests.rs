@@ -31,12 +31,12 @@ fn wire(def: &mut CgpGraphBackendDef, sink: VoteSink, source: GraphSource, weigh
 fn graph_genome(def: CgpGraphBackendDef) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Graph(def),
-            targets: vec![],
-        }],
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Graph(def),
+            vec![],
+        )],
     }
 }
 
@@ -69,10 +69,10 @@ fn drive_edges_are_signed_and_floored_and_vm_paths_unsigned() {
     let graph = graph_genome(def);
     let vm = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program: vec![
@@ -86,8 +86,8 @@ fn drive_edges_are_signed_and_floored_and_vm_paths_unsigned() {
                     },
                 ],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     };
     let empty = CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -236,7 +236,7 @@ fn a_bundle_is_not_a_fanout() {
     let ring = vec![InputReference::World(WorldInputKey::NeighborBarrierRing)];
     let with_refs = |def| {
         let mut genome = graph_genome(def);
-        genome.nodes[0].input_refs = ring.clone();
+        *genome.nodes[0].input_refs_mut() = ring.clone();
         genome
     };
     let moves = |def| census_of(&[with_refs(def)]).kinds[DirectedVoteKind::Move.index()];
@@ -263,7 +263,7 @@ fn pair_members_are_not_a_fanout() {
     );
     def.bundle_mut(id).set_scale(1.0);
     let mut genome = graph_genome(def);
-    genome.nodes[0].input_refs = vec![area];
+    *genome.nodes[0].input_refs_mut() = vec![area];
     let moves = census_of(&[genome]).kinds[DirectedVoteKind::Move.index()];
     assert_eq!((moves.fanouts, moves.fanout_edges), (0, 0));
 }

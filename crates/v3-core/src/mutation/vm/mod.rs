@@ -199,8 +199,8 @@ impl VmMutator {
             .nodes
             .iter()
             .enumerate()
-            .filter(|(_, n)| match &n.backend_def {
-                BackendDef::Vm(vm) => op.applies_to(vm, &n.input_refs),
+            .filter(|(_, n)| match n.backend_def() {
+                BackendDef::Vm(vm) => op.applies_to(vm, n.input_refs()),
                 BackendDef::Graph(_) => false,
             })
             .map(|(i, _)| i)

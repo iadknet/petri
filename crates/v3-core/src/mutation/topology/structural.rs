@@ -119,7 +119,7 @@ fn safe_predecessors(genome: &CreatureGenome, source: usize) -> Vec<(usize, u8, 
             let incumbent = node.targets.get(static_incumbent(&node.targets)?)?;
             if incumbent.target_id != source_id
                 || !incumbent.gate_bias.is_finite()
-                || writes_gate(&node.backend_def, incumbent.slot)
+                || writes_gate(node.backend_def(), incumbent.slot)
             {
                 return None;
             }
@@ -159,7 +159,7 @@ fn copy_attached(
         }
     }
     if swap_backend {
-        clone.backend_def = match clone.backend_def {
+        *clone.backend_edit().1 = match clone.backend_def() {
             BackendDef::Vm(_) => birth::blank_graph_backend(),
             BackendDef::Graph(_) => birth::minimal_vm_backend(),
         };
@@ -230,11 +230,11 @@ fn clone_and_remap_slice(
         .iter()
         .map(|&idx| {
             let original = &genome.nodes[idx];
-            NodeGenome {
-                node_id: id_map[&original.node_id],
-                input_refs: original.input_refs.clone(),
-                backend_def: original.backend_def.clone(),
-                targets: original
+            NodeGenome::new(
+                id_map[&original.node_id],
+                original.input_refs().to_vec(),
+                original.backend_def().clone(),
+                original
                     .targets
                     .iter()
                     .map(|t| {
@@ -249,7 +249,7 @@ fn clone_and_remap_slice(
                         }
                     })
                     .collect(),
-            }
+            )
         })
         .collect();
 

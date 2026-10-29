@@ -374,13 +374,13 @@ fn collect_added_node_input_classes(
                 .nodes
                 .iter()
                 .find(|node| !before_ids.contains(&node.node_id))?;
-            Some(classify_added_node_input_classes(&newborn.input_refs))
+            Some(classify_added_node_input_classes(newborn.input_refs()))
         }
         MutationOperator::Graph(GraphOperator::AddInternalGraphNode) => {
             let target = before.nodes.iter().zip(after.nodes.iter()).find_map(
                 |(before_node, after_node)| match (
-                    &before_node.backend_def,
-                    &after_node.backend_def,
+                    before_node.backend_def(),
+                    after_node.backend_def(),
                 ) {
                     (BackendDef::Graph(before_graph), BackendDef::Graph(after_graph))
                         if after_graph.compute_nodes().len()
@@ -391,7 +391,7 @@ fn collect_added_node_input_classes(
                     _ => None,
                 },
             )?;
-            Some(classify_added_node_input_classes(&target.input_refs))
+            Some(classify_added_node_input_classes(target.input_refs()))
         }
         _ => None,
     }
@@ -410,13 +410,13 @@ fn collect_added_node_world_inputs_for_operator(
                 .nodes
                 .iter()
                 .find(|node| !before_ids.contains(&node.node_id))?;
-            Some(collect_added_node_world_inputs(&newborn.input_refs))
+            Some(collect_added_node_world_inputs(newborn.input_refs()))
         }
         MutationOperator::Graph(GraphOperator::AddInternalGraphNode) => {
             let target = before.nodes.iter().zip(after.nodes.iter()).find_map(
                 |(before_node, after_node)| match (
-                    &before_node.backend_def,
-                    &after_node.backend_def,
+                    before_node.backend_def(),
+                    after_node.backend_def(),
                 ) {
                     (BackendDef::Graph(before_graph), BackendDef::Graph(after_graph))
                         if after_graph.compute_nodes().len()
@@ -427,7 +427,7 @@ fn collect_added_node_world_inputs_for_operator(
                     _ => None,
                 },
             )?;
-            Some(collect_added_node_world_inputs(&target.input_refs))
+            Some(collect_added_node_world_inputs(target.input_refs()))
         }
         _ => None,
     }

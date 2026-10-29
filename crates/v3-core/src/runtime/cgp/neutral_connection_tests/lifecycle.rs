@@ -34,7 +34,7 @@ fn existing_weight_mutation_refines_one_zero_duplicate_without_touching_the_orig
     let after: Vec<_> = graph(&copy).edges().cloned().collect();
     assert_eq!(after.iter().zip(&before).filter(|(a, b)| a != b).count(), 1);
     assert!(before.iter().all(|e| e.own_weight() == 0.0));
-    let votes = effects(graph(&copy), &copy.input_refs, 0.25)
+    let votes = effects(graph(&copy), copy.input_refs(), 0.25)
         .side
         .dispatch_effects()
         .0;
@@ -94,15 +94,15 @@ proptest! {
             wire(&mut def, OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Reproduce, 7)), edge(leaf(unused as u16, channel), weight));
         }
         let mut genome = CreatureGenome { entry_node_id: NodeId::new(0), nodes: vec![graph_node(def, refs)] };
-        let before = effects(graph(&genome.nodes[0]), &genome.nodes[0].input_refs, 0.25).side.dispatch_effects();
+        let before = effects(graph(&genome.nodes[0]), genome.nodes[0].input_refs(), 0.25).side.dispatch_effects();
         let mut rng = SmallRng::seed_from_u64(seed);
         InputRefMutator::apply_to_node(&mut genome, InputRefOperator::Prune, 0, &mut rng, &crate::config::test_sensor_context(2)).unwrap();
         let node = &genome.nodes[0];
-        prop_assert_eq!(&node.input_refs[unused - 1], &source_ref);
+        prop_assert_eq!(&node.input_refs()[unused - 1], &source_ref);
         for edge in graph(node).edges() {
             prop_assert_eq!(edge.source(), leaf((unused - 1) as u16, channel));
         }
-        prop_assert_eq!(effects(graph(node), &node.input_refs, 0.25).side.dispatch_effects(), before);
+        prop_assert_eq!(effects(graph(node), node.input_refs(), 0.25).side.dispatch_effects(), before);
         prop_assert!(!prunable_indices(node).contains(&(unused - 1)));
     }
 
@@ -118,7 +118,7 @@ proptest! {
         let mut genome = CreatureGenome { entry_node_id: NodeId::new(0), nodes: vec![graph_node(def, vec![])] };
         let before = genome.genome_size();
         let source = if add_declaration {
-            genome.nodes[0].input_refs.push(InputReference::World(WorldInputKey::NearbyCreature));
+            genome.nodes[0].input_refs_mut().push(InputReference::World(WorldInputKey::NearbyCreature));
             leaf(0, 7)
         } else { memory(15, true) };
         wire(graph_mut(&mut genome.nodes[0]), kind, edge(source, 0.0));
@@ -162,7 +162,7 @@ fn last_zero_consumer_removal_enables_pruning_and_never_recreates_the_edge() {
         &crate::config::test_sensor_context(1),
     )
     .unwrap();
-    assert!(genome.nodes[0].input_refs.is_empty());
+    assert!(genome.nodes[0].input_refs().is_empty());
     assert_eq!(
         remove_edge(graph_mut(&mut genome.nodes[0]), &mut rng),
         Err(MutationSkipReason::NoApplicableTarget)
@@ -201,8 +201,8 @@ fn native_node_copy_and_genome_serde_retain_channels_sink_identity_and_independe
     )
     .unwrap();
     assert_eq!(genome.nodes.len(), 3);
-    assert_eq!(genome.nodes[2].input_refs, original_worker.input_refs);
-    assert_eq!(genome.nodes[2].backend_def, original_worker.backend_def);
+    assert_eq!(genome.nodes[2].input_refs(), original_worker.input_refs());
+    assert_eq!(genome.nodes[2].backend_def(), original_worker.backend_def());
     assert_ne!(genome.nodes[2].node_id, original_worker.node_id);
     let mut decoded: CreatureGenome =
         serde_json::from_str(&serde_json::to_string(&genome).unwrap()).unwrap();

@@ -17,16 +17,16 @@ use crate::sensors::static_inputs::assemble_static_inputs;
 fn outcome_genome(program: Vec<VmInstruction>) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![InputReference::PreviousOutcome],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![InputReference::PreviousOutcome],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 2,
                 constants: vec![1.0, 0.0],
                 program,
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     }
 }
 

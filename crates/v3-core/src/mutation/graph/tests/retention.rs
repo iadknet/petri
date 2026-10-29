@@ -78,12 +78,7 @@ fn fixture(ungrouped: f32, members: [f32; 3]) -> (CgpGraphBackendDef, Vec<EdgeOc
 }
 
 fn node(def: CgpGraphBackendDef) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(0),
-        input_refs: refs(),
-        backend_def: BackendDef::Graph(def),
-        targets: vec![],
-    }
+    NodeGenome::new(NodeId::new(0), refs(), BackendDef::Graph(def), vec![])
 }
 
 fn retention_at(def: &CgpGraphBackendDef, at: EdgeOccurrence) -> Option<f32> {

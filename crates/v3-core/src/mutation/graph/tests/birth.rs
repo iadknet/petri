@@ -92,12 +92,12 @@ fn a_set_without_an_admissible_plan_skips() {
 fn birth_learning_reports_each_creation_by_wiring_and_form() {
     let context = test_sensor_context(1);
     for seed in 0..16 {
-        let mut node = NodeGenome {
-            node_id: crate::contracts::NodeId::new(0),
-            input_refs: vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
-            backend_def: BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
-            targets: vec![],
-        };
+        let mut node = NodeGenome::new(
+            crate::contracts::NodeId::new(0),
+            vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
+            BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
+            vec![],
+        );
         let wiring = Wiring::Ring {
             kind: DirectedVoteKind::Move,
             offset: 2,
@@ -112,7 +112,7 @@ fn birth_learning_reports_each_creation_by_wiring_and_form() {
             scale: 0.0,
         };
         let id = node.add_bundle(source, birth, &context).unwrap();
-        let BackendDef::Graph(def) = &mut node.backend_def else {
+        let BackendDef::Graph(def) = node.backend_edit().1 else {
             unreachable!()
         };
         let mut rng = SmallRng::seed_from_u64(seed);
@@ -130,12 +130,12 @@ fn birth_learning_reports_each_creation_by_wiring_and_form() {
 #[test]
 fn edge_operators_report_their_bundle_edits() {
     let context = test_sensor_context(1);
-    let mut node = NodeGenome {
-        node_id: crate::contracts::NodeId::new(0),
-        input_refs: vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
-        backend_def: BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
-        targets: vec![],
-    };
+    let mut node = NodeGenome::new(
+        crate::contracts::NodeId::new(0),
+        vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
+        BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
+        vec![],
+    );
     let wiring = Wiring::Ring {
         kind: DirectedVoteKind::Move,
         offset: 0,
@@ -150,8 +150,8 @@ fn edge_operators_report_their_bundle_edits() {
         scale: 0.5,
     };
     node.add_bundle(source, birth, &context).unwrap();
-    let refs = node.input_refs.clone();
-    let BackendDef::Graph(def) = &mut node.backend_def else {
+    let refs = node.input_refs().to_vec();
+    let BackendDef::Graph(def) = node.backend_edit().1 else {
         unreachable!()
     };
     // Only members are on the graph: every retarget that changes a source

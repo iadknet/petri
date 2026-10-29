@@ -145,11 +145,11 @@ impl MeshExecutionMode for ReadRecording {
         config: &RuntimeConfig,
         side_outputs: &mut MeshSideOutputs,
     ) -> (NodeResult, ()) {
-        let result = match &node.backend_def {
+        let result = match node.backend_def() {
             BackendDef::Vm(def) => {
                 execute_vm_node_impl(
                     def,
-                    &node.input_refs,
+                    node.input_refs(),
                     upstream_slots,
                     energy,
                     energy_consumed,
@@ -172,7 +172,7 @@ impl MeshExecutionMode for ReadRecording {
                     reads: &mut self.reads,
                 },
                 def,
-                &node.input_refs,
+                node.input_refs(),
                 upstream_slots,
                 energy,
                 energy_consumed,

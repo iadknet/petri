@@ -8,7 +8,7 @@ use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource,
     OutputSinkKind,
 };
-use crate::genome::{BackendDef, NodeGenome};
+use crate::genome::BackendDef;
 use proptest::prelude::*;
 
 fn fixture() -> (SimulationConfig, Battery) {
@@ -34,7 +34,7 @@ fn eater(weight: f32, extra: Vec<ComputeNode>) -> CreatureGenome {
 }
 
 fn graph_def(genome: &mut CreatureGenome, node: usize) -> &mut CgpGraphBackendDef {
-    match &mut genome.nodes[node].backend_def {
+    match genome.nodes[node].backend_edit().1 {
         BackendDef::Graph(def) => def,
         BackendDef::Vm(_) => unreachable!("fixtures are Graph genomes"),
     }
@@ -109,11 +109,9 @@ fn an_identical_child_is_genome_identical() {
 #[test]
 fn an_edit_to_a_never_dispatched_node_is_unexecuted() {
     let mut parent = eater(1.0, Vec::new());
-    let stray = graph_genome(Vec::new(), vec![constant(3.0)], Vec::new()).nodes[0].clone();
-    parent.nodes.push(NodeGenome {
-        node_id: NodeId::new(9),
-        ..stray
-    });
+    let mut stray = graph_genome(Vec::new(), vec![constant(3.0)], Vec::new()).nodes[0].clone();
+    stray.node_id = NodeId::new(9);
+    parent.nodes.push(stray);
     let mut child = parent.clone();
     graph_def(&mut child, 1).set_compute_kind(0, ComputeNodeKind::Constant(4.0));
     assert_eq!(
@@ -535,7 +533,7 @@ fn copied_genome_content_is_not_part_of_the_computation_record() {
     let parent = eater(1.0, Vec::new());
     let mut child = parent.clone();
     child.nodes[0]
-        .input_refs
+        .input_refs_mut()
         .push(crate::contracts::InputReference::World(
             crate::contracts::WorldInputKey::NeighborBarrierRing,
         ));

@@ -528,12 +528,12 @@ pub fn brain_view(
             .map(|(node_idx, (node, annotation))| BrainNode {
                 node_id: node.node_id,
                 annotation: annotation.into(),
-                input_refs: node.input_refs.iter().map(InputRef::from).collect(),
-                backend: match &node.backend_def {
+                input_refs: node.input_refs().iter().map(InputRef::from).collect(),
+                backend: match node.backend_def() {
                     BackendDef::Vm(vm) => BrainBackend::Vm(vm.into()),
                     BackendDef::Graph(def) => BrainBackend::Graph(graph_brain(
                         def,
-                        &node.input_refs,
+                        node.input_refs(),
                         learned,
                         node_idx,
                         context,
@@ -656,7 +656,7 @@ pub fn learning_view(genome: &CreatureGenome, learned: &LearnedState) -> Option<
         .iter()
         .enumerate()
         .filter_map(|(node_idx, node)| {
-            let BackendDef::Graph(def) = &node.backend_def else {
+            let BackendDef::Graph(def) = node.backend_def() else {
                 return None;
             };
             let edges: Vec<LearningEdge> = walk_edges(def, learned, node_idx)

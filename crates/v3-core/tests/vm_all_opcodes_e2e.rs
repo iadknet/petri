@@ -161,18 +161,18 @@ fn sample_vm_program() -> Vec<VmInstruction> {
 fn sample_vm_genome() -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![InputReference::World(WorldInputKey::FoodHere {
                 type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
             })],
-            backend_def: BackendDef::Vm(VmBackendDef {
+            BackendDef::Vm(VmBackendDef {
                 register_count: 16,
                 constants: vec![5.0, 77.0, 0.1],
                 program: sample_vm_program(),
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     }
 }
 

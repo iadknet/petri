@@ -90,10 +90,10 @@ fn run_tick_accumulates_reward_modulated_plasticity_update_in_phase_2_5() {
     let node_id = NodeId::new(0);
     let genome = CreatureGenome {
         entry_node_id: node_id,
-        nodes: vec![NodeGenome {
+        nodes: vec![NodeGenome::new(
             node_id,
-            input_refs: vec![],
-            backend_def: BackendDef::Graph(
+            vec![],
+            BackendDef::Graph(
                 CgpGraphBackendDef::new_with_fixed_outputs()
                     .with_compute_nodes(vec![crate::genome::cgp::test_support::plastic_node(
                         ComputeNodeKind::Constant(1.0),
@@ -118,8 +118,8 @@ fn run_tick_accumulates_reward_modulated_plasticity_update_in_phase_2_5() {
                     )])
                     .with_output_sinks(vec![]),
             ),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     };
 
     let (mut sim, _id) = make_sim_with_custom_genome(100.0, genome);
@@ -171,10 +171,9 @@ fn run_tick_counts_only_dispatches_that_ran_out_of_energy() {
 #[test]
 fn run_tick_counts_passes_that_reach_the_hop_cap() {
     let mut genome = vm_program_genome(vec![VmInstruction::Halt]);
-    genome.nodes.push(NodeGenome {
-        node_id: NodeId::new(1),
-        ..genome.nodes[0].clone()
-    });
+    let mut copy = genome.nodes[0].clone();
+    copy.node_id = NodeId::new(1);
+    genome.nodes.push(copy);
     genome.nodes[0].targets = vec![crate::contracts::RouteTarget {
         target_id: NodeId::new(1),
         slot: 0,
@@ -230,11 +229,10 @@ fn mixed_learning_genome(hebbian_edges: usize, reward_edges: usize) -> CreatureG
     };
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            targets: vec![],
-            backend_def: BackendDef::Graph(
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Graph(
                 CgpGraphBackendDef::new_with_fixed_outputs()
                     .with_compute_nodes(vec![
                         ComputeNode::new(ComputeNodeKind::Constant(1.0), vec![]),
@@ -246,7 +244,8 @@ fn mixed_learning_genome(hebbian_edges: usize, reward_edges: usize) -> CreatureG
                         OutputSink::new(OutputSinkKind::ClearSlot(0), vec![edge]),
                     ]),
             ),
-        }],
+            vec![],
+        )],
     }
 }
 

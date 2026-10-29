@@ -327,9 +327,10 @@ mod tests {
             entry_node_id: NodeId::new(ids[0]),
             nodes: ids
                 .iter()
-                .map(|&id| crate::genome::NodeGenome {
-                    node_id: NodeId::new(id),
-                    ..node.clone()
+                .map(|&id| {
+                    let mut copy = node.clone();
+                    copy.node_id = NodeId::new(id);
+                    copy
                 })
                 .collect(),
         }

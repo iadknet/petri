@@ -46,7 +46,7 @@ fn controlled_growth(g: &mut CreatureGenome, op: TopologyOperator, graph: bool) 
         &MutationConfig::default(),
     )
     .unwrap();
-    assert_eq!(g.nodes.last().unwrap().backend_def, blank(graph));
+    assert_eq!(g.nodes.last().unwrap().backend_def(), &blank(graph));
 }
 
 proptest! {
@@ -63,10 +63,10 @@ proptest! {
                     prop_assert_eq!(grown.nodes.len(), base.nodes.len()+1);
                     prop_assert_eq!(&grown.nodes[1], &base.nodes[1]);
                     prop_assert_eq!(grown.entry_node_id,base.entry_node_id);
-                    prop_assert_eq!(&grown.nodes[0].input_refs,&base.nodes[0].input_refs);
+                    prop_assert_eq!(grown.nodes[0].input_refs(),base.nodes[0].input_refs());
                     let new = grown.nodes.last().unwrap();
                     prop_assert!(!base.nodes.iter().any(|n| n.node_id == new.node_id));
-                    prop_assert!(new.input_refs.is_empty());
+                    prop_assert!(new.input_refs().is_empty());
                     prop_assert_eq!(new.targets.as_slice(), &[RouteTarget {target_id: NodeId::new(1),slot:0,gate_bias:0.0}]);
                     if op == TopologyOperator::AddRouteTarget {
                         prop_assert_eq!(grown.nodes[0].targets[0],base.nodes[0].targets[0]);
@@ -75,7 +75,7 @@ proptest! {
                         prop_assert_eq!(grown.nodes[0].targets[1].target_id,new.node_id);
                         prop_assert_ne!(grown.nodes[0].targets[1].slot,slot);
                         let added_slot=grown.nodes[0].targets[1].slot;
-                        let mut restored=grown.nodes[0].backend_def.clone();
+                        let mut restored=grown.nodes[0].backend_def().clone();
                         match &mut restored {
                             BackendDef::Vm(vm) => {
                                 let at=vm.program.iter().position(|i| matches!(i,VmInstruction::WriteRouteGate {slot,..} if *slot==added_slot)).unwrap();
@@ -87,9 +87,9 @@ proptest! {
                                 g.remove_edge(crate::genome::cgp::EdgeOccurrence::new(gate, last));
                             }
                         }
-                        prop_assert_eq!(&restored,&base.nodes[0].backend_def);
+                        prop_assert_eq!(&restored,base.nodes[0].backend_def());
                     } else {
-                        prop_assert_eq!(&grown.nodes[0].backend_def,&base.nodes[0].backend_def);
+                        prop_assert_eq!(grown.nodes[0].backend_def(),base.nodes[0].backend_def());
                         prop_assert_eq!(grown.nodes[0].targets.len(),1);
                         prop_assert_eq!(grown.nodes[0].targets[0],RouteTarget {target_id:new.node_id, ..base.nodes[0].targets[0]});
                         let mut alias=base.clone();
@@ -124,13 +124,13 @@ fn stateful_fixture(source_graph: bool) -> CreatureGenome {
     ));
     let surface = def.sink_surface(OutputSinkKind::WriteSlot(4)).unwrap();
     def.push_edge(surface, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
-    temporal.backend_def = BackendDef::Graph(def);
+    *temporal.backend_edit().1 = BackendDef::Graph(def);
     base.nodes[0].targets[0].target_id = temporal.node_id;
     base.nodes.push(temporal);
     // Prelude ensures both source kinds receive a real queue, bid,
     // and nonzero bus. Its metadata remains local to that VM.
     let mut prelude = node(8, &[0]);
-    prelude.backend_def = BackendDef::Vm(VmBackendDef {
+    *prelude.backend_edit().1 = BackendDef::Vm(VmBackendDef {
         register_count: 1,
         constants: vec![3.0],
         program: vec![
@@ -277,7 +277,7 @@ fn both_detours_preserve_nonzero_bus_queue_local_metadata_and_temporal_state() {
                     if graph { 2 } else { 3 }
                 );
                 let mut paired = grown.clone();
-                paired.nodes.last_mut().unwrap().backend_def = blank(!graph);
+                *paired.nodes.last_mut().unwrap().backend_edit().1 = blank(!graph);
                 assert_eq!(
                     if graph {
                         paired.genome_size() - grown.genome_size()
@@ -347,13 +347,13 @@ fn t11_f18_paired_growth_characterization() {
             }
             applied += 1;
             created[usize::from(matches!(
-                child.nodes.last().unwrap().backend_def,
+                child.nodes.last().unwrap().backend_def(),
                 BackendDef::Vm(_)
             ))] += 1;
             let id = child.nodes.last().unwrap().node_id;
             for (i, graph) in [true, false].into_iter().enumerate() {
                 let mut pair = child.clone();
-                pair.nodes.last_mut().unwrap().backend_def = blank(graph);
+                *pair.nodes.last_mut().unwrap().backend_edit().1 = blank(graph);
                 let signature =
                     battery.signature(&pair, &config.runtime, config.shared_memory.decay_rate);
                 equal[i] += usize::from(signature == baseline);

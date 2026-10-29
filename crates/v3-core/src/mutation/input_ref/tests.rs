@@ -30,23 +30,23 @@ fn default_config() -> MutationConfig {
 fn single_node_genome_with_input_ref(input_ref: InputReference) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![input_ref],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![input_ref],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program: vec![VmInstruction::Halt],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     }
 }
 
 #[test]
 fn add_input_ref_increases_count() {
     let mut genome = v3alpha1_founder_genome();
-    let before: usize = genome.nodes.iter().map(|n| n.input_refs.len()).sum();
+    let before: usize = genome.nodes.iter().map(|n| n.input_refs().len()).sum();
     let mut r = rng(0);
     InputRefMutator::apply(
         &mut genome,
@@ -56,7 +56,7 @@ fn add_input_ref_increases_count() {
         &default_config(),
     )
     .unwrap();
-    let after: usize = genome.nodes.iter().map(|n| n.input_refs.len()).sum();
+    let after: usize = genome.nodes.iter().map(|n| n.input_refs().len()).sum();
     assert_eq!(after, before + 1);
 }
 
@@ -68,8 +68,8 @@ fn battery_signature(genome: &CreatureGenome) -> Signature {
 /// node's table: `None` for a dangling index. A prune must leave this
 /// sequence identical.
 fn resolved_consumers(node: &NodeGenome) -> Vec<Option<InputReference>> {
-    let resolve = |ref_idx: u16| node.input_refs.get(usize::from(ref_idx)).cloned();
-    match &node.backend_def {
+    let resolve = |ref_idx: u16| node.input_refs().get(usize::from(ref_idx)).cloned();
+    match node.backend_def() {
         BackendDef::Graph(def) => def
             .edges()
             .filter_map(|edge| match edge.source() {
@@ -93,7 +93,7 @@ fn consumer_count(node: &NodeGenome) -> usize {
 }
 
 fn noop_count(node: &NodeGenome) -> usize {
-    match &node.backend_def {
+    match node.backend_def() {
         BackendDef::Vm(vm) => vm
             .program
             .iter()
@@ -243,7 +243,7 @@ fn prune_applies_to_founder_node_zero_only_and_is_silent() {
     );
     assert_eq!(prunable_indices(&genome.nodes[0]), vec![4]);
     assert_eq!(
-        genome.nodes[0].input_refs[4],
+        genome.nodes[0].input_refs()[4],
         InputReference::World(WorldInputKey::NeighborOccupiedRing)
     );
     assert!(prunable_indices(&genome.nodes[1]).is_empty());
@@ -259,8 +259,8 @@ fn prune_applies_to_founder_node_zero_only_and_is_silent() {
         &config,
     )
     .unwrap();
-    assert_eq!(pruned.nodes[0].input_refs.len(), 4);
-    assert_eq!(pruned.nodes[0].backend_def, genome.nodes[0].backend_def);
+    assert_eq!(pruned.nodes[0].input_refs().len(), 4);
+    assert_eq!(pruned.nodes[0].backend_def(), genome.nodes[0].backend_def());
     assert_eq!(pruned.nodes[1], genome.nodes[1]);
     assert_eq!(battery_signature(&pruned), base);
 }
@@ -271,7 +271,9 @@ fn prune_applies_to_founder_node_zero_only_and_is_silent() {
 #[test]
 fn prune_on_the_founder_vm_node_is_silent() {
     let mut genome = crate::creature::founder::vm_decision_founder_genome();
-    genome.nodes[1].input_refs.push(InputReference::ActionQueue);
+    genome.nodes[1]
+        .input_refs_mut()
+        .push(InputReference::ActionQueue);
     assert_eq!(prunable_indices(&genome.nodes[1]), vec![7]);
     let base = battery_signature(&genome);
 
@@ -286,17 +288,17 @@ fn prune_on_the_founder_vm_node_is_silent() {
     )
     .unwrap();
     assert_eq!(
-        pruned.nodes[1].input_refs,
-        crate::creature::founder::vm_decision_founder_genome().nodes[1].input_refs
+        pruned.nodes[1].input_refs(),
+        crate::creature::founder::vm_decision_founder_genome().nodes[1].input_refs()
     );
-    assert_eq!(pruned.nodes[1].backend_def, genome.nodes[1].backend_def);
+    assert_eq!(pruned.nodes[1].backend_def(), genome.nodes[1].backend_def());
     assert_eq!(battery_signature(&pruned), base);
 }
 
 #[test]
 fn prune_input_ref_decreases_count() {
     let mut genome = v3alpha1_founder_genome();
-    let before: usize = genome.nodes.iter().map(|n| n.input_refs.len()).sum();
+    let before: usize = genome.nodes.iter().map(|n| n.input_refs().len()).sum();
     assert!(before > 0, "founder must have input_refs");
     let mut r = rng(0);
     InputRefMutator::apply(
@@ -307,7 +309,7 @@ fn prune_input_ref_decreases_count() {
         &default_config(),
     )
     .unwrap();
-    let after: usize = genome.nodes.iter().map(|n| n.input_refs.len()).sum();
+    let after: usize = genome.nodes.iter().map(|n| n.input_refs().len()).sum();
     assert_eq!(after, before - 1);
 }
 
@@ -315,7 +317,7 @@ fn prune_input_ref_decreases_count() {
 fn prune_input_ref_on_empty_returns_no_applicable_target() {
     let mut genome = v3alpha1_founder_genome();
     for node in &mut genome.nodes {
-        node.input_refs.clear();
+        node.input_refs_mut().clear();
     }
     let mut r = rng(0);
     let result = InputRefMutator::apply(
@@ -334,7 +336,7 @@ fn swap_input_ref_changes_value() {
     let original_refs: Vec<InputReference> = genome
         .nodes
         .iter()
-        .flat_map(|n| n.input_refs.iter().cloned())
+        .flat_map(|n| n.input_refs().iter().cloned())
         .collect();
     let mut changed = false;
     for seed in 0u64..100 {
@@ -352,7 +354,7 @@ fn swap_input_ref_changes_value() {
             let new_refs: Vec<InputReference> = g
                 .nodes
                 .iter()
-                .flat_map(|n| n.input_refs.iter().cloned())
+                .flat_map(|n| n.input_refs().iter().cloned())
                 .collect();
             if new_refs != original_refs {
                 changed = true;
@@ -397,14 +399,14 @@ fn swap_on_the_graph_backend_keeps_every_edge() {
         ]);
     let base_genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![InputReference::World(WorldInputKey::neighbor_food_ring(
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![InputReference::World(WorldInputKey::neighbor_food_ring(
                 OrdinaryFoodTypeId::new(0),
             ))],
-            backend_def: BackendDef::Graph(def),
-            targets: vec![],
-        }],
+            BackendDef::Graph(def),
+            vec![],
+        )],
     };
 
     for seed in 0u64..64 {
@@ -420,15 +422,15 @@ fn swap_on_the_graph_backend_keeps_every_edge() {
         )
         .unwrap();
         assert_eq!(
-            genome.nodes[0].input_refs,
+            genome.nodes[0].input_refs(),
             vec![InputReference::World(WorldInputKey::neighbor_food_ring(
                 OrdinaryFoodTypeId::new(1)
             ))],
             "the only other member of (Food, 8) at two food types"
         );
         assert_eq!(
-            genome.nodes[0].backend_def,
-            base_genome.nodes[0].backend_def
+            genome.nodes[0].backend_def(),
+            base_genome.nodes[0].backend_def()
         );
     }
 }
@@ -524,23 +526,23 @@ proptest! {
                 }
                 let before = &base.nodes[node_idx];
                 let after = &genome.nodes[node_idx];
-                prop_assert_eq!(&after.backend_def, &before.backend_def, "a swap touched an edge or instruction");
-                prop_assert_eq!(after.input_refs.len(), before.input_refs.len());
-                let changed: Vec<usize> = (0..before.input_refs.len())
-                    .filter(|&i| before.input_refs[i] != after.input_refs[i])
+                prop_assert_eq!(after.backend_def(), before.backend_def(), "a swap touched an edge or instruction");
+                prop_assert_eq!(after.input_refs().len(), before.input_refs().len());
+                let changed: Vec<usize> = (0..before.input_refs().len())
+                    .filter(|&i| before.input_refs()[i] != after.input_refs()[i])
                     .collect();
                 prop_assert_eq!(changed.len(), 1, "exactly one entry changes");
                 let i = changed[0];
                 prop_assert!(
-                    swap_alternatives(&before.input_refs[i], &crate::config::test_sensor_context(food_type_count))
-                        .contains(&after.input_refs[i]),
+                    swap_alternatives(&before.input_refs()[i], &crate::config::test_sensor_context(food_type_count))
+                        .contains(&after.input_refs()[i]),
                     "{:?} -> {:?} is not a within-kind step",
-                    before.input_refs[i],
-                    after.input_refs[i]
+                    before.input_refs()[i],
+                    after.input_refs()[i]
                 );
                 prop_assert_eq!(
-                    input_ref_kind(&after.input_refs[i], &crate::config::test_sensor_context(1)),
-                    input_ref_kind(&before.input_refs[i], &crate::config::test_sensor_context(1))
+                    input_ref_kind(&after.input_refs()[i], &crate::config::test_sensor_context(1)),
+                    input_ref_kind(&before.input_refs()[i], &crate::config::test_sensor_context(1))
                 );
             }
         }
@@ -571,7 +573,7 @@ proptest! {
                 }
                 let before = &base.nodes[node_idx];
                 let after = &genome.nodes[node_idx];
-                prop_assert_eq!(after.input_refs.len() + 1, before.input_refs.len());
+                prop_assert_eq!(after.input_refs().len() + 1, before.input_refs().len());
                 prop_assert_eq!(consumer_count(after), consumer_count(before), "a consumer was removed");
                 prop_assert_eq!(noop_count(after), noop_count(before), "a ReadInput became Noop");
                 prop_assert_eq!(resolved_consumers(after), resolved_consumers(before));
@@ -579,15 +581,15 @@ proptest! {
                 // position, so ask whether deleting any unreferenced entry
                 // reproduces the table instead of inferring one index.
                 let deleted_an_unreferenced_entry = prunable_indices(before).into_iter().any(|i| {
-                    let mut expected = before.input_refs.clone();
+                    let mut expected = before.input_refs().to_vec();
                     expected.remove(i);
-                    expected == after.input_refs
+                    expected == after.input_refs()
                 });
                 prop_assert!(
                     deleted_an_unreferenced_entry,
                     "the deleted entry had a consumer: {:?} -> {:?}",
-                    before.input_refs,
-                    after.input_refs
+                    before.input_refs(),
+                    after.input_refs()
                 );
             }
         }
@@ -673,7 +675,7 @@ fn raw_field_mutation_upstream_slot_bounded() {
             &default_config(),
         )
         .unwrap();
-        if let InputReference::UpstreamSlot(slot) = genome.nodes[0].input_refs[0] {
+        if let InputReference::UpstreamSlot(slot) = genome.nodes[0].input_refs()[0] {
             assert!(
                 slot < OUTPUT_SLOT_COUNT,
                 "mutated upstream slot must be bounded < {OUTPUT_SLOT_COUNT}, got {slot}"
@@ -745,17 +747,17 @@ fn complexity_effect_consistent_with_types() {
 fn graph_node_genome_full_catalog() -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
-            targets: vec![],
-        }],
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
+            vec![],
+        )],
     }
 }
 
 fn graph_def(node: &NodeGenome) -> &CgpGraphBackendDef {
-    let BackendDef::Graph(def) = &node.backend_def else {
+    let BackendDef::Graph(def) = node.backend_def() else {
         panic!("expected graph backend");
     };
     def
@@ -763,7 +765,7 @@ fn graph_def(node: &NodeGenome) -> &CgpGraphBackendDef {
 
 /// Every edge on the node's `ActionVote` sinks as (sink, source, weight).
 fn vote_edges(node: &NodeGenome) -> Vec<(VoteSink, GraphSource, f32)> {
-    let BackendDef::Graph(def) = &node.backend_def else {
+    let BackendDef::Graph(def) = node.backend_def() else {
         return Vec::new();
     };
     def.output_sinks()
@@ -781,7 +783,7 @@ fn vote_edges(node: &NodeGenome) -> Vec<(VoteSink, GraphSource, f32)> {
 }
 
 fn edge_count(node: &NodeGenome) -> usize {
-    match &node.backend_def {
+    match node.backend_def() {
         BackendDef::Graph(def) => def.edges().count(),
         BackendDef::Vm(_) => 0,
     }
@@ -814,17 +816,18 @@ fn apply_add_to_node(
 /// coordinate its wiring materializes present, own weight 0, and a scale
 /// in `[-1, 1]` (live) or exactly 0 (silent); nothing else changes.
 fn assert_whole_sensor(before: &NodeGenome, after: &NodeGenome, op: InputRefOperator) {
-    assert_eq!(after.input_refs.len(), before.input_refs.len() + 1);
+    assert_eq!(after.input_refs().len(), before.input_refs().len() + 1);
     assert_eq!(
-        after.input_refs[..before.input_refs.len()],
-        before.input_refs[..]
+        after.input_refs()[..before.input_refs().len()],
+        before.input_refs()[..]
     );
-    let ref_idx = u16::try_from(before.input_refs.len()).unwrap();
-    let reference = &after.input_refs[usize::from(ref_idx)];
-    let (BackendDef::Graph(b), BackendDef::Graph(a)) = (&before.backend_def, &after.backend_def)
+    let ref_idx = u16::try_from(before.input_refs().len()).unwrap();
+    let reference = &after.input_refs()[usize::from(ref_idx)];
+    let (BackendDef::Graph(b), BackendDef::Graph(a)) = (before.backend_def(), after.backend_def())
     else {
         assert_eq!(
-            after.backend_def, before.backend_def,
+            after.backend_def(),
+            before.backend_def(),
             "a VM node is unchanged"
         );
         return;
@@ -910,7 +913,7 @@ fn add_sensor_on_a_graph_node_wires_the_whole_sensor() {
 fn add_sensor_to_graph_node_leaves_existing_edges_untouched() {
     let mut base = v3alpha1_founder_genome();
     {
-        let BackendDef::Graph(def) = &mut base.nodes[1].backend_def else {
+        let BackendDef::Graph(def) = base.nodes[1].backend_edit().1 else {
             panic!("the founder decision node is a Graph node");
         };
         crate::genome::cgp::test_support::set_surface_plasticity(
@@ -980,7 +983,7 @@ fn add_sensor_draws_the_sensor_then_each_sets_plan_and_scale() {
             apply_add_to_node(&mut genome, op, 0, &mut rng(seed), 1).unwrap();
             let mut replay = rng(seed);
             let reference = random_input_reference(&mut replay, &context);
-            assert_eq!(genome.nodes[0].input_refs, vec![reference.clone()]);
+            assert_eq!(genome.nodes[0].input_refs(), vec![reference.clone()]);
             let expected: Vec<(Wiring, f32)> = SensorDescriptor::of(&reference, &context)
                 .field_sets()
                 .map(|set| {
@@ -1035,10 +1038,10 @@ fn add_sensor_on_vm_draws_only_the_reference() {
                     random_input_reference_for_food_types(&mut replay, food_type_count)
                 };
                 assert_eq!(
-                    genome.nodes[0].input_refs,
+                    genome.nodes[0].input_refs(),
                     vec![InputReference::ActionQueue, reference]
                 );
-                assert_eq!(genome.nodes[0].backend_def, before.nodes[0].backend_def);
+                assert_eq!(genome.nodes[0].backend_def(), before.nodes[0].backend_def());
                 assert_eq!(r.gen::<u64>(), replay.gen::<u64>(), "seed {seed}");
             }
         }
@@ -1053,7 +1056,7 @@ fn add_sensor_without_an_admissible_plan_skips_and_writes_nothing() {
     for op in ADD_SENSOR {
         for seed in 0u64..64 {
             let mut genome = graph_node_genome_full_catalog();
-            let BackendDef::Graph(def) = &mut genome.nodes[0].backend_def else {
+            let BackendDef::Graph(def) = genome.nodes[0].backend_edit().1 else {
                 unreachable!()
             };
             crate::genome::cgp::test_support::edit_sinks(def, |sinks| {
@@ -1083,9 +1086,9 @@ fn add_sensor_without_an_admissible_plan_skips_and_writes_nothing() {
 fn add_sensor_declares_only_while_the_index_fits_u16() {
     let filler = InputReference::ActionQueue;
     let mut fits = graph_node_genome_full_catalog();
-    fits.nodes[0].input_refs = vec![filler.clone(); 65_535];
+    *fits.nodes[0].input_refs_mut() = vec![filler.clone(); 65_535];
     let mut overflows = graph_node_genome_full_catalog();
-    overflows.nodes[0].input_refs = vec![filler; 65_536];
+    *overflows.nodes[0].input_refs_mut() = vec![filler; 65_536];
 
     apply_add_to_node(
         &mut fits,
@@ -1107,7 +1110,7 @@ fn add_sensor_declares_only_while_the_index_fits_u16() {
         Err(MutationSkipReason::NoApplicableTarget),
         "a declaration past the u16 index space is refused (T25.F11 `add_sensor`)"
     );
-    assert_eq!(fits.nodes[0].input_refs.len(), 65_536);
+    assert_eq!(fits.nodes[0].input_refs().len(), 65_536);
     let edges = vote_edges(&fits.nodes[0]);
     assert!(!edges.is_empty());
     assert!(edges.iter().all(|edge| matches!(
@@ -1127,7 +1130,7 @@ fn add_sensor_declares_only_while_the_index_fits_u16() {
 fn graph_mutation_after_the_boundary_addition_stays_within_u16() {
     use crate::mutation::graph::{GraphMutator, GraphOperator};
     let mut boundary = graph_node_genome_full_catalog();
-    boundary.nodes[0].input_refs = vec![InputReference::ActionQueue; 65_535];
+    *boundary.nodes[0].input_refs_mut() = vec![InputReference::ActionQueue; 65_535];
     apply_add_to_node(
         &mut boundary,
         InputRefOperator::AddSensorLive,
@@ -1152,7 +1155,7 @@ fn graph_mutation_after_the_boundary_addition_stays_within_u16() {
                 &MutationConfig::default(),
                 &context,
             );
-            assert_eq!(genome.nodes[0].input_refs.len(), 65_536);
+            assert_eq!(genome.nodes[0].input_refs().len(), 65_536);
             assert_eq!(
                 crate::genome::cgp::validate_graph(&genome.nodes[0]),
                 Ok(()),
@@ -1266,8 +1269,8 @@ fn add_sensor_to_vm_node_leaves_program_unchanged() {
         let mut genome = single_node_genome_with_input_ref(InputReference::World(
             WorldInputKey::food_here(OrdinaryFoodTypeId::default()),
         ));
-        genome.nodes[0].input_refs.clear(); // start with 0 refs
-        let program_before = match &genome.nodes[0].backend_def {
+        genome.nodes[0].input_refs_mut().clear(); // start with 0 refs
+        let program_before = match genome.nodes[0].backend_def() {
             BackendDef::Vm(vm) => vm.program.clone(),
             _ => panic!("expected VM backend"),
         };
@@ -1279,8 +1282,8 @@ fn add_sensor_to_vm_node_leaves_program_unchanged() {
             &default_config(),
         )
         .unwrap();
-        assert_eq!(genome.nodes[0].input_refs.len(), 1);
-        let BackendDef::Vm(ref vm) = genome.nodes[0].backend_def else {
+        assert_eq!(genome.nodes[0].input_refs().len(), 1);
+        let BackendDef::Vm(ref vm) = genome.nodes[0].backend_def() else {
             panic!("expected VM backend");
         };
         assert_eq!(
@@ -1297,14 +1300,14 @@ fn add_sensor_to_vm_node_leaves_program_unchanged() {
 fn reindex_vm_decrements_and_noops_orphans() {
     let mut genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![
                 InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())),
                 InputReference::UpstreamSlot(0),
                 InputReference::UpstreamSlot(1),
             ],
-            backend_def: BackendDef::Vm(VmBackendDef {
+            BackendDef::Vm(VmBackendDef {
                 register_count: 2,
                 constants: vec![],
                 program: vec![
@@ -1326,14 +1329,15 @@ fn reindex_vm_decrements_and_noops_orphans() {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     };
     // Remove input ref at index 1
     genome.nodes[0]
-        .backend_def
+        .backend_edit()
+        .1
         .reindex_input_refs_after_removal(1);
-    if let BackendDef::Vm(ref vm) = genome.nodes[0].backend_def {
+    if let BackendDef::Vm(ref vm) = genome.nodes[0].backend_def() {
         // ref_idx 0 < 1 -> unchanged
         assert!(matches!(
             vm.program[0],
@@ -1367,21 +1371,22 @@ fn reindex_vm_decrements_and_noops_orphans() {
 fn reindex_noop_on_empty_vm_program() {
     let mut genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![InputReference::World(WorldInputKey::food_here(
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![InputReference::World(WorldInputKey::food_here(
                 OrdinaryFoodTypeId::default(),
             ))],
-            backend_def: BackendDef::Vm(VmBackendDef {
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program: vec![], // empty program
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     };
     genome.nodes[0]
-        .backend_def
+        .backend_edit()
+        .1
         .reindex_input_refs_after_removal(0); // should not panic
 }
 
@@ -1475,7 +1480,7 @@ fn input_ref_add_can_introduce_non_default_food_type() {
         if genome
             .nodes
             .iter()
-            .any(|node| any_non_default_food_type(&node.input_refs))
+            .any(|node| any_non_default_food_type(node.input_refs()))
         {
             saw_non_default = true;
             break;
@@ -1505,7 +1510,7 @@ fn input_ref_swap_can_introduce_non_default_food_type() {
         if genome
             .nodes
             .iter()
-            .any(|node| any_non_default_food_type(&node.input_refs))
+            .any(|node| any_non_default_food_type(node.input_refs()))
         {
             saw_non_default = true;
             break;
@@ -1534,7 +1539,7 @@ fn input_ref_raw_field_mutation_can_mutate_food_type_idx() {
     );
 
     assert!(
-        result.is_ok() && any_non_default_food_type(&genome.nodes[0].input_refs),
+        result.is_ok() && any_non_default_food_type(genome.nodes[0].input_refs()),
         "InputRef.RawFieldMutation should be able to mutate food sensor type_idx when multiple food types exist"
     );
 }

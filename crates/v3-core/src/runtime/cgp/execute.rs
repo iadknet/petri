@@ -359,10 +359,10 @@ mod work_counter_tests {
         let id0 = NodeId::new(0);
         let genome = CreatureGenome {
             entry_node_id: id0,
-            nodes: vec![NodeGenome {
-                node_id: id0,
-                input_refs: vec![],
-                backend_def: BackendDef::Graph(
+            nodes: vec![NodeGenome::new(
+                id0,
+                vec![],
+                BackendDef::Graph(
                     CgpGraphBackendDef::new_with_fixed_outputs()
                         .with_compute_nodes(vec![ComputeNode::new(
                             ComputeNodeKind::Constant(1.0),
@@ -370,8 +370,8 @@ mod work_counter_tests {
                         )])
                         .with_output_sinks(vec![]),
                 ),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         };
 
         let ss = empty_ss();
@@ -405,10 +405,10 @@ mod work_counter_tests {
         let id0 = NodeId::new(0);
         let genome = CreatureGenome {
             entry_node_id: id0,
-            nodes: vec![NodeGenome {
-                node_id: id0,
-                input_refs: vec![],
-                backend_def: BackendDef::Graph(
+            nodes: vec![NodeGenome::new(
+                id0,
+                vec![],
+                BackendDef::Graph(
                     CgpGraphBackendDef::new_with_fixed_outputs()
                         .with_compute_nodes(vec![crate::genome::cgp::test_support::plastic_node(
                             ComputeNodeKind::Constant(1.0),
@@ -435,8 +435,8 @@ mod work_counter_tests {
                             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
                         )]),
                 ),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         };
 
         let ss = empty_ss();

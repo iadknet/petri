@@ -1392,7 +1392,7 @@ mod tests {
     fn plastic(genome: &CreatureGenome) -> CreatureGenome {
         let mut plastic = genome.clone();
         for node in &mut plastic.nodes {
-            if let BackendDef::Graph(graph) = &mut node.backend_def {
+            if let BackendDef::Graph(graph) = node.backend_edit().1 {
                 let compute: Vec<_> = graph
                     .edge_sites()
                     .filter(|site| {

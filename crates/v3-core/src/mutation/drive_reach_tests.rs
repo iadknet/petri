@@ -37,12 +37,12 @@ fn grown_vote_sink(before: &CgpGraphBackendDef, after: &CgpGraphBackendDef) -> O
 
 /// A Graph node on a full sink catalog declaring nothing.
 fn bare_graph_node() -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId(0),
-        input_refs: Vec::new(),
-        backend_def: BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
-        targets: Vec::new(),
-    }
+    NodeGenome::new(
+        NodeId(0),
+        Vec::new(),
+        BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
+        Vec::new(),
+    )
 }
 
 /// `AddSensorLive` of `reference` onto a bare Graph node with `seed`: the
@@ -56,7 +56,7 @@ fn add_sensor_on_bare_node(
     Option<BirthEdgeClass>,
 ) {
     let mut node = bare_graph_node();
-    let BackendDef::Graph(before) = node.backend_def.clone() else {
+    let BackendDef::Graph(before) = node.backend_def().clone() else {
         unreachable!()
     };
     let (_, class) = add_sensor_by_law(
@@ -67,10 +67,10 @@ fn add_sensor_on_bare_node(
         &mut SmallRng::seed_from_u64(seed),
     )
     .expect("a full catalog hosts every Plain bundle");
-    let BackendDef::Graph(after) = node.backend_def else {
+    let BackendDef::Graph(after) = node.backend_def() else {
         unreachable!()
     };
-    (before, after, class)
+    (before, after.clone(), class)
 }
 
 fn drives() -> BTreeSet<usize> {
@@ -139,8 +139,8 @@ fn a_dispatched_add_graph_edge_reports_its_vote_sink_class() {
             .first_pick()
             .expect("an applied event records its pick");
         let (BackendDef::Graph(before), BackendDef::Graph(after)) = (
-            &base.nodes[pick].backend_def,
-            &genome.nodes[pick].backend_def,
+            base.nodes[pick].backend_def(),
+            genome.nodes[pick].backend_def(),
         ) else {
             panic!("AddGraphEdge picks a Graph node");
         };

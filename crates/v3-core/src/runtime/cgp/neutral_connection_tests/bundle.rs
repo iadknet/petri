@@ -324,12 +324,12 @@ fn an_unresolvable_ring_ref_fails_validation() {
             2.0,
             &[0.0; 8],
         );
-        let node = crate::genome::NodeGenome {
-            node_id: crate::contracts::NodeId(0),
-            input_refs: rings(),
-            backend_def: crate::genome::BackendDef::Graph(def),
-            targets: Vec::new(),
-        };
+        let node = crate::genome::NodeGenome::new(
+            crate::contracts::NodeId(0),
+            rings(),
+            crate::genome::BackendDef::Graph(def),
+            Vec::new(),
+        );
         assert_eq!(
             crate::genome::cgp::validate_graph(&node),
             Err(crate::genome::cgp::GraphInvariantViolation::ShapeReference),
@@ -368,12 +368,12 @@ fn visit(def: &CgpGraphBackendDef, energy: f32, traced: bool) -> (MeshSideOutput
     let refs = rings();
     let genome = crate::genome::CreatureGenome {
         entry_node_id: crate::contracts::NodeId(0),
-        nodes: vec![crate::genome::NodeGenome {
-            node_id: crate::contracts::NodeId(0),
-            input_refs: refs.clone(),
-            backend_def: crate::genome::BackendDef::Graph(def.clone()),
-            targets: Vec::new(),
-        }],
+        nodes: vec![crate::genome::NodeGenome::new(
+            crate::contracts::NodeId(0),
+            refs.clone(),
+            crate::genome::BackendDef::Graph(def.clone()),
+            Vec::new(),
+        )],
     };
     let mut state = GraphRuntimeState::for_genome(&genome, Vec::new());
     let mut side = side();

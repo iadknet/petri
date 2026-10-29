@@ -15,7 +15,7 @@ use v3_core::contracts::{InputReference, WorldInputKey};
 use v3_core::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
-use v3_core::genome::{BackendDef, CreatureGenome};
+use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome};
 
 /// The founder's vote node (its decision graph) and the reference index a
 /// controller authored on the founder appends to it (the founder's vote
@@ -104,6 +104,20 @@ fn move_sink(direction: u8) -> OutputSinkKind {
     OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, direction))
 }
 
+/// Rebuilds `node` with `edit` applied to its declarations, through
+/// [`NodeGenome::new`]: the lab authors its genomes whole, so a declaration
+/// it adds or rewrites is construction, not a mutation edit.
+pub fn edit_declarations(node: &mut NodeGenome, edit: impl FnOnce(&mut Vec<InputReference>)) {
+    let mut input_refs = node.input_refs().to_vec();
+    edit(&mut input_refs);
+    *node = NodeGenome::new(
+        node.node_id,
+        input_refs,
+        node.backend_def().clone(),
+        node.targets.clone(),
+    );
+}
+
 /// Appends `family`'s reference at the vote node's next index and wires its
 /// structure reading that index.
 ///
@@ -112,9 +126,9 @@ fn move_sink(direction: u8) -> OutputSinkKind {
 /// If `genome`'s vote node is not a Graph node.
 pub fn append_controller(genome: &mut CreatureGenome, family: Family) {
     let node = &mut genome.nodes[VOTE_NODE];
-    let ref_idx = u16::try_from(node.input_refs.len()).expect("a vote node's references fit u16");
-    node.input_refs.push(family.reference());
-    let BackendDef::Graph(graph) = &mut node.backend_def else {
+    let ref_idx = u16::try_from(node.input_refs().len()).expect("a vote node's references fit u16");
+    edit_declarations(node, |refs| refs.push(family.reference()));
+    let BackendDef::Graph(graph) = node.backend_edit().1 else {
         panic!("the founder's vote node is a Graph node");
     };
     let mut author = Author { graph, ref_idx };
@@ -158,7 +172,7 @@ pub fn append_controller(genome: &mut CreatureGenome, family: Family) {
 pub fn controller(founder: &CreatureGenome, family: Family) -> CreatureGenome {
     let mut genome = founder.clone();
     assert_eq!(
-        genome.nodes[VOTE_NODE].input_refs.len(),
+        genome.nodes[VOTE_NODE].input_refs().len(),
         usize::from(AUTHORED_REF),
         "the founder's vote node holds seven references"
     );

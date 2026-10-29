@@ -117,8 +117,8 @@ fn graphs<'a>(
 ) -> impl Iterator<Item = (&'a CgpGraphBackendDef, &'a [InputReference])> + 'a {
     reachable.iter().filter_map(|&idx| {
         let node = genome.nodes.get(idx)?;
-        match &node.backend_def {
-            BackendDef::Graph(def) => Some((def, node.input_refs.as_slice())),
+        match node.backend_def() {
+            BackendDef::Graph(def) => Some((def, node.input_refs())),
             BackendDef::Vm(_) => None,
         }
     })

@@ -1095,16 +1095,16 @@ mod tests {
             // Bias toward skipped mutations: no Graph nodes, no input refs, no route targets.
             let genome = crate::genome::CreatureGenome {
                 entry_node_id: NodeId::new(0),
-                nodes: vec![NodeGenome {
-                    node_id: NodeId::new(0),
-                    input_refs: vec![],
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                nodes: vec![NodeGenome::new(
+                    NodeId::new(0),
+                    vec![],
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],
                         program: vec![VmInstruction::Halt],
                     }),
-                    targets: vec![],
-                }],
+                    vec![],
+                )],
             };
             let (mut sim, parent_id) = make_sim_one_founder(genome, pos, 80.0);
             sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
@@ -1506,16 +1506,16 @@ mod tests {
         let program = vec![VmInstruction::AddVote { sink: 25, src: 0 }; instruction_count];
         CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program,
                 }),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         }
     }
 

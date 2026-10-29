@@ -42,28 +42,28 @@ fn constants() -> Vec<f32> {
 fn vm_genome(program: Vec<VmInstruction>) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: Vec::new(),
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            Vec::new(),
+            BackendDef::Vm(VmBackendDef {
                 register_count: REGISTER_COUNT,
                 constants: constants(),
                 program,
             }),
-            targets: Vec::new(),
-        }],
+            Vec::new(),
+        )],
     }
 }
 
 fn program_of(genome: &CreatureGenome) -> Vec<VmInstruction> {
-    match &genome.nodes[0].backend_def {
+    match genome.nodes[0].backend_def() {
         BackendDef::Vm(vm) => vm.program.clone(),
         BackendDef::Graph(_) => panic!("expected a VM backend"),
     }
 }
 
 fn set_program(genome: &mut CreatureGenome, program: Vec<VmInstruction>) {
-    match &mut genome.nodes[0].backend_def {
+    match genome.nodes[0].backend_edit().1 {
         BackendDef::Vm(vm) => vm.program = program,
         BackendDef::Graph(_) => panic!("expected a VM backend"),
     }

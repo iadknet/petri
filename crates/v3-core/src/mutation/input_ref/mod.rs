@@ -45,7 +45,7 @@ pub fn swap_alternatives(entry: &InputReference, context: &SensorContext) -> Vec
 /// per node, not once per entry.
 fn swappable_indices(node: &NodeGenome, context: &SensorContext) -> Vec<usize> {
     let universe = input_reference_universe(context);
-    node.input_refs
+    node.input_refs()
         .iter()
         .enumerate()
         .filter(|(_, entry)| alternatives_in(&universe, entry, context).next().is_some())
@@ -59,7 +59,7 @@ fn swappable_indices(node: &NodeGenome, context: &SensorContext) -> Vec<usize> {
 #[must_use]
 pub fn prunable_indices(node: &NodeGenome) -> Vec<usize> {
     let addressed = node.addressed_input_refs();
-    (0..node.input_refs.len())
+    (0..node.input_refs().len())
         .filter(|&idx| u16::try_from(idx).is_ok_and(|idx| !addressed.contains(&idx)))
         .collect()
 }
@@ -98,7 +98,7 @@ impl InputRefOperator {
             Self::AddSensorLive | Self::AddSensorSilent => true,
             Self::Prune => !prunable_indices(node).is_empty(),
             Self::Swap => !swappable_indices(node, context).is_empty(),
-            Self::RawFieldMutation => node.input_refs.iter().any(is_raw_mutable),
+            Self::RawFieldMutation => node.input_refs().iter().any(is_raw_mutable),
         }
     }
 
@@ -297,7 +297,7 @@ fn apply_swap(
     let ref_idx = *swappable_indices(node, context)
         .choose(rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let new_ref = swap_alternatives(&node.input_refs[ref_idx], context)
+    let new_ref = swap_alternatives(&node.input_refs()[ref_idx], context)
         .choose(rng)
         .cloned()
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
@@ -319,7 +319,7 @@ fn apply_raw_field_mutation(
         .iter()
         .enumerate()
         .flat_map(|(node_idx, node)| {
-            node.input_refs
+            node.input_refs()
                 .iter()
                 .enumerate()
                 .filter(|(_, reference)| is_raw_mutable(reference))
@@ -331,7 +331,7 @@ fn apply_raw_field_mutation(
     }
     let (node_idx, ref_idx) = sites[rng.gen_range(0..sites.len())];
     let node = &mut genome.nodes[node_idx];
-    let replacement = match &node.input_refs[ref_idx] {
+    let replacement = match &node.input_refs()[ref_idx] {
         InputReference::UpstreamSlot(_) => {
             InputReference::UpstreamSlot(rng.gen_range(0..OUTPUT_SLOT_COUNT))
         }

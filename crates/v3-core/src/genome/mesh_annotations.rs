@@ -297,14 +297,13 @@ mod tests {
     fn derives_factual_vm_annotations_from_live_instructions() {
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(1),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(1),
-                input_refs: vec![
+            nodes: vec![NodeGenome::new(
+                NodeId::new(1),
+                vec![
                     InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())),
                     InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
                 ],
-                targets: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+                BackendDef::Vm(VmBackendDef {
                     register_count: 2,
                     constants: vec![],
                     program: vec![
@@ -329,7 +328,8 @@ mod tests {
                         },
                     ],
                 }),
-            }],
+                vec![],
+            )],
         };
 
         let annotations = derive_mesh_annotations(&genome);
@@ -350,11 +350,10 @@ mod tests {
     fn derives_graph_annotations_and_marks_unreachable_nodes() {
         // CGP graph: CN0 (AdaptiveGain) with InputLeaf(0,0) → RouterGate(0) sink
         // CN1 (Constant) disconnected (dead)
-        let reachable_graph = NodeGenome {
-            node_id: NodeId::new(1),
-            input_refs: vec![InputReference::World(WorldInputKey::NearbyCreature)],
-            targets: vec![],
-            backend_def: BackendDef::Graph(
+        let reachable_graph = NodeGenome::new(
+            NodeId::new(1),
+            vec![InputReference::World(WorldInputKey::NearbyCreature)],
+            BackendDef::Graph(
                 CgpGraphBackendDef::new_with_fixed_outputs()
                     .with_compute_nodes(vec![
                         ComputeNode::new(
@@ -374,13 +373,13 @@ mod tests {
                         vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
                     )]),
             ),
-        };
+            vec![],
+        );
 
-        let unreachable_vm = NodeGenome {
-            node_id: NodeId::new(2),
-            input_refs: vec![InputReference::ActionQueue],
-            targets: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        let unreachable_vm = NodeGenome::new(
+            NodeId::new(2),
+            vec![InputReference::ActionQueue],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program: vec![
@@ -388,7 +387,8 @@ mod tests {
                     VmInstruction::SetPriorityBid { src: 0 },
                 ],
             }),
-        };
+            vec![],
+        );
 
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(1),
@@ -429,11 +429,10 @@ mod tests {
     fn classifies_add_vote_as_an_action_write() {
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(1),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(1),
-                input_refs: vec![],
-                targets: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            nodes: vec![NodeGenome::new(
+                NodeId::new(1),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![1.0],
                     program: vec![
@@ -444,7 +443,8 @@ mod tests {
                         VmInstruction::AddVote { sink: 0, src: 0 },
                     ],
                 }),
-            }],
+                vec![],
+            )],
         };
 
         let annotation = &derive_mesh_annotations(&genome)[0];
@@ -459,11 +459,10 @@ mod tests {
     fn classifies_write_internal_payload_as_a_payload_write() {
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(1),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(1),
-                input_refs: vec![],
-                targets: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            nodes: vec![NodeGenome::new(
+                NodeId::new(1),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![1.0],
                     program: vec![
@@ -477,7 +476,8 @@ mod tests {
                         },
                     ],
                 }),
-            }],
+                vec![],
+            )],
         };
 
         let annotation = &derive_mesh_annotations(&genome)[0];
@@ -492,11 +492,10 @@ mod tests {
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(1),
             nodes: vec![
-                NodeGenome {
-                    node_id: NodeId::new(1),
-                    input_refs: vec![],
-                    targets: wrap_targets(vec![NodeId::new(2)]),
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                NodeGenome::new(
+                    NodeId::new(1),
+                    vec![],
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],
                         program: vec![
@@ -507,14 +506,14 @@ mod tests {
                             VmInstruction::WriteRouteGate { slot: 0, src: 0 },
                         ],
                     }),
-                },
-                NodeGenome {
-                    node_id: NodeId::new(2),
-                    input_refs: vec![InputReference::World(WorldInputKey::food_here(
+                    wrap_targets(vec![NodeId::new(2)]),
+                ),
+                NodeGenome::new(
+                    NodeId::new(2),
+                    vec![InputReference::World(WorldInputKey::food_here(
                         OrdinaryFoodTypeId::default(),
                     ))],
-                    targets: vec![],
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],
                         program: vec![
@@ -529,12 +528,12 @@ mod tests {
                             },
                         ],
                     }),
-                },
-                NodeGenome {
-                    node_id: NodeId::new(3),
-                    input_refs: vec![InputReference::ActionQueue],
-                    targets: vec![],
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                    vec![],
+                ),
+                NodeGenome::new(
+                    NodeId::new(3),
+                    vec![InputReference::ActionQueue],
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],
                         program: vec![
@@ -542,7 +541,8 @@ mod tests {
                             VmInstruction::SetPriorityBid { src: 0 },
                         ],
                     }),
-                },
+                    vec![],
+                ),
             ],
         };
 
@@ -575,36 +575,36 @@ mod tests {
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(10),
             nodes: vec![
-                NodeGenome {
-                    node_id: NodeId::new(10),
-                    input_refs: vec![],
-                    targets: wrap_targets(vec![NodeId::new(11)]),
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                NodeGenome::new(
+                    NodeId::new(10),
+                    vec![],
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],
                         program: vec![VmInstruction::Halt],
                     }),
-                },
-                NodeGenome {
-                    node_id: NodeId::new(11),
-                    input_refs: vec![],
-                    targets: wrap_targets(vec![NodeId::new(10), NodeId::new(999)]),
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                    wrap_targets(vec![NodeId::new(11)]),
+                ),
+                NodeGenome::new(
+                    NodeId::new(11),
+                    vec![],
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],
                         program: vec![VmInstruction::Halt],
                     }),
-                },
-                NodeGenome {
-                    node_id: NodeId::new(12),
-                    input_refs: vec![],
-                    targets: vec![],
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                    wrap_targets(vec![NodeId::new(10), NodeId::new(999)]),
+                ),
+                NodeGenome::new(
+                    NodeId::new(12),
+                    vec![],
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],
                         program: vec![VmInstruction::Halt],
                     }),
-                },
+                    vec![],
+                ),
             ],
         };
 
@@ -635,25 +635,25 @@ mod bus_slot_tests {
     }
 
     fn vm_node(input_refs: Vec<InputReference>, program: Vec<VmInstruction>) -> NodeGenome {
-        NodeGenome {
-            node_id: NodeId::new(0),
+        NodeGenome::new(
+            NodeId::new(0),
             input_refs,
-            targets: Vec::new(),
-            backend_def: BackendDef::Vm(VmBackendDef {
+            BackendDef::Vm(VmBackendDef {
                 register_count: 2,
                 constants: vec![1.0],
                 program,
             }),
-        }
+            Vec::new(),
+        )
     }
 
     fn graph_node(input_refs: Vec<InputReference>, def: CgpGraphBackendDef) -> NodeGenome {
-        NodeGenome {
-            node_id: NodeId::new(0),
+        NodeGenome::new(
+            NodeId::new(0),
             input_refs,
-            targets: Vec::new(),
-            backend_def: BackendDef::Graph(def),
-        }
+            BackendDef::Graph(def),
+            Vec::new(),
+        )
     }
 
     fn leaf(sub_idx: u16) -> GraphEdge {

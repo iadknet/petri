@@ -366,12 +366,12 @@ fn each_stateful_split_counts_the_creatures_that_qualify_for_it() {
     fn graph_genome(graph: CgpGraphBackendDef) -> CreatureGenome {
         CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                targets: vec![],
-                backend_def: BackendDef::Graph(graph),
-            }],
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Graph(graph),
+                vec![],
+            )],
         }
     }
     fn sink(source: GraphSource) -> OutputSink {
@@ -1849,16 +1849,16 @@ fn decision_input_rows_count_each_referencing_creature_once() {
         program.push(VmInstruction::Halt);
         CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: refs,
-                targets: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                refs,
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program,
                 }),
-            }],
+                vec![],
+            )],
         }
     }
 

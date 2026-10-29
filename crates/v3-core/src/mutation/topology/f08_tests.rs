@@ -17,25 +17,25 @@ use rand::{rngs::SmallRng, SeedableRng};
 /// Entry node: halts without terminating the chain, so routing continues to
 /// whichever target wins.
 fn entry_node(target: u32) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(0),
-        input_refs: vec![],
-        backend_def: birth::minimal_vm_backend(),
-        targets: vec![RouteTarget {
+    NodeGenome::new(
+        NodeId::new(0),
+        vec![],
+        birth::minimal_vm_backend(),
+        vec![RouteTarget {
             target_id: NodeId::new(target),
             slot: 0,
             gate_bias: 0.0,
         }],
-    }
+    )
 }
 
 /// Worker node: writes a shared-memory slot and commits one action, so both
 /// the action queue and shared memory carry its behavior.
 fn worker_node() -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(1),
-        input_refs: vec![],
-        backend_def: BackendDef::Vm(VmBackendDef {
+    NodeGenome::new(
+        NodeId::new(1),
+        vec![],
+        BackendDef::Vm(VmBackendDef {
             register_count: 2,
             constants: vec![0.75],
             program: vec![
@@ -51,8 +51,8 @@ fn worker_node() -> NodeGenome {
                 VmInstruction::Halt,
             ],
         }),
-        targets: vec![],
-    }
+        vec![],
+    )
 }
 
 fn chain_genome() -> CreatureGenome {
@@ -83,7 +83,7 @@ fn signature(genome: &CreatureGenome) -> Signature {
 
 /// Apply the production single-field step to the clone's first instruction.
 fn diverge_clone(genome: &mut CreatureGenome, seed: u64) {
-    let BackendDef::Vm(vm) = &mut genome.nodes[2].backend_def else {
+    let BackendDef::Vm(vm) = genome.nodes[2].backend_edit().1 else {
         panic!("the clone carries the original's VM backend");
     };
     let index = vm
@@ -102,8 +102,8 @@ fn copy_node_clone_shares_its_original_addresses_slots_and_references() {
     let mut genome = chain_genome();
     apply(&mut genome, TopologyOperator::CopyNode, 7).unwrap();
     let (original, clone) = (&genome.nodes[1], &genome.nodes[2]);
-    assert_eq!(clone.backend_def, original.backend_def);
-    assert_eq!(clone.input_refs, original.input_refs);
+    assert_eq!(clone.backend_def(), original.backend_def());
+    assert_eq!(clone.input_refs(), original.input_refs());
     assert_ne!(clone.node_id, original.node_id);
     assert_eq!(
         genome.nodes[0].targets.len(),

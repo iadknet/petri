@@ -102,7 +102,7 @@ impl DriveCensus {
         self.creatures += 1;
         let mut one = [KindDrives::default(); KINDS];
         for node in reachable.iter().filter_map(|&idx| genome.nodes.get(idx)) {
-            match &node.backend_def {
+            match node.backend_def() {
                 BackendDef::Graph(def) => {
                     for kind in DirectedVoteKind::ALL {
                         let row = &mut one[kind.index()];

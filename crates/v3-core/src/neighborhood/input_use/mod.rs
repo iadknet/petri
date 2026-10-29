@@ -235,7 +235,7 @@ fn evaluate_parent(
             .iter()
             .flat_map(|&index| {
                 genome.nodes[index]
-                    .input_refs
+                    .input_refs()
                     .iter()
                     .flat_map(|reference| channels_of(reference, sensors))
             })

@@ -16,10 +16,10 @@ use std::collections::HashSet;
 fn move_north_with_barrier_reader_genome() -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 2,
                 constants: vec![1.0],
                 program: vec![
@@ -37,18 +37,18 @@ fn move_north_with_barrier_reader_genome() -> CreatureGenome {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     }
 }
 
 fn reproduce_north_with_barrier_reader_genome() -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 2,
                 constants: vec![1.0],
                 program: vec![
@@ -66,8 +66,8 @@ fn reproduce_north_with_barrier_reader_genome() -> CreatureGenome {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     }
 }
 
@@ -138,10 +138,10 @@ fn tick_action_log_records_applied_food_type_amount_and_result() {
     // Arrange
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![1.0],
                 program: vec![
@@ -157,8 +157,8 @@ fn tick_action_log_records_applied_food_type_amount_and_result() {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     };
     let (mut sim, id) = make_sim_with_custom_genome(10.0, genome);
     sim.config
@@ -625,12 +625,12 @@ fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
         ));
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Graph(def),
-                targets: vec![],
-            }],
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Graph(def),
+                vec![],
+            )],
         };
         let (mut sim, parent) = make_sim_with_custom_genome(1000.0, genome);
         sim.config.mutation.per_unit_rate = 0.0;
@@ -783,10 +783,10 @@ fn founder_reproduce_charge_is_bit_identical_with_and_without_the_replication_ra
 fn eat_type_genome(type_idx: u16) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 2,
                 constants: vec![f32::from(type_idx), 1.0],
                 program: vec![
@@ -806,8 +806,8 @@ fn eat_type_genome(type_idx: u16) -> CreatureGenome {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     }
 }
 
@@ -920,10 +920,10 @@ fn eat_leave_genome(leave: f32) -> CreatureGenome {
     use crate::contracts::votes::{ActionParamField, VoteSink};
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 2,
                 constants: vec![leave, 1.0],
                 program: vec![
@@ -946,8 +946,8 @@ fn eat_leave_genome(leave: f32) -> CreatureGenome {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     }
 }
 

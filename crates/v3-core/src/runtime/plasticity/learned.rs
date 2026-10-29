@@ -582,10 +582,10 @@ impl LearnedState {
             .nodes
             .iter()
             .enumerate()
-            .map(|(idx, node)| match &node.backend_def {
+            .map(|(idx, node)| match node.backend_def() {
                 BackendDef::Graph(def) => BackendLearning::from_layout(
                     def,
-                    LearningLayout::of(def, &node.input_refs),
+                    LearningLayout::of(def, node.input_refs()),
                     seeds.get(idx).and_then(Option::as_ref),
                 ),
                 BackendDef::Vm(_) => BackendLearning::default(),

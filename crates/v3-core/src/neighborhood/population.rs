@@ -104,7 +104,7 @@ impl<'a> PopulationCensus<'a> {
             mesh_nodes += creature.genome().nodes.len() as u64;
             generation += creature.generation;
             for node in &creature.genome().nodes {
-                if let BackendDef::Graph(graph) = &node.backend_def {
+                if let BackendDef::Graph(graph) = node.backend_def() {
                     wired_sinks += graph
                         .output_sinks()
                         .iter()

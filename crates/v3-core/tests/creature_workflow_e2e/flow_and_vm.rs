@@ -67,39 +67,39 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
     let id_c = NodeId::new(2);
 
     // Node A: writes 0.8 into slot 2, routes to B (RouterGate sinks unwired → 0.0 → targets[0]).
-    let node_a = NodeGenome {
-        node_id: id_a,
-        input_refs: vec![],
-        backend_def: BackendDef::Graph(cgp_constant_to_custom_output(0.8, 2)),
-        targets: vec![RouteTarget {
+    let node_a = NodeGenome::new(
+        id_a,
+        vec![],
+        BackendDef::Graph(cgp_constant_to_custom_output(0.8, 2)),
+        vec![RouteTarget {
             target_id: id_b,
             slot: 0,
             gate_bias: 0.0,
         }],
-    };
+    );
 
     // Node B: reads upstream slot 2 via InputLeaf and writes it into slot 4, routes to C.
-    let node_b = NodeGenome {
-        node_id: id_b,
-        input_refs: vec![InputReference::UpstreamSlot(2)],
-        backend_def: BackendDef::Graph(cgp_passthrough_input_to_custom_output(0, 0, 4)),
-        targets: vec![RouteTarget {
+    let node_b = NodeGenome::new(
+        id_b,
+        vec![InputReference::UpstreamSlot(2)],
+        BackendDef::Graph(cgp_passthrough_input_to_custom_output(0, 0, 4)),
+        vec![RouteTarget {
             target_id: id_c,
             slot: 0,
             gate_bias: 0.0,
         }],
-    };
+    );
 
     // Node C (VM): reads upstream slot 4 + FoodHere; emits Eat when sum > 1.2.
-    let node_c = NodeGenome {
-        node_id: id_c,
-        input_refs: vec![
+    let node_c = NodeGenome::new(
+        id_c,
+        vec![
             InputReference::UpstreamSlot(4),
             InputReference::World(WorldInputKey::FoodHere {
                 type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
             }),
         ],
-        backend_def: BackendDef::Vm(VmBackendDef {
+        BackendDef::Vm(VmBackendDef {
             register_count: 4,
             constants: vec![1.2],
             program: vec![
@@ -126,8 +126,8 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
                 VmInstruction::Halt,
             ],
         }),
-        targets: vec![],
-    };
+        vec![],
+    );
 
     let genome = CreatureGenome {
         entry_node_id: id_a,
@@ -199,16 +199,16 @@ fn vm_reads_all_inputs_e2e() {
     let id_graph = NodeId::new(0);
     let id_vm = NodeId::new(1);
 
-    let graph_node = NodeGenome {
-        node_id: id_graph,
-        input_refs: vec![],
-        backend_def: BackendDef::Graph(cgp_constant_to_custom_output(0.73, 11)),
-        targets: vec![RouteTarget {
+    let graph_node = NodeGenome::new(
+        id_graph,
+        vec![],
+        BackendDef::Graph(cgp_constant_to_custom_output(0.73, 11)),
+        vec![RouteTarget {
             target_id: id_vm,
             slot: 0,
             gate_bias: 0.0,
         }],
-    };
+    );
 
     // Ring sensors are compound (8 sub-values each, indexed by Direction::to_index()).
     // ref 0: FoodHere
@@ -261,16 +261,16 @@ fn vm_reads_all_inputs_e2e() {
     program.push(VmInstruction::Noop);
     program.push(VmInstruction::Halt);
 
-    let vm_node = NodeGenome {
-        node_id: id_vm,
-        input_refs: input_refs.clone(),
-        backend_def: BackendDef::Vm(VmBackendDef {
+    let vm_node = NodeGenome::new(
+        id_vm,
+        input_refs.clone(),
+        BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: vec![99.0],
             program,
         }),
-        targets: vec![],
-    };
+        vec![],
+    );
 
     let genome = CreatureGenome {
         entry_node_id: id_graph,
@@ -392,10 +392,10 @@ fn vm_uses_neighbor_barrier_sensor_to_choose_action_e2e() {
             .expect("center position should have north neighbor");
         world.set_barrier(north, north_barrier);
 
-        let vm_node = NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        let vm_node = NodeGenome::new(
+            NodeId::new(0),
+            vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 3,
                 constants: vec![99.0, 0.5],
                 program: vec![
@@ -420,8 +420,8 @@ fn vm_uses_neighbor_barrier_sensor_to_choose_action_e2e() {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: vec![],
-        };
+            vec![],
+        );
 
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),

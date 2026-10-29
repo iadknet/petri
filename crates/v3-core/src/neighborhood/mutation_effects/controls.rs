@@ -26,12 +26,12 @@ pub(super) fn graph_genome(
     let id = NodeId::new(0);
     CreatureGenome {
         entry_node_id: id,
-        nodes: vec![NodeGenome {
-            node_id: id,
+        nodes: vec![NodeGenome::new(
+            id,
             input_refs,
-            backend_def: BackendDef::Graph(def),
-            targets: Vec::new(),
-        }],
+            BackendDef::Graph(def),
+            Vec::new(),
+        )],
     }
 }
 

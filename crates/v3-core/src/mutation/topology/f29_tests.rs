@@ -205,7 +205,7 @@ fn the_margin_starts_one_unit_below_where_f32_spacing_reaches_two() {
 #[test]
 fn a_zero_register_vm_node_is_never_the_selected_source() {
     let mut base = genome(vec![node(0, &[1]), node(1, &[2]), node(2, &[])]);
-    if let BackendDef::Vm(vm) = &mut base.nodes[0].backend_def {
+    if let BackendDef::Vm(vm) = base.nodes[0].backend_edit().1 {
         vm.register_count = 0;
     }
     for seed in 0..32 {
@@ -234,9 +234,9 @@ fn the_event_appends_a_losing_branch_with_its_own_gate_write_on_both_backends() 
         );
         assert_eq!(g.nodes[1], base.nodes[1]);
         assert_eq!(g.nodes.len(), base.nodes.len());
-        match &source.backend_def {
+        match source.backend_def() {
             BackendDef::Vm(vm) => {
-                let BackendDef::Vm(old) = &base.nodes[0].backend_def else {
+                let BackendDef::Vm(old) = base.nodes[0].backend_def() else {
                     unreachable!()
                 };
                 assert_eq!(vm.program.len(), old.program.len() + 1);
@@ -276,7 +276,7 @@ fn the_slot_skips_an_orphan_gate_write() {
     gate(&mut g.nodes[0], 1);
     feedback_seeded(&mut g, &[], 3).unwrap();
     assert_eq!(g.nodes[0].targets[1].slot, 2);
-    let BackendDef::Vm(vm) = &g.nodes[0].backend_def else {
+    let BackendDef::Vm(vm) = g.nodes[0].backend_def() else {
         unreachable!()
     };
     assert!(vm
@@ -290,7 +290,7 @@ fn ineligible_sources_skip_atomically() {
     let base = || genome(vec![node(0, &[1]), node(1, &[])]);
     let mut cases: Vec<(&str, CreatureGenome)> = Vec::new();
     let mut zero_registers = base();
-    if let BackendDef::Vm(vm) = &mut zero_registers.nodes[0].backend_def {
+    if let BackendDef::Vm(vm) = zero_registers.nodes[0].backend_edit().1 {
         vm.register_count = 0;
     }
     cases.push(("zero-register VM", zero_registers));
@@ -299,7 +299,7 @@ fn ineligible_sources_skip_atomically() {
     crate::genome::cgp::test_support::edit_sinks(&mut backend, |sinks| {
         sinks.retain(|s| !matches!(s.kind, OutputSinkKind::RouterGate(1)));
     });
-    no_sink.nodes[0].backend_def = BackendDef::Graph(backend);
+    *no_sink.nodes[0].backend_edit().1 = BackendDef::Graph(backend);
     cases.push(("missing RouterGate sink", no_sink));
     let mut full = base();
     full.nodes[0].targets = (0..MAX_GATE_SLOTS as u8)
@@ -387,7 +387,7 @@ fn a_feedback_branch_is_silent_at_birth_and_ordinary_bias_steps_activate_it() {
         // exceed 1.0; seed 7 draws a source in the unit range.
         let mut grown = base.clone();
         feedback_seeded(&mut grown, &[0, 1], 7).unwrap();
-        if let BackendDef::Graph(backend) = &grown.nodes[0].backend_def {
+        if let BackendDef::Graph(backend) = grown.nodes[0].backend_def() {
             let sink = backend
                 .output_sinks()
                 .iter()

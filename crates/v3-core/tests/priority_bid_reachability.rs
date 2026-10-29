@@ -145,7 +145,7 @@ fn genome_contains_reachable_priority_bid(genome: &CreatureGenome) -> bool {
         let Some(node) = genome.nodes.get(node_idx) else {
             return false;
         };
-        match &node.backend_def {
+        match node.backend_def() {
             BackendDef::Vm(vm) => vm
                 .program
                 .iter()

@@ -1218,7 +1218,7 @@ fn a_snapshot_counts_drive_carriers_and_fanout_creatures_per_kind() {
                 return;
             }
             let entry = mesh_reachable_nodes(genome)[0];
-            let BackendDef::Graph(def) = &mut genome.nodes[entry].backend_def else {
+            let BackendDef::Graph(def) = genome.nodes[entry].backend_edit().1 else {
                 panic!("the default founder's entry node is a Graph node");
             };
             let surface = def
@@ -1296,7 +1296,7 @@ fn a_snapshot_counts_declared_wired_and_read_sensors_per_world_input() {
                 .expect("the founder has its entry node");
             let node = &mut genome.nodes[entry];
             let ring = node
-                .input_refs
+                .input_refs()
                 .iter()
                 .position(|r| *r == InputReference::World(WorldInputKey::NeighborOccupiedRing))
                 .expect("the founder's entry node lists the occupied ring");
@@ -1419,7 +1419,7 @@ fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
                 return;
             }
             let entry = mesh_reachable_nodes(genome)[0];
-            let BackendDef::Graph(def) = &mut genome.nodes[entry].backend_def else {
+            let BackendDef::Graph(def) = genome.nodes[entry].backend_edit().1 else {
                 panic!("the default founder's entry node is a Graph node");
             };
             let edge = |slot, weight| {

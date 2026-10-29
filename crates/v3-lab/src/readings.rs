@@ -407,8 +407,8 @@ pub fn consumers(genome: &CreatureGenome) -> BTreeMap<Family, BTreeSet<usize>> {
         let mut add = |family: Family| {
             families.entry(family).or_default().insert(index);
         };
-        let reference = |ref_idx: u16| node.input_refs.get(usize::from(ref_idx)).map(Family::of);
-        match &node.backend_def {
+        let reference = |ref_idx: u16| node.input_refs().get(usize::from(ref_idx)).map(Family::of);
+        match node.backend_def() {
             BackendDef::Graph(graph) => {
                 let edges = graph
                     .compute_nodes()
@@ -585,7 +585,7 @@ pub fn ablation_supported(genome: &CreatureGenome) -> bool {
     genome
         .nodes
         .iter()
-        .all(|node| node.input_refs.len() < usize::from(ABLATED_REF))
+        .all(|node| node.input_refs().len() < usize::from(ABLATED_REF))
 }
 
 /// Hand every input-reference index of `backend` (`InputLeaf` edges and
@@ -624,13 +624,13 @@ pub fn ablate(genome: &CreatureGenome, family: Family) -> Option<CreatureGenome>
     }
     let mut ablated = genome.clone();
     for node in &mut ablated.nodes {
-        let len = node.input_refs.len();
+        let len = node.input_refs().len();
         let mut used = BTreeSet::new();
         let mut targets = BTreeSet::new();
-        for_each_ref_idx(&mut node.backend_def, |ref_idx| {
+        let (refs, backend) = node.backend_edit();
+        for_each_ref_idx(backend, |ref_idx| {
             used.insert(*ref_idx);
-            if node
-                .input_refs
+            if refs
                 .get(usize::from(*ref_idx))
                 .is_some_and(|reference| Family::of(reference) == family)
             {
@@ -645,7 +645,7 @@ pub fn ablate(genome: &CreatureGenome, family: Family) -> Option<CreatureGenome>
         for target in targets {
             sentinels.insert(target, free.next()?);
         }
-        for_each_ref_idx(&mut node.backend_def, |ref_idx| {
+        for_each_ref_idx(node.backend_edit().1, |ref_idx| {
             if let Some(&sentinel) = sentinels.get(ref_idx) {
                 *ref_idx = sentinel;
             }

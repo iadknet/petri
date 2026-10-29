@@ -22,12 +22,12 @@ fn rng(seed: u64) -> SmallRng {
 }
 
 fn vm_node(id: u32, constant: f32, target: Option<u32>) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(id),
-        input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
+    NodeGenome::new(
+        NodeId::new(id),
+        vec![InputReference::World(WorldInputKey::FoodHere {
             type_idx: crate::config::OrdinaryFoodTypeId::default(),
         })],
-        backend_def: BackendDef::Vm(VmBackendDef {
+        BackendDef::Vm(VmBackendDef {
             register_count: 4,
             constants: vec![constant],
             program: vec![
@@ -38,14 +38,14 @@ fn vm_node(id: u32, constant: f32, target: Option<u32>) -> NodeGenome {
                 VmInstruction::Halt,
             ],
         }),
-        targets: target.map_or_else(Vec::new, |id| {
+        target.map_or_else(Vec::new, |id| {
             vec![RouteTarget {
                 target_id: NodeId::new(id),
                 slot: 0,
                 gate_bias: 0.0,
             }]
         }),
-    }
+    )
 }
 
 /// Entry `a` routes to `c`; `b` sits between them in the node vector and is

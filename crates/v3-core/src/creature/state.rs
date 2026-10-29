@@ -439,16 +439,16 @@ mod tests {
     fn minimal_genome() -> CreatureGenome {
         CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         }
     }
 
@@ -546,26 +546,27 @@ mod tests {
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![
-                NodeGenome {
-                    node_id: NodeId::new(0),
-                    input_refs: vec![],
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                NodeGenome::new(
+                    NodeId::new(0),
+                    vec![],
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],
                         program: vec![VmInstruction::Halt],
                     }),
-                    targets: vec![], // no targets => node 1 is unreachable
-                },
-                NodeGenome {
-                    node_id: NodeId::new(1),
-                    input_refs: vec![],
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                    // no targets => node 1 is unreachable
+                    vec![],
+                ),
+                NodeGenome::new(
+                    NodeId::new(1),
+                    vec![],
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],
                         program: vec![VmInstruction::Halt],
                     }),
-                    targets: vec![],
-                },
+                    vec![],
+                ),
             ],
         };
         let state = CreatureState::new(
@@ -746,7 +747,7 @@ mod tests {
         use crate::creature::founder::{founder_genome, FOUNDER_GENOME_SIZE_UNITS};
 
         let no_bundle = |genome: &CreatureGenome| {
-            genome.nodes.iter().all(|node| match &node.backend_def {
+            genome.nodes.iter().all(|node| match node.backend_def() {
                 BackendDef::Graph(def) => def.bundles().is_empty(),
                 BackendDef::Vm(_) => true,
             })
@@ -834,9 +835,9 @@ mod tests {
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![
-                NodeGenome {
-                    node_id: NodeId::new(0),
-                    input_refs: vec![
+                NodeGenome::new(
+                    NodeId::new(0),
+                    vec![
                         InputReference::World(WorldInputKey::AreaFoodSummary {
                             type_idx: crate::config::OrdinaryFoodTypeId::default(),
                         }),
@@ -845,7 +846,7 @@ mod tests {
                             DynamicIntrospectionKey::EnergyCurrent,
                         ),
                     ],
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 4,
                         constants: vec![],
                         program: vec![
@@ -878,12 +879,12 @@ mod tests {
                             },
                         ],
                     }),
-                    targets: vec![],
-                },
-                NodeGenome {
-                    node_id: NodeId::new(1),
-                    input_refs: vec![InputReference::World(WorldInputKey::AreaOccupancySummary)],
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                    vec![],
+                ),
+                NodeGenome::new(
+                    NodeId::new(1),
+                    vec![InputReference::World(WorldInputKey::AreaOccupancySummary)],
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 2,
                         constants: vec![],
                         program: vec![
@@ -898,8 +899,8 @@ mod tests {
                             },
                         ],
                     }),
-                    targets: vec![],
-                },
+                    vec![],
+                ),
             ],
         };
 

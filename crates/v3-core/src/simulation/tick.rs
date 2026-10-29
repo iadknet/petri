@@ -956,10 +956,10 @@ mod final_action_observation_tests {
     fn memory_direction_genome() -> CreatureGenome {
         CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 3,
                     constants: vec![0.5, 1.0],
                     // Reproduce NE when slot 0 exceeds 0.5, else N, with
@@ -990,8 +990,8 @@ mod final_action_observation_tests {
                         VmInstruction::Halt,
                     ],
                 }),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         }
     }
 
@@ -999,10 +999,10 @@ mod final_action_observation_tests {
         let runtime_output = GraphEdge::new(GraphSource::ComputeNode(0), 1.0);
         CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Graph(
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Graph(
                     CgpGraphBackendDef::new_with_fixed_outputs()
                         .with_compute_nodes(vec![ComputeNode::new(
                             ComputeNodeKind::DecayIntegrator(0.0),
@@ -1015,8 +1015,8 @@ mod final_action_observation_tests {
                             vec![runtime_output],
                         )]),
                 ),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         }
     }
 
@@ -1178,7 +1178,7 @@ mod final_action_observation_tests {
                 ComputeNodeKind::Add
             };
             let mut genome = runtime_state_action_genome();
-            let BackendDef::Graph(def) = &mut genome.nodes[0].backend_def else {
+            let BackendDef::Graph(def) = genome.nodes[0].backend_edit().1 else {
                 unreachable!()
             };
             *def = def.clone().with_compute_nodes(vec![

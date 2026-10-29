@@ -40,16 +40,16 @@ mod tests {
     use crate::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
 
     fn make_minimal_node(id: u32) -> NodeGenome {
-        NodeGenome {
-            node_id: NodeId::new(id),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        NodeGenome::new(
+            NodeId::new(id),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program: vec![VmInstruction::Halt],
             }),
-            targets: vec![],
-        }
+            vec![],
+        )
     }
 
     #[test]
@@ -97,20 +97,21 @@ mod tests {
         // targets may reference non-existent nodes (junk DNA)
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![crate::contracts::RouteTarget {
+                // dangling
+                vec![crate::contracts::RouteTarget {
                     target_id: NodeId::new(999),
                     slot: 0,
                     gate_bias: 0.0,
-                }], // dangling
-            }],
+                }],
+            )],
         };
         assert!(ParseabilityGate::validate(&genome).is_ok());
     }

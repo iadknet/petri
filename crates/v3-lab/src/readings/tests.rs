@@ -197,11 +197,13 @@ fn with_unread_family(genome: &CreatureGenome) -> CreatureGenome {
         .position(|node| node.node_id == genome.entry_node_id)
         .unwrap();
     let node = &mut genome.nodes[entry];
-    let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
-    node.input_refs.push(InputReference::World(
-        v3_core::contracts::WorldInputKey::NearbyCreature,
-    ));
-    let BackendDef::Graph(graph) = &mut node.backend_def else {
+    let ref_idx = u16::try_from(node.input_refs().len()).unwrap();
+    crate::controllers::edit_declarations(node, |refs| {
+        refs.push(InputReference::World(
+            v3_core::contracts::WorldInputKey::NearbyCreature,
+        ));
+    });
+    let BackendDef::Graph(graph) = node.backend_edit().1 else {
         panic!("the founder entry is a graph node");
     };
     graph.append_compute_node(ComputeNode::new(
@@ -266,9 +268,11 @@ fn with_wide_node(genome: &CreatureGenome, refs: usize, vm: bool) -> CreatureGen
     let mut node = genome.nodes[0].clone();
     node.node_id = NodeId::new(u32::MAX);
     node.targets.clear();
-    node.input_refs = vec![InputReference::ActionQueue; refs];
+    crate::controllers::edit_declarations(&mut node, |declared| {
+        *declared = vec![InputReference::ActionQueue; refs];
+    });
     if vm {
-        node.backend_def = BackendDef::Vm(VmBackendDef {
+        *node.backend_edit().1 = BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: Vec::new(),
             program: vec![VmInstruction::ReadInput {
@@ -428,9 +432,9 @@ fn two_references_of_one_family_keep_distinct_sentinels() {
     let setup = setup(1, 100.0);
     let mut genome = founder(&setup);
     let node = &mut genome.nodes[0];
-    let duplicate = u16::try_from(node.input_refs.len()).unwrap();
-    node.input_refs.push(node.input_refs[0].clone());
-    let BackendDef::Graph(graph) = &mut node.backend_def else {
+    let duplicate = u16::try_from(node.input_refs().len()).unwrap();
+    crate::controllers::edit_declarations(node, |refs| refs.push(refs[0].clone()));
+    let BackendDef::Graph(graph) = node.backend_edit().1 else {
         panic!("the founder's node 0 is a graph node");
     };
     // Wire the duplicate onto a surface that already reads reference 0.
@@ -454,7 +458,7 @@ fn two_references_of_one_family_keep_distinct_sentinels() {
             0.0,
         ),
     );
-    let family = Family::of(&genome.nodes[0].input_refs[0]);
+    let family = Family::of(&genome.nodes[0].input_refs()[0]);
     let ablated = ablate(&genome, family).unwrap();
     // One shared sentinel would count one consumed index where there were two.
     assert_eq!(ablated.complexity(), genome.complexity());
@@ -482,13 +486,13 @@ fn with_ring(genome: &mut CreatureGenome, key: WorldInputKey) -> (usize, u16) {
         .position(|node| node.node_id == genome.entry_node_id)
         .unwrap();
     let node = &mut genome.nodes[entry];
-    let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
-    node.input_refs.push(InputReference::World(key));
+    let ref_idx = u16::try_from(node.input_refs().len()).unwrap();
+    crate::controllers::edit_declarations(node, |refs| refs.push(InputReference::World(key)));
     (entry, ref_idx)
 }
 
 fn graph(genome: &CreatureGenome, node: usize) -> &CgpGraphBackendDef {
-    let BackendDef::Graph(graph) = &genome.nodes[node].backend_def else {
+    let BackendDef::Graph(graph) = genome.nodes[node].backend_def() else {
         panic!("a graph node");
     };
     graph
@@ -504,7 +508,7 @@ fn grouped_founder() -> (CreatureGenome, usize, u16, u16) {
     let node = &mut genome.nodes[entry];
     for (ring_ref, offset, scale) in [(barrier, 0, 0.5), (occupied, 3, -0.5)] {
         let id = add_geometric(node, ring_ref, 0, DirectedVoteKind::Move, offset);
-        let BackendDef::Graph(graph) = &mut node.backend_def else {
+        let BackendDef::Graph(graph) = node.backend_edit().1 else {
             panic!("the founder entry is a graph node");
         };
         graph.bundle_mut(id).set_scale(scale);
@@ -523,7 +527,7 @@ fn masking_a_ring_reference_zeroes_every_member_read() {
     assert!(found[&Family::NeighborOccupiedRing].contains(&entry));
 
     let ablated = ablate(&genome, Family::NeighborBarrierRing).unwrap();
-    let len = genome.nodes[entry].input_refs.len();
+    let len = genome.nodes[entry].input_refs().len();
     let (before, after) = (graph(&genome, entry), graph(&ablated, entry));
     for (bundle, ring) in [(BundleId::new(0), barrier), (BundleId::new(1), occupied)] {
         let reads: Vec<u16> = after
@@ -559,7 +563,7 @@ fn ablating_a_grouped_genome_leaves_size_complexity_bundles_memberships_and_memb
     let ablated = ablate(&genome, Family::NeighborBarrierRing).unwrap();
     assert_eq!(ablated.genome_size(), genome.genome_size());
     assert_eq!(ablated.complexity(), genome.complexity());
-    let refs = &genome.nodes[entry].input_refs;
+    let refs = genome.nodes[entry].input_refs();
     let (before, after) = (graph(&genome, entry), graph(&ablated, entry));
     assert_eq!(after.bundles(), before.bundles());
     let memberships =
@@ -583,7 +587,9 @@ fn a_genome_file_breaking_a_graph_invariant_is_refused() {
     .unwrap();
     assert_eq!(crate::GenomeFile::load(&path).unwrap(), genome);
     let mut broken = genome;
-    broken.nodes[entry].input_refs[usize::from(barrier)] = InputReference::ActionVotes;
+    crate::controllers::edit_declarations(&mut broken.nodes[entry], |refs| {
+        refs[usize::from(barrier)] = InputReference::ActionVotes;
+    });
     std::fs::write(
         &path,
         serde_json::to_vec(&crate::GenomeFile::new(broken)).unwrap(),
@@ -632,8 +638,8 @@ fn a_ring_read_only_through_a_bundle_is_causal() {
     // the same reference at scale 1.
     let mut moved = 0;
     for node in &mut genome.nodes {
-        let refs = &node.input_refs;
-        let BackendDef::Graph(graph) = &mut node.backend_def else {
+        let (refs, backend) = node.backend_edit();
+        let BackendDef::Graph(graph) = backend else {
             continue;
         };
         let mut rings = BTreeSet::new();
@@ -673,7 +679,7 @@ fn a_ring_read_only_through_a_bundle_is_causal() {
         moved += rings.len();
         for ring_ref in rings {
             let id = add_geometric(node, ring_ref, 0, DirectedVoteKind::Move, 0);
-            let BackendDef::Graph(graph) = &mut node.backend_def else {
+            let BackendDef::Graph(graph) = node.backend_edit().1 else {
                 unreachable!("a Graph node")
             };
             graph.bundle_mut(id).set_scale(1.0);
@@ -750,12 +756,14 @@ const OCCUPIED: [u16; 3] = [ABLATED_REF, ABLATED_REF - 1, ABLATED_REF - 2];
 fn with_reads(picks: &[usize], idxs: &[u16], vm: bool) -> CreatureGenome {
     let mut genome = founder(&setup(1, 100.0));
     let node = &mut genome.nodes[0];
-    let pool = node.input_refs.clone();
-    node.input_refs = picks
-        .iter()
-        .map(|&p| pool[p % pool.len()].clone())
-        .collect();
-    node.backend_def = if vm {
+    let pool = node.input_refs().to_vec();
+    crate::controllers::edit_declarations(node, |refs| {
+        *refs = picks
+            .iter()
+            .map(|&p| pool[p % pool.len()].clone())
+            .collect();
+    });
+    *node.backend_edit().1 = if vm {
         BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: Vec::new(),
@@ -774,7 +782,7 @@ fn with_reads(picks: &[usize], idxs: &[u16], vm: bool) -> CreatureGenome {
                 .collect(),
         })
     } else {
-        let BackendDef::Graph(mut graph) = node.backend_def.clone() else {
+        let BackendDef::Graph(mut graph) = node.backend_def().clone() else {
             panic!("the founder's node 0 is a graph node");
         };
         let mut first = idxs
@@ -804,7 +812,7 @@ fn with_reads(picks: &[usize], idxs: &[u16], vm: bool) -> CreatureGenome {
 
 /// Node 0's reference indices in visit order.
 fn ref_idxs(genome: &CreatureGenome) -> Vec<u16> {
-    let mut backend = genome.nodes[0].backend_def.clone();
+    let mut backend = genome.nodes[0].backend_def().clone();
     let mut idxs = Vec::new();
     for_each_ref_idx(&mut backend, |ref_idx| idxs.push(*ref_idx));
     idxs
@@ -831,7 +839,7 @@ proptest! {
             })
             .collect();
         let genome = with_reads(&picks, &idxs, vm);
-        let refs = &genome.nodes[0].input_refs;
+        let refs = genome.nodes[0].input_refs();
         let family = Family::of(&refs[family_pick % len]);
         let ablated = ablate(&genome, family);
         prop_assert!(ablated.is_some(), "ample headroom");
@@ -877,9 +885,9 @@ fn breeding_uses_the_last_training_scene_record() {
 fn a_vm_node_consumes_its_read_input_and_shared_memory_families() {
     let mut genome = with_reads(&[0], &[], true);
     let node = &mut genome.nodes[0];
-    let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
-    node.input_refs.push(InputReference::ActionVotes);
-    let BackendDef::Vm(vm) = &mut node.backend_def else {
+    let ref_idx = u16::try_from(node.input_refs().len()).unwrap();
+    crate::controllers::edit_declarations(node, |refs| refs.push(InputReference::ActionVotes));
+    let BackendDef::Vm(vm) = node.backend_edit().1 else {
         panic!("with_reads builds a VM node");
     };
     vm.program = vec![
@@ -908,7 +916,7 @@ fn a_vm_node_consumes_its_read_input_and_shared_memory_families() {
             slot_idx: 1,
         },
     ] {
-        let BackendDef::Vm(vm) = &mut genome.nodes[0].backend_def else {
+        let BackendDef::Vm(vm) = genome.nodes[0].backend_edit().1 else {
             unreachable!("still a VM node");
         };
         vm.program[1] = load;
@@ -940,9 +948,9 @@ fn a_wired_decision_read_is_live() {
     let setup = setup(40, 100.0);
     let mut genome = founder(&setup);
     let node = &mut genome.nodes[0];
-    let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
-    node.input_refs.push(InputReference::ActionVotes);
-    let BackendDef::Graph(graph) = &mut node.backend_def else {
+    let ref_idx = u16::try_from(node.input_refs().len()).unwrap();
+    crate::controllers::edit_declarations(node, |refs| refs.push(InputReference::ActionVotes));
+    let BackendDef::Graph(graph) = node.backend_edit().1 else {
         panic!("the founder's node 0 is a graph node");
     };
     // Wire it onto a surface that already reads reference 0.
@@ -1037,7 +1045,7 @@ fn pair_grouped_founder() -> (CreatureGenome, usize) {
     let (entry, summary) = with_ring(&mut genome, WorldInputKey::AreaBarrierSummary);
     let node = &mut genome.nodes[entry];
     let id = add_geometric(node, summary, 1, DirectedVoteKind::Move, 2);
-    let BackendDef::Graph(graph) = &mut node.backend_def else {
+    let BackendDef::Graph(graph) = node.backend_edit().1 else {
         panic!("the founder entry is a graph node");
     };
     graph.bundle_mut(id).set_scale(0.75);
@@ -1052,7 +1060,7 @@ fn masking_a_pair_reference_zeroes_every_member_read_and_keeps_the_bundle() {
     let (genome, entry) = pair_grouped_founder();
     assert!(consumers(&genome)[&Family::AreaBarrierSummary].contains(&entry));
     let ablated = ablate(&genome, Family::AreaBarrierSummary).unwrap();
-    let len = genome.nodes[entry].input_refs.len();
+    let len = genome.nodes[entry].input_refs().len();
     let (before, after) = (graph(&genome, entry), graph(&ablated, entry));
     let bundle = BundleId::new(0);
     let reads: Vec<u16> = after
@@ -1076,7 +1084,7 @@ fn masking_a_pair_reference_zeroes_every_member_read_and_keeps_the_bundle() {
     let memberships =
         |def: &CgpGraphBackendDef| -> Vec<_> { def.edges().map(GraphEdge::membership).collect() };
     assert_eq!(memberships(after), memberships(before));
-    let refs = &genome.nodes[entry].input_refs;
+    let refs = genome.nodes[entry].input_refs();
     assert_eq!(after.sink_weight_rows(refs), before.sink_weight_rows(refs));
     assert_ne!(
         before.genomic_weight(before.members(bundle).next().unwrap(), refs),

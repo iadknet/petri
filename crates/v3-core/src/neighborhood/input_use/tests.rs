@@ -44,12 +44,7 @@ fn graph_node(
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     def = def.with_compute_nodes(compute);
     crate::genome::cgp::test_support::set_sink_inputs(&mut def, sink, edges);
-    NodeGenome {
-        node_id: NodeId::new(id),
-        input_refs: refs,
-        backend_def: BackendDef::Graph(def),
-        targets: Vec::new(),
-    }
+    NodeGenome::new(NodeId::new(id), refs, BackendDef::Graph(def), Vec::new())
 }
 
 fn genome(nodes: Vec<NodeGenome>) -> CreatureGenome {
@@ -217,16 +212,16 @@ fn a_vm_branch_condition_is_causal_outside_the_live_walk() {
         },
         VmInstruction::Halt,
     ];
-    let vm = genome(vec![NodeGenome {
-        node_id: NodeId::new(0),
-        input_refs: vec![food_here()],
-        backend_def: BackendDef::Vm(VmBackendDef {
+    let vm = genome(vec![NodeGenome::new(
+        NodeId::new(0),
+        vec![food_here()],
+        BackendDef::Vm(VmBackendDef {
             register_count: 4,
             constants: vec![1.0],
             program,
         }),
-        targets: Vec::new(),
-    }]);
+        Vec::new(),
+    )]);
     let parent = Fixture::new().read(&vm);
     let food = channel(&food_here(), 0);
     assert!(!parent.connected.contains(&food));
@@ -393,10 +388,10 @@ fn ablation_is_the_identity_for_unread_and_all_zero_channels() {
     let split = scenes.original_executions();
     for reader in [
         eat_from(barriers(), 0),
-        genome(vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![barriers()],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        genome(vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![barriers()],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 2,
                 constants: Vec::new(),
                 program: vec![
@@ -411,8 +406,8 @@ fn ablation_is_the_identity_for_unread_and_all_zero_channels() {
                     },
                 ],
             }),
-            targets: Vec::new(),
-        }]),
+            Vec::new(),
+        )]),
     ] {
         let base = scenes.actions(&reader);
         let zeroed = scenes.actions(&ablated(
@@ -665,7 +660,7 @@ proptest! {
 fn a_ring_bundle_consumes_all_eight_channels_of_its_ring() {
     use crate::contracts::votes::DirectedVoteKind;
     let mut node = graph_node(0, vec![barriers()], Vec::new(), EAT, Vec::new());
-    let BackendDef::Graph(def) = &mut node.backend_def else {
+    let BackendDef::Graph(def) = node.backend_edit().1 else {
         unreachable!()
     };
     let id = def.add_ring_bundle(0, DirectedVoteKind::Move, 1);
@@ -688,7 +683,7 @@ fn ablating_a_ring_channel_redirects_only_its_members_and_keeps_their_weights() 
     use crate::genome::cgp::GraphSource;
     let refs = vec![barriers(), food_here(), barriers()];
     let mut node = graph_node(0, refs.clone(), Vec::new(), EAT, vec![leaf(1, 0)]);
-    let BackendDef::Graph(def) = &mut node.backend_def else {
+    let BackendDef::Graph(def) = node.backend_edit().1 else {
         unreachable!()
     };
     for (ring_ref, kind, offset, scale) in [
@@ -706,9 +701,10 @@ fn ablating_a_ring_channel_redirects_only_its_members_and_keeps_their_weights() 
         &crate::config::test_sensor_context(1),
     );
     assert_eq!(ablated.genome_size(), genome.genome_size());
-    let (BackendDef::Graph(before), BackendDef::Graph(after)) =
-        (&genome.nodes[0].backend_def, &ablated.nodes[0].backend_def)
-    else {
+    let (BackendDef::Graph(before), BackendDef::Graph(after)) = (
+        genome.nodes[0].backend_def(),
+        ablated.nodes[0].backend_def(),
+    ) else {
         unreachable!()
     };
     assert_eq!(after.bundles(), before.bundles());
@@ -753,7 +749,7 @@ fn masking_a_pair_reference_zeroes_every_member_read() {
     let area = InputReference::World(WorldInputKey::AreaBarrierSummary);
     let refs = vec![area.clone(), food_here()];
     let mut node = graph_node(0, refs.clone(), Vec::new(), EAT, vec![leaf(1, 0)]);
-    let BackendDef::Graph(def) = &mut node.backend_def else {
+    let BackendDef::Graph(def) = node.backend_edit().1 else {
         unreachable!()
     };
     let id = def.add_pair_bundle(
@@ -773,9 +769,10 @@ fn masking_a_pair_reference_zeroes_every_member_read() {
     );
     assert_eq!(ablated.genome_size(), genome.genome_size());
     assert_eq!(ablated.complexity(), genome.complexity());
-    let (BackendDef::Graph(before), BackendDef::Graph(after)) =
-        (&genome.nodes[0].backend_def, &ablated.nodes[0].backend_def)
-    else {
+    let (BackendDef::Graph(before), BackendDef::Graph(after)) = (
+        genome.nodes[0].backend_def(),
+        ablated.nodes[0].backend_def(),
+    ) else {
         unreachable!()
     };
     assert_eq!(after.bundles(), before.bundles());

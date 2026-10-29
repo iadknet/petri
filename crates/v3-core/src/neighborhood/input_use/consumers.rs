@@ -69,7 +69,7 @@ pub(super) struct Inventory {
 fn edge_target(node: &NodeGenome, edge: &GraphEdge, context: &SensorContext) -> Option<Target> {
     match edge.source() {
         GraphSource::InputLeaf { ref_idx, sub_idx } => node
-            .input_refs
+            .input_refs()
             .get(usize::from(ref_idx))
             .map(|reference| Target::Input(addressed(reference, sub_idx, context))),
         GraphSource::SharedMemory { slot, previous } if slot < 16 => {
@@ -88,7 +88,7 @@ fn instruction_target(
         VmInstruction::ReadInput {
             ref_idx, sub_idx, ..
         } => node
-            .input_refs
+            .input_refs()
             .get(usize::from(ref_idx))
             .map(|reference| Target::Input(addressed(reference, sub_idx, context))),
         VmInstruction::LoadSlotImm { slot_idx, .. } => {
@@ -146,7 +146,7 @@ impl Inventory {
             .iter()
             .enumerate()
             .map(|(index, node)| {
-                let mut consumers = match &node.backend_def {
+                let mut consumers = match node.backend_def() {
                     BackendDef::Graph(graph) => graph_consumers(node, graph, context),
                     BackendDef::Vm(vm) => {
                         let live: BTreeSet<usize> = collect_live_vm_instruction_indices(vm)
@@ -221,7 +221,7 @@ pub(super) fn declarations(genome: &CreatureGenome, reachable: &[usize]) -> BTre
     reachable
         .iter()
         .filter_map(|&index| genome.nodes.get(index))
-        .flat_map(|node| node.input_refs.iter().map(Declaration::of))
+        .flat_map(|node| node.input_refs().iter().map(Declaration::of))
         .collect()
 }
 
@@ -241,16 +241,16 @@ pub(in crate::neighborhood) fn ablated(
     let mut ablated = genome.clone();
     for node in &mut ablated.nodes {
         assert!(
-            node.input_refs.len() < usize::from(u16::MAX),
+            node.input_refs().len() < usize::from(u16::MAX),
             "ablation needs u16::MAX to be an out-of-range reference index"
         );
-        let refs = &node.input_refs;
+        let (refs, backend) = node.backend_edit();
         let hit = |ref_idx: u16, sub_idx: u16| {
             refs.get(usize::from(ref_idx)).is_some_and(|reference| {
                 matches!(addressed(reference, sub_idx, context), Addressed::Channel(c) if ablate(c))
             })
         };
-        match &mut node.backend_def {
+        match backend {
             BackendDef::Graph(graph) => {
                 graph.redirect_leaf_reads(|ref_idx, sub_idx| {
                     hit(ref_idx, sub_idx).then_some(u16::MAX)

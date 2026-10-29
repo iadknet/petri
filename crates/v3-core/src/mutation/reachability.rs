@@ -579,16 +579,16 @@ mod tests {
     }
 
     fn bare_node(node_id: NodeId) -> NodeGenome {
-        NodeGenome {
+        NodeGenome::new(
             node_id,
-            input_refs: Vec::new(),
-            backend_def: crate::genome::BackendDef::Vm(crate::genome::VmBackendDef {
+            Vec::new(),
+            crate::genome::BackendDef::Vm(crate::genome::VmBackendDef {
                 register_count: 1,
                 constants: Vec::new(),
                 program: vec![crate::genome::VmInstruction::Halt],
             }),
-            targets: Vec::new(),
-        }
+            Vec::new(),
+        )
     }
 
     /// The next free id at or above the current maximum plus one, as

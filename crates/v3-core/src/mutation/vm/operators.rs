@@ -22,7 +22,7 @@ pub(super) fn apply_constant_mutation(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let node = &mut genome.nodes[node_idx];
-    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+    if let BackendDef::Vm(vm) = node.backend_edit().1 {
         if vm.constants.is_empty() {
             vm.constants.push(rng.gen_range(-1.0f32..=1.0));
         } else {
@@ -69,7 +69,7 @@ pub(super) fn apply_register_count_mutation(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let node = &mut genome.nodes[node_idx];
-    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+    if let BackendDef::Vm(vm) = node.backend_edit().1 {
         let old_width = vm.register_count;
         // The direction is drawn only among the feasible ones, so a def with
         // either move available never skips here.
@@ -442,16 +442,16 @@ pub(super) fn apply_instruction_mutation(
     // (own-borrow-over-clone: avoid conflicting borrows on genome.nodes[node_idx]).
     let (register_count, constants_len, input_refs_len) = {
         let node = &genome.nodes[node_idx];
-        let (rc, cl) = if let BackendDef::Vm(ref vm) = node.backend_def {
+        let (rc, cl) = if let BackendDef::Vm(ref vm) = node.backend_def() {
             (vm.register_count, vm.constants.len())
         } else {
             return Ok(());
         };
-        (rc, cl, node.input_refs.len())
+        (rc, cl, node.input_refs().len())
     };
 
     let node = &mut genome.nodes[node_idx];
-    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+    if let BackendDef::Vm(vm) = node.backend_edit().1 {
         if vm.program.is_empty() {
             // Edge case: empty program — insert a random instruction.
             insert_new_instruction_with_reference_repair(
@@ -522,7 +522,7 @@ pub(super) fn apply_delete_instruction(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let node = &mut genome.nodes[node_idx];
-    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+    if let BackendDef::Vm(vm) = node.backend_edit().1 {
         if vm.program.len() <= 1 {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
@@ -539,7 +539,7 @@ pub(super) fn apply_instruction_raw_field_mutation(
     _config: &MutationConfig,
 ) -> Result<(), MutationSkipReason> {
     let node = &mut genome.nodes[node_idx];
-    let BackendDef::Vm(ref mut vm) = node.backend_def else {
+    let BackendDef::Vm(vm) = node.backend_edit().1 else {
         return Ok(());
     };
     let eligible: Vec<usize> = vm
@@ -800,7 +800,7 @@ pub(super) fn apply_copy_instruction_block(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let node = &mut genome.nodes[node_idx];
-    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+    if let BackendDef::Vm(vm) = node.backend_edit().1 {
         if vm.program.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
@@ -816,14 +816,14 @@ pub(super) fn apply_copy_instruction_block_remapped(
     node_idx: usize,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let register_count = if let BackendDef::Vm(ref vm) = genome.nodes[node_idx].backend_def {
+    let register_count = if let BackendDef::Vm(ref vm) = genome.nodes[node_idx].backend_def() {
         vm.register_count
     } else {
         return Ok(());
     };
 
     let node = &mut genome.nodes[node_idx];
-    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+    if let BackendDef::Vm(vm) = node.backend_edit().1 {
         if vm.program.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
@@ -853,7 +853,7 @@ pub(super) fn apply_copy_constant_block(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let node = &mut genome.nodes[node_idx];
-    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+    if let BackendDef::Vm(vm) = node.backend_edit().1 {
         if vm.constants.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
@@ -872,7 +872,7 @@ pub(super) fn apply_copy_gene_backward_slice(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let node = &mut genome.nodes[node_idx];
-    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+    if let BackendDef::Vm(vm) = node.backend_edit().1 {
         if vm.program.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
@@ -891,7 +891,7 @@ pub(super) fn apply_copy_gene_forward_slice(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let node = &mut genome.nodes[node_idx];
-    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+    if let BackendDef::Vm(vm) = node.backend_edit().1 {
         if vm.program.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
@@ -911,12 +911,12 @@ pub(super) fn apply_insert_read_store_motif(
     node_idx: usize,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let input_refs_len = genome.nodes[node_idx].input_refs.len();
+    let input_refs_len = genome.nodes[node_idx].input_refs().len();
     if input_refs_len == 0 {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
     let node = &mut genome.nodes[node_idx];
-    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+    if let BackendDef::Vm(vm) = node.backend_edit().1 {
         let rc = vm.register_count.max(1);
         let il = input_refs_len.min(255) as u16;
         let dst = rng.gen_range(0..rc);
@@ -946,13 +946,13 @@ pub(super) fn apply_insert_read_bid_motif(
     node_idx: usize,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let input_refs_len = genome.nodes[node_idx].input_refs.len();
+    let input_refs_len = genome.nodes[node_idx].input_refs().len();
     if input_refs_len == 0 {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
 
     let node = &mut genome.nodes[node_idx];
-    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+    if let BackendDef::Vm(vm) = node.backend_edit().1 {
         let rc = vm.register_count.max(1);
         let il = input_refs_len.min(255) as u16;
         let dst = rng.gen_range(0..rc);
@@ -996,7 +996,7 @@ pub(super) fn apply_insert_load_compare_motif(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let node = &mut genome.nodes[node_idx];
-    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+    if let BackendDef::Vm(vm) = node.backend_edit().1 {
         let rc = vm.register_count.max(1);
         let load_dst = rng.gen_range(0..rc);
         let slot_idx = rng.gen_range(0u8..16);
@@ -1031,7 +1031,7 @@ pub(super) fn apply_mutate_slot_address(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let node = &mut genome.nodes[node_idx];
-    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+    if let BackendDef::Vm(vm) = node.backend_edit().1 {
         let slot_indices: Vec<usize> = vm
             .program
             .iter()
@@ -1054,7 +1054,7 @@ pub(super) fn apply_mutate_paired_slot_address(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let node = &mut genome.nodes[node_idx];
-    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+    if let BackendDef::Vm(vm) = node.backend_edit().1 {
         let eligible = paired_slot_groups(&vm.program);
         if eligible.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);

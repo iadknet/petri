@@ -570,10 +570,10 @@ fn charge_and_reward_match_the_energy_flow_deltas() {
 fn steal_north_genome() -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 2,
                 constants: vec![1.0, 10.0],
                 program: vec![
@@ -594,8 +594,8 @@ fn steal_north_genome() -> CreatureGenome {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     }
 }
 
@@ -760,7 +760,7 @@ fn a_victim_killed_before_or_after_its_turn_records_predation() {
 
 /// `genome` plus a priority bid, so it acts before an unbidding creature.
 fn bidding(mut genome: CreatureGenome) -> CreatureGenome {
-    let BackendDef::Vm(def) = &mut genome.nodes[0].backend_def else {
+    let BackendDef::Vm(def) = genome.nodes[0].backend_edit().1 else {
         unreachable!("fixture genomes are VM");
     };
     let at = def.program.len() - 1;
@@ -885,20 +885,20 @@ fn typed_food_reader_genome() -> CreatureGenome {
     let grass = OrdinaryFoodTypeId::new(0);
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![
                 InputReference::World(WorldInputKey::food_here(grass)),
                 InputReference::World(WorldInputKey::food_here(fruit)),
                 InputReference::World(WorldInputKey::area_food_summary(fruit)),
             ],
-            backend_def: BackendDef::Vm(VmBackendDef {
+            BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program: vec![VmInstruction::Halt],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     }
 }
 

@@ -389,7 +389,7 @@ mod tests {
         // nothing, so every execution is `NoOp`.
         let mut dead = founder_genome(FounderProfile::V3Alpha1);
         for node in &mut dead.nodes {
-            if let BackendDef::Graph(graph) = &mut node.backend_def {
+            if let BackendDef::Graph(graph) = node.backend_edit().1 {
                 crate::genome::cgp::test_support::edit_sinks(graph, |sinks| {
                     for sink in sinks {
                         if matches!(

@@ -17,12 +17,7 @@ fn companion_population() -> [v3_core::genome::CreatureGenome; 3] {
     };
     let make = |backend_def| CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def,
-            targets: vec![],
-        }],
+        nodes: vec![NodeGenome::new(NodeId::new(0), vec![], backend_def, vec![])],
     };
     let reader_writer = make(BackendDef::Vm(VmBackendDef {
         register_count: 1,
@@ -50,7 +45,7 @@ fn companion_population() -> [v3_core::genome::CreatureGenome; 3] {
             .with_output_sinks(vec![]),
     ));
     let mut stateful_plastic = stateful_plastic;
-    if let BackendDef::Graph(def) = &mut stateful_plastic.nodes[0].backend_def {
+    if let BackendDef::Graph(def) = stateful_plastic.nodes[0].backend_edit().1 {
         def.edge_mut(v3_core::genome::cgp::EdgeOccurrence::new(
             v3_core::genome::cgp::EdgeSurface::ComputeInput(0),
             0,
@@ -465,11 +460,10 @@ fn temporal_report_keeps_substrate_counts_separate() {
     );
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            targets: vec![],
-            backend_def: BackendDef::Graph(
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Graph(
                 CgpGraphBackendDef::new_with_fixed_outputs()
                     .with_compute_nodes(vec![ComputeNode::new(
                         ComputeNodeKind::Constant(0.0),
@@ -482,7 +476,8 @@ fn temporal_report_keeps_substrate_counts_separate() {
                         vec![edge],
                     )]),
             ),
-        }],
+            vec![],
+        )],
     };
     let mut sim = v3_core::simulation::seeding::seed_simulation_with_founder_genomes(
         config,
@@ -1103,25 +1098,27 @@ fn mesh_execution_block_carries_within_and_across_snapshot_route_flags() {
     use v3_core::contracts::votes::VoteSink;
     use v3_core::contracts::{InputReference, NodeId, RouteTarget};
     use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
-    let vm_node = |id: u32, targets: &[u32], program: Vec<VmInstruction>| NodeGenome {
-        node_id: NodeId::new(id),
-        input_refs: vec![],
-        backend_def: BackendDef::Vm(VmBackendDef {
-            register_count: 1,
-            constants: vec![1.0],
-            program,
-        }),
-        targets: targets
-            .iter()
-            .enumerate()
-            .map(|(slot, &id)| RouteTarget {
-                target_id: NodeId::new(id),
-                slot: slot as u8,
-                gate_bias: 0.0,
-            })
-            .collect(),
+    let vm_node = |id: u32, targets: &[u32], program: Vec<VmInstruction>| {
+        NodeGenome::new(
+            NodeId::new(id),
+            vec![],
+            BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                constants: vec![1.0],
+                program,
+            }),
+            targets
+                .iter()
+                .enumerate()
+                .map(|(slot, &id)| RouteTarget {
+                    target_id: NodeId::new(id),
+                    slot: slot as u8,
+                    gate_bias: 0.0,
+                })
+                .collect(),
+        )
     };
-    let mut router = vm_node(
+    let router = vm_node(
         0,
         &[1, 2],
         vec![
@@ -1134,7 +1131,12 @@ fn mesh_execution_block_carries_within_and_across_snapshot_route_flags() {
             VmInstruction::Halt,
         ],
     );
-    router.input_refs = vec![InputReference::CommitCounts];
+    let router = NodeGenome::new(
+        router.node_id,
+        vec![InputReference::CommitCounts],
+        router.backend_def().clone(),
+        router.targets.clone(),
+    );
     let eater = vm_node(
         1,
         &[],

@@ -608,12 +608,12 @@ mod tests {
 
         CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Graph(def),
-                targets: vec![],
-            }],
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Graph(def),
+                vec![],
+            )],
         }
     }
 
@@ -879,16 +879,16 @@ mod tests {
 
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         };
 
         // VM nodes carry no plastic edge.
@@ -906,15 +906,17 @@ mod tests {
         use crate::mutation::topology::{TopologyMutator, TopologyOperator};
         use rand::SeedableRng;
 
-        let vm = |id: u32, targets: Vec<RouteTarget>| NodeGenome {
-            node_id: NodeId::new(id),
-            input_refs: vec![],
-            backend_def: BackendDef::Vm(VmBackendDef {
-                register_count: 1,
-                constants: vec![],
-                program: vec![VmInstruction::Halt],
-            }),
-            targets,
+        let vm = |id: u32, targets: Vec<RouteTarget>| {
+            NodeGenome::new(
+                NodeId::new(id),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::Halt],
+                }),
+                targets,
+            )
         };
         let mut child = CreatureGenome {
             entry_node_id: NodeId::new(0),
@@ -940,7 +942,7 @@ mod tests {
             &MutationConfig::default(),
         )
         .unwrap();
-        let BackendDef::Graph(created) = &child.nodes[2].backend_def else {
+        let BackendDef::Graph(created) = child.nodes[2].backend_def() else {
             panic!("a swapped VM copy is a Graph node");
         };
         assert!(created.birth_seeds().is_none());
@@ -986,7 +988,7 @@ mod tests {
                     gate_bias: 0.0,
                 }];
             }
-            let BackendDef::Graph(def) = &mut node.backend_def else {
+            let BackendDef::Graph(def) = node.backend_edit().1 else {
                 unreachable!()
             };
             def.edge_mut(EdgeOccurrence::new(EdgeSurface::ComputeInput(0), 0))
@@ -1010,7 +1012,7 @@ mod tests {
                 .unwrap();
             });
             for (idx, node) in child.nodes.iter().enumerate() {
-                let BackendDef::Graph(def) = &node.backend_def else {
+                let BackendDef::Graph(def) = node.backend_def() else {
                     unreachable!()
                 };
                 assert_eq!(
@@ -1022,7 +1024,7 @@ mod tests {
         }
         // Replacing a backend at the same mesh index/ID gives it no correspondence.
         let (_, result) = birth_learned(&original, &parent, |child| {
-            child.nodes[0].backend_def = original.nodes[0].backend_def.clone();
+            *child.nodes[0].backend_edit().1 = original.nodes[0].backend_def().clone();
         });
         assert_eq!(result[0][0], None);
         assert_eq!(result[1][0], Some(3.0));
@@ -1136,7 +1138,7 @@ mod tests {
         assert!(child.graph_runtime().node_outputs.is_empty());
         assert!(child.graph_runtime().dispatch_record.is_empty());
         for node in &child.genome().nodes {
-            if let BackendDef::Graph(def) = &node.backend_def {
+            if let BackendDef::Graph(def) = node.backend_def() {
                 assert!(def.birth_seeds().is_none());
             }
         }
@@ -1205,12 +1207,12 @@ mod tests {
         let node = genome
             .nodes
             .iter_mut()
-            .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+            .find(|node| matches!(node.backend_def(), BackendDef::Graph(_)))
             .expect("the founder carries a Graph node");
-        let ring = u16::try_from(node.input_refs.len()).unwrap();
-        node.input_refs
+        let ring = u16::try_from(node.input_refs().len()).unwrap();
+        node.input_refs_mut()
             .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
-        let BackendDef::Graph(def) = &mut node.backend_def else {
+        let BackendDef::Graph(def) = node.backend_edit().1 else {
             unreachable!("a Graph node")
         };
         def.add_ring_bundle(ring, DirectedVoteKind::Move, 0);
@@ -1275,13 +1277,13 @@ mod tests {
         let node = genome
             .nodes
             .iter_mut()
-            .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+            .find(|node| matches!(node.backend_def(), BackendDef::Graph(_)))
             .expect("the founder carries a Graph node");
         let reference = InputReference::World(WorldInputKey::AreaBarrierSummary);
-        let ref_idx = u16::try_from(node.input_refs.len()).unwrap();
+        let ref_idx = u16::try_from(node.input_refs().len()).unwrap();
         let layout = crate::contracts::pair_layout(&reference, 0);
-        node.input_refs.push(reference);
-        let BackendDef::Graph(def) = &mut node.backend_def else {
+        node.input_refs_mut().push(reference);
+        let BackendDef::Graph(def) = node.backend_edit().1 else {
             unreachable!("a Graph node")
         };
         let id = def.add_pair_bundle(ref_idx, 0, layout, DirectedVoteKind::Move, 3);

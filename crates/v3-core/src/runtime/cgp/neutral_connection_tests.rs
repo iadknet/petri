@@ -102,23 +102,18 @@ fn wire(def: &mut CgpGraphBackendDef, kind: OutputSinkKind, edge: GraphEdge) {
 }
 
 fn graph_node(def: CgpGraphBackendDef, refs: Vec<InputReference>) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(0),
-        input_refs: refs,
-        backend_def: BackendDef::Graph(def),
-        targets: vec![],
-    }
+    NodeGenome::new(NodeId::new(0), refs, BackendDef::Graph(def), vec![])
 }
 
 fn graph(node: &NodeGenome) -> &CgpGraphBackendDef {
-    let BackendDef::Graph(def) = &node.backend_def else {
+    let BackendDef::Graph(def) = node.backend_def() else {
         panic!("Graph fixture")
     };
     def
 }
 
 fn graph_mut(node: &mut NodeGenome) -> &mut CgpGraphBackendDef {
-    let BackendDef::Graph(def) = &mut node.backend_def else {
+    let BackendDef::Graph(def) = node.backend_edit().1 else {
         panic!("Graph fixture")
     };
     def
@@ -422,10 +417,10 @@ fn active_native_visits_and_ticks_preserve_actions_temporal_plasticity_and_costs
         use crate::contracts::SensorDescriptor;
         use crate::genome::cgp::{plans, BundleBirth, BundleSource};
         let context = crate::config::test_sensor_context(1);
-        let BackendDef::Graph(def) = &silent.backend_def else {
+        let BackendDef::Graph(def) = silent.backend_def() else {
             unreachable!()
         };
-        let sources: Vec<_> = SensorDescriptor::of(&silent.input_refs[0], &context)
+        let sources: Vec<_> = SensorDescriptor::of(&silent.input_refs()[0], &context)
             .indexed_field_sets()
             .map(|(field_set, fields)| {
                 (
@@ -486,7 +481,7 @@ fn active_native_visits_and_ticks_preserve_actions_temporal_plasticity_and_costs
             let node = &genomes[i].nodes[0];
             let result = execute_graph_node(
                 graph(node),
-                &node.input_refs,
+                node.input_refs(),
                 &ramp(0.25),
                 &mut energies[i],
                 25.0,

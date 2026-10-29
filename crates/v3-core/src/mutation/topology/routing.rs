@@ -38,7 +38,7 @@ pub(super) fn writes_gate(backend: &BackendDef, slot: u8) -> bool {
 /// backend, so an orphan write never feeds a new branch.
 pub(super) fn free_gate_slot(node: &NodeGenome) -> Option<u8> {
     (0..MAX_GATE_SLOTS as u8).find(|&slot| {
-        !node.targets.iter().any(|t| t.slot == slot) && !writes_gate(&node.backend_def, slot)
+        !node.targets.iter().any(|t| t.slot == slot) && !writes_gate(node.backend_def(), slot)
     })
 }
 
@@ -160,17 +160,10 @@ pub(super) fn apply_add_route_target(
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let slot = lowest_unused_slot(&genome.nodes[idx].targets)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let mut backend = genome.nodes[idx].backend_def.clone();
-    add_gate_write(
-        &mut backend,
-        &genome.nodes[idx].input_refs,
-        context,
-        slot,
-        rng,
-    )?;
+    let (input_refs, backend) = genome.nodes[idx].backend_edit();
+    add_gate_write(backend, input_refs, context, slot, rng)?;
     let old = genome.nodes[idx].targets[0];
     let new_id = next_node_id(genome);
-    genome.nodes[idx].backend_def = backend;
     genome.nodes[idx].targets.push(RouteTarget {
         target_id: new_id,
         slot,
@@ -241,7 +234,7 @@ fn feedback_slot(genome: &CreatureGenome, executed: &[usize], idx: usize) -> Opt
     let node = &genome.nodes[idx];
     let incumbent = node.targets.get(static_incumbent(&node.targets)?)?;
     if !incumbent.gate_bias.is_finite()
-        || writes_gate(&node.backend_def, incumbent.slot)
+        || writes_gate(node.backend_def(), incumbent.slot)
         || !genome
             .nodes
             .iter()
@@ -250,7 +243,7 @@ fn feedback_slot(genome: &CreatureGenome, executed: &[usize], idx: usize) -> Opt
         return None;
     }
     let slot = free_gate_slot(node)?;
-    let writable = match &node.backend_def {
+    let writable = match node.backend_def() {
         BackendDef::Vm(vm) => vm.register_count > 0,
         BackendDef::Graph(graph) => gate_sink(graph, slot).is_some(),
     };
@@ -275,12 +268,13 @@ pub(super) fn apply_add_feedback_route(
     let node = &genome.nodes[idx];
     let incumbent = static_incumbent(&node.targets).expect("eligible source has an incumbent");
     let gate_bias = losing_bias(node.targets[incumbent].gate_bias);
-    let mut backend = node.backend_def.clone();
-    add_gate_write(&mut backend, &node.input_refs, context, slot, rng)?;
+    let (input_refs, backend) = genome.nodes[idx].backend_edit();
+    add_gate_write(backend, input_refs, context, slot, rng)?;
+    // The destinations read only routing targets, which the gate write
+    // leaves alone.
     let candidates = feedback_destinations(genome, executed, idx);
     let target_id = candidates[rng.gen_range(0..candidates.len())];
     let node = &mut genome.nodes[idx];
-    node.backend_def = backend;
     node.targets.push(RouteTarget {
         target_id,
         slot,

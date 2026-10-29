@@ -125,12 +125,12 @@ fn graph_reads_all_neighbor_sensor_directions_e2e() {
 
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
             input_refs,
-            backend_def: BackendDef::Graph(graph_def),
-            targets: vec![],
-        }],
+            BackendDef::Graph(graph_def),
+            vec![],
+        )],
     };
 
     let target = insert_creature(&mut creatures, &mut world, genome, target_pos, 120.0, 0);
@@ -259,12 +259,12 @@ fn graph_reads_inputs_and_writes_outputs_e2e() {
 
     let target_genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
             input_refs,
-            backend_def: BackendDef::Graph(graph_def),
-            targets: vec![],
-        }],
+            BackendDef::Graph(graph_def),
+            vec![],
+        )],
     };
 
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();

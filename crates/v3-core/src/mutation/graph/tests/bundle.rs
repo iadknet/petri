@@ -63,23 +63,18 @@ fn refs() -> Vec<InputReference> {
 }
 
 fn graph_node(refs: Vec<InputReference>, def: CgpGraphBackendDef) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(0),
-        input_refs: refs,
-        backend_def: BackendDef::Graph(def),
-        targets: vec![],
-    }
+    NodeGenome::new(NodeId::new(0), refs, BackendDef::Graph(def), vec![])
 }
 
 fn graph(node: &NodeGenome) -> &CgpGraphBackendDef {
-    match &node.backend_def {
+    match node.backend_def() {
         BackendDef::Graph(def) => def,
         BackendDef::Vm(_) => panic!("Graph fixture"),
     }
 }
 
 fn graph_mut(node: &mut NodeGenome) -> &mut CgpGraphBackendDef {
-    match &mut node.backend_def {
+    match node.backend_edit().1 {
         BackendDef::Graph(def) => def,
         BackendDef::Vm(_) => panic!("Graph fixture"),
     }
@@ -292,16 +287,16 @@ fn applicability_follows_sources_bundles_and_wirings() {
     }
     let vm = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![barrier()],
-            backend_def: BackendDef::Vm(VmBackendDef {
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![barrier()],
+            BackendDef::Vm(VmBackendDef {
                 register_count: 4,
                 constants: vec![],
                 program: vec![],
             }),
-            targets: vec![],
-        }],
+            vec![],
+        )],
     };
     for op in BUNDLE_OPERATORS {
         assert!(!applies(&vm, op), "{op:?}");
@@ -446,7 +441,7 @@ proptest::proptest! {
         proptest::prop_assert_eq!(rng.gen::<u64>(), expected.gen::<u64>(), "no further draw");
         proptest::prop_assert!(validate_graph(&node).is_ok());
         let def = graph(&node);
-        let coordinates = def.birth_coordinates(id(0), &node.input_refs, &crate::contracts::SensorContext::WIDEST);
+        let coordinates = def.birth_coordinates(id(0), node.input_refs(), &crate::contracts::SensorContext::WIDEST);
         for c in &coordinates {
             let member = c.member.expect("the whole set");
             proptest::prop_assert!(
@@ -708,10 +703,10 @@ fn add_sensor_is_unchanged_by_bundles() {
             let idx = plain
                 .nodes
                 .iter()
-                .position(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+                .position(|node| matches!(node.backend_def(), BackendDef::Graph(_)))
                 .unwrap();
-            let ring = u16::try_from(plain.nodes[idx].input_refs.len()).unwrap();
-            plain.nodes[idx].input_refs.push(barrier());
+            let ring = u16::try_from(plain.nodes[idx].input_refs().len()).unwrap();
+            plain.nodes[idx].input_refs_mut().push(barrier());
             let mut grouped = plain.clone();
             graph_mut(&mut grouped.nodes[idx]).add_ring_bundle(
                 ring,
@@ -732,7 +727,10 @@ fn add_sensor_is_unchanged_by_bundles() {
             }
             let [a, b] = &mut rngs;
             assert_eq!(a.gen::<u64>(), b.gen::<u64>(), "seed {seed}");
-            assert_eq!(plain.nodes[idx].input_refs, grouped.nodes[idx].input_refs);
+            assert_eq!(
+                plain.nodes[idx].input_refs(),
+                grouped.nodes[idx].input_refs()
+            );
             let (p, q) = (graph(&plain.nodes[idx]), graph(&grouped.nodes[idx]));
             let independent = |def: &CgpGraphBackendDef| -> Vec<_> {
                 def.edges()
@@ -939,10 +937,10 @@ proptest::proptest! {
         proptest::prop_assert_eq!(rng.gen::<u64>(), expected.gen::<u64>(), "one draw");
 
         let mut want = def.clone();
-        let (at, removed) = detach(&mut want, picked, &original.input_refs);
+        let (at, removed) = detach(&mut want, picked, original.input_refs());
         proptest::prop_assert!(!removed);
         proptest::prop_assert_eq!(graph(&node), &want);
-        let pattern = def.pattern(picked, &original.input_refs);
+        let pattern = def.pattern(picked, original.input_refs());
         let before = def.edge_at(picked);
         let after = graph(&node).edge_at(at);
         proptest::prop_assert_eq!(

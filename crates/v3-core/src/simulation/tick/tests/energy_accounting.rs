@@ -382,11 +382,10 @@ fn learning_genome(reward: bool) -> crate::genome::CreatureGenome {
     };
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            targets: vec![],
-            backend_def: BackendDef::Graph(
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Graph(
                 CgpGraphBackendDef::new_with_fixed_outputs()
                     .with_compute_nodes(vec![crate::genome::cgp::test_support::plastic_node(
                         ComputeNodeKind::Constant(1.0),
@@ -411,7 +410,8 @@ fn learning_genome(reward: bool) -> crate::genome::CreatureGenome {
                     )])
                     .with_output_sinks(vec![]),
             ),
-        }],
+            vec![],
+        )],
     }
 }
 
@@ -491,7 +491,7 @@ fn sink_learning_genome() -> crate::genome::CreatureGenome {
             }),
             retention: 1.0,
         }));
-    genome.nodes[0].backend_def = BackendDef::Graph(def);
+    *genome.nodes[0].backend_edit().1 = BackendDef::Graph(def);
     genome
 }
 

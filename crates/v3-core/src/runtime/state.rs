@@ -111,8 +111,8 @@ impl GraphRuntimeState {
         let sink_weights = genome
             .nodes
             .iter()
-            .map(|node| match &node.backend_def {
-                BackendDef::Graph(def) => def.sink_weight_rows(&node.input_refs),
+            .map(|node| match node.backend_def() {
+                BackendDef::Graph(def) => def.sink_weight_rows(node.input_refs()),
                 BackendDef::Vm(_) => Vec::new(),
             })
             .collect();

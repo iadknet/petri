@@ -96,9 +96,9 @@ fn node0_graph_sensor(
     min_reproduce_age_ticks: u64,
     age_reference_ticks: u64,
 ) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(0),
-        input_refs: vec![
+    NodeGenome::new(
+        NodeId::new(0),
+        vec![
             InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
             InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
@@ -107,17 +107,17 @@ fn node0_graph_sensor(
             )),
             InputReference::World(WorldInputKey::NeighborOccupiedRing),
         ],
-        backend_def: BackendDef::Graph(build_cgp_founder_graph_with_thresholds(
+        BackendDef::Graph(build_cgp_founder_graph_with_thresholds(
             reproduce_energy_threshold,
             min_reproduce_age_ticks,
             age_reference_ticks,
         )),
-        targets: vec![RouteTarget {
+        vec![RouteTarget {
             target_id: NodeId::new(1),
             slot: 0,
             gate_bias: 0.0,
         }],
-    }
+    )
 }
 
 /// Node 1 reads node 0's six slots and the `ActionQueue` compound input
@@ -129,15 +129,15 @@ fn node1_graph_decision(forage_first: bool, reproduce_transfer_fraction: f32) ->
         input_refs.len(),
         usize::from(super::cgp_founder::FOUNDER_QUEUE_REF) + 1
     );
-    NodeGenome {
-        node_id: NodeId::new(1),
+    NodeGenome::new(
+        NodeId::new(1),
         input_refs,
-        backend_def: BackendDef::Graph(build_cgp_founder_decision_graph(
+        BackendDef::Graph(build_cgp_founder_decision_graph(
             forage_first,
             reproduce_transfer_fraction,
         )),
-        targets: vec![],
-    }
+        vec![],
+    )
 }
 
 /// The V3Alpha1 founder with its decision node as a VM program voting the
@@ -241,7 +241,7 @@ pub(crate) fn vm_decision_founder_genome() -> CreatureGenome {
         VmInstruction::Halt,
     ]);
     let mut genome = v3alpha1_founder_genome();
-    genome.nodes[1].backend_def = BackendDef::Vm(VmBackendDef {
+    *genome.nodes[1].backend_edit().1 = BackendDef::Vm(VmBackendDef {
         register_count: 20,
         constants: vec![0.0, 1.0, 2.5, 3.5, 0.4, fraction, 0.5],
         program,
@@ -593,10 +593,10 @@ mod tests {
         for (profile, ..) in PROFILES {
             let genome = founder_genome(profile);
             assert_eq!(genome.nodes.len(), 2);
-            assert_eq!(genome.nodes[0].input_refs.len(), 5);
-            assert_eq!(genome.nodes[1].input_refs.len(), 7);
-            assert_eq!(genome.nodes[1].input_refs[6], InputReference::ActionQueue);
-            let BackendDef::Graph(graph) = &genome.nodes[0].backend_def else {
+            assert_eq!(genome.nodes[0].input_refs().len(), 5);
+            assert_eq!(genome.nodes[1].input_refs().len(), 7);
+            assert_eq!(genome.nodes[1].input_refs()[6], InputReference::ActionQueue);
+            let BackendDef::Graph(graph) = genome.nodes[0].backend_def() else {
                 panic!("graph")
             };
             assert_eq!(graph.compute_nodes().len(), 3);
@@ -608,7 +608,7 @@ mod tests {
                     .count(),
                 6
             );
-            let BackendDef::Graph(decision) = &genome.nodes[1].backend_def else {
+            let BackendDef::Graph(decision) = genome.nodes[1].backend_def() else {
                 panic!("graph")
             };
             // Eat, four Move, four Reproduce, Terminate, and one parameter.

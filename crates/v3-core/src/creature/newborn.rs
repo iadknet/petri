@@ -13,7 +13,7 @@ use crate::genome::{BackendDef, CreatureGenome};
 /// clones, a parent with nothing initialized) gives the empty vector.
 pub(crate) fn take_birth_seeds(genome: &mut CreatureGenome) -> Vec<Option<BirthSeeds>> {
     let seeded = genome.nodes.iter().any(
-        |node| matches!(&node.backend_def, BackendDef::Graph(def) if def.birth_seeds().is_some()),
+        |node| matches!(node.backend_def(), BackendDef::Graph(def) if def.birth_seeds().is_some()),
     );
     if !seeded {
         return Vec::new();
@@ -21,7 +21,7 @@ pub(crate) fn take_birth_seeds(genome: &mut CreatureGenome) -> Vec<Option<BirthS
     genome
         .nodes
         .iter_mut()
-        .map(|node| match &mut node.backend_def {
+        .map(|node| match node.backend_edit().1 {
             BackendDef::Graph(def) => def.take_birth_seeds(),
             BackendDef::Vm(_) => None,
         })

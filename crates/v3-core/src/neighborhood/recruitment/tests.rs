@@ -9,33 +9,33 @@ use crate::mutation::TargetReachability;
 use proptest::prelude::*;
 
 fn vm_node(id: u32, register_count: u8) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(id),
-        input_refs: Vec::new(),
-        backend_def: BackendDef::Vm(VmBackendDef {
+    NodeGenome::new(
+        NodeId::new(id),
+        Vec::new(),
+        BackendDef::Vm(VmBackendDef {
             register_count,
             constants: Vec::new(),
             program: vec![VmInstruction::Halt],
         }),
-        targets: Vec::new(),
-    }
+        Vec::new(),
+    )
 }
 
 fn graph_node(id: u32) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(id),
-        input_refs: vec![InputReference::ActionQueue],
-        backend_def: BackendDef::Graph(
+    NodeGenome::new(
+        NodeId::new(id),
+        vec![InputReference::ActionQueue],
+        BackendDef::Graph(
             crate::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs()
                 .with_compute_nodes(Vec::new())
                 .with_output_sinks(Vec::new()),
         ),
-        targets: vec![RouteTarget {
+        vec![RouteTarget {
             target_id: NodeId::new(0),
             slot: 0,
             gate_bias: 0.0,
         }],
-    }
+    )
 }
 
 /// A summary carrying exactly the given event records, with the totals the
@@ -937,11 +937,11 @@ fn a_copy_names_its_first_matching_source_and_flags_ambiguity() {
     assert_eq!(module(&tracker, 2, 0).copy_source, None);
     assert_eq!(
         module(&tracker, 3, 1).birth_payload_hash,
-        payload_hash(&vm_node(3, 3).backend_def)
+        payload_hash(&vm_node(3, 3).backend_def())
     );
     assert_eq!(
         tracker.birth_payload(module(&tracker, 4, 2)),
-        Some(&vm_node(4, 5).backend_def)
+        Some(vm_node(4, 5).backend_def())
     );
 }
 
@@ -970,15 +970,15 @@ fn the_birth_payload_is_the_creation_content_not_the_current_one() {
     let created = module(&tracker, 1, 1);
     assert_eq!(
         tracker.birth_payload(created),
-        Some(&vm_node(1, 2).backend_def)
+        Some(vm_node(1, 2).backend_def())
     );
     assert_eq!(
         created.birth_payload_hash,
-        payload_hash(&vm_node(1, 2).backend_def)
+        payload_hash(&vm_node(1, 2).backend_def())
     );
     assert_ne!(
         created.birth_payload_hash,
-        payload_hash(&vm_node(1, 9).backend_def)
+        payload_hash(&vm_node(1, 9).backend_def())
     );
     let mut foreign = created.clone();
     foreign.lineage = 4;
@@ -1002,20 +1002,20 @@ fn rebasing_birth_payloads_moves_the_live_modules_only() {
     let live = module(&tracker, 0, 0);
     assert_eq!(
         tracker.birth_payload(live),
-        Some(&vm_node(0, 9).backend_def)
+        Some(vm_node(0, 9).backend_def())
     );
     assert_eq!(
         live.birth_payload_hash,
-        payload_hash(&vm_node(0, 9).backend_def)
+        payload_hash(&vm_node(0, 9).backend_def())
     );
     let gone = module(&tracker, 1, 0);
     assert_eq!(
         tracker.birth_payload(gone),
-        Some(&vm_node(1, 1).backend_def)
+        Some(vm_node(1, 1).backend_def())
     );
     assert_eq!(
         gone.birth_payload_hash,
-        payload_hash(&vm_node(1, 1).backend_def)
+        payload_hash(&vm_node(1, 1).backend_def())
     );
 }
 

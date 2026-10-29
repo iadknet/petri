@@ -118,12 +118,12 @@ fn slots(
 fn genome(def: &CgpGraphBackendDef) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: refs(),
-            backend_def: BackendDef::Graph(def.clone()),
-            targets: vec![],
-        }],
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            refs(),
+            BackendDef::Graph(def.clone()),
+            vec![],
+        )],
     }
 }
 

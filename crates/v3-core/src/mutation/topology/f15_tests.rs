@@ -8,11 +8,11 @@ use proptest::prelude::*;
 use rand::{rngs::SmallRng, SeedableRng};
 
 fn node(id: u32, targets: &[u32]) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(id),
-        input_refs: vec![],
-        backend_def: birth::minimal_vm_backend(),
-        targets: targets
+    NodeGenome::new(
+        NodeId::new(id),
+        vec![],
+        birth::minimal_vm_backend(),
+        targets
             .iter()
             .enumerate()
             .map(|(i, &target)| RouteTarget {
@@ -21,7 +21,7 @@ fn node(id: u32, targets: &[u32]) -> NodeGenome {
                 gate_bias: 0.0,
             })
             .collect(),
-    }
+    )
 }
 fn genome(nodes: Vec<NodeGenome>) -> CreatureGenome {
     CreatureGenome {
@@ -44,7 +44,7 @@ fn apply(
     )
 }
 fn gate(node: &mut NodeGenome, slot: u8) {
-    if let BackendDef::Vm(vm) = &mut node.backend_def {
+    if let BackendDef::Vm(vm) = node.backend_edit().1 {
         vm.program
             .insert(0, VmInstruction::WriteRouteGate { slot, src: 0 });
     }
@@ -57,7 +57,7 @@ fn copy_faithfully_preserves_references_and_uses_safe_later_slot() {
         TopologyOperator::SwapNodeBackend,
     ] {
         let mut g = genome(vec![node(0, &[1]), node(1, &[1, 2]), node(2, &[])]);
-        g.nodes[1].input_refs = vec![InputReference::UpstreamSlot(3)];
+        *g.nodes[1].input_refs_mut() = vec![InputReference::UpstreamSlot(3)];
         gate(&mut g.nodes[0], 1); // orphan write must not make slot 2 unavailable
         gate(&mut g.nodes[1], 0); // prevents node 2 being another attachment candidate
         let old = g.clone();
@@ -66,13 +66,13 @@ fn copy_faithfully_preserves_references_and_uses_safe_later_slot() {
         assert_eq!(g.nodes[0].targets[1].slot, 2);
         assert_eq!(g.nodes[0].targets[0], old.nodes[0].targets[0]);
         assert_eq!(&g.nodes[1..3], &old.nodes[1..3]);
-        assert_eq!(clone.input_refs, old.nodes[1].input_refs);
+        assert_eq!(clone.input_refs(), old.nodes[1].input_refs());
         assert_eq!(clone.targets[0].target_id, clone.node_id);
         assert_eq!(clone.targets[1], old.nodes[1].targets[1]);
         if op == TopologyOperator::CopyNode {
-            assert_eq!(clone.backend_def, old.nodes[1].backend_def);
+            assert_eq!(clone.backend_def(), old.nodes[1].backend_def());
         } else {
-            assert!(matches!(clone.backend_def, BackendDef::Graph(_)));
+            assert!(matches!(clone.backend_def(), BackendDef::Graph(_)));
         }
     }
 }
@@ -119,7 +119,7 @@ fn branch_failure_is_atomic_and_orphan_writes_are_preserved() {
                 g.nodes[0].targets.push(target);
             }
             2 => {
-                if let BackendDef::Vm(vm) = &mut g.nodes[0].backend_def {
+                if let BackendDef::Vm(vm) = g.nodes[0].backend_edit().1 {
                     vm.register_count = 0;
                 }
             }
@@ -128,7 +128,7 @@ fn branch_failure_is_atomic_and_orphan_writes_are_preserved() {
                 crate::genome::cgp::test_support::edit_sinks(&mut graph, |sinks| {
                     sinks.retain(|s| !matches!(s.kind, OutputSinkKind::RouterGate(1)));
                 });
-                g.nodes[0].backend_def = BackendDef::Graph(graph);
+                *g.nodes[0].backend_edit().1 = BackendDef::Graph(graph);
             }
         }
         let old = g.clone();
@@ -141,7 +141,7 @@ fn branch_failure_is_atomic_and_orphan_writes_are_preserved() {
     let mut g = genome(vec![node(0, &[1]), node(1, &[])]);
     gate(&mut g.nodes[0], 1);
     apply(&mut g, TopologyOperator::AddRouteTarget, 7).unwrap();
-    let BackendDef::Vm(vm) = &g.nodes[0].backend_def else {
+    let BackendDef::Vm(vm) = g.nodes[0].backend_def() else {
         panic!()
     };
     assert_eq!(
@@ -156,7 +156,7 @@ fn branch_failure_is_atomic_and_orphan_writes_are_preserved() {
 #[test]
 fn paired_vm_gate_insertion_repairs_jumps_and_precedes_first_terminal() {
     let mut g = genome(vec![node(0, &[1]), node(1, &[])]);
-    let BackendDef::Vm(vm) = &mut g.nodes[0].backend_def else {
+    let BackendDef::Vm(vm) = g.nodes[0].backend_edit().1 else {
         panic!()
     };
     vm.program = vec![
@@ -165,7 +165,7 @@ fn paired_vm_gate_insertion_repairs_jumps_and_precedes_first_terminal() {
         VmInstruction::Noop,
     ];
     apply(&mut g, TopologyOperator::AddRouteTarget, 7).unwrap();
-    let BackendDef::Vm(vm) = &g.nodes[0].backend_def else {
+    let BackendDef::Vm(vm) = g.nodes[0].backend_def() else {
         panic!()
     };
     let VmInstruction::Jump { offset } = vm.program[0] else {
@@ -307,7 +307,7 @@ fn removal_uses_current_topology_when_parent_reachability_cache_is_stale() {
 fn conditional_fixture(graph: bool) -> CreatureGenome {
     use crate::contracts::WorldInputKey;
     let mut g = genome(vec![node(0, &[1]), node(1, &[])]);
-    g.nodes[0].input_refs = vec![InputReference::World(WorldInputKey::FoodHere {
+    *g.nodes[0].input_refs_mut() = vec![InputReference::World(WorldInputKey::FoodHere {
         type_idx: Default::default(),
     })];
     if graph {
@@ -335,9 +335,9 @@ fn conditional_fixture(graph: bool) -> CreatureGenome {
                 1.0,
             ),
         );
-        g.nodes[0].backend_def = BackendDef::Graph(backend);
+        *g.nodes[0].backend_edit().1 = BackendDef::Graph(backend);
     } else {
-        g.nodes[0].backend_def = BackendDef::Vm(VmBackendDef {
+        *g.nodes[0].backend_edit().1 = BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: vec![3.0, 1.0],
             program: vec![
@@ -371,8 +371,8 @@ fn conditional_fixture(graph: bool) -> CreatureGenome {
     }
     // Node 1 carries the bus value (3.0) into the `Eat` food-type field, which
     // node 0's `Eat` vote commits, and votes one `Move(SE)`.
-    g.nodes[1].input_refs = vec![InputReference::UpstreamSlot(0)];
-    g.nodes[1].backend_def = BackendDef::Vm(VmBackendDef {
+    *g.nodes[1].input_refs_mut() = vec![InputReference::UpstreamSlot(0)];
+    *g.nodes[1].backend_edit().1 = BackendDef::Vm(VmBackendDef {
         register_count: 1,
         constants: vec![1.0],
         program: vec![
@@ -441,7 +441,7 @@ fn added_work_retains_default_behavior_but_can_exhaust_at_the_boundary() {
     let base = conditional_fixture(false);
     let mut grown = base.clone();
     apply(&mut grown, TopologyOperator::AddRouteTarget, 7).unwrap();
-    grown.nodes.last_mut().unwrap().backend_def = birth::minimal_vm_backend();
+    *grown.nodes.last_mut().unwrap().backend_edit().1 = birth::minimal_vm_backend();
     let config = crate::config::RuntimeConfig::default();
     for input in [0.0, 1.0] {
         let before = execute_with_config(&base, input, 80.0, &config);
@@ -494,8 +494,8 @@ fn one_production_addition_is_conditional_silent_and_can_diverge_on_both_backend
         let base = conditional_fixture(graph);
         let mut grown = base.clone();
         apply(&mut grown, TopologyOperator::AddRouteTarget, 7).unwrap();
-        grown.nodes.last_mut().unwrap().backend_def = birth::minimal_vm_backend();
-        if let BackendDef::Graph(g) = &grown.nodes[0].backend_def {
+        *grown.nodes.last_mut().unwrap().backend_edit().1 = birth::minimal_vm_backend();
+        if let BackendDef::Graph(g) = grown.nodes[0].backend_def() {
             let sink = g
                 .output_sinks()
                 .iter()
@@ -571,7 +571,7 @@ fn dormant_alternative_cannot_win_even_when_other_routes_have_dynamic_bids() {
         });
         gate(&mut g.nodes[0], 1);
         // Place a varying bid after the ReadInput, before Halt.
-        if let BackendDef::Vm(vm) = &mut g.nodes[0].backend_def {
+        if let BackendDef::Vm(vm) = g.nodes[0].backend_edit().1 {
             vm.program.remove(0);
             let at = vm.program.len() - 1;
             vm.program
@@ -596,12 +596,12 @@ fn dormant_alternative_cannot_win_even_when_other_routes_have_dynamic_bids() {
 #[test]
 fn graph_alternative_can_grow_a_vm_without_erasing_original() {
     let mut g = genome(vec![node(0, &[1]), node(1, &[])]);
-    g.nodes[1].backend_def = BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs());
+    *g.nodes[1].backend_edit().1 = BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs());
     let old = g.nodes[1].clone();
     apply(&mut g, TopologyOperator::SwapNodeBackend, 7).unwrap();
     assert_eq!(g.nodes[1], old);
     assert!(
-        matches!(&g.nodes[2].backend_def,BackendDef::Vm(vm) if vm.program==vec![VmInstruction::Halt])
+        matches!(g.nodes[2].backend_def(),BackendDef::Vm(vm) if vm.program==vec![VmInstruction::Halt])
     );
     apply(&mut g, TopologyOperator::SwapRouteTargets, 7).unwrap();
     assert_eq!(g.nodes[0].targets[0].target_id, g.nodes[2].node_id);
@@ -611,13 +611,14 @@ fn graph_alternative_can_grow_a_vm_without_erasing_original() {
 fn paired_graph_gates_reach_all_sensor_subvalues_without_resampling() {
     use crate::contracts::WorldInputKey;
     let mut base = conditional_fixture(true);
-    base.nodes[0].input_refs = vec![InputReference::World(WorldInputKey::NeighborBarrierRing)];
+    *base.nodes[0].input_refs_mut() =
+        vec![InputReference::World(WorldInputKey::NeighborBarrierRing)];
     let mut seen = std::collections::BTreeSet::new();
     let mut memory_sources = 0;
     for seed in 0..256 {
         let mut g = base.clone();
         apply(&mut g, TopologyOperator::AddRouteTarget, seed).unwrap();
-        let BackendDef::Graph(graph) = &g.nodes[0].backend_def else {
+        let BackendDef::Graph(graph) = g.nodes[0].backend_def() else {
             panic!()
         };
         let edge = graph
@@ -649,7 +650,7 @@ fn paired_graph_gates_reach_all_sensor_subvalues_without_resampling() {
 fn vm_gate_can_append_without_terminal_and_preserve_shifted_jump_target() {
     for terminal in [VmInstruction::Halt, VmInstruction::Halt] {
         let mut g = genome(vec![node(0, &[1]), node(1, &[])]);
-        let BackendDef::Vm(vm) = &mut g.nodes[0].backend_def else {
+        let BackendDef::Vm(vm) = g.nodes[0].backend_edit().1 else {
             panic!()
         };
         vm.program = vec![
@@ -658,7 +659,7 @@ fn vm_gate_can_append_without_terminal_and_preserve_shifted_jump_target() {
             VmInstruction::Noop,
         ];
         apply(&mut g, TopologyOperator::AddRouteTarget, 7).unwrap();
-        let BackendDef::Vm(vm) = &g.nodes[0].backend_def else {
+        let BackendDef::Vm(vm) = g.nodes[0].backend_def() else {
             panic!()
         };
         let VmInstruction::Jump { offset } = vm.program[0] else {
@@ -671,11 +672,11 @@ fn vm_gate_can_append_without_terminal_and_preserve_shifted_jump_target() {
         assert_eq!(vm.program[2], terminal);
     }
     let mut g = genome(vec![node(0, &[1]), node(1, &[])]);
-    if let BackendDef::Vm(vm) = &mut g.nodes[0].backend_def {
+    if let BackendDef::Vm(vm) = g.nodes[0].backend_edit().1 {
         vm.program = vec![VmInstruction::Noop];
     }
     apply(&mut g, TopologyOperator::AddRouteTarget, 7).unwrap();
-    let BackendDef::Vm(vm) = &g.nodes[0].backend_def else {
+    let BackendDef::Vm(vm) = g.nodes[0].backend_def() else {
         panic!()
     };
     assert!(matches!(
@@ -706,10 +707,10 @@ fn inline_growth_preserves_bus_queue_priority_memory_and_exposes_real_energy_cos
         }
     }
     let mut base = genome(vec![node(0, &[1]), node(1, &[])]);
-    base.nodes[1].input_refs = vec![InputReference::DynamicIntrospection(
+    *base.nodes[1].input_refs_mut() = vec![InputReference::DynamicIntrospection(
         crate::contracts::DynamicIntrospectionKey::EnergyConsumedThisTick,
     )];
-    base.nodes[1].backend_def = BackendDef::Vm(VmBackendDef {
+    *base.nodes[1].backend_edit().1 = BackendDef::Vm(VmBackendDef {
         register_count: 1,
         constants: vec![],
         program: vec![
@@ -724,7 +725,7 @@ fn inline_growth_preserves_bus_queue_priority_memory_and_exposes_real_energy_cos
     });
     let mut grown = base.clone();
     apply(&mut grown, TopologyOperator::AddNode, 7).unwrap();
-    grown.nodes.last_mut().unwrap().backend_def = birth::minimal_vm_backend();
+    *grown.nodes.last_mut().unwrap().backend_edit().1 = birth::minimal_vm_backend();
     let before = execute(&base, 0.0, 1000.0);
     let after = execute(&grown, 0.0, 1000.0);
     assert!(
@@ -828,7 +829,7 @@ fn f18_growth_backend_choice_is_equal_and_source_independent() {
                 )
                 .unwrap();
                 assert_eq!(
-                    matches!(g.nodes[2].backend_def, BackendDef::Graph(_)),
+                    matches!(g.nodes[2].backend_def(), BackendDef::Graph(_)),
                     graph,
                     "{op:?} source_graph={source_graph} draw={draw}"
                 );

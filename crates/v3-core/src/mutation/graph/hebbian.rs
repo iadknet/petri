@@ -991,12 +991,12 @@ mod tests {
                         true;
                 }
                 assert_eq!(
-                    crate::genome::cgp::validate_graph(&crate::genome::NodeGenome {
-                        node_id: crate::contracts::NodeId::new(0),
-                        input_refs: Vec::new(),
-                        backend_def: BackendDef::Graph(def),
-                        targets: Vec::new(),
-                    }),
+                    crate::genome::cgp::validate_graph(&crate::genome::NodeGenome::new(
+                        crate::contracts::NodeId::new(0),
+                        Vec::new(),
+                        BackendDef::Graph(def),
+                        Vec::new()
+                    )),
                     Ok(()),
                     "{name} seed {seed}"
                 );

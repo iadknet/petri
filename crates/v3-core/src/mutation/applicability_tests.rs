@@ -200,12 +200,7 @@ pub(in crate::mutation) fn genome(seed: u64, sizes: &[ModuleSize]) -> CreatureGe
             } else {
                 BackendDef::Vm(vm_def(&mut rng, size))
             };
-            NodeGenome {
-                node_id: NodeId::new(i as u32),
-                input_refs: refs,
-                backend_def,
-                targets: Vec::new(),
-            }
+            NodeGenome::new(NodeId::new(i as u32), refs, backend_def, Vec::new())
         })
         .collect();
     CreatureGenome {
@@ -216,26 +211,26 @@ pub(in crate::mutation) fn genome(seed: u64, sizes: &[ModuleSize]) -> CreatureGe
 
 /// The blank Graph module the mesh birth operators create.
 fn blank_graph_node(id: u32) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(id),
-        input_refs: Vec::new(),
-        backend_def: BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
-        targets: Vec::new(),
-    }
+    NodeGenome::new(
+        NodeId::new(id),
+        Vec::new(),
+        BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
+        Vec::new(),
+    )
 }
 
 /// The minimal VM module the mesh birth operators create.
 fn blank_vm_node(id: u32) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(id),
-        input_refs: Vec::new(),
-        backend_def: BackendDef::Vm(VmBackendDef {
+    NodeGenome::new(
+        NodeId::new(id),
+        Vec::new(),
+        BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: Vec::new(),
             program: vec![VmInstruction::Halt],
         }),
-        targets: Vec::new(),
-    }
+        Vec::new(),
+    )
 }
 
 fn selector<'a>() -> TargetSelector<'a> {

@@ -42,12 +42,12 @@ fn graph_index(genome: &CreatureGenome) -> usize {
     genome
         .nodes
         .iter()
-        .position(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+        .position(|node| matches!(node.backend_def(), BackendDef::Graph(_)))
         .expect("the founder carries a Graph node")
 }
 
 fn graph_mut(node: &mut NodeGenome) -> &mut CgpGraphBackendDef {
-    match &mut node.backend_def {
+    match node.backend_edit().1 {
         BackendDef::Graph(def) => def,
         BackendDef::Vm(_) => panic!("a Graph node"),
     }
@@ -59,8 +59,8 @@ fn grouped_founder() -> (CreatureGenome, usize, u16) {
     let mut genome = v3alpha1_founder_genome();
     let idx = graph_index(&genome);
     let node = &mut genome.nodes[idx];
-    let ring = u16::try_from(node.input_refs.len()).unwrap();
-    node.input_refs
+    let ring = u16::try_from(node.input_refs().len()).unwrap();
+    node.input_refs_mut()
         .push(InputReference::World(WorldInputKey::NeighborBarrierRing));
     let id = graph_mut(node).add_ring_bundle(ring, DirectedVoteKind::Move, 2);
     graph_mut(node).bundle_mut(id).set_scale(0.5);
@@ -101,7 +101,7 @@ fn the_gate_rolls_back_a_graph_event_that_breaks_an_invariant() {
 #[test]
 fn the_gate_rolls_back_an_input_ref_event_that_breaks_an_invariant() {
     gate_rejects(|genome, idx, ring| {
-        genome.nodes[idx].input_refs[usize::from(ring)] = InputReference::ActionVotes;
+        genome.nodes[idx].input_refs_mut()[usize::from(ring)] = InputReference::ActionVotes;
     });
 }
 
@@ -113,8 +113,8 @@ fn the_gate_rolls_back_a_topology_event_that_breaks_an_invariant() {
         let other = (0..genome.nodes.len())
             .find(|&i| i != idx)
             .expect("the founder carries two nodes");
-        let backend = genome.nodes[idx].backend_def.clone();
-        genome.nodes[other].backend_def = backend;
+        let backend = genome.nodes[idx].backend_def().clone();
+        *genome.nodes[other].backend_edit().1 = backend;
     });
 }
 
@@ -128,13 +128,13 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
     let mut broken = valid.clone();
     // `other` carries a member whose bundle record is missing (I3), so no
     // bundle operator applies there and every gate check fails.
-    let mut json = serde_json::to_value(&valid.nodes[idx].backend_def).unwrap();
+    let mut json = serde_json::to_value(valid.nodes[idx].backend_def()).unwrap();
     json["Graph"]
         .as_object_mut()
         .expect("a Graph backend")
         .remove("bundles");
-    broken.nodes[other].backend_def = serde_json::from_value(json).unwrap();
-    broken.nodes[other].input_refs = valid.nodes[idx].input_refs.clone();
+    *broken.nodes[other].backend_edit().1 = serde_json::from_value(json).unwrap();
+    *broken.nodes[other].input_refs_mut() = valid.nodes[idx].input_refs().to_vec();
     assert!(validate_graph(&broken.nodes[other]).is_err());
     let config = MutationConfig::default();
     let all: Vec<usize> = (0..valid.nodes.len()).collect();
@@ -175,7 +175,7 @@ fn a_rolled_back_event_adds_nothing_to_either_counter() {
 fn a_rolled_back_learning_edit_reports_no_broadcast() {
     let (valid, idx, ring) = grouped_founder();
     let mut broken = valid.clone();
-    broken.nodes[idx].input_refs[usize::from(ring)] = InputReference::ActionVotes;
+    broken.nodes[idx].input_refs_mut()[usize::from(ring)] = InputReference::ActionVotes;
     assert!(validate_graph(&broken.nodes[idx]).is_err());
     let config = MutationConfig::default();
     let all = every_node(&valid);
@@ -278,7 +278,7 @@ fn a_committed_detach_counts_one_graph_edge_detached() {
 #[test]
 fn a_last_member_detach_removes_the_bundle_and_counts_one_removal() {
     let (mut genome, idx, _) = grouped_founder();
-    let refs = genome.nodes[idx].input_refs.clone();
+    let refs = genome.nodes[idx].input_refs().to_vec();
     let def = graph_mut(&mut genome.nodes[idx]);
     while def.members(BundleId::new(0)).count() > 1 {
         let member = def.members(BundleId::new(0)).next().unwrap();
@@ -343,12 +343,12 @@ fn sole_member_genome(fact: bool) -> CreatureGenome {
     );
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![area],
-            backend_def: BackendDef::Graph(def),
-            targets: vec![],
-        }],
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![area],
+            BackendDef::Graph(def),
+            vec![],
+        )],
     }
 }
 
@@ -371,7 +371,7 @@ fn every_creation_operator_moves_genome_size_by_its_unit_delta() {
     let base = v3alpha1_founder_genome();
     let graph = graph_index(&base);
     let mut vm_genome = base.clone();
-    vm_genome.nodes[graph].backend_def = BackendDef::Vm(VmBackendDef {
+    *vm_genome.nodes[graph].backend_edit().1 = BackendDef::Vm(VmBackendDef {
         register_count: 1,
         constants: vec![],
         program: vec![VmInstruction::Halt],
@@ -391,7 +391,7 @@ fn every_creation_operator_moves_genome_size_by_its_unit_delta() {
                 &context,
             )
             .expect("a full catalog wires every sensor");
-            let reference = genome.nodes[graph].input_refs.last().unwrap();
+            let reference = genome.nodes[graph].input_refs().last().unwrap();
             let sets = SensorDescriptor::of(reference, &context).field_set_count();
             let delta = genome.genome_size() - base.genome_size();
             assert_eq!(delta as usize, 1 + sets, "{op:?} {reference:?}");
@@ -490,7 +490,7 @@ fn a_committed_learning_edit_reports_its_reach() {
         genome
             .nodes
             .iter()
-            .filter_map(|node| match &node.backend_def {
+            .filter_map(|node| match node.backend_def() {
                 BackendDef::Graph(def) => Some(def),
                 BackendDef::Vm(_) => None,
             })
@@ -715,14 +715,14 @@ fn bundle_spec() -> impl Strategy<Value = BundleSpec> {
 /// each with members dropped (a bundle keeps at least one).
 fn add_bundles(node: &mut NodeGenome, bundles: &[BundleSpec]) {
     use crate::genome::cgp::{BundleBirth, BundleSource, Wiring};
-    let ring = u16::try_from(node.input_refs.len()).unwrap();
-    node.input_refs
+    let ring = u16::try_from(node.input_refs().len()).unwrap();
+    node.input_refs_mut()
         .push(InputReference::World(WorldInputKey::NeighborOccupiedRing));
     let area = InputReference::World(WorldInputKey::AreaOccupancySummary);
     let summary = ring + 1;
-    node.input_refs.push(area.clone());
+    node.input_refs_mut().push(area.clone());
     let counts = ring + 2;
-    node.input_refs.push(InputReference::CommitCounts);
+    node.input_refs_mut().push(InputReference::CommitCounts);
     let context = crate::config::test_sensor_context(1);
     for &(kind, offset, scale, drop, shape) in bundles {
         let kind = DirectedVoteKind::ALL[kind];
@@ -768,7 +768,7 @@ fn add_bundles(node: &mut NodeGenome, bundles: &[BundleSpec]) {
 fn grouped_mixed_genome(bundles: &[Vec<BundleSpec>; 2]) -> CreatureGenome {
     let mut genome = v3alpha1_founder_genome();
     let graphs: Vec<usize> = (0..genome.nodes.len())
-        .filter(|&i| matches!(genome.nodes[i].backend_def, BackendDef::Graph(_)))
+        .filter(|&i| matches!(genome.nodes[i].backend_def(), BackendDef::Graph(_)))
         .collect();
     assert_eq!(graphs.len(), 2, "the founder carries two Graph nodes");
     for (&idx, bundles) in graphs.iter().zip(bundles) {
@@ -780,16 +780,16 @@ fn grouped_mixed_genome(bundles: &[Vec<BundleSpec>; 2]) -> CreatureGenome {
         slot: 0,
         gate_bias: 0.0,
     });
-    genome.nodes.push(NodeGenome {
-        node_id: vm_id,
-        input_refs: vec![],
-        backend_def: BackendDef::Vm(VmBackendDef {
+    genome.nodes.push(NodeGenome::new(
+        vm_id,
+        vec![],
+        BackendDef::Vm(VmBackendDef {
             register_count: 2,
             constants: vec![1.0],
             program: vec![VmInstruction::Halt],
         }),
-        targets: vec![],
-    });
+        vec![],
+    ));
     genome
 }
 
@@ -851,8 +851,8 @@ proptest! {
             let target = event.target.and_then(|id| before.nodes.iter().position(|n| n.node_id == id));
             let Some(target) = target else { continue };
             let (BackendDef::Graph(old), Some(BackendDef::Graph(new))) = (
-                &before.nodes[target].backend_def,
-                genome.nodes.iter().find(|n| n.node_id == before.nodes[target].node_id).map(|n| &n.backend_def),
+                before.nodes[target].backend_def(),
+                genome.nodes.iter().find(|n| n.node_id == before.nodes[target].node_id).map(|n| n.backend_def()),
             ) else {
                 continue;
             };
@@ -860,10 +860,10 @@ proptest! {
                 let delta = i64::from(genome.genome_size()) - i64::from(before.genome_size());
                 prop_assert!(allowed.contains(&delta), "{:?}: {} not in {:?}", op, delta, allowed);
             }
-            let removed = before.nodes.iter().map(|n| match &n.backend_def {
+            let removed = before.nodes.iter().map(|n| match n.backend_def() {
                 BackendDef::Graph(d) => d.bundles().len(),
                 BackendDef::Vm(_) => 0,
-            }).sum::<usize>().saturating_sub(genome.nodes.iter().map(|n| match &n.backend_def {
+            }).sum::<usize>().saturating_sub(genome.nodes.iter().map(|n| match n.backend_def() {
                 BackendDef::Graph(d) => d.bundles().len(),
                 BackendDef::Vm(_) => 0,
             }).sum::<usize>());

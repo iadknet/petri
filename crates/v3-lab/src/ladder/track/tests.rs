@@ -24,12 +24,7 @@ fn founder() -> CreatureGenome {
 }
 
 fn node(id: u32, input_refs: Vec<InputReference>, backend_def: BackendDef) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId(id),
-        input_refs,
-        backend_def,
-        targets: Vec::new(),
-    }
+    NodeGenome::new(NodeId(id), input_refs, backend_def, Vec::new())
 }
 
 fn vm(program: Vec<VmInstruction>) -> BackendDef {
@@ -389,7 +384,7 @@ fn a_later_edit_of_a_changed_node_or_a_moved_entry_breaks_the_carry() {
     assert_eq!(change.added, [junk(9, 1)]);
     assert!(change.carried_by(&with(&child, junk(10, 0))));
     let mut edited = child.clone();
-    edited.nodes.last_mut().unwrap().backend_def = vm(Vec::new());
+    *edited.nodes.last_mut().unwrap().backend_edit().1 = vm(Vec::new());
     assert!(!change.carried_by(&edited));
 
     let mut moved = child.clone();
@@ -688,7 +683,7 @@ fn touching_children_are_classed_on_the_battery_and_viable_needs_a_behavior_chan
     let silent = with(&parent, junk(60, 1));
     let mut dead = parent.clone();
     for n in &mut dead.nodes {
-        if let BackendDef::Graph(graph) = &mut n.backend_def {
+        if let BackendDef::Graph(graph) = n.backend_edit().1 {
             let sinks = graph
                 .output_sinks()
                 .iter()

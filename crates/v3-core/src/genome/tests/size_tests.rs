@@ -23,23 +23,23 @@ fn leaf(ref_idx: u16) -> GraphSource {
 fn graph_genome(def: CgpGraphBackendDef, refs: usize, targets: u8) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![
                 InputReference::World(WorldInputKey::FoodHere {
                     type_idx: OrdinaryFoodTypeId::default(),
                 });
                 refs
             ],
-            backend_def: BackendDef::Graph(def),
-            targets: (0..targets)
+            BackendDef::Graph(def),
+            (0..targets)
                 .map(|slot| RouteTarget {
                     target_id: NodeId::new(1),
                     slot,
                     gate_bias: 0.0,
                 })
                 .collect(),
-        }],
+        )],
     }
 }
 

@@ -41,11 +41,11 @@ fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
         }
         def
     };
-    let entry = NodeGenome {
-        node_id: id_entry,
-        input_refs: vec![],
-        backend_def: BackendDef::Graph(entry_def),
-        targets: vec![
+    let entry = NodeGenome::new(
+        id_entry,
+        vec![],
+        BackendDef::Graph(entry_def),
+        vec![
             RouteTarget {
                 target_id: id_noop,
                 slot: 0,
@@ -57,21 +57,21 @@ fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
                 gate_bias: 0.0,
             },
         ],
-    };
-    let noop = NodeGenome {
-        node_id: id_noop,
-        input_refs: vec![],
-        backend_def: BackendDef::Vm(VmBackendDef {
+    );
+    let noop = NodeGenome::new(
+        id_noop,
+        vec![],
+        BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: vec![],
             program: vec![VmInstruction::Noop, VmInstruction::Halt],
         }),
-        targets: vec![],
-    };
-    let eat = NodeGenome {
-        node_id: id_eat,
-        input_refs: vec![],
-        backend_def: BackendDef::Vm(VmBackendDef {
+        vec![],
+    );
+    let eat = NodeGenome::new(
+        id_eat,
+        vec![],
+        BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: vec![1.0],
             program: vec![
@@ -83,8 +83,8 @@ fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
                 VmInstruction::Halt,
             ],
         }),
-        targets: vec![],
-    };
+        vec![],
+    );
 
     let genome = CreatureGenome {
         entry_node_id: id_entry,
@@ -150,12 +150,12 @@ fn graph_state_persists_across_ticks_e2e() {
     };
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Graph(state_def),
-            targets: vec![],
-        }],
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Graph(state_def),
+            vec![],
+        )],
     };
 
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();

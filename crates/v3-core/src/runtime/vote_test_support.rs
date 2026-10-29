@@ -46,16 +46,16 @@ pub(crate) fn vm_voter(id: u32, votes: &[(VoteSink, f32)], target_ids: &[u32]) -
         });
     }
     program.push(VmInstruction::Halt);
-    NodeGenome {
-        node_id: NodeId::new(id),
-        input_refs: vec![],
-        backend_def: BackendDef::Vm(VmBackendDef {
+    NodeGenome::new(
+        NodeId::new(id),
+        vec![],
+        BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: votes.iter().map(|(_, value)| *value).collect(),
             program,
         }),
-        targets: targets(target_ids),
-    }
+        targets(target_ids),
+    )
 }
 
 /// A VM node running `program` over `constants` with `registers` registers.
@@ -67,16 +67,16 @@ pub(crate) fn vm_node(
     input_refs: Vec<InputReference>,
     target_ids: &[u32],
 ) -> NodeGenome {
-    NodeGenome {
-        node_id: NodeId::new(id),
+    NodeGenome::new(
+        NodeId::new(id),
         input_refs,
-        backend_def: BackendDef::Vm(VmBackendDef {
+        BackendDef::Vm(VmBackendDef {
             register_count: registers,
             constants,
             program,
         }),
-        targets: targets(target_ids),
-    }
+        targets(target_ids),
+    )
 }
 
 /// A graph backend under construction on the full fixed catalog.
@@ -142,12 +142,12 @@ impl GraphBuilder {
         input_refs: Vec<InputReference>,
         target_ids: &[u32],
     ) -> NodeGenome {
-        NodeGenome {
-            node_id: NodeId::new(id),
+        NodeGenome::new(
+            NodeId::new(id),
             input_refs,
-            backend_def: BackendDef::Graph(self.0),
-            targets: targets(target_ids),
-        }
+            BackendDef::Graph(self.0),
+            targets(target_ids),
+        )
     }
 }
 

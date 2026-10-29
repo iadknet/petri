@@ -19,34 +19,25 @@ pub(super) fn graph_def_mut(
     genome: &mut CreatureGenome,
     node_idx: usize,
 ) -> Result<&mut CgpGraphBackendDef, MutationSkipReason> {
+    graph_node_mut(genome, node_idx).map(|(def, _)| def)
+}
+
+/// The target node's graph backend def beside its declarations, through
+/// the node's split borrow ([`crate::genome::NodeGenome::backend_edit`]),
+/// for operators (`random_graph_source` callers) that need both.
+#[inline]
+pub(super) fn graph_node_mut(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+) -> Result<(&mut CgpGraphBackendDef, &[InputReference]), MutationSkipReason> {
     let node = genome
         .nodes
         .get_mut(node_idx)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    match &mut node.backend_def {
-        BackendDef::Graph(def) => Ok(def),
-        _ => Err(MutationSkipReason::NoApplicableTarget),
+    match node.backend_edit() {
+        (input_refs, BackendDef::Graph(def)) => Ok((def, input_refs)),
+        (_, BackendDef::Vm(_)) => Err(MutationSkipReason::NoApplicableTarget),
     }
-}
-
-/// The target node's graph backend def alongside a clone of its
-/// `input_refs`, for operators (`random_graph_source` callers) that need
-/// both: the clone is taken before the mutable borrow of `backend_def` so
-/// both are available together despite living on the same `NodeGenome`.
-// WORKAROUND(T30.F11): a split borrow of the node's declarations and graph
-// (as `mutation/graph/bundle.rs` `graph_node` does), not a clone of `input_refs`.
-#[inline]
-fn graph_def_mut_with_input_refs(
-    genome: &mut CreatureGenome,
-    node_idx: usize,
-) -> Result<(&mut CgpGraphBackendDef, Vec<InputReference>), MutationSkipReason> {
-    let input_refs = genome
-        .nodes
-        .get(node_idx)
-        .map(|n| n.input_refs.clone())
-        .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let def = graph_def_mut(genome, node_idx)?;
-    Ok((def, input_refs))
 }
 
 /// A node's declarations under the run's sensor context: what the source
@@ -120,11 +111,11 @@ pub(super) fn add_internal_node(
     context: &SensorContext,
     rng: &mut impl Rng,
 ) -> Result<BundleEdits, MutationSkipReason> {
-    let (def, input_refs) = graph_def_mut_with_input_refs(genome, node_idx)?;
+    let (def, input_refs) = graph_node_mut(genome, node_idx)?;
     add_compute_node(
         def,
         NodeInputs {
-            refs: &input_refs,
+            refs: input_refs,
             context,
         },
         rng,
@@ -137,11 +128,11 @@ pub(super) fn add_graph_edge(
     context: &SensorContext,
     rng: &mut impl Rng,
 ) -> Result<Option<BirthEdgeClass>, MutationSkipReason> {
-    let (def, input_refs) = graph_def_mut_with_input_refs(genome, node_idx)?;
+    let (def, input_refs) = graph_node_mut(genome, node_idx)?;
     add_edge(
         def,
         NodeInputs {
-            refs: &input_refs,
+            refs: input_refs,
             context,
         },
         rng,
@@ -163,11 +154,11 @@ pub(super) fn retarget_graph_edge(
     context: &SensorContext,
     rng: &mut impl Rng,
 ) -> Result<BundleEdits, MutationSkipReason> {
-    let (def, input_refs) = graph_def_mut_with_input_refs(genome, node_idx)?;
+    let (def, input_refs) = graph_node_mut(genome, node_idx)?;
     retarget_edge(
         def,
         NodeInputs {
-            refs: &input_refs,
+            refs: input_refs,
             context,
         },
         rng,
@@ -189,11 +180,11 @@ pub(super) fn apply_graph_raw_field_mutation(
     context: &SensorContext,
     rng: &mut impl Rng,
 ) -> Result<BundleEdits, MutationSkipReason> {
-    let (def, input_refs) = graph_def_mut_with_input_refs(genome, node_idx)?;
+    let (def, input_refs) = graph_node_mut(genome, node_idx)?;
     raw_field_mutation(
         def,
         NodeInputs {
-            refs: &input_refs,
+            refs: input_refs,
             context,
         },
         rng,
@@ -1664,16 +1655,16 @@ mod tests {
         let before = total_edge_count(&def);
         let mut genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: sample_input_refs(),
-                backend_def: BackendDef::Graph(def),
-                targets: Vec::new(),
-            }],
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                sample_input_refs(),
+                BackendDef::Graph(def),
+                Vec::new(),
+            )],
         };
         let mut rng = test_rng();
         add_graph_edge(&mut genome, 0, &TEST_CONTEXT, &mut rng).expect("edge add should succeed");
-        let BackendDef::Graph(after_def) = &genome.nodes[0].backend_def else {
+        let BackendDef::Graph(after_def) = genome.nodes[0].backend_def() else {
             panic!("expected a Cgp graph node");
         };
         assert_eq!(total_edge_count(after_def), before + 1);

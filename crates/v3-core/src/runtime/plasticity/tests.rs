@@ -109,12 +109,12 @@ fn edit_config(def: &mut CgpGraphBackendDef, node: usize, edit: impl Fn(&mut Lea
 fn genome(def: &CgpGraphBackendDef) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Graph(def.clone()),
-            targets: vec![],
-        }],
+        nodes: vec![NodeGenome::new(
+            NodeId::new(0),
+            vec![],
+            BackendDef::Graph(def.clone()),
+            vec![],
+        )],
     }
 }
 
@@ -639,12 +639,7 @@ fn out_of_range_learning_attributes_are_rejected_at_the_load_boundary() {
             edge(plasticity)
         );
         let def: CgpGraphBackendDef = serde_json::from_str(&json).unwrap();
-        NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Graph(def),
-            targets: vec![],
-        }
+        NodeGenome::new(NodeId::new(0), vec![], BackendDef::Graph(def), vec![])
     };
     let modulated = |decay: &str| {
         format!(

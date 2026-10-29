@@ -178,11 +178,60 @@ impl BackendDef {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct NodeGenome {
     pub node_id: NodeId,
-    /// Shared input slot references for both VM and Graph backends.
-    pub input_refs: Vec<InputReference>,
-    pub backend_def: BackendDef,
+    /// Shared input slot references for both VM and Graph backends; written
+    /// only by the node's owner operations (`genome::node_edit`).
+    input_refs: Vec<InputReference>,
+    /// Edited through [`Self::backend_edit`] or the genome's operations.
+    backend_def: BackendDef,
     /// Candidate routing targets. May contain dangling IDs (junk DNA).
     pub targets: Vec<RouteTarget>,
+}
+
+impl NodeGenome {
+    /// A node of `node_id` declaring `input_refs`, running `backend_def` and
+    /// routing to `targets`, exactly as given.
+    #[must_use]
+    pub fn new(
+        node_id: NodeId,
+        input_refs: Vec<InputReference>,
+        backend_def: BackendDef,
+        targets: Vec<RouteTarget>,
+    ) -> Self {
+        Self {
+            node_id,
+            input_refs,
+            backend_def,
+            targets,
+        }
+    }
+
+    /// The node's declarations, in index order.
+    #[inline]
+    #[must_use]
+    pub fn input_refs(&self) -> &[InputReference] {
+        &self.input_refs
+    }
+
+    /// The node's backend.
+    #[inline]
+    #[must_use]
+    pub fn backend_def(&self) -> &BackendDef {
+        &self.backend_def
+    }
+
+    /// The split borrow for a backend edit: the declarations a Graph edit
+    /// reads its sources and patterns from, beside the backend it edits.
+    #[inline]
+    pub fn backend_edit(&mut self) -> (&[InputReference], &mut BackendDef) {
+        (&self.input_refs, &mut self.backend_def)
+    }
+
+    /// A fixture's direct write of the declarations, past the owner
+    /// operations' checks (tests only).
+    #[cfg(test)]
+    pub(crate) fn input_refs_mut(&mut self) -> &mut Vec<InputReference> {
+        &mut self.input_refs
+    }
 }
 
 /// The complete genome of a creature.
@@ -482,20 +531,20 @@ mod tests {
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![
-                NodeGenome {
-                    node_id: NodeId::new(0),
-                    input_refs: vec![],
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                NodeGenome::new(
+                    NodeId::new(0),
+                    vec![],
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],
                         program: vec![VmInstruction::Halt],
                     }),
-                    targets: vec![],
-                },
-                NodeGenome {
-                    node_id: NodeId::new(1),
-                    input_refs: vec![],
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                    vec![],
+                ),
+                NodeGenome::new(
+                    NodeId::new(1),
+                    vec![],
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],
                         program: vec![
@@ -503,8 +552,8 @@ mod tests {
                             VmInstruction::Halt,
                         ],
                     }),
-                    targets: vec![],
-                },
+                    vec![],
+                ),
             ],
         };
         assert!(genome.find_node(NodeId::new(0)).is_some());
@@ -526,13 +575,13 @@ mod tests {
         // 1 node + 2 input_refs + 1 target + 3 program + 2 constants = 9
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![
                     InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
                     InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
                 ],
-                backend_def: BackendDef::Vm(VmBackendDef {
+                BackendDef::Vm(VmBackendDef {
                     register_count: 4,
                     constants: vec![1.0, 2.0],
                     program: vec![
@@ -544,12 +593,12 @@ mod tests {
                         VmInstruction::Halt,
                     ],
                 }),
-                targets: vec![RouteTarget {
+                vec![RouteTarget {
                     target_id: NodeId::new(1),
                     slot: 0,
                     gate_bias: 0.0,
                 }],
-            }],
+            )],
         };
         assert_eq!(genome.genome_size(), 9);
     }
@@ -589,14 +638,14 @@ mod tests {
         ]);
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![InputReference::World(WorldInputKey::FoodHere {
                     type_idx: crate::config::OrdinaryFoodTypeId::default(),
                 })],
-                backend_def: BackendDef::Graph(cgp),
-                targets: vec![],
-            }],
+                BackendDef::Graph(cgp),
+                vec![],
+            )],
         };
         assert_eq!(genome.genome_size(), 7);
     }
@@ -615,28 +664,28 @@ mod tests {
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![
-                NodeGenome {
-                    node_id: NodeId::new(0),
-                    input_refs: vec![],
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                NodeGenome::new(
+                    NodeId::new(0),
+                    vec![],
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],
                         program: vec![VmInstruction::Halt],
                     }),
-                    targets: vec![RouteTarget {
+                    vec![RouteTarget {
                         target_id: NodeId::new(1),
                         slot: 0,
                         gate_bias: 0.0,
                     }],
-                },
-                NodeGenome {
-                    node_id: NodeId::new(1),
-                    input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
+                ),
+                NodeGenome::new(
+                    NodeId::new(1),
+                    vec![InputReference::World(WorldInputKey::FoodHere {
                         type_idx: crate::config::OrdinaryFoodTypeId::default(),
                     })],
-                    backend_def: BackendDef::Graph(cgp),
-                    targets: vec![],
-                },
+                    BackendDef::Graph(cgp),
+                    vec![],
+                ),
             ],
         };
         assert_eq!(genome.genome_size(), 6);
@@ -650,12 +699,12 @@ mod tests {
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![
-                NodeGenome {
-                    node_id: NodeId::new(0),
-                    input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
+                NodeGenome::new(
+                    NodeId::new(0),
+                    vec![InputReference::World(WorldInputKey::FoodHere {
                         type_idx: crate::config::OrdinaryFoodTypeId::default(),
                     })],
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 4,
                         constants: vec![],
                         program: vec![
@@ -667,16 +716,16 @@ mod tests {
                             VmInstruction::WriteRouteGate { slot: 0, src: 0 },
                         ],
                     }),
-                    targets: vec![RouteTarget {
+                    vec![RouteTarget {
                         target_id: NodeId::new(1),
                         slot: 0,
                         gate_bias: 0.0,
                     }],
-                },
-                NodeGenome {
-                    node_id: NodeId::new(1),
-                    input_refs: vec![],
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                ),
+                NodeGenome::new(
+                    NodeId::new(1),
+                    vec![],
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 4,
                         constants: vec![],
                         program: vec![
@@ -687,14 +736,14 @@ mod tests {
                             },
                         ],
                     }),
-                    targets: vec![],
-                },
-                NodeGenome {
-                    node_id: NodeId::new(2),
-                    input_refs: vec![InputReference::DynamicIntrospection(
+                    vec![],
+                ),
+                NodeGenome::new(
+                    NodeId::new(2),
+                    vec![InputReference::DynamicIntrospection(
                         DynamicIntrospectionKey::EnergyCurrent,
                     )],
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 4,
                         constants: vec![],
                         program: vec![
@@ -710,8 +759,8 @@ mod tests {
                             },
                         ],
                     }),
-                    targets: vec![],
-                },
+                    vec![],
+                ),
             ],
         };
         // Node 0: 1 + 1 target + 2 live instrs + 0 consts + 1 consumed ref = 5
@@ -728,12 +777,12 @@ mod tests {
         // All nodes reachable, all instructions live, all input_refs consumed
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![InputReference::World(WorldInputKey::FoodHere {
                     type_idx: crate::config::OrdinaryFoodTypeId::default(),
                 })],
-                backend_def: BackendDef::Vm(VmBackendDef {
+                BackendDef::Vm(VmBackendDef {
                     register_count: 4,
                     constants: vec![],
                     program: vec![
@@ -745,8 +794,8 @@ mod tests {
                         VmInstruction::WriteRouteGate { slot: 0, src: 0 },
                     ],
                 }),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         };
         // Node: 1 + 0 targets + 2 live instrs + 0 consts + 1 consumed ref = 4
         // genome_size: 1 + 1 input_ref + 0 targets + 2 instrs + 0 consts = 4
@@ -757,10 +806,10 @@ mod tests {
     fn creature_genome_serde_roundtrip() {
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome {
-                node_id: NodeId::new(0),
-                input_refs: vec![],
-                backend_def: BackendDef::Vm(VmBackendDef {
+            nodes: vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
                     register_count: 2,
                     constants: vec![1.0, 2.0],
                     program: vec![
@@ -768,8 +817,8 @@ mod tests {
                         VmInstruction::Halt,
                     ],
                 }),
-                targets: vec![],
-            }],
+                vec![],
+            )],
         };
         let json = serde_json::to_string(&genome).unwrap();
         let genome2: CreatureGenome = serde_json::from_str(&json).unwrap();
@@ -800,18 +849,18 @@ mod tests {
         CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![
-                NodeGenome {
-                    node_id: NodeId::new(0),
-                    input_refs: vec![InputReference::DynamicIntrospection(
+                NodeGenome::new(
+                    NodeId::new(0),
+                    vec![InputReference::DynamicIntrospection(
                         DynamicIntrospectionKey::EnergyCurrent,
                     )],
-                    backend_def: BackendDef::Graph(graph),
-                    targets: vec![],
-                },
-                NodeGenome {
-                    node_id: NodeId::new(1),
-                    input_refs: vec![],
-                    backend_def: BackendDef::Vm(VmBackendDef {
+                    BackendDef::Graph(graph),
+                    vec![],
+                ),
+                NodeGenome::new(
+                    NodeId::new(1),
+                    vec![],
+                    BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![0.25],
                         program: ActionParamField::ALL
@@ -822,8 +871,8 @@ mod tests {
                             })
                             .collect(),
                     }),
-                    targets: vec![],
-                },
+                    vec![],
+                ),
             ],
         }
     }

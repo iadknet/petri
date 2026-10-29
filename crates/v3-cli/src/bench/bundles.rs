@@ -223,7 +223,7 @@ mod tests {
         let node = genome
             .nodes
             .iter_mut()
-            .find(|node| matches!(node.backend_def, BackendDef::Graph(_)))
+            .find(|node| matches!(node.backend_def(), BackendDef::Graph(_)))
             .expect("the founder carries a Graph node");
         let ring = node
             .add_sensor(

@@ -815,11 +815,13 @@ fn add_bundle_refuses_an_inadmissible_wiring_or_a_full_table() {
 
 #[test]
 fn validate_graph_rejects_each_broken_invariant() {
-    let node = |def: CgpGraphBackendDef, input_refs: Vec<InputReference>| NodeGenome {
-        node_id: crate::contracts::NodeId(0),
-        input_refs,
-        backend_def: BackendDef::Graph(def),
-        targets: Vec::new(),
+    let node = |def: CgpGraphBackendDef, input_refs: Vec<InputReference>| {
+        NodeGenome::new(
+            crate::contracts::NodeId(0),
+            input_refs,
+            BackendDef::Graph(def),
+            Vec::new(),
+        )
     };
     let (def, _) = grouped(DirectedVoteKind::Move, 1);
     assert_eq!(validate_graph(&node(def.clone(), ring_refs())), Ok(()));
@@ -1135,12 +1137,12 @@ fn coordinates(def: &CgpGraphBackendDef, id: BundleId) -> Vec<(u16, Site)> {
 }
 
 fn pair_node(def: CgpGraphBackendDef, input_refs: Vec<InputReference>) -> NodeGenome {
-    NodeGenome {
-        node_id: crate::contracts::NodeId(0),
+    NodeGenome::new(
+        crate::contracts::NodeId(0),
         input_refs,
-        backend_def: BackendDef::Graph(def),
-        targets: Vec::new(),
-    }
+        BackendDef::Graph(def),
+        Vec::new(),
+    )
 }
 
 /// Re-sort a hand-edited sink into the I10 order.
@@ -1571,12 +1573,12 @@ proptest! {
 // ── Learning attributes (T25.F06) ───────────────────────────────────────────
 
 fn learning_node(def: CgpGraphBackendDef, input_refs: Vec<InputReference>) -> NodeGenome {
-    NodeGenome {
-        node_id: crate::contracts::NodeId(0),
+    NodeGenome::new(
+        crate::contracts::NodeId(0),
         input_refs,
-        backend_def: BackendDef::Graph(def),
-        targets: Vec::new(),
-    }
+        BackendDef::Graph(def),
+        Vec::new(),
+    )
 }
 
 /// A `ClearSlot` edge never learns (its sum is ignored): it is not
