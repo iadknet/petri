@@ -667,8 +667,22 @@ added/removed/retyped — only their edges are evolvable.
 - `RawFieldMutation` (raw representable-field mutation for tolerant
   `UpstreamSlot(usize)` values)
 
-Phenotype mutation is not a mutation engine domain. It is a separate pathway
-triggered by genome mutation; see `v3-phenotype-spec.md`.
+The body chromosome is the fifth domain, `Body` (T29.F02): one operator per
+gene, `Body.Colour`, `Body.KinTag`, `Body.Capacity`, `Body.StealShare` and
+`Body.GiveShare`, each complexity-neutral. A body event draws its gene
+uniformly over the five, then that gene's draws: the colour step
+(`v3-phenotype-spec.md` Section 5), a kin-tag bit in `0..32`, or a step
+uniform in `[-log_step, log_step]` (`mutation.capacity.log_step` for the
+capacity, `mutation.share.log_step` for each share), applied as
+`(value × e^δ).clamp(min, max)` over the gene's range (the capacity in
+`[energy.capacity.min, energy.lifecycle.max_energy]`, each share in
+`[exchange.share_min, 1]`). A body event is never rejected, needs no
+parseability or graph gate, ignores the size-pressure restriction, selects no
+node and maps every learnable to itself. It is recorded as attempted and
+applied with no target, no discards and `NotApplicable` reachability. The
+facts only the brain has (the two-layer dispatch, operator weights, the
+reachable bias) are defined over the four brain domains (`BrainDomain`); a
+body operator has no weight.
 
 Implementations may add operators, but they must preserve structural
 parseability or be rolled back/skipped under policy below.
@@ -686,11 +700,13 @@ apply_mutations(genome, mutation_config, parent_reachable_nodes,
 
 Call semantics:
 - `MutationEngine` is called unconditionally for every offspring. Internally,
-  it draws the requested event count from the one supply rule: one
-  Bernoulli trial per unit at `per_unit_rate` (T11.F19, T11.F20), on the
-  parent's own `genome_size()` for every production birth. If
-  the count is zero, it returns a zero-event summary immediately. Callers
-  never skip the `MutationEngine` call.
+  it draws the requested event count from the one supply rule, per
+  chromosome: one Bernoulli trial per unit at `per_unit_rate` (T11.F19,
+  T11.F20), first on the parent's `brain_units()`, then on the body's five
+  units (T29.F02). The brain's events run the loop below; the body's events
+  follow them. Every entry takes the body's ranges, resolved from config by
+  `creature::body::body_ranges`. Callers never skip the `MutationEngine`
+  call.
 - `parent_reachable_nodes` is a sorted ascending slice of node indices that
   were reachable in the parent's genome (computed via BFS from entry node).
   Used for reachability-biased target selection (see Section 4.3).
@@ -749,18 +765,20 @@ Selection randomization rules (internal to `MutationEngine`):
   count once, draw one Bernoulli trial at `per_unit_rate` per unit, and
   request one event per success, so the count is
   `Binomial(units, per_unit_rate)` with no trigger, minimum, maximum, or
-  continuation. Every production birth and reading uses the parent's own
-  `genome_size()`, so a genome pays its size in exposure. Rate 0.0 requests
-  nothing (every birth is a clone); rate 1.0 requests one event per unit. The
-  default 0.0060625 (`0.485 / 80`, T25.F02) keeps the 80-unit V3Alpha1
-  founder at 0.485 requested events per birth. Natural analog: per-base copy error. If the count is
-  zero, `MutationEngine` returns `MutationSummary { attempted_events: 0,
-  applied_events: 0, skipped_events: 0, ... }` immediately.
-- The one instrument, the drift walk, draws the same rule on a fixed unit
-  count: the canonical V3Alpha1 founder's `genome_size()`
-  (`FOUNDER_GENOME_SIZE_UNITS`, 80), whatever the walked genome's size, so
-  its exposure is an instrument constant (`Binomial(80, per_unit_rate)`,
-  0.485 requested events per birth at the default rate).
+  continuation, drawn per chromosome: `Binomial(brain_units, rate)` brain
+  events, then `Binomial(5, rate)` body events (T29.F02). Every production
+  birth and reading uses the parent's own units, so a genome pays its size in
+  exposure. Rate 0.0 requests nothing (every birth is a clone); rate 1.0
+  requests one event per unit. The default `0.485 / 85` (T29.F02; T25.F02's
+  `0.485 / 80` before the body genes) keeps the 85-unit V3Alpha1 founder at
+  0.485 requested events per birth. Natural analog: per-base copy error. If
+  both counts are zero, `MutationEngine` returns `MutationSummary {
+  attempted_events: 0, applied_events: 0, skipped_events: 0, ... }`.
+- The drift walk draws the same rule on fixed unit counts: the canonical
+  V3Alpha1 founder's 80 brain and 5 body units (`drift::walk_units`),
+  whatever the walked genome's size, so its exposure is an instrument
+  constant (0.485 requested events per birth at the default rate). The
+  one-event screen draws on one brain unit and no body unit.
 - Every requested event becomes one attempted event; a skip does not cause an
   extra requested event. `attempted_events = applied_events + skipped_events`.
 - For each event, select topology with `mesh_layer_probability`; otherwise

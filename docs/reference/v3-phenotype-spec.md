@@ -38,9 +38,11 @@ This document does not define:
 
 ## 2. Phenotype State Model
 
-Per-creature phenotype state is the `Phenotype` record
-(`crates/v3-core/src/creature/phenotype.rs`), carried with the kin identity in the
-creature's heritable body (`HeritableBody`, field `CreatureState::body`):
+Per-creature phenotype state is the colour gene, the `Phenotype` record
+(`crates/v3-core/src/genome/body.rs`): one of the five genes of the body
+chromosome (`BodyGenome`) that `CreatureGenome` carries (T29.F02). Its fields
+are private behind read accessors, and an active channel outside `0..6` is
+rejected at construction (`Phenotype::new`) and when a genome decodes:
 
 | Field | Type | Description |
 | --- | --- | --- |
@@ -49,7 +51,7 @@ creature's heritable body (`HeritableBody`, field `CreatureState::body`):
 | `polarity` | `[bool; 6]` | Step direction per channel (`true` = increment, `false` = decrement). |
 
 The visible colour is derived, not stored: `channels_to_rgb(channels)`
-(`mutation/phenotype.rs`) maps the channels through HSL to `[u8; 3]` RGB.
+(`creature/colour.rs`) maps the channels through HSL to `[u8; 3]` RGB.
 
 Visibility rules:
 - Frame payloads and creature snapshots carry only the derived
@@ -63,8 +65,8 @@ Visibility rules:
 ## 3. Founder Baseline
 
 All startup-seeded founders use one canonical phenotype, the public constant
-`Phenotype::FOUNDER`, paired with the founder identity by
-`HeritableBody::founder(founder_index, startup_seed)`:
+`Phenotype::FOUNDER`, in the founder body
+`creature::founder::founder_body(founder_index, startup_seed, config)`:
 
 | Field | Value |
 | --- | --- |
@@ -80,39 +82,35 @@ v3alpha1 policy:
 
 ---
 
-## 4. Inheritance and Trigger Rules
+## 4. Inheritance and Supply
 
 Core rule:
-- **Phenotype mutation is NOT a mutation engine domain.** It is a completely
-  separate pathway triggered by genome mutation.
+- **The colour is one gene of the body chromosome**, mutated by the body's
+  own per-unit supply (`v3-mutation-spec.md`, body chromosome), at the brain's
+  per-unit rate and with no gate on brain mutation (T29.F02).
 
-Trigger semantics:
-- After the `MutationEngine` processes the offspring genome and returns a
-  `MutationSummary`, conception samples the body draws
-  (`mutation::body::sample_body_draws(applied_events > 0, config, rng)`) and
-  applies them with `HeritableBody::inherit(parent_body, draws, ...)`.
-- If `MutationSummary.applied_events > 0` (at least one genome mutation event
-  was applied), the phenotype mutates using the algorithm in Section 5, and
-  then the kin tag mutates (`v3-creature-identity-spec.md` Section 5): the
-  phenotype draws come first.
-- If `MutationSummary.applied_events == 0` (no genome mutation occurred),
-  the offspring inherits the parent's exact `Phenotype` and no draw is made.
+Supply semantics:
+- After the brain's events, `MutationEngine` draws
+  `Binomial(BodyGenome::UNITS, per_unit_rate)` body events; each draws its
+  gene uniformly over the five genes. A colour event samples the colour step
+  (Section 5, `mutation::body::sample_body_edit`) and the body chromosome
+  applies it (`BodyGenome::apply`, `Phenotype::mutated`).
+- A birth drawing no colour event inherits the parent's exact `Phenotype`.
+- A colour event is reported as the operator `Body.Colour`, attempted and
+  applied with no target and `NotApplicable` reachability.
 
 Ownership boundary:
-- Reproduction evaluates the trigger after `MutationEngine` returns, not
-  inside the mutation engine itself; the body policy (`mutation::body`,
-  `mutation::phenotype`) owns every draw and its order from config alone;
-  `Phenotype::mutated` (`creature::phenotype`) applies a sampled step without
-  a draw; this file owns how the phenotype mutates.
-- The mutation engine has no knowledge of phenotype state.
+- The body policy (`mutation::body`, `mutation::phenotype`) owns every draw
+  and its order from config alone; `Phenotype::mutated` (`genome::body`)
+  applies a sampled step without a draw; this file owns how the phenotype
+  mutates.
 - Canonical reproduction action flow is in `v3-reproduction-spec.md`.
 
 ---
 
 ## 5. Mutation Algorithm
 
-When the trigger condition is met (`applied_events > 0`), phenotype mutates as
-follows:
+A colour event mutates the phenotype as follows:
 
 ```text
 sample_phenotype_draw(config, rng) then Phenotype::mutated(draw):

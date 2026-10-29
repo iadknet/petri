@@ -33,17 +33,18 @@ This document does not define:
 
 ## 2. Identity State Model
 
-Canonical creature identity state:
+Canonical creature identity state (T29.F02) is split by role:
 
-```rust
-pub struct CreatureIdentityState {
-    pub lineage_id: u32,
-    pub kin_tag: u32,
-}
-```
+- `kin_tag: u32` is a body gene, one of the five genes of the body chromosome
+  (`BodyGenome`, `crates/v3-core/src/genome/body.rs`) that `CreatureGenome`
+  carries; it costs one genome unit like any gene.
+- `lineage_id: u32` is provenance: `Provenance::lineage_id`
+  (`creature/birth.rs`), written by the birth's finalization onto the
+  creature record (`CreatureState::lineage_id`) beside `generation`.
 
 State semantics:
-- `lineage_id` is stable founder/clade identity.
+- `lineage_id` is stable founder/clade identity; no rule, sensor or draw
+  reads it.
 - `kin_tag` is an inherited, slowly drifting family signature.
 - `CreatureId` remains the runtime occupancy/turn-order identifier and is not a
   substitute for `lineage_id` or `kin_tag`.
@@ -80,47 +81,35 @@ the identity values derived by that flow.
 
 ## 4. Offspring Inheritance
 
-Identity inheritance occurs during reproduction after child genome mutation has
-been evaluated.
+Identity inheritance occurs at conception.
 
 Canonical rules:
-- child inherits `lineage_id` unchanged from parent;
-- child starts with parent `kin_tag`;
-- if `MutationSummary.applied_events == 0`, child keeps inherited `kin_tag`
-  unchanged;
-- if `MutationSummary.applied_events > 0`, child mutates `kin_tag` using the
-  mutation rule in Section 5.
-
-Carrier: the identity travels in the creature's heritable body record
-(`HeritableBody`, `crates/v3-core/src/creature/body.rs`) beside the
-phenotype. At conception the body policy (`mutation::body`,
-`sample_body_draws(applied_events > 0, config, rng)`) samples every body
-draw from config alone: when mutated, the phenotype step first
-(`v3-phenotype-spec.md` Section 5) and the `kin_tag` bit second; otherwise
-neither is drawn. `HeritableBody::inherit(parent_body, draws, ...)` applies
-the sampled choices without a draw.
+- child inherits `lineage_id` unchanged from parent (its provenance);
+- child's genome is a copy of the parent's, so it starts with the parent's
+  `kin_tag`;
+- the body chromosome's own supply (`v3-mutation-spec.md`, body chromosome)
+  draws `Binomial(5, per_unit_rate)` body events after the brain's, each on a
+  uniformly drawn gene; each `KinTag` event mutates `kin_tag` by the rule in
+  Section 5, whatever the brain's events did.
 
 Ownership split:
-- reproduction owns **when** this trigger is evaluated;
-- the body policy owns every draw and its **order**;
-- creature identity owns **how** a drawn bit changes `kin_tag`
-  (`CreatureIdentityState::flip_kin_bit`).
-
-This keeps the generic mutation engine free of lifecycle-specific side effects.
+- the body policy (`mutation::body`) owns every draw and its **order**;
+- the body chromosome owns **how** a drawn bit changes `kin_tag`
+  (`BodyGenome::apply`, `BodyEdit::KinTag`);
+- finalization (`Zygote::finalize`) writes `lineage_id`.
 
 ---
 
 ## 5. Kin-Tag Mutation Rule
 
 Canonical v1 rule:
-- flip exactly one uniformly random bit in the 32-bit `kin_tag`;
-- use the reproduction RNG after genome mutation has completed and only when
-  `MutationSummary.applied_events > 0`.
+- a `KinTag` body event flips exactly one uniformly random bit, in `0..32`,
+  of the 32-bit `kin_tag`;
+- the event is reported as the operator `Body.KinTag`.
 
 Rationale:
 - preserves family resemblance across generations;
-- introduces gradual kin drift without coupling identity semantics to specific
-  genome mutation domains.
+- introduces gradual kin drift at the per-unit rate of any other gene.
 
 Future versions may revise the mutation rule, but any change must remain
 owned by this identity spec and explicitly update sensor-facing similarity

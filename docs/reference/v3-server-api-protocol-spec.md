@@ -1,6 +1,6 @@
 # V3 Server API and Protocol Spec
 
-Reference specification for canonical v3alpha18 server HTTP/WebSocket contracts,
+Reference specification for canonical v3alpha19 server HTTP/WebSocket contracts,
 lifecycle transitions, and error semantics.
 
 Status: Active
@@ -21,7 +21,7 @@ Related references:
 ## 1. Purpose and Scope
 
 This document defines:
-- v3alpha18 protocol-version posture;
+- v3alpha19 protocol-version posture;
 - canonical HTTP endpoint contracts for simulation lifecycle, status/frame, and
   config read/patch surfaces;
 - canonical WebSocket event envelope and payload mapping;
@@ -50,8 +50,10 @@ Current viewport-transport addenda:
 Version contract:
 - `protocol_version` is required in all top-level HTTP responses and WebSocket
   event envelopes.
-- Canonical value: `"v3alpha18"`.
-- Breaking payload changes require protocol-version bump. `v3alpha18`
+- Canonical value: `"v3alpha19"`.
+- Breaking payload changes require protocol-version bump. `v3alpha19`
+  (T29.F02) deleted the `chance` of the config's `mutation.capacity` and
+  `mutation.share` blocks. `v3alpha18`
   (T25.F12) replaced the brain's member `scope` with `policy` and `credits`,
   made an edge learner carry one wire `Learning` and its `source`, and gave
   each bundle `scale_learning` and `member_default` slots (section 4.11).
@@ -145,7 +147,7 @@ Base path: `/v3`.
 
 ### 4.1 `POST /v3/simulation/startup`
 
-Request (conceptual v3alpha18 shape):
+Request (conceptual v3alpha19 shape):
 
 ```json
 {
@@ -236,7 +238,7 @@ Request (conceptual v3alpha18 shape):
     }
   },
   "mutation": {
-    "per_unit_rate": 0.0060625,
+    "per_unit_rate": 0.005705882352941176,
     "phenotype": {
       "channel_step": 1,
       "channel_change_chance": 0.001,
@@ -261,9 +263,11 @@ Request rules:
 - Mutation tuning lives at top-level `mutation.*` in the startup/config keyspace
   (not under `runtime.*`). `mutation.per_unit_rate` is the only mutation-count
   field: each birth requests `Binomial(genome_size(), per_unit_rate)` events,
-  and the drift walk, the one instrument, draws the same rule on the
-  canonical founder's 80 units. The keys of the retired per-birth rule
-  are unknown fields and are rejected (T11.F20).
+  drawn per chromosome (brain, then the five body genes, T29.F02), and the
+  drift walk draws the same rule on the canonical founder's 80 brain and 5
+  body units. The keys of the retired per-birth rules (T11.F20, and the
+  `chance` of `mutation.capacity` and `mutation.share`, T29.F02) are unknown
+  fields and are rejected.
 - `population.initial_creatures` and `population.founder_profile` are
   restart-only (Section 4.8).
 - `population.founder_profile` is optional and selects the founder genome
@@ -280,7 +284,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha18",
+  "protocol_version": "v3alpha19",
   "state": "idle",
   "tick": 0,
   "config_digest": "sha256:<hex>",
@@ -301,7 +305,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha18",
+  "protocol_version": "v3alpha19",
   "state": "running",
   "tick": 123
 }
@@ -316,7 +320,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha18",
+  "protocol_version": "v3alpha19",
   "state": "paused",
   "tick": 123
 }
@@ -345,7 +349,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha18",
+  "protocol_version": "v3alpha19",
   "state": "paused",
   "tick": 124,
   "steps_applied": 1
@@ -358,7 +362,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha18",
+  "protocol_version": "v3alpha19",
   "state": "running",
   "tick": 124,
   "population": 48,
@@ -412,7 +416,7 @@ Response (full sparse frame):
 
 ```json
 {
-  "protocol_version": "v3alpha18",
+  "protocol_version": "v3alpha19",
   "state": "running",
   "tick": 124,
   "width": 1600,
@@ -461,7 +465,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha18",
+  "protocol_version": "v3alpha19",
   "state": "paused",
   "config": {
     "population": {
@@ -550,7 +554,7 @@ Response:
       }
     },
     "mutation": {
-      "per_unit_rate": 0.0060625,
+      "per_unit_rate": 0.005705882352941176,
       "phenotype": {
         "channel_step": 1,
         "channel_change_chance": 0.001,
@@ -604,7 +608,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha18",
+  "protocol_version": "v3alpha19",
   "state": "paused",
   "config": { "...": "effective config" }
 }
@@ -635,7 +639,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha18",
+  "protocol_version": "v3alpha19",
   "status": "recording",
   "ticks_requested": 5,
   "include_perception_debug": false
@@ -648,7 +652,7 @@ Recording response:
 
 ```json
 {
-  "protocol_version": "v3alpha18",
+  "protocol_version": "v3alpha19",
   "status": "recording",
   "ticks_completed": 2,
   "ticks_remaining": 3
@@ -659,7 +663,7 @@ Complete response:
 
 ```json
 {
-  "protocol_version": "v3alpha18",
+  "protocol_version": "v3alpha19",
   "status": "complete",
   "sample": {
     "creature_id": 7,
@@ -757,7 +761,7 @@ Response (full, no query parameters):
 
 ```json
 {
-  "protocol_version": "v3alpha18",
+  "protocol_version": "v3alpha19",
   "id": 7,
   "position": { "x": 10, "y": 22 },
   "energy": 41.0,
@@ -797,11 +801,11 @@ Field definitions:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `protocol_version` | string | Always `"v3alpha18"`. |
+| `protocol_version` | string | Always `"v3alpha19"`. |
 | `id` | u64 | Creature FFI ID. |
 | `position` | `{x, y}` | Current grid position. |
 | `energy` | f32 | Current energy level. |
-| `max_energy` | f32 | The creature's own energy capacity (`body.capacity`, T26.F02): the cap its credits are clamped at, in `[energy.capacity.min, energy.lifecycle.max_energy]`. |
+| `max_energy` | f32 | The creature's own energy capacity (the body gene `capacity`, T26.F02, T29.F02): the cap its credits are clamped at, in `[energy.capacity.min, energy.lifecycle.max_energy]`. |
 | `steal_share`, `give_share` | f32 | The body's stored heritable exchange shares (T27.F03), in the `[exchange.share_min, 1]` in force at the creature's birth: the share of a victim's store a steal at effort modifier 1 takes, and of its own store a gift passes. |
 | `age` | u64 | Ticks alive. |
 | `generation` | u64 | Reproduction generation (0 = founder). |
@@ -853,7 +857,7 @@ Event envelope:
 
 ```json
 {
-  "protocol_version": "v3alpha18",
+  "protocol_version": "v3alpha19",
   "event": "status",
   "tick": 124,
   "payload": {}
@@ -961,7 +965,7 @@ Envelope/payload consistency rules:
 Emission frequency:
 - Events are emitted once per completed tick while the simulation is `running`.
 - Implementations may throttle emission (for example emit every Nth tick) for
-  performance, but must document the throttle policy. The default v3alpha18
+  performance, but must document the throttle policy. The default v3alpha19
   behavior is per-tick emission.
 
 Ordering rules:
@@ -978,7 +982,7 @@ All non-2xx HTTP responses use:
 
 ```json
 {
-  "protocol_version": "v3alpha18",
+  "protocol_version": "v3alpha19",
   "error": {
     "code": "validation_rejected",
     "message": "startup request failed validation",
@@ -1004,7 +1008,7 @@ Required error codes:
 
 ---
 
-## 7. Out-of-Scope API Surfaces (v3alpha18)
+## 7. Out-of-Scope API Surfaces (v3alpha19)
 
 Not part of this version:
 - `GET /v3/simulation/snapshot`
@@ -1026,7 +1030,7 @@ Snapshot import/export contracts require a follow-up spec.
 - Required observability semantics: `v3-evolution-observability-spec.md`
 - Local runner NDJSON output contract: `v3-cli-contract-spec.md`
 
-This file remains canonical for v3alpha18 server transport/API semantics.
+This file remains canonical for v3alpha19 server transport/API semantics.
 
 ---
 

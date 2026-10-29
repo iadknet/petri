@@ -79,10 +79,11 @@ This document does not define:
 Mutation supply is owned by `v3-mutation-spec.md` and configured by
 `v3-runtime-config-spec.md`. The engine has one supply rule and requests
 `Binomial(genome_size(), per_unit_rate)` events per birth (T11.F19,
-T11.F20): every unit of structure the parent carries is an independent
-0.0060625 chance of one event, so the 80-unit V3Alpha1 founder expects 0.485
+T11.F20), drawn per chromosome, brain then body (T29.F02): every unit the
+parent carries, brain unit or body gene, is an independent `0.485 / 85`
+chance of one event, so the 85-unit V3Alpha1 founder expects 0.485
 requested events per birth and a larger genome pays its size in exposure. The
-drift walk, the one instrument, draws the same rule on the founder's 80 units
+drift walk draws the same rule on the founder's 80 brain and 5 body units
 whatever the walked genome's size, so its exposure is an instrument constant. Requested events become attempts;
 skipped events are not extra requests, and applied count governs downstream
 mutation effects. Compare both conditional mutated-birth outcomes and absolute
@@ -96,9 +97,9 @@ outcomes per all births when interpreting this supply.
 - `initial_energy` (post-transfer child energy, scalar `f32`: the
   transfer of step 7, at least `energy.lifecycle.initial_energy`)
 - `generation` (`parent.generation + 1`)
-- `identity` (`CreatureIdentityState` derived during reproduction flow)
-- `phenotype` (inherited or mutated per `v3-phenotype-spec.md` trigger rules)
-- `genome` (parent genome copy after mutation application)
+- `lineage_id` (the parent's, the child's provenance)
+- `genome` (parent genome copy after mutation application, the body
+  chromosome included: colour, kin tag, capacity and both shares)
 - `memory` (byte-for-byte copy from parent)
 - `graph_state` (empty map at spawn)
 
@@ -170,26 +171,18 @@ Constraints:
   a built creature's genome carries no seeds, and runtime arrays do not define
   homology.
 
-### Phenotype
+### Body
 
-- If genome mutation was applied (`MutationSummary.applied_events > 0`),
-  phenotype mutates per `v3-phenotype-spec.md` Section 5 algorithm.
-- If no genome mutation occurred (`applied_events == 0`), offspring inherits
-  the parent's `Phenotype` exactly (six channels, active channel and
-  polarity).
-- Phenotype mutation is NOT a mutation engine domain; it is a separate pathway
-  evaluated in this reproduction flow after `MutationEngine` returns.
-
-### Identity
-
-- Child identity starts from parent identity.
-- Child inherits `lineage_id` unchanged from parent.
-- If `MutationSummary.applied_events == 0`, child inherits `kin_tag` unchanged.
-- If `MutationSummary.applied_events > 0`, child mutates `kin_tag` per
-  `v3-creature-identity-spec.md`.
-- Identity mutation is NOT a mutation engine domain; reproduction evaluates the
-  trigger after `MutationEngine` returns and delegates the mutation rule to the
-  identity domain.
+- The body is the genome's body chromosome (T29.F02): the child's is the
+  parent's after the body's own supply, `Binomial(5, per_unit_rate)` events
+  after the brain's, each on a uniformly drawn gene (`v3-mutation-spec.md`,
+  body chromosome); no body draw depends on the brain's events.
+- Conception then clamps the three scalars to the ranges in force (the
+  capacity to `[energy.capacity.min, energy.lifecycle.max_energy]`, each share
+  to `[exchange.share_min, 1]`), so a live patch of a bound reaches the next
+  generation without a draw.
+- The child inherits `lineage_id` unchanged from the parent; a `KinTag`
+  event flips one bit of `kin_tag` (`v3-creature-identity-spec.md`).
 
 ### Inventory
 
@@ -248,7 +241,7 @@ runtime config contract: `v3-runtime-config-spec.md`.
   5. compute cost = energy.costs.reproduce_cost scaled by the complexity and
      age multipliers and by the genome replication cost factor
      (1 + energy.lifecycle.genome_replication_cost_per_unit
-        * max(genome_size() - 80, 0)), and after_cost = post-effort parent
+        * max(genome_size() - 85, 0)), and after_cost = post-effort parent
      energy - cost; nothing more is deducted yet
   6. enforce energy.lifecycle.min_reproduce_energy gate on after_cost
      -> below threshold : [reject RejectedEnergyConstraints; return]
@@ -263,7 +256,7 @@ runtime config contract: `v3-runtime-config-spec.md`.
      subtractions; the extra cost energy is burned, not transferred
      -> result Conceived; the parent stores one pending birth
         (direction, litter energy = transfer, deliver_tick = T + h,
-         h = ceil(genome_size() * gestation_ticks_per_founder_genome / 80))
+         h = ceil(genome_size() * gestation_ticks_per_founder_genome / 85))
      -> h >= 1 : the rest of the parent's action queue for tick T is
         discarded (no penalty, no log entry); steps 9-12 run at delivery
      -> h == 0 : delivery runs now at the validated target and the queue
@@ -281,22 +274,14 @@ runtime config contract: `v3-runtime-config-spec.md`.
         takes the validated Reproduce direction; never the parent's heading
      -> build OffspringDraft with initial_energy = litter energy, reading
         every inherited field from the parent now
-  9. call MutationEngine unconditionally on child genome -> MutationSummary
-     (MutationEngine internally draws the requested event count;
-      see v3-mutation-spec.md Section 4.1)
- 10. sample the child's body draws in one call, mutation::body::
-     sample_body_draws, and apply them with HeritableBody::inherit
-     (creature/body.rs), copying the parent's phenotype, identity
-     (lineage_id unchanged), capacity and exchange shares; only if
-     MutationSummary.applied_events > 0:
- 11.   mutate the phenotype per v3-phenotype-spec.md, then
-       mutate kin_tag per v3-creature-identity-spec.md (this draw order;
-       no draw when no event applied); then, on every birth, draw one f32
-       against mutation.capacity.chance and, on a hit, the log-space step
-       (v3-runtime-config-spec.md Section 3): the capacity draws come after
-       the kin-tag draw and are the only draws T26.F02 adds; then, on every
-       birth, steal_share then give_share by the same rule under
-       mutation.share over [exchange.share_min, 1] (T27.F03)
+  9. call MutationEngine unconditionally on the child genome under the
+     config's body ranges -> MutationSummary (MutationEngine draws the
+     brain's and then the body's requested event counts; see
+     v3-mutation-spec.md Section 4.1)
+ 10. clamp the child's capacity and shares to the ranges in force
+     (idempotent when no bound changed)
+ 11. derive the provenance: lineage_id unchanged, generation + 1, the
+     birth's operators and edge class
  12. finalize the zygote (creature::birth, Zygote::finalize) with the whole
      litter on the cell, which caps the child's energy at its own capacity
      and returns the excess, booked to

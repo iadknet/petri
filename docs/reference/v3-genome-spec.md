@@ -69,7 +69,9 @@ and fixed structural outputs (the sinks). The fixed catalog holds 108 sinks: 24 
 membership and nothing for a sink itself, so unwired sinks add nothing to it
 (T25.F02), and one unit per bundle record with nothing for its members
 (T25.F03, T25.F10, T25.F11: a gene costs one unit, an explicit economic
-discount); the founder carries no bundle and is 80 units.
+discount); that sum is `brain_units()`. `genome_size()` adds the body
+chromosome's five genes, one unit each (T29.F02): the founder carries no
+bundle and is 85 units, 80 brain and 5 body.
 A graph edge serializes as `{source, own_weight, learning?}` when lone or
 `{source, own_weight, membership}` when a member, never both (T25.F06,
 T25.F12: a compute node is `{kind, inputs}`, and a genome with a node-level

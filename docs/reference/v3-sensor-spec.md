@@ -190,7 +190,7 @@ clamped to `[0.0, 1.0]`:
   consumed since turn start, including the VM's owed dispatch debt.
 
 The energy scale (T26.F02) is one per-creature denominator for every energy
-read, `HeritableBody::energy_scale`: `energy.capacity.reference` for every
+read, `creature::body::energy_scale` over the genome's body chromosome: `energy.capacity.reference` for every
 creature under `energy.capacity.sensor_scale = "reference"` (the default), the
 creature's own capacity under `"own"`. Under `"reference"` a creature above
 the reference reads `1.0` at and above the reference, and the founder's 0.16
