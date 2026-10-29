@@ -97,7 +97,8 @@
       "docs/progress/features/t30-f09.json",
       "docs/progress/features/t30-f10.json",
       "docs/progress/features/t30-f13.json",
-      "docs/progress/features/t30-f15.json"
+      "docs/progress/features/t30-f15.json",
+      "docs/progress/features/t25-f12.json"
     ]
   },
   "goal": {
@@ -336,7 +337,8 @@
       "docs/progress/features/t27-f01-colour-vision-goal.json",
       "docs/progress/features/t26-f02-evolvable-energy-reserves-goal.json",
       "docs/progress/features/t27-f03-giving-energy-goal.json",
-      "docs/progress/features/t25-f11-goal.json"
+      "docs/progress/features/t25-f11-goal.json",
+      "docs/progress/features/t25-f12-goal.json"
     ]
   },
   "goal_worlds_long": {

@@ -150,7 +150,7 @@ compute cost outside the predeclaration.
 - [x] Note's cases: a bundle-only learner learns; an `Inherit` member under a learning scale moves only through it; `member_default` serves `Inherit` and leaves `Own` and `Static`; the slots evolve independently; a member that learns and credits updates both from one visit; disabling one member leaves siblings and the scale's credit; a child whose last contributor was switched off keeps, decays and passes on the scale; each detach row; Lamarckian seeding of a scale and a modifier; the layout built once per birth, with `Inherit` never resolved during a visit (invariant 5: `runtime::plasticity` names no `MemberPolicy`, `credits` or slot).
 - [x] Proptests (v3-core): detach preserves the composed weight bitwise and yields the table's `Learning` for any policy and slots; the layout's effective `Learning` is the override when `Own`, `member_default` or none when `Inherit`, none when `Static`.
 - [ ] `make check`; `make rust-test-slow`.
-- [ ] Gate and goal summaries at `docs/progress/features/t25-f12.json` and `t25-f12-goal.json`, raw hash, byte count and time checked, series entries, no full report staged.
+- [x] Gate and goal summaries at `docs/progress/features/t25-f12.json` and `t25-f12-goal.json`, raw hash, byte count and time checked, series entries, no full report staged. (The gate ran three times after host contention; see the verdict.)
 
 Each checked clause's tests and the commands run with their results are in [readings](../../progress/readings/t25-f12.md#verification-2026-10-28).
 
@@ -183,7 +183,23 @@ counter move with the draw stream with no predeclared direction; a `severe`
 there blocks closure until the user accepts it or remediation removes it.
 The epochs re-pin at closure with commit 2's cause.
 
-**Measured verdict.** Not yet measured.
+**Measured verdict (2026-10-28, HEAD `da63b8e23`).** Both profiles: CLI exit
+0, `severe=false` against their references. Gate ran three times: runs 1 and 2
+(0.01249 and 0.01750 ms per creature-tick) were contaminated by another
+worktree's test binary at about 575 % CPU, which started after the
+`bench-wait` preflight; run 3 on a quiet host (0.00271) is the kept summary;
+`deterministic` is byte-identical across the three. Run 3 is 48 % below the
+gate epoch (0.00520, `t25-f11`), outside the predeclared +-10 % and 25 % flag
+band on the fast side; the tool reports no wall comparison, so this is a
+manual reading, not a pass. Counter flags: `plasticity_updates` +47.7 %
+(definition change, invariant 6) and `vm_steps` +49.1 % (not predeclared,
+under the 50 % severe line); goal flags `vm_steps` +34.6 %, `pass_cap_hits`
++23.8 %. Goal hypotheses held in all three worlds: `scale_learning` 58 to 75 %
+and `member_default` 63 to 73 % of bundles at tick 2,000, `learned_scales`
+equal to the `scale_learning` bundles (3,570 to 8,439) with nonzero drift,
+`own` and `member_default` edge learners both present. Seed 22 fell to 27
+creatures at about tick 200 and recovered (final 2,784); no extinction. The
+epochs are not re-pinned yet. Details in the readings.
 
 - Summaries of the declared profiles: [gate](../../progress/features/t25-f12.json),
   [goal](../../progress/features/t25-f12-goal.json).
