@@ -261,8 +261,8 @@ mod tests {
     use crate::contracts::{DynamicIntrospectionKey, NodeId, OrdinaryFoodTypeId};
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::genome::analysis::mesh_reachable_nodes;
-    use crate::genome::cgp::test_support::push_sink;
-    use crate::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, OutputSink, OutputSinkKind};
+    use crate::genome::cgp::test_support::set_sink_inputs;
+    use crate::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, OutputSinkKind};
     use crate::genome::{HebbianRule, Learning, NodeGenome, VmBackendDef, VmInstruction};
     use proptest::prelude::*;
 
@@ -297,9 +297,7 @@ mod tests {
     }
 
     fn empty_graph() -> CgpGraphBackendDef {
-        CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(Vec::new())
-            .with_output_sinks(Vec::new())
+        CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(Vec::new())
     }
 
     fn edge(source: GraphSource) -> GraphEdge {
@@ -348,12 +346,10 @@ mod tests {
                 ComputeNodeKind::Add,
                 vec![leaf(0), leaf(0)],
             ));
-            push_sink(
+            set_sink_inputs(
                 &mut graph,
-                OutputSink::new(
-                    OutputSinkKind::CustomOutput(0),
-                    vec![edge(GraphSource::ComputeNode(0)), leaf(0)],
-                ),
+                OutputSinkKind::CustomOutput(0),
+                vec![edge(GraphSource::ComputeNode(0)), leaf(0)],
             );
             graph
         };
@@ -441,10 +437,7 @@ mod tests {
         let genome = graph_node(
             {
                 let mut graph = empty_graph();
-                push_sink(
-                    &mut graph,
-                    OutputSink::new(OutputSinkKind::CustomOutput(0), vec![leaf(0)]),
-                );
+                set_sink_inputs(&mut graph, OutputSinkKind::CustomOutput(0), vec![leaf(0)]);
                 graph
             },
             vec![InputReference::World(WorldInputKey::NearbyCreature)],
@@ -516,12 +509,10 @@ mod tests {
     fn a_shared_memory_edge_is_a_stateful_read_for_either_previous_flag() {
         for previous in [false, true] {
             let mut graph = empty_graph();
-            push_sink(
+            set_sink_inputs(
                 &mut graph,
-                OutputSink::new(
-                    OutputSinkKind::CustomOutput(0),
-                    vec![edge(GraphSource::SharedMemory { slot: 0, previous })],
-                ),
+                OutputSinkKind::CustomOutput(0),
+                vec![edge(GraphSource::SharedMemory { slot: 0, previous })],
             );
             let census = census_of(&graph_node(graph, vec![]));
 
@@ -544,12 +535,10 @@ mod tests {
         for kind in stateful_kinds {
             let mut graph = empty_graph();
             graph.append_compute_node(ComputeNode::new(kind, vec![]));
-            push_sink(
+            set_sink_inputs(
                 &mut graph,
-                OutputSink::new(
-                    OutputSinkKind::CustomOutput(0),
-                    vec![edge(GraphSource::ComputeNode(0))],
-                ),
+                OutputSinkKind::CustomOutput(0),
+                vec![edge(GraphSource::ComputeNode(0))],
             );
             let census = census_of(&graph_node(graph, vec![]));
 
@@ -571,12 +560,10 @@ mod tests {
                 retention: 1.0,
             }),
         ));
-        push_sink(
+        set_sink_inputs(
             &mut graph,
-            OutputSink::new(
-                OutputSinkKind::CustomOutput(0),
-                vec![edge(GraphSource::ComputeNode(0))],
-            ),
+            OutputSinkKind::CustomOutput(0),
+            vec![edge(GraphSource::ComputeNode(0))],
         );
         assert!(
             !crate::genome::learning::LearningLayout::of(&graph, &[]).is_empty(),
@@ -608,21 +595,17 @@ mod tests {
     #[test]
     fn world_inputs_reach_vote_and_terminate_sink_edges() {
         use crate::contracts::votes::VoteSink;
-        use crate::genome::cgp::{OutputSink, OutputSinkKind};
+        use crate::genome::cgp::OutputSinkKind;
         let mut graph = empty_graph();
-        push_sink(
+        set_sink_inputs(
             &mut graph,
-            OutputSink::new(
-                OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 0)),
-                vec![leaf(0)],
-            ),
+            OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 0)),
+            vec![leaf(0)],
         );
-        push_sink(
+        set_sink_inputs(
             &mut graph,
-            OutputSink::new(
-                OutputSinkKind::ActionVote(VoteSink::Terminate),
-                vec![leaf(1)],
-            ),
+            OutputSinkKind::ActionVote(VoteSink::Terminate),
+            vec![leaf(1)],
         );
         let census = census_of(&graph_node(
             graph,
@@ -675,12 +658,10 @@ mod tests {
         assert!(census.world_inputs.is_empty());
 
         let mut graph = empty_graph();
-        push_sink(
+        set_sink_inputs(
             &mut graph,
-            OutputSink::new(
-                OutputSinkKind::CustomOutput(0),
-                vec![leaf(2), leaf(2), leaf(4)],
-            ),
+            OutputSinkKind::CustomOutput(0),
+            vec![leaf(2), leaf(2), leaf(4)],
         );
         let census = census_of(&graph_node(graph, refs.clone()));
         assert_eq!(
@@ -747,10 +728,7 @@ mod tests {
     #[test]
     fn a_non_world_reference_is_not_a_world_input() {
         let mut graph = empty_graph();
-        push_sink(
-            &mut graph,
-            OutputSink::new(OutputSinkKind::CustomOutput(0), vec![leaf(0)]),
-        );
+        set_sink_inputs(&mut graph, OutputSinkKind::CustomOutput(0), vec![leaf(0)]);
         let census = census_of(&graph_node(
             graph,
             vec![InputReference::DynamicIntrospection(
@@ -808,12 +786,10 @@ mod tests {
     /// set of world keys behind the drawn indices, whatever was drawn.
     fn graph_reading_refs(refs: &[InputReference], indices: &[u16]) -> CreatureGenome {
         let mut graph = empty_graph();
-        push_sink(
+        set_sink_inputs(
             &mut graph,
-            OutputSink::new(
-                OutputSinkKind::CustomOutput(0),
-                indices.iter().copied().map(leaf).collect(),
-            ),
+            OutputSinkKind::CustomOutput(0),
+            indices.iter().copied().map(leaf).collect(),
         );
         graph_node(graph, refs.to_vec())
     }

@@ -277,8 +277,7 @@ mod tests {
     use crate::contracts::{DynamicIntrospectionKey, InputReference, RouteTarget};
     use crate::genome::analysis::mesh_reachable_nodes;
     use crate::genome::cgp::{
-        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
-        OutputSinkKind,
+        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
     };
     use crate::genome::{CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 
@@ -368,10 +367,10 @@ mod tests {
                         ),
                         ComputeNode::new(ComputeNodeKind::Constant(1.0), vec![]),
                     ])
-                    .with_output_sinks(vec![OutputSink::new(
+                    .with_sink_inputs(
                         OutputSinkKind::RouterGate(0),
                         vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                    )]),
+                    ),
             ),
             vec![],
         );
@@ -623,8 +622,7 @@ mod bus_slot_tests {
     use super::*;
     use crate::contracts::OUTPUT_SLOT_COUNT;
     use crate::genome::cgp::{
-        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
-        OutputSinkKind,
+        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
     };
     use crate::genome::VmInstruction;
     use proptest::prelude::{any, Strategy};
@@ -666,16 +664,16 @@ mod bus_slot_tests {
         )
     }
 
-    fn sink(slot: u8, inputs: Vec<GraphEdge>) -> OutputSink {
-        OutputSink::new(OutputSinkKind::CustomOutput(slot), inputs)
+    /// The fixed catalog with `CustomOutput(slot)` reading `inputs`.
+    fn custom_output(slot: u8, inputs: Vec<GraphEdge>) -> CgpGraphBackendDef {
+        CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_sink_inputs(OutputSinkKind::CustomOutput(slot), inputs)
     }
 
     /// A Graph node whose input leaf `sub_idx` of `reference` feeds a
     /// `CustomOutput(0)` sink directly.
     fn graph_reading(reference: InputReference, sub_idx: u16) -> NodeGenome {
-        let def = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(Vec::new())
-            .with_output_sinks(vec![sink(0, vec![leaf(sub_idx)])]);
+        let def = custom_output(0, vec![leaf(sub_idx)]);
         graph_node(vec![reference], def)
     }
 
@@ -752,12 +750,11 @@ mod bus_slot_tests {
     fn an_input_leaf_into_a_non_live_compute_node_reads_no_slot() {
         // Arrange: compute node 0 reads slot 2; only `live` wires it to a sink.
         let dead = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(vec![ComputeNode::new(ComputeNodeKind::Add, vec![leaf(0)])])
-            .with_output_sinks(Vec::new());
-        let live = dead.clone().with_output_sinks(vec![sink(
-            1,
+            .with_compute_nodes(vec![ComputeNode::new(ComputeNodeKind::Add, vec![leaf(0)])]);
+        let live = dead.clone().with_sink_inputs(
+            OutputSinkKind::CustomOutput(1),
             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-        )]);
+        );
         let refs = vec![InputReference::UpstreamSlot(2)];
 
         // Act
@@ -858,33 +855,26 @@ mod bus_slot_tests {
         }
 
         /// A live payload write reaches its slot below `OUTPUT_SLOT_COUNT`
-        /// and no slot at or above it, on either backend.
+        /// and no slot at or above it, on the VM; a Graph's catalog holds a
+        /// `CustomOutput` sink for each bus slot only.
         #[test]
         fn a_live_payload_write_reaches_only_on_bus_slots(slot in any::<u8>()) {
             let vm = slots_of(&vm_payload_write(Vec::new(), slot));
-            let graph = slots_of(&graph_node(
-                vec![InputReference::UpstreamSlot(0)],
-                CgpGraphBackendDef::new_with_fixed_outputs()
-                    .with_compute_nodes(Vec::new())
-                    .with_output_sinks(vec![sink(slot, vec![leaf(0)])]),
-            ));
-
             proptest::prop_assert_eq!(&vm.payload_written, &expected_payload(slot));
-            proptest::prop_assert_eq!(&graph.payload_written, &expected_payload(slot));
+            if usize::from(slot) < OUTPUT_SLOT_COUNT {
+                let graph = slots_of(&graph_node(
+                    vec![InputReference::UpstreamSlot(0)],
+                    custom_output(slot, vec![leaf(0)]),
+                ));
+                proptest::prop_assert_eq!(&graph.payload_written, &expected_payload(slot));
+            }
         }
     }
 
     #[test]
     fn a_wired_custom_output_writes_its_slot_and_an_unwired_one_does_not() {
         // Arrange
-        let past = u8::try_from(OUTPUT_SLOT_COUNT).expect("a small bus");
-        let def = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(Vec::new())
-            .with_output_sinks(vec![
-                sink(6, vec![leaf(0)]),
-                sink(7, Vec::new()),
-                sink(past, vec![leaf(0)]),
-            ]);
+        let def = custom_output(6, vec![leaf(0)]);
         let node = graph_node(vec![InputReference::UpstreamSlot(0)], def);
 
         // Act

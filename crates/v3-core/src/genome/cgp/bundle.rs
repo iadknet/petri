@@ -445,49 +445,23 @@ pub fn compose(own: f32, scale: f32, pattern: f32) -> f32 {
     scale * pattern + own
 }
 
-/// Whether `def` carries every sink `kind`'s directed wirings need: its
-/// eight direction sinks, and its drive when `drive` is set.
-fn hosts_kind(def: &CgpGraphBackendDef, kind: DirectedVoteKind, drive: bool) -> bool {
-    let present = |vote: VoteSink| def.sink(OutputSinkKind::ActionVote(vote)).is_some();
-    (0..VOTE_DIRECTION_COUNT).all(|d| present(kind.sink(d))) && (!drive || present(kind.drive()))
-}
-
-/// Whether `def` carries every sink `wiring` needs: a `Plain` wiring's vote
-/// sink; a `Ring`'s eight direction sinks; a `DirectionPair`'s eight and the
-/// drive.
+/// Every admissible wiring of `set`, in deterministic order (T25.F11
+/// invariant 5): a set without geometry one `Plain` per vote sink in catalog
+/// order; a `Ring` or `Pair` set `(kind, offset)` for every kind, kinds in
+/// `DirectedVoteKind::ALL` order, offsets `0..8`. Depends only on the set's
+/// geometry: every graph carries the fixed catalog, so every sink a wiring
+/// names.
 #[must_use]
-pub fn hosts(def: &CgpGraphBackendDef, wiring: &Wiring) -> bool {
-    match *wiring {
-        Wiring::Plain { sink } => def.sink(OutputSinkKind::ActionVote(sink)).is_some(),
-        Wiring::Ring { kind, .. } => hosts_kind(def, kind, false),
-        Wiring::DirectionPair { kind, .. } => hosts_kind(def, kind, true),
-    }
-}
-
-/// Every admissible wiring of `set` on `def`, in deterministic order (T25.F11
-/// invariant 5): a set without geometry one `Plain` per present vote sink in
-/// catalog order; a `Ring` or `Pair` set `(kind, offset)` for every kind
-/// whose required sinks are present, kinds in `DirectedVoteKind::ALL` order,
-/// offsets `0..8`. Depends only on the set's geometry and the sinks present.
-#[must_use]
-pub fn plans(def: &CgpGraphBackendDef, set: &FieldSet) -> Vec<Wiring> {
-    let directed = |drive: bool, wiring: fn(DirectedVoteKind, u8) -> Wiring| {
+pub fn plans(set: &FieldSet) -> Vec<Wiring> {
+    let directed = |wiring: fn(DirectedVoteKind, u8) -> Wiring| {
         DirectedVoteKind::ALL
             .into_iter()
-            .filter(|&kind| hosts_kind(def, kind, drive))
             .flat_map(move |kind| (0..VOTE_DIRECTION_COUNT).map(move |offset| wiring(kind, offset)))
             .collect()
     };
     match set {
-        FieldSet::Plain { .. } => def
-            .output_sinks()
-            .iter()
-            .filter_map(|sink| match sink.kind {
-                OutputSinkKind::ActionVote(vote) => Some(Wiring::Plain { sink: vote }),
-                _ => None,
-            })
-            .collect(),
-        FieldSet::Ring => directed(false, |kind, offset| Wiring::Ring { kind, offset }),
-        FieldSet::Pair(_) => directed(true, |kind, offset| Wiring::DirectionPair { kind, offset }),
+        FieldSet::Plain { .. } => VoteSink::all().map(|sink| Wiring::Plain { sink }).collect(),
+        FieldSet::Ring => directed(|kind, offset| Wiring::Ring { kind, offset }),
+        FieldSet::Pair(_) => directed(|kind, offset| Wiring::DirectionPair { kind, offset }),
     }
 }

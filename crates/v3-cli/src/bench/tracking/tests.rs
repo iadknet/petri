@@ -356,8 +356,7 @@ fn every_checkpoint_carries_the_population_blocks_of_its_own_tick() {
 fn each_stateful_split_counts_the_creatures_that_qualify_for_it() {
     use v3_core::contracts::NodeId;
     use v3_core::genome::cgp::{
-        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
-        OutputSinkKind,
+        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
     };
     use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome};
 
@@ -374,24 +373,26 @@ fn each_stateful_split_counts_the_creatures_that_qualify_for_it() {
             )],
         }
     }
-    fn sink(source: GraphSource) -> OutputSink {
-        OutputSink::new(
-            OutputSinkKind::CustomOutput(0),
-            vec![GraphEdge::new(source, 1.0)],
-        )
+    fn sink(source: GraphSource) -> Vec<GraphEdge> {
+        vec![GraphEdge::new(source, 1.0)]
     }
     let inert = CgpGraphBackendDef::new_with_fixed_outputs()
         .with_compute_nodes(vec![ComputeNode::new(
             ComputeNodeKind::Constant(0.0),
             vec![],
         )])
-        .with_output_sinks(vec![sink(GraphSource::ComputeNode(0))]);
+        .with_sink_inputs(
+            OutputSinkKind::CustomOutput(0),
+            sink(GraphSource::ComputeNode(0)),
+        );
     let mut shared_memory_reader = inert.clone();
-    shared_memory_reader =
-        shared_memory_reader.with_output_sinks(vec![sink(GraphSource::SharedMemory {
+    shared_memory_reader = shared_memory_reader.with_sink_inputs(
+        OutputSinkKind::CustomOutput(0),
+        sink(GraphSource::SharedMemory {
             slot: 0,
             previous: false,
-        })]);
+        }),
+    );
     let mut stateful_node_holder = inert.clone();
     stateful_node_holder.set_compute_kind(0, ComputeNodeKind::DecayIntegrator(0.5));
 

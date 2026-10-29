@@ -769,7 +769,7 @@ fn graph_copy_operators_carry_available_values_and_new_edges_carry_none() {
             assert!(base_rows.contains(&row));
         }
     }
-    let mut def = tracked_def().with_output_sinks(Vec::new());
+    let mut def = tracked_def();
     let parent = tracked_parent(&def);
     let mut map = GraphMapping::Identity;
     for seed in 0..12 {

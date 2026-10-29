@@ -117,20 +117,9 @@ fn plasticity(rng: &mut SmallRng) -> Option<Learning> {
 
 fn graph_def(rng: &mut SmallRng, size: ModuleSize, refs: &[InputReference]) -> CgpGraphBackendDef {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    // The first `sinks` value sinks and the first `vote_sinks` vote sinks.
+    // The full catalog; the first `sinks` value sinks and the first
+    // `vote_sinks` vote sinks are wired.
     let first_vote = crate::genome::cgp::FIRST_ACTION_VOTE_SINK;
-    let catalog = def.output_sinks().to_vec();
-    def = def.with_output_sinks(
-        catalog
-            .into_iter()
-            .enumerate()
-            .filter(|&(i, _)| {
-                i < size.sinks || (first_vote..first_vote + size.vote_sinks).contains(&i)
-            })
-            .map(|(_, sink)| sink)
-            .collect(),
-    );
-    let vote_start = def.output_sinks().len() - size.vote_sinks;
     for _ in 0..size.compute_nodes {
         def.append_compute_node(crate::genome::cgp::test_support::plastic_node(
             random_compute_node_kind(rng),
@@ -157,13 +146,13 @@ fn graph_def(rng: &mut SmallRng, size: ModuleSize, refs: &[InputReference]) -> C
             def.push_edge(EdgeSurface::ComputeInput(i), e);
         }
     }
-    for i in 0..vote_start {
+    for i in 0..size.sinks {
         for _ in 0..size.edges_per_node {
             let e = edge(rng);
             def.push_edge(EdgeSurface::SinkInput(i), e);
         }
     }
-    for i in vote_start..def.output_sinks().len() {
+    for i in first_vote..first_vote + size.vote_sinks {
         for _ in 0..size.vote_edges {
             let e = edge(rng);
             def.push_edge(EdgeSurface::SinkInput(i), e);

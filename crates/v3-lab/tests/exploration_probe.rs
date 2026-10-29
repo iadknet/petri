@@ -16,8 +16,7 @@ use v3_core::contracts::InputReference;
 use v3_core::creature::founder::founder_genome_with_age_gate;
 use v3_core::genome::analysis::mesh_reachable_nodes;
 use v3_core::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
-    OutputSinkKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
 use v3_core::genome::{BackendDef, CreatureGenome};
 use v3_core::mutation::reachability::ParentExecuted;
@@ -461,16 +460,7 @@ fn graph_mut(genome: &mut CreatureGenome, node: usize) -> &mut CgpGraphBackendDe
 
 /// `def` with its `kind` sink reading exactly `edges`.
 fn set_sink_inputs(def: &mut CgpGraphBackendDef, kind: OutputSinkKind, edges: &[GraphEdge]) {
-    assert!(def.sink(kind).is_some(), "fixed catalog");
-    let sinks = def
-        .output_sinks()
-        .iter()
-        .map(|sink| match sink.kind {
-            k if k == kind => OutputSink::new(k, edges.to_vec()),
-            _ => sink.clone(),
-        })
-        .collect();
-    *def = def.clone().with_output_sinks(sinks);
+    *def = def.clone().with_sink_inputs(kind, edges.to_vec());
 }
 
 /// The readiness signal silenced: node 0's `CustomOutput(1)` (the founder's

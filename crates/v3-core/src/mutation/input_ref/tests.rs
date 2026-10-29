@@ -6,8 +6,7 @@ use crate::contracts::{DynamicIntrospectionKey, NodeId, StaticIntrospectionKey, 
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::parseability::ParseabilityGate;
 use crate::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
-    OutputSinkKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
 use crate::genome::learning::{LearnableId, LearnableKey, Seeds};
 use crate::genome::mesh_annotations::MeshReadClass;
@@ -386,18 +385,16 @@ fn swap_on_the_graph_backend_keeps_every_edge() {
             ComputeNodeKind::Add,
             vec![leaf(3), leaf(0)],
         )])
-        .with_output_sinks(vec![
-            OutputSink::new(OutputSinkKind::CustomOutput(0), vec![leaf(2)]),
-            OutputSink::new(OutputSinkKind::ActionVote(VoteSink::Eat), vec![leaf(4)]),
-            OutputSink::new(
-                OutputSinkKind::ActionParam(ActionParamField::EatFoodType),
-                vec![leaf(0)],
-            ),
-            OutputSink::new(
-                OutputSinkKind::ActionVote(VoteSink::Terminate),
-                vec![leaf(7)],
-            ),
-        ]);
+        .with_sink_inputs(OutputSinkKind::CustomOutput(0), vec![leaf(2)])
+        .with_sink_inputs(OutputSinkKind::ActionVote(VoteSink::Eat), vec![leaf(4)])
+        .with_sink_inputs(
+            OutputSinkKind::ActionParam(ActionParamField::EatFoodType),
+            vec![leaf(0)],
+        )
+        .with_sink_inputs(
+            OutputSinkKind::ActionVote(VoteSink::Terminate),
+            vec![leaf(7)],
+        );
     let base_genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome::new(
@@ -1057,38 +1054,6 @@ fn add_sensor_on_vm_draws_only_the_reference() {
                 assert_eq!(genome.nodes[0].backend_def(), before.nodes[0].backend_def());
                 assert_eq!(r.gen::<u64>(), replay.gen::<u64>(), "seed {seed}");
             }
-        }
-    }
-}
-
-/// A Graph node without a vote sink admits no plan: the event skips with
-/// `NoApplicableTarget` before the first set's draws and writes nothing, so
-/// no unwired declaration survives.
-#[test]
-fn add_sensor_without_an_admissible_plan_skips_and_writes_nothing() {
-    for op in ADD_SENSOR {
-        for seed in 0u64..64 {
-            let mut genome = graph_node_genome_full_catalog();
-            let BackendDef::Graph(def) = genome.nodes[0].backend_edit().1 else {
-                unreachable!()
-            };
-            crate::genome::cgp::test_support::edit_sinks(def, |sinks| {
-                sinks.retain(|sink| !matches!(sink.kind, OutputSinkKind::ActionVote(_)));
-            });
-            let before = genome.clone();
-            let mut r = rng(seed);
-            assert_eq!(
-                apply_add_to_node(&mut genome, op, 0, &mut r, 1),
-                Err(MutationSkipReason::NoApplicableTarget)
-            );
-            assert_eq!(genome, before, "seed {seed}");
-            let mut replay = rng(seed);
-            random_input_reference(&mut replay, &crate::config::test_sensor_context(1));
-            assert_eq!(
-                r.gen::<u64>(),
-                replay.gen::<u64>(),
-                "seed {seed}: the sensor only"
-            );
         }
     }
 }

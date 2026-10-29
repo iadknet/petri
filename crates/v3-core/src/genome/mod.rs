@@ -834,9 +834,7 @@ mod tests {
         use crate::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
         for (i, field) in ActionParamField::ALL.into_iter().enumerate() {
-            let surface = graph
-                .sink_surface(OutputSinkKind::ActionParam(field))
-                .expect("fixed catalog carries every field");
+            let surface = graph.sink_surface(OutputSinkKind::ActionParam(field));
             graph.push_edge(
                 surface,
                 GraphEdge::new(

@@ -500,7 +500,7 @@ mod tests {
                 7.0,
             )],
         ));
-        let surface = graph.sink_surface(OutputSinkKind::CustomOutput(0)).unwrap();
+        let surface = graph.sink_surface(OutputSinkKind::CustomOutput(0));
         graph.push_edge(surface, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
         *producer.backend_edit().1 = BackendDef::Graph(graph);
         let mut consumer = node(1, &[], false);
@@ -1008,7 +1008,7 @@ mod tests {
     fn graph_and_vm_memory_producers_and_sequence_only_effects_contribute() {
         use crate::contracts::{InputReference, WorldInputKey};
         use crate::genome::cgp::{
-            CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
+            CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
             OutputSinkKind,
         };
         let mut reader = node(0, &[1], false);
@@ -1052,7 +1052,7 @@ mod tests {
         assert_eq!(reading(&g).backends.vm.contributing, 2);
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
         graph.append_compute_node(ComputeNode::new(ComputeNodeKind::WeightedSum, vec![]));
-        graph = graph.with_output_sinks(vec![OutputSink::new(
+        graph = graph.with_sink_inputs(
             OutputSinkKind::WriteSlot(0),
             vec![GraphEdge::new(
                 GraphSource::InputLeaf {
@@ -1061,7 +1061,7 @@ mod tests {
                 },
                 7.0,
             )],
-        )]);
+        );
         let graph_writer = NodeGenome::new(
             NodeId::new(1),
             vec![InputReference::World(WorldInputKey::FoodHere {

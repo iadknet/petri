@@ -95,9 +95,7 @@ fn leaf(ref_idx: u16, sub_idx: u16) -> GraphSource {
 }
 
 fn wire(def: &mut CgpGraphBackendDef, kind: OutputSinkKind, edge: GraphEdge) {
-    let surface = def
-        .sink_surface(kind)
-        .expect("destination must already exist");
+    let surface = def.sink_surface(kind);
     def.push_edge(surface, edge);
 }
 
@@ -281,10 +279,6 @@ fn every_vote_identity_accepts_every_excited_family_channel_and_independent_refi
             for (refs, source, expected) in &sources {
                 assert_ne!(*expected, 0.0, "authored channels are excited");
                 let mut base = CgpGraphBackendDef::new_with_fixed_outputs();
-                // Rotate the catalog: eligibility comes from identity, never position.
-                crate::genome::cgp::test_support::edit_sinks(&mut base, |sinks| {
-                    sinks.rotate_left(vote.index());
-                });
                 if wired {
                     wire(
                         &mut base,
@@ -309,12 +303,9 @@ fn every_vote_identity_accepts_every_excited_family_channel_and_independent_refi
                 assert_eq!(before.memory, after.memory);
                 assert_eq!(before.side.work_counters, after.side.work_counters);
                 let kind = OutputSinkKind::ActionVote(vote);
-                let sink = silent.sink_surface(kind).unwrap();
+                let sink = silent.sink_surface(kind);
                 let inputs = silent.surface_edges(sink);
-                assert_eq!(
-                    &inputs[..inputs.len() - 1],
-                    &base.sink(kind).unwrap().inputs[..]
-                );
+                assert_eq!(&inputs[..inputs.len() - 1], &base.sink(kind).inputs[..]);
                 let last = crate::genome::cgp::EdgeOccurrence::new(sink, inputs.len() - 1);
                 silent.edge_mut(last).set_weight(0.5);
                 let refined = effects(&silent, refs, ramp::<16>(0.0)[15]);
@@ -417,7 +408,7 @@ fn active_native_visits_and_ticks_preserve_actions_temporal_plasticity_and_costs
         use crate::contracts::SensorDescriptor;
         use crate::genome::cgp::{plans, BundleBirth, BundleSource};
         let context = crate::config::test_sensor_context(1);
-        let BackendDef::Graph(def) = silent.backend_def() else {
+        let BackendDef::Graph(_def) = silent.backend_def() else {
             unreachable!()
         };
         let sources: Vec<_> = SensorDescriptor::of(&silent.input_refs()[0], &context)
@@ -435,11 +426,7 @@ fn active_native_visits_and_ticks_preserve_actions_temporal_plasticity_and_costs
                 BundleSource::Memory { previous: true },
                 crate::contracts::MEMORY_BANK,
             )])
-            .flat_map(|(source, set)| {
-                plans(def, &set)
-                    .into_iter()
-                    .map(move |wiring| (source, wiring))
-            })
+            .flat_map(|(source, set)| plans(&set).into_iter().map(move |wiring| (source, wiring)))
             .collect();
         for (source, wiring) in sources {
             let birth = BundleBirth {

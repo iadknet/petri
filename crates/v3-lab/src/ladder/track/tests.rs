@@ -8,7 +8,7 @@ use rand::SeedableRng;
 use v3_core::contracts::votes::DirectedVoteKind;
 use v3_core::contracts::{InputReference, Position, WorldInputKey};
 use v3_core::creature::founder::founder_genome_with_age_gate;
-use v3_core::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSink};
+use v3_core::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource};
 use v3_core::genome::VmBackendDef;
 use v3_core::mutation::graph::GraphOperator;
 use v3_core::mutation::input_ref::InputRefOperator;
@@ -46,7 +46,7 @@ fn one_node(node: NodeGenome) -> CreatureGenome {
 /// unless `wired` names its kind; one non-relevant input reference.
 fn graph_node(id: u32, wired: Option<OutputSinkKind>) -> NodeGenome {
     let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-    if let Some(sink) = wired.and_then(|kind| graph.sink_surface(kind)) {
+    if let Some(sink) = wired.map(|kind| graph.sink_surface(kind)) {
         graph.push_edge(
             sink,
             GraphEdge::new(
@@ -684,15 +684,11 @@ fn touching_children_are_classed_on_the_battery_and_viable_needs_a_behavior_chan
     let mut dead = parent.clone();
     for n in &mut dead.nodes {
         if let BackendDef::Graph(graph) = n.backend_edit().1 {
-            let sinks = graph
-                .output_sinks()
-                .iter()
-                .map(|sink| match sink.kind {
-                    OutputSinkKind::ActionVote(_) => OutputSink::new(sink.kind, Vec::new()),
-                    _ => sink.clone(),
-                })
-                .collect();
-            *graph = graph.clone().with_output_sinks(sinks);
+            *graph = OutputSinkKind::catalog()
+                .filter(|kind| matches!(kind, OutputSinkKind::ActionVote(_)))
+                .fold(graph.clone(), |def, kind| {
+                    def.with_sink_inputs(kind, Vec::new())
+                });
         }
     }
     let touching = |child: &CreatureGenome| Birth {

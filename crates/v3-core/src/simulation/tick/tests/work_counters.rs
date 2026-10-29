@@ -94,8 +94,8 @@ fn run_tick_accumulates_reward_modulated_plasticity_update_in_phase_2_5() {
             node_id,
             vec![],
             BackendDef::Graph(
-                CgpGraphBackendDef::new_with_fixed_outputs()
-                    .with_compute_nodes(vec![crate::genome::cgp::test_support::plastic_node(
+                CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+                    crate::genome::cgp::test_support::plastic_node(
                         ComputeNodeKind::Constant(1.0),
                         vec![GraphEdge::new(
                             GraphSource::SharedMemory {
@@ -115,8 +115,8 @@ fn run_tick_accumulates_reward_modulated_plasticity_update_in_phase_2_5() {
                             }),
                             retention: 1.0,
                         }),
-                    )])
-                    .with_output_sinks(vec![]),
+                    ),
+                ]),
             ),
             vec![],
         )],
@@ -208,7 +208,7 @@ fn cognition_totals(stats: &crate::simulation::stats::SimStats) -> [u64; 7] {
 }
 
 fn mixed_learning_genome(hebbian_edges: usize, reward_edges: usize) -> CreatureGenome {
-    use crate::genome::cgp::{OutputSink, OutputSinkKind};
+    use crate::genome::cgp::OutputSinkKind;
     let edge = GraphEdge::new(GraphSource::ComputeNode(0), 0.5);
     let node = |edges, modulated: bool| {
         crate::genome::cgp::test_support::plastic_node(
@@ -239,10 +239,8 @@ fn mixed_learning_genome(hebbian_edges: usize, reward_edges: usize) -> CreatureG
                         node(hebbian_edges, false),
                         node(reward_edges, true),
                     ])
-                    .with_output_sinks(vec![
-                        OutputSink::new(OutputSinkKind::WriteSlot(0), vec![edge]),
-                        OutputSink::new(OutputSinkKind::ClearSlot(0), vec![edge]),
-                    ]),
+                    .with_sink_inputs(OutputSinkKind::WriteSlot(0), vec![edge])
+                    .with_sink_inputs(OutputSinkKind::ClearSlot(0), vec![edge]),
             ),
             vec![],
         )],

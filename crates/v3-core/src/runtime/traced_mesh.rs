@@ -409,8 +409,7 @@ mod tests {
         DynamicIntrospectionKey, InputReference, NodeId, RouteTarget, WorldAction,
     };
     use crate::genome::cgp::{
-        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
-        OutputSinkKind,
+        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
     };
     use crate::genome::{
         BackendDef, CreatureGenome, HebbianRule, Learning, NodeGenome, VmBackendDef, VmInstruction,
@@ -497,10 +496,10 @@ mod tests {
                         ComputeNodeKind::Constant(0.0),
                         vec![],
                     )])
-                    .with_output_sinks(vec![OutputSink::new(
+                    .with_sink_inputs(
                         OutputSinkKind::RouterGate(0),
                         vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                    )]),
+                    ),
             ),
             wrap_targets(vec![id_vm]),
         );
@@ -589,13 +588,11 @@ mod tests {
                         ComputeNodeKind::Constant(9.0),
                         vec![],
                     )])
-                    .with_output_sinks(vec![
-                        OutputSink::new(
-                            OutputSinkKind::CustomOutput(5),
-                            vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                        ),
-                        OutputSink::new(OutputSinkKind::RouterGate(0), vec![]),
-                    ]),
+                    .with_sink_inputs(
+                        OutputSinkKind::CustomOutput(5),
+                        vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+                    )
+                    .with_sink_inputs(OutputSinkKind::RouterGate(0), vec![]),
             ),
             wrap_targets(vec![id_vm]),
         );
@@ -672,25 +669,23 @@ mod tests {
                             ComputeNodeKind::Constant(1.0),
                             vec![],
                         )])
-                        .with_output_sinks(vec![
-                            OutputSink::new(
-                                OutputSinkKind::CustomOutput(0),
-                                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                            ),
-                            OutputSink::new(OutputSinkKind::RouterGate(0), vec![]),
-                            OutputSink::new(
-                                OutputSinkKind::ActionVote(VoteSink::Eat),
-                                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                            ),
-                            OutputSink::new(
-                                OutputSinkKind::ActionParam(ActionParamField::EatFoodType),
-                                vec![GraphEdge::new(GraphSource::ComputeNode(0), f32::INFINITY)],
-                            ),
-                            OutputSink::new(
-                                OutputSinkKind::ActionVote(VoteSink::Terminate),
-                                vec![GraphEdge::new(GraphSource::ComputeNode(0), f32::NAN)],
-                            ),
-                        ]),
+                        .with_sink_inputs(
+                            OutputSinkKind::CustomOutput(0),
+                            vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+                        )
+                        .with_sink_inputs(OutputSinkKind::RouterGate(0), vec![])
+                        .with_sink_inputs(
+                            OutputSinkKind::ActionVote(VoteSink::Eat),
+                            vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+                        )
+                        .with_sink_inputs(
+                            OutputSinkKind::ActionParam(ActionParamField::EatFoodType),
+                            vec![GraphEdge::new(GraphSource::ComputeNode(0), f32::INFINITY)],
+                        )
+                        .with_sink_inputs(
+                            OutputSinkKind::ActionVote(VoteSink::Terminate),
+                            vec![GraphEdge::new(GraphSource::ComputeNode(0), f32::NAN)],
+                        ),
                 ),
                 vec![],
             )],
@@ -729,13 +724,23 @@ mod tests {
         let BackendTrace::Graph(graph) = &hops[0].backend_trace else {
             panic!("expected graph backend trace");
         };
-        assert_eq!(graph.output_sinks.len(), 5);
-        assert!(graph.output_sinks[0].applied);
-        assert!((graph.output_sinks[0].applied_value - 1.0).abs() < 1e-6);
-        assert!(!graph.output_sinks[1].wired);
-        assert!(graph.output_sinks[2].applied);
-        assert_eq!(graph.output_sinks[3].applied_value, 1_000_000_000.0);
-        assert_eq!(graph.output_sinks[4].weighted_sum, 0.0);
+        assert_eq!(
+            graph.output_sinks.len(),
+            crate::genome::cgp::FIXED_SINK_COUNT
+        );
+        let sink = |kind: OutputSinkKind| &graph.output_sinks[kind.catalog_index()];
+        assert!(sink(OutputSinkKind::CustomOutput(0)).applied);
+        assert!((sink(OutputSinkKind::CustomOutput(0)).applied_value - 1.0).abs() < 1e-6);
+        assert!(!sink(OutputSinkKind::RouterGate(0)).wired);
+        assert!(sink(OutputSinkKind::ActionVote(VoteSink::Eat)).applied);
+        assert_eq!(
+            sink(OutputSinkKind::ActionParam(ActionParamField::EatFoodType)).applied_value,
+            1_000_000_000.0
+        );
+        assert_eq!(
+            sink(OutputSinkKind::ActionVote(VoteSink::Terminate)).weighted_sum,
+            0.0
+        );
         assert_eq!(hops[0].vote_contribution[VoteSink::Eat.index()], 1.0);
         assert_eq!(passes[0].votes[VoteSink::Terminate.index()], 0.0);
     }
@@ -795,12 +800,9 @@ mod tests {
                 id0,
                 vec![],
                 BackendDef::Graph(
-                    CgpGraphBackendDef::new_with_fixed_outputs()
-                        .with_compute_nodes(vec![ComputeNode::new(
-                            ComputeNodeKind::Constant(1.0),
-                            vec![],
-                        )])
-                        .with_output_sinks(vec![]),
+                    CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+                        ComputeNode::new(ComputeNodeKind::Constant(1.0), vec![]),
+                    ]),
                 ),
                 vec![],
             )],
@@ -866,10 +868,10 @@ mod tests {
                                 retention: 1.0,
                             }),
                         )])
-                        .with_output_sinks(vec![OutputSink::new(
+                        .with_sink_inputs(
                             OutputSinkKind::ActionVote(VoteSink::Eat),
                             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                        )]),
+                        ),
                 ),
                 vec![],
             )],

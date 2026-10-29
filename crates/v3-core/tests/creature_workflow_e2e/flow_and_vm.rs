@@ -25,9 +25,8 @@ fn cgp_constant_to_custom_output(value: f32, custom_slot: u8) -> CgpGraphBackend
         Vec::new(),
     ));
     // Wire the CustomOutput(custom_slot) sink to CN0
-    if let Some(sink) = def.sink_surface(OutputSinkKind::CustomOutput(custom_slot)) {
-        def.push_edge(sink, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
-    }
+    let sink = def.sink_surface(OutputSinkKind::CustomOutput(custom_slot));
+    def.push_edge(sink, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
     def
 }
 
@@ -48,9 +47,8 @@ fn cgp_passthrough_input_to_custom_output(
         )],
     ));
     // Wire CustomOutput(custom_slot) to CN0
-    if let Some(sink) = def.sink_surface(OutputSinkKind::CustomOutput(custom_slot)) {
-        def.push_edge(sink, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
-    }
+    let sink = def.sink_surface(OutputSinkKind::CustomOutput(custom_slot));
+    def.push_edge(sink, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
     def
 }
 

@@ -300,9 +300,7 @@ mod tests {
     fn a_wired_write_slot_sink_writes_shared_memory_but_an_unwired_one_does_not() {
         let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
         graph.append_compute_node(ComputeNode::new(ComputeNodeKind::Add, vec![]));
-        let sink = graph
-            .sink_surface(OutputSinkKind::WriteSlot(0))
-            .expect("the fixed catalog always has a WriteSlot(0) sink");
+        let sink = graph.sink_surface(OutputSinkKind::WriteSlot(0));
         graph.push_edge(sink, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
         let genome = graph_genome(graph);
         assert!(structural_companions(&genome).writes_shared_memory);

@@ -144,12 +144,10 @@ pub(crate) fn cgp_functional_complexity(def: &CgpGraphBackendDef) -> u32 {
 mod tests {
     use super::*;
     use crate::contracts::votes::VoteSink;
-    use crate::genome::cgp::{ComputeNode, ComputeNodeKind, OutputSink, OutputSinkKind};
+    use crate::genome::cgp::{ComputeNode, ComputeNodeKind, OutputSinkKind};
 
     fn empty_def() -> CgpGraphBackendDef {
-        CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(Vec::new())
-            .with_output_sinks(Vec::new())
+        CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(Vec::new())
     }
 
     fn wired_def() -> CgpGraphBackendDef {
@@ -176,20 +174,18 @@ mod tests {
                 ComputeNode::new(ComputeNodeKind::Constant(1.0), Vec::new()),
                 ComputeNode::new(ComputeNodeKind::Sigmoid, Vec::new()),
             ])
-            .with_output_sinks(vec![
-                OutputSink::new(
-                    OutputSinkKind::CustomOutput(0),
-                    vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                ),
-                OutputSink::new(
-                    OutputSinkKind::ActionVote(VoteSink::Eat),
-                    vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
-                ),
-                OutputSink::new(
-                    OutputSinkKind::ActionVote(VoteSink::Terminate),
-                    vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                ),
-            ])
+            .with_sink_inputs(
+                OutputSinkKind::CustomOutput(0),
+                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+            )
+            .with_sink_inputs(
+                OutputSinkKind::ActionVote(VoteSink::Eat),
+                vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
+            )
+            .with_sink_inputs(
+                OutputSinkKind::ActionVote(VoteSink::Terminate),
+                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+            )
     }
 
     // ── Live compute indices ────────────────────────────────────────────────

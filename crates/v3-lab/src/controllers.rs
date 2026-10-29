@@ -92,10 +92,7 @@ impl Author<'_> {
 
     fn wire(&mut self, sink: OutputSinkKind, source: GraphSource, weight: f32) {
         let edge = GraphEdge::new(source, weight);
-        let surface = self
-            .graph
-            .sink_surface(sink)
-            .expect("the fixed catalog holds every vote and parameter sink");
+        let surface = self.graph.sink_surface(sink);
         self.graph.push_edge(surface, edge);
     }
 }

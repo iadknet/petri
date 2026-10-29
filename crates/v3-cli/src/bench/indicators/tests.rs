@@ -31,18 +31,16 @@ fn companion_population() -> [v3_core::genome::CreatureGenome; 3] {
         ],
     }));
     let stateful_plastic = make(BackendDef::Graph(
-        CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(vec![ComputeNode::new(
-                ComputeNodeKind::DecayIntegrator(0.5),
-                vec![GraphEdge::new(
-                    GraphSource::SharedMemory {
-                        slot: 0,
-                        previous: true,
-                    },
-                    1.0,
-                )],
-            )])
-            .with_output_sinks(vec![]),
+        CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![ComputeNode::new(
+            ComputeNodeKind::DecayIntegrator(0.5),
+            vec![GraphEdge::new(
+                GraphSource::SharedMemory {
+                    slot: 0,
+                    previous: true,
+                },
+                1.0,
+            )],
+        )]),
     ));
     let mut stateful_plastic = stateful_plastic;
     if let BackendDef::Graph(def) = stateful_plastic.nodes[0].backend_edit().1 {
@@ -469,12 +467,12 @@ fn temporal_report_keeps_substrate_counts_separate() {
                         ComputeNodeKind::Constant(0.0),
                         vec![],
                     )])
-                    .with_output_sinks(vec![v3_core::genome::cgp::OutputSink::new(
+                    .with_sink_inputs(
                         v3_core::genome::cgp::OutputSinkKind::ActionVote(
                             v3_core::contracts::votes::VoteSink::Eat,
                         ),
                         vec![edge],
-                    )]),
+                    ),
             ),
             vec![],
         )],

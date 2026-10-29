@@ -9,7 +9,7 @@ use crate::contracts::votes::{DirectedVoteKind, VoteSink, VOTE_SINK_COUNT};
 use crate::contracts::OutcomeChannel;
 use crate::contracts::{FieldSet, InputReference, NodeId, SensorDescriptor, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
-use crate::genome::cgp::test_support::{add_bundle_on, edit_sinks};
+use crate::genome::cgp::test_support::add_bundle_on;
 use crate::genome::cgp::{
     compose, detach, validate_graph, BundleBirth, BundleId, BundleSource, CgpGraphBackendDef,
     EdgeOccurrence, GraphSource, LearningSlot, OutputSinkKind, Site, Wiring,
@@ -242,9 +242,8 @@ fn the_catalog_places_the_bundle_operators_at_their_tiers() {
 }
 
 /// The creation operators apply wherever a declared sensor's field set or
-/// a memory bank has an admissible plan: on every Graph node with a vote
-/// sink, a bare one included, never on a Graph node without one or a VM
-/// node; the unit operators need a bundle, `ShiftBundleOffset` a geometric
+/// a memory bank has an admissible plan: on every Graph node, a bare one
+/// included, never on a VM node; the unit operators need a bundle, `ShiftBundleOffset` a geometric
 /// one (T25.F11 invariant 7).
 #[test]
 fn applicability_follows_sources_bundles_and_wirings() {
@@ -253,15 +252,7 @@ fn applicability_follows_sources_bundles_and_wirings() {
         nodes: vec![graph_node(refs, def)],
     };
     let full = CgpGraphBackendDef::new_with_fixed_outputs;
-    let voteless = || {
-        let mut def = full();
-        edit_sinks(&mut def, |sinks| {
-            sinks.retain(|sink| !matches!(sink.kind, OutputSinkKind::ActionVote(_)));
-        });
-        def
-    };
     let bare = genome(vec![], full());
-    let mute = genome(vec![barrier(), area_barrier()], voteless());
     let grouped = genome(refs(), three());
     let mut plain_only = full();
     let source = BundleSource::Memory { previous: false };
@@ -280,7 +271,6 @@ fn applicability_follows_sources_bundles_and_wirings() {
     for op in BUNDLE_OPERATORS {
         let creation = CREATION.contains(&op);
         assert_eq!(applies(&bare, op), creation, "{op:?}");
-        assert!(!applies(&mute, op), "{op:?}");
         assert!(applies(&grouped, op), "{op:?}");
         let geometric_only = op == GraphOperator::ShiftBundleOffset;
         assert_eq!(applies(&plain_only, op), !geometric_only, "{op:?}");
@@ -515,41 +505,13 @@ fn randomized_members_differ_within_one_bundle() {
     assert_eq!(mixed, [true; 2]);
 }
 
-/// A creation on a Graph node without a vote sink has no admissible source
-/// and skips without a draw, writing nothing.
-#[test]
-fn add_bundle_skips_without_a_draw_without_an_admissible_source() {
-    let mut voteless = CgpGraphBackendDef::new_with_fixed_outputs();
-    edit_sinks(&mut voteless, |sinks| {
-        sinks.retain(|sink| !matches!(sink.kind, OutputSinkKind::ActionVote(_)));
-    });
-    for law in [bundle::BirthLaw::Live, bundle::BirthLaw::Silent] {
-        let mut node = graph_node(vec![barrier(), area_barrier()], voteless.clone());
-        let before = node.clone();
-        let mut rng = SmallRng::seed_from_u64(9);
-        let mut untouched = SmallRng::seed_from_u64(9);
-        assert_eq!(
-            bundle::add_bundle_by_law(
-                &mut node,
-                law,
-                &crate::config::test_sensor_context(1),
-                &mut rng
-            ),
-            Err(MutationSkipReason::NoApplicableTarget)
-        );
-        assert_eq!(node, before);
-        assert_eq!(rng.gen::<u64>(), untouched.gen::<u64>());
-    }
-}
-
 /// A sensor at index 65,535 is a bundle source; one past it is not.
 #[test]
 fn bundle_sources_reach_the_last_u16_index_and_none_past_it() {
     let context = crate::config::test_sensor_context(1);
-    let def = CgpGraphBackendDef::new_with_fixed_outputs();
     let mut refs = vec![InputReference::CommitCounts; usize::from(u16::MAX)];
     refs.push(barrier());
-    let last: Vec<_> = bundle::bundle_sources(&def, &refs, &context).collect();
+    let last: Vec<_> = bundle::bundle_sources(&refs, &context).collect();
     assert_eq!(last.len(), refs.len() + 2);
     assert!(last.contains(&(
         BundleSource::Sensor {
@@ -559,7 +521,7 @@ fn bundle_sources_reach_the_last_u16_index_and_none_past_it() {
         FieldSet::Ring
     )));
     refs.insert(0, InputReference::CommitCounts);
-    let past: Vec<_> = bundle::bundle_sources(&def, &refs, &context).collect();
+    let past: Vec<_> = bundle::bundle_sources(&refs, &context).collect();
     assert_eq!(past.len(), usize::from(u16::MAX) + 1 + 2);
     assert!(past.iter().all(|(_, set)| *set != FieldSet::Ring));
 }
@@ -645,11 +607,10 @@ fn plain_on(def: &mut CgpGraphBackendDef, sink: VoteSink) -> BundleId {
 }
 
 /// `RetargetBundle` on a `Plain` bundle: the bundle, then one `gen_range`
-/// over the other present vote sinks in catalog order; every member moves
-/// to the new sink. With no other vote sink it skips before that draw
-/// (T25.F11 invariant 7).
+/// over the other vote sinks in catalog order; every member moves to the
+/// new sink (T25.F11 invariant 7).
 #[test]
-fn retarget_moves_a_plain_bundle_to_another_present_vote_sink() {
+fn retarget_moves_a_plain_bundle_to_another_vote_sink() {
     let mut reached = std::collections::BTreeSet::new();
     for seed in 0..512 {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
@@ -669,24 +630,6 @@ fn retarget_moves_a_plain_bundle_to_another_present_vote_sink() {
         reached.insert(sink.index());
     }
     assert_eq!(reached.len(), VOTE_SINK_COUNT - 1);
-
-    let mut lone = CgpGraphBackendDef::new_with_fixed_outputs();
-    edit_sinks(&mut lone, |sinks| {
-        sinks.retain(
-            |sink| !matches!(sink.kind, OutputSinkKind::ActionVote(vote) if vote != VoteSink::Eat),
-        );
-    });
-    plain_on(&mut lone, VoteSink::Eat);
-    let before = lone.clone();
-    let mut rng = SmallRng::seed_from_u64(3);
-    let mut expected = SmallRng::seed_from_u64(3);
-    assert_eq!(
-        bundle::retarget(&mut lone, &mut rng),
-        Err(MutationSkipReason::NoApplicableTarget)
-    );
-    assert_eq!(lone, before);
-    expected.gen_range(0..1);
-    assert_eq!(rng.gen::<u64>(), expected.gen::<u64>(), "the pick only");
 }
 
 /// `AddSensor*` on a Graph node draws and writes exactly what it would
@@ -1045,11 +988,10 @@ fn add_graph_edge_never_joins_a_bundle() {
 }
 
 /// `RetargetBundle` on a pair bundle moves its fact members to the new
-/// kind's drive, and skips, after its draws, when that kind lacks a site
-/// the wiring needs; a ring bundle needs no drive and retargets regardless
-/// (T25.F11 invariant 7).
+/// kind's drive after its draws; a ring bundle retargets too (T25.F11
+/// invariant 7).
 #[test]
-fn retarget_skips_after_its_draws_when_the_kind_lacks_a_site() {
+fn retarget_moves_a_pair_bundles_facts_to_the_new_kinds_drive() {
     let refs = vec![area_food(0), barrier()];
     let layout = crate::contracts::pair_layout(&refs[0], 1);
     let gene = |pair: bool| {
@@ -1059,12 +1001,8 @@ fn retarget_skips_after_its_draws_when_the_kind_lacks_a_site() {
         } else {
             def.add_ring_bundle(1, DirectedVoteKind::Move, 2);
         }
-        // Reproduce loses its drive sink.
-        let drive = OutputSinkKind::ActionVote(DirectedVoteKind::Reproduce.drive());
-        edit_sinks(&mut def, |sinks| sinks.retain(|sink| sink.kind != drive));
         def
     };
-    let (mut moved, mut skipped) = (false, false);
     for seed in 0..32 {
         let mut def = gene(true);
         let before = def.clone();
@@ -1083,17 +1021,9 @@ fn retarget_skips_after_its_draws_when_the_kind_lacks_a_site() {
         );
         let result = bundle::retarget(&mut def, &mut rng);
         assert_eq!(rng.gen::<u64>(), expected.gen::<u64>(), "seed {seed}");
-        if target == DirectedVoteKind::Reproduce {
-            assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
-            skipped = true;
-            continue;
-        }
         assert_eq!(result.map(|_| ()), Ok(()));
-        moved = true;
         assert_ne!(def, before);
-        let drive = def
-            .sink_surface(OutputSinkKind::ActionVote(target.drive()))
-            .unwrap();
+        let drive = def.sink_surface(OutputSinkKind::ActionVote(target.drive()));
         let facts = def
             .members(id(0))
             .filter(|&member| member.surface == drive)
@@ -1101,5 +1031,4 @@ fn retarget_skips_after_its_draws_when_the_kind_lacks_a_site() {
         assert_eq!(facts, layout.facts.len());
         assert!(validate_graph(&graph_node(refs.clone(), def)).is_ok());
     }
-    assert!(moved && skipped);
 }

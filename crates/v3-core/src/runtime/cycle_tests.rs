@@ -80,12 +80,9 @@ fn graph_node(id: u32, target_ids: &[u32]) -> NodeGenome {
         NodeId::new(id),
         vec![],
         BackendDef::Graph(
-            CgpGraphBackendDef::new_with_fixed_outputs()
-                .with_compute_nodes(vec![ComputeNode::new(
-                    ComputeNodeKind::Constant(1.0),
-                    vec![],
-                )])
-                .with_output_sinks(vec![]),
+            CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+                ComputeNode::new(ComputeNodeKind::Constant(1.0), vec![]),
+            ]),
         ),
         targets(target_ids),
     )

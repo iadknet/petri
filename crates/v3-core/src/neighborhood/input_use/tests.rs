@@ -735,7 +735,7 @@ fn ablating_a_ring_channel_redirects_only_its_members_and_keeps_their_weights() 
     // Channel 3 of each barrier ring, one member per bundle.
     assert_eq!(redirected, 2);
     // The ordinary food consumer is untouched.
-    assert_eq!(after.sink(EAT).unwrap().inputs, vec![leaf(1, 0)]);
+    assert_eq!(after.sink(EAT).inputs, vec![leaf(1, 0)]);
 }
 
 /// Masking a pair reference redirects every member of its `DirectionPair`

@@ -30,7 +30,7 @@ fn node(id: u32, refs: Vec<InputReference>, def: CgpGraphBackendDef) -> NodeGeno
 }
 
 fn wire(def: &mut CgpGraphBackendDef, kind: OutputSinkKind, edge: GraphEdge) {
-    let surface = def.sink_surface(kind).expect("fixed catalog");
+    let surface = def.sink_surface(kind);
     def.push_edge(surface, edge);
 }
 

@@ -2,9 +2,7 @@ use super::*;
 use crate::config::SimulationConfig;
 use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
-use crate::genome::cgp::{
-    CgpGraphBackendDef, EdgeSurface, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
-};
+use crate::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::graph::GraphOperator;
 use crate::mutation::input_ref::InputRefOperator;
@@ -96,10 +94,7 @@ fn single_graph_genome_with_inputs(input_refs: Vec<InputReference>) -> CreatureG
             BackendDef::Graph(
                 CgpGraphBackendDef::new_with_fixed_outputs()
                     .with_compute_nodes(Vec::new())
-                    .with_output_sinks(vec![OutputSink::new(
-                        OutputSinkKind::CustomOutput(0),
-                        Vec::new(),
-                    )]),
+                    .with_sink_inputs(OutputSinkKind::CustomOutput(0), Vec::new()),
             ),
             Vec::new(),
         )],
@@ -228,10 +223,7 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
                 BackendDef::Graph(
                     CgpGraphBackendDef::new_with_fixed_outputs()
                         .with_compute_nodes(Vec::new())
-                        .with_output_sinks(vec![OutputSink::new(
-                            OutputSinkKind::CustomOutput(0),
-                            Vec::new(),
-                        )]),
+                        .with_sink_inputs(OutputSinkKind::CustomOutput(0), Vec::new()),
                 ),
                 vec![RouteTarget {
                     target_id: NodeId::new(1),
@@ -245,10 +237,7 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
                 BackendDef::Graph(
                     CgpGraphBackendDef::new_with_fixed_outputs()
                         .with_compute_nodes(Vec::new())
-                        .with_output_sinks(vec![OutputSink::new(
-                            OutputSinkKind::CustomOutput(0),
-                            Vec::new(),
-                        )]),
+                        .with_sink_inputs(OutputSinkKind::CustomOutput(0), Vec::new()),
                 ),
                 vec![],
             ),

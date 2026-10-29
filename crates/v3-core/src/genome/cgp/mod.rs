@@ -17,8 +17,8 @@ mod edge;
 pub(crate) mod test_support;
 
 pub use bundle::{
-    compose, detach, hosts, pair_relative, plans, ring_offset, BirthCoordinate, Bundle,
-    BundleBirth, BundleId, BundleSource, LearningSlot, Site, Wiring,
+    compose, detach, pair_relative, plans, ring_offset, BirthCoordinate, Bundle, BundleBirth,
+    BundleId, BundleSource, LearningSlot, Site, Wiring,
 };
 pub(crate) use container::bundle_capacity_admits;
 pub use container::{

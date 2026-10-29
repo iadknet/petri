@@ -5,12 +5,9 @@ use rand::{Rng, SeedableRng};
 use crate::config::test_sensor_context;
 use crate::contracts::votes::DirectedVoteKind;
 use crate::contracts::{FieldSet, InputReference, SensorDescriptor, WorldInputKey, MEMORY_BANK};
-use crate::genome::cgp::{
-    plans, test_support::edit_sinks, BundleId, BundleSource, CgpGraphBackendDef, OutputSinkKind,
-    Wiring,
-};
+use crate::genome::cgp::{plans, BundleId, BundleSource, CgpGraphBackendDef, Wiring};
 use crate::genome::{BackendDef, NodeGenome};
-use crate::mutation::event::{BundleEdits, MutationSkipReason};
+use crate::mutation::event::BundleEdits;
 use crate::mutation::graph::bundle::{draw_birth_learning, draw_births, BirthLaw};
 use crate::mutation::graph::operators::{remove_edge, retarget_edge, test_inputs};
 
@@ -25,18 +22,17 @@ fn area_sets() -> Vec<(u8, FieldSet)> {
 /// its plan draws, and each wiring is admissible for its set.
 #[test]
 fn the_birth_law_draws_a_scale_only_when_live() {
-    let def = CgpGraphBackendDef::new_with_fixed_outputs();
     let sets = area_sets();
     for seed in 0..32 {
         let mut silent_rng = SmallRng::seed_from_u64(seed);
-        let silent = draw_births(&def, &sets, BirthLaw::Silent, &mut silent_rng).unwrap();
+        let silent = draw_births(&sets, BirthLaw::Silent, &mut silent_rng);
         let mut live_rng = SmallRng::seed_from_u64(seed);
-        let live = draw_births(&def, &sets[..1], BirthLaw::Live, &mut live_rng).unwrap();
+        let live = draw_births(&sets[..1], BirthLaw::Live, &mut live_rng);
         assert!(silent.iter().all(|birth| birth.scale == 0.0));
         assert_eq!(silent.len(), 2);
         for birth in &silent {
             let set = sets[usize::from(birth.field_set)].1;
-            assert!(plans(&def, &set).contains(&birth.wiring));
+            assert!(plans(&set).contains(&birth.wiring));
         }
         // Set 0's plan draws are the same under both laws; the live scale
         // is the next draw of the stream.
@@ -49,40 +45,24 @@ fn the_birth_law_draws_a_scale_only_when_live() {
     }
 }
 
-/// A `Plain` set's plan is one draw over the present vote sinks in catalog
-/// order; a geometric set's the kind over the hostable kinds, then the
-/// offset.
+/// A `Plain` set's plan is one draw over the vote sinks in catalog order;
+/// a geometric set's the kind over `DirectedVoteKind::ALL`, then the offset.
 #[test]
 fn the_plan_draws_follow_the_admissible_order() {
-    let def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let plain = plans(&def, &MEMORY_BANK);
+    let plain = plans(&MEMORY_BANK);
     for seed in 0..32 {
         let mut rng = SmallRng::seed_from_u64(seed);
-        let births = draw_births(&def, &[(0, MEMORY_BANK)], BirthLaw::Silent, &mut rng).unwrap();
+        let births = draw_births(&[(0, MEMORY_BANK)], BirthLaw::Silent, &mut rng);
         let mut replay = SmallRng::seed_from_u64(seed);
         assert_eq!(births[0].wiring, plain[replay.gen_range(0..plain.len())]);
 
         let mut rng = SmallRng::seed_from_u64(seed);
-        let births = draw_births(&def, &[(0, FieldSet::Ring)], BirthLaw::Silent, &mut rng).unwrap();
+        let births = draw_births(&[(0, FieldSet::Ring)], BirthLaw::Silent, &mut rng);
         let mut replay = SmallRng::seed_from_u64(seed);
         let kind = DirectedVoteKind::ALL[replay.gen_range(0..DirectedVoteKind::ALL.len())];
         let offset = replay.gen_range(0..8u8);
         assert_eq!(births[0].wiring, Wiring::Ring { kind, offset });
     }
-}
-
-/// A set with no admissible plan skips the event.
-#[test]
-fn a_set_without_an_admissible_plan_skips() {
-    let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    edit_sinks(&mut def, |sinks| {
-        sinks.retain(|sink| !matches!(sink.kind, OutputSinkKind::ActionVote(_)));
-    });
-    let mut rng = SmallRng::seed_from_u64(0);
-    assert_eq!(
-        draw_births(&def, &[(0, MEMORY_BANK)], BirthLaw::Live, &mut rng),
-        Err(MutationSkipReason::NoApplicableTarget)
-    );
 }
 
 /// The learning draws run per bundle after materialization: the form coin,

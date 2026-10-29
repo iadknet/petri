@@ -232,7 +232,8 @@ impl GraphOperator {
             }
             Self::MutateGraphOperatorParam => operators::has_parameterized_compute_node(def),
             Self::AddInternalGraphNode => operators::can_add_compute_node(def),
-            Self::AddGraphEdge => operators::can_add_edge(def),
+            // Every Graph node carries the fixed sink catalog to draw from.
+            Self::AddGraphEdge => true,
             Self::GraphRawFieldMutation => operators::has_raw_field_site(def, inputs),
             Self::CopyInternalNode => operators::can_copy_compute_node(def),
             Self::CopySubgraph => operators::can_copy_subgraph(def),
@@ -250,7 +251,7 @@ impl GraphOperator {
                 hebbian::any_target(def, hebbian::is_reward_modulated)
             }
             Self::AddBundleLive | Self::AddBundleSilent => {
-                bundle::bundle_sources(def, inputs.refs, inputs.context)
+                bundle::bundle_sources(inputs.refs, inputs.context)
                     .next()
                     .is_some()
             }

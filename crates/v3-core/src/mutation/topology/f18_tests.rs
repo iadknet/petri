@@ -82,7 +82,7 @@ proptest! {
                                 vm.program.remove(at);
                             }
                             BackendDef::Graph(g) => {
-                                let gate = g.sink_surface(OutputSinkKind::RouterGate(added_slot)).unwrap();
+                                let gate = g.sink_surface(OutputSinkKind::RouterGate(added_slot));
                                 let last = g.surface_edges(gate).len() - 1;
                                 g.remove_edge(crate::genome::cgp::EdgeOccurrence::new(gate, last));
                             }
@@ -122,7 +122,7 @@ fn stateful_fixture(source_graph: bool) -> CreatureGenome {
             1.0,
         )],
     ));
-    let surface = def.sink_surface(OutputSinkKind::WriteSlot(4)).unwrap();
+    let surface = def.sink_surface(OutputSinkKind::WriteSlot(4));
     def.push_edge(surface, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
     *temporal.backend_edit().1 = BackendDef::Graph(def);
     base.nodes[0].targets[0].target_id = temporal.node_id;

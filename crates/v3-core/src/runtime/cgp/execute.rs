@@ -363,12 +363,9 @@ mod work_counter_tests {
                 id0,
                 vec![],
                 BackendDef::Graph(
-                    CgpGraphBackendDef::new_with_fixed_outputs()
-                        .with_compute_nodes(vec![ComputeNode::new(
-                            ComputeNodeKind::Constant(1.0),
-                            vec![],
-                        )])
-                        .with_output_sinks(vec![]),
+                    CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+                        ComputeNode::new(ComputeNodeKind::Constant(1.0), vec![]),
+                    ]),
                 ),
                 vec![],
             )],
@@ -429,12 +426,12 @@ mod work_counter_tests {
                                 retention: 1.0,
                             }),
                         )])
-                        .with_output_sinks(vec![crate::genome::cgp::OutputSink::new(
+                        .with_sink_inputs(
                             crate::genome::cgp::OutputSinkKind::ActionVote(
                                 crate::contracts::votes::VoteSink::Terminate,
                             ),
                             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                        )]),
+                        ),
                 ),
                 vec![],
             )],
@@ -473,7 +470,7 @@ mod work_counter_tests {
 mod clock_tests {
     use super::*;
     use crate::genome::cgp::{
-        ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
+        ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
     };
     use crate::genome::{HebbianRule, Learning};
     use proptest::prelude::*;
@@ -494,10 +491,10 @@ mod clock_tests {
         );
         CgpGraphBackendDef::new_with_fixed_outputs()
             .with_compute_nodes(nodes)
-            .with_output_sinks(vec![OutputSink::new(
+            .with_sink_inputs(
                 OutputSinkKind::WriteSlot(1),
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-            )])
+            )
     }
 
     fn visit(
@@ -649,7 +646,7 @@ mod clock_tests {
         ));
         def.retarget_edge(
             crate::genome::cgp::EdgeOccurrence::new(
-                crate::genome::cgp::EdgeSurface::SinkInput(0),
+                def.sink_surface(OutputSinkKind::WriteSlot(1)),
                 0,
             ),
             GraphSource::ComputeNode(1),

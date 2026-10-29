@@ -363,9 +363,7 @@ fn slot_write_and_previous_read_graph_genome() -> CreatureGenome {
 }
 
 fn wire_custom_write_slot(def: &mut CgpGraphBackendDef, kind: OutputSinkKind, source_node: u16) {
-    let sink = def
-        .sink_surface(kind)
-        .expect("sink kind must exist in the fixed catalog");
+    let sink = def.sink_surface(kind);
     def.push_edge(
         sink,
         GraphEdge::new(GraphSource::ComputeNode(source_node), 1.0),
@@ -477,9 +475,7 @@ fn reward_modulated_node_genome_impl(
         retention: 1.0,
     }));
     if wire_action {
-        let surface = def
-            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
-            .expect("catalog Eat vote sink");
+        let surface = def.sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat));
         def.push_edge(surface, GraphEdge::new(GraphSource::ComputeNode(1), 1.0));
     }
     CreatureGenome {

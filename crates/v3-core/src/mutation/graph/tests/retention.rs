@@ -57,9 +57,7 @@ fn fixture(ungrouped: f32, members: [f32; 3]) -> (CgpGraphBackendDef, Vec<EdgeOc
     for (&member, &retention) in all.iter().zip(&members) {
         store_learning(&mut def, member, Some(plastic(retention)));
     }
-    let surface = def
-        .sink_surface(crate::genome::cgp::OutputSinkKind::CustomOutput(0))
-        .unwrap();
+    let surface = def.sink_surface(crate::genome::cgp::OutputSinkKind::CustomOutput(0));
     def.push_edge(
         surface,
         GraphEdge::new(

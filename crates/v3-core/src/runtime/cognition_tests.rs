@@ -1,8 +1,7 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::NodeId;
 use crate::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
-    OutputSinkKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use crate::runtime::state::GraphRuntimeState;
@@ -124,41 +123,51 @@ fn vm_writes(values: &[f32], clear: bool) -> CreatureGenome {
     }))
 }
 
+/// A genome writing its values to slot 0 then clearing it when asked.
+type Writes = fn(&[f32], bool) -> CreatureGenome;
+
+/// The values a Graph pass can write to slot 0: its catalog holds one
+/// `WriteSlot(0)` sink, so at most the first.
+fn graph_expressible(values: &[f32]) -> &[f32] {
+    &values[..values.len().min(1)]
+}
+
+/// A Graph writing `values` (at most one, [`graph_expressible`]) to slot 0
+/// through its `WriteSlot(0)` sink, then clearing it through `ClearSlot(0)`,
+/// which follows in catalog order.
 fn graph_writes(values: &[f32], clear: bool) -> CreatureGenome {
+    assert!(values.len() <= 1, "the catalog holds one WriteSlot(0) sink");
     let edge = |weight| GraphEdge::new(GraphSource::ComputeNode(0), weight);
-    let mut output_sinks: Vec<_> = values
-        .iter()
-        .map(|&value| OutputSink::new(OutputSinkKind::WriteSlot(0), vec![edge(value)]))
-        .collect();
-    if clear {
-        output_sinks.push(OutputSink::new(
-            OutputSinkKind::ClearSlot(0),
-            vec![edge(1.0)],
-        ));
-    }
-    genome(BackendDef::Graph(
-        CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(vec![ComputeNode::new(
-                ComputeNodeKind::Constant(1.0),
-                vec![],
-            )])
-            .with_output_sinks(output_sinks),
-    ))
+    let def = CgpGraphBackendDef::new_with_fixed_outputs()
+        .with_compute_nodes(vec![ComputeNode::new(
+            ComputeNodeKind::Constant(1.0),
+            vec![],
+        )])
+        .with_sink_inputs(
+            OutputSinkKind::WriteSlot(0),
+            values.iter().map(|&value| edge(value)).collect(),
+        );
+    genome(BackendDef::Graph(if clear {
+        def.with_sink_inputs(OutputSinkKind::ClearSlot(0), vec![edge(1.0)])
+    } else {
+        def
+    }))
 }
 
 #[test]
 fn memory_counts_each_changed_store_and_clear_with_traced_parity() {
-    for build in [vm_writes, graph_writes] {
-        // Initial 3 -> 2 -> 2 -> 3 -> 0: the repeated write is unchanged,
-        // and reversing back to 3 still counts before the final clear.
-        let (output, final_value) = run_both(
-            &build(&[2.0, 2.0, 3.0], true),
-            3.0,
-            100.0,
-            &RuntimeConfig::default(),
-        );
-        assert_eq!(output.work_counters.shared_memory_writes_changed, 3);
+    // VM: initial 3 -> 2 -> 2 -> 3 -> 0: the repeated write is unchanged,
+    // and reversing back to 3 still counts before the final clear. Graph:
+    // 3 -> 2 -> 0, its one write and its clear.
+    let cases: [(Writes, &[f32], u32); 2] =
+        [(vm_writes, &[2.0, 2.0, 3.0], 3), (graph_writes, &[2.0], 2)];
+    for (build, values, changed) in cases {
+        let (output, final_value) =
+            run_both(&build(values, true), 3.0, 100.0, &RuntimeConfig::default());
+        assert_eq!(output.work_counters.shared_memory_writes_changed, changed);
         assert_eq!(final_value, 0.0);
+    }
+    for build in [vm_writes, graph_writes] {
         let (output, _) = run_both(&build(&[0.0], true), 0.0, 100.0, &RuntimeConfig::default());
         assert_eq!(output.work_counters.shared_memory_writes_changed, 0);
     }
@@ -188,18 +197,8 @@ fn memory_changed_write_preserves_epsilon_boundary_and_sanitizes_values() {
 }
 
 #[test]
-fn graph_invalid_and_unwired_sinks_do_not_count_as_writes() {
-    let mut g = graph_writes(&[], false);
-    let BackendDef::Graph(def) = g.nodes[0].backend_edit().1 else {
-        unreachable!()
-    };
-    let edge = GraphEdge::new(GraphSource::ComputeNode(0), 1.0);
-    *def = def.clone().with_output_sinks(vec![
-        OutputSink::new(OutputSinkKind::WriteSlot(16), vec![edge]),
-        OutputSink::new(OutputSinkKind::ClearSlot(16), vec![edge]),
-        OutputSink::new(OutputSinkKind::WriteSlot(0), vec![]),
-        OutputSink::new(OutputSinkKind::ClearSlot(0), vec![]),
-    ]);
+fn graph_unwired_sinks_do_not_count_as_writes() {
+    let g = graph_writes(&[], false);
     let (output, final_value) = run_both(&g, 3.0, 100.0, &RuntimeConfig::default());
     assert_eq!(output.work_counters.shared_memory_writes_changed, 0);
     assert_eq!(final_value, 3.0);
@@ -238,14 +237,16 @@ proptest! {
     fn memory_event_counts_follow_each_immediate_predecessor(
         initial in -10.0f32..10.0, values in prop::collection::vec(any::<f32>(), 0..12), clear in any::<bool>(),
     ) {
-        let mut previous = initial;
-        let mut expected = 0;
-        for next in values.iter().copied().map(sanitize_f32).chain(clear.then_some(0.0)) {
-            expected += u32::from((previous - next).abs() > f32::EPSILON);
-            previous = next;
-        }
-        for build in [vm_writes, graph_writes] {
-            let (output, final_value) = run_both(&build(&values, clear), initial, 100.0, &RuntimeConfig::default());
+        let cases: [(Writes, &[f32]); 2] =
+            [(vm_writes, &values), (graph_writes, graph_expressible(&values))];
+        for (build, values) in cases {
+            let mut previous = initial;
+            let mut expected = 0;
+            for next in values.iter().copied().map(sanitize_f32).chain(clear.then_some(0.0)) {
+                expected += u32::from((previous - next).abs() > f32::EPSILON);
+                previous = next;
+            }
+            let (output, final_value) = run_both(&build(values, clear), initial, 100.0, &RuntimeConfig::default());
             prop_assert_eq!(output.work_counters.shared_memory_writes_changed, expected);
             prop_assert!(expected <= values.len() as u32 + u32::from(clear));
             prop_assert_eq!(final_value, previous);

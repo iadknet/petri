@@ -87,30 +87,23 @@ pub(crate) enum BirthLaw {
 
 /// The one birth policy's plan draws (T25.F11 invariant 6): for each field
 /// set in order, its wiring among `plans` — a `Plain` set's sink one
-/// `gen_range` over its admissible sinks in catalog order; a `Ring` or
-/// `Pair` set's kind one `gen_range` over the hostable kinds in
-/// `DirectedVoteKind::ALL` order, then a `gen_range(0..8)` offset — and its
-/// scale by `law`. A set with no admissible plan skips the event before its
-/// draws (the earlier sets' draws already taken).
+/// `gen_range` over its plans in catalog order; a `Ring` or `Pair` set's
+/// kind one `gen_range` over `DirectedVoteKind::ALL`, then a
+/// `gen_range(0..8)` offset — and its scale by `law`.
 pub(crate) fn draw_births(
-    def: &CgpGraphBackendDef,
     sets: &[(u8, FieldSet)],
     law: BirthLaw,
     rng: &mut impl Rng,
-) -> Result<Vec<BundleBirth>, MutationSkipReason> {
+) -> Vec<BundleBirth> {
     sets.iter()
         .map(|&(field_set, set)| {
-            let admissible = cgp::plans(def, &set);
-            if admissible.is_empty() {
-                return Err(MutationSkipReason::NoApplicableTarget);
-            }
             let wiring = match set {
-                FieldSet::Plain { .. } => admissible[rng.gen_range(0..admissible.len())],
+                FieldSet::Plain { .. } => {
+                    let plans = cgp::plans(&set);
+                    plans[rng.gen_range(0..plans.len())]
+                }
                 FieldSet::Ring | FieldSet::Pair(_) => {
-                    let kinds: Vec<DirectedVoteKind> = DirectedVoteKind::ALL
-                        .into_iter()
-                        .filter(|&kind| admissible.iter().any(|plan| plan.kind() == Some(kind)))
-                        .collect();
+                    let kinds = DirectedVoteKind::ALL;
                     let kind = kinds[rng.gen_range(0..kinds.len())];
                     let offset = rng.gen_range(0..VOTE_DIRECTION_COUNT);
                     match set {
@@ -123,11 +116,11 @@ pub(crate) fn draw_births(
                 BirthLaw::Live => rng.gen_range(-1.0f32..=1.0),
                 BirthLaw::Silent => 0.0,
             };
-            Ok(BundleBirth {
+            BundleBirth {
                 field_set,
                 wiring,
                 scale,
-            })
+            }
         })
         .collect()
 }
@@ -169,10 +162,9 @@ pub(crate) fn creation_class(wirings: &[Wiring]) -> Option<BirthEdgeClass> {
 /// The node's admissible bundle sources for `AddBundle*`, in order (T25.F11
 /// invariant 7): declared sensors by `ref_idx` (at an index representable
 /// as `u16`), field sets ascending, then `Memory { previous: false }` and
-/// `Memory { previous: true }`; each when its set has an admissible plan.
-/// Lazy, so an applicability check stops at the first source.
+/// `Memory { previous: true }`. Lazy, so an applicability check stops at the
+/// first source.
 pub(crate) fn bundle_sources<'a>(
-    def: &'a CgpGraphBackendDef,
     input_refs: &'a [InputReference],
     context: &'a SensorContext,
 ) -> impl Iterator<Item = (BundleSource, FieldSet)> + 'a {
@@ -189,9 +181,7 @@ pub(crate) fn bundle_sources<'a>(
                 })
         });
     let banks = [false, true].map(|previous| (BundleSource::Memory { previous }, MEMORY_BANK));
-    sensors
-        .chain(banks)
-        .filter(|(_, set)| !cgp::plans(def, set).is_empty())
+    sensors.chain(banks)
 }
 
 /// `AddBundleLive` / `AddBundleSilent` (T25.F11 invariant 7): one
@@ -205,13 +195,10 @@ pub(crate) fn add_bundle_by_law(
     context: &SensorContext,
     rng: &mut impl Rng,
 ) -> Result<((BundleEdits, Option<BirthEdgeClass>), GraphMapping), MutationSkipReason> {
-    let (def, input_refs) = graph_node(node)?;
-    let sources: Vec<_> = bundle_sources(def, input_refs, context).collect();
-    if sources.is_empty() {
-        return Err(MutationSkipReason::NoApplicableTarget);
-    }
+    let (_, input_refs) = graph_node(node)?;
+    let sources: Vec<_> = bundle_sources(input_refs, context).collect();
     let (source, set) = sources[rng.gen_range(0..sources.len())];
-    let births = draw_births(def, &[(source.field_set(), set)], law, rng)?;
+    let births = draw_births(&[(source.field_set(), set)], law, rng);
     let (id, map) = node
         .add_bundle(source, births[0], context)
         .map_err(|_| MutationSkipReason::NoApplicableTarget)?;
@@ -224,8 +211,7 @@ pub(crate) fn add_bundle_by_law(
 /// (T25.F11 invariant 7): on a Graph node the birth policy for every field
 /// set of `reference` in order, then [`NodeGenome::add_sensor`] with every
 /// birth, then the learning draws per bundle; on a VM node the declaration
-/// alone. A set without an admissible plan skips before its draws; an
-/// `Err` from `add_sensor` skips after them.
+/// alone. An `Err` from `add_sensor` skips after the draws.
 pub(crate) fn add_sensor_by_law(
     node: &mut NodeGenome,
     reference: InputReference,
@@ -242,7 +228,7 @@ pub(crate) fn add_sensor_by_law(
     let sets: Vec<(u8, FieldSet)> = SensorDescriptor::of(&reference, context)
         .indexed_field_sets()
         .collect();
-    let births = draw_births(def, &sets, law, rng)?;
+    let births = draw_births(&sets, law, rng);
     let first = def.bundles().len();
     let (_, map) = node
         .add_sensor(reference, &births, context)
@@ -360,11 +346,9 @@ pub(crate) fn shift_offset(
 }
 
 /// `RetargetBundle` (T25.F11 invariant 7): one bundle; a `Plain` bundle
-/// moves to another present vote sink, `gen_range` over the others in
-/// catalog order (`NoApplicableTarget` before that draw when there is
-/// none); a geometric bundle to another kind, `gen_range(0..3)` over
-/// `DirectedVoteKind::ALL` minus its own, skipping after the draw when the
-/// graph lacks a site the new kind needs. Every member moves by coordinate.
+/// moves to another vote sink, `gen_range` over the others in catalog
+/// order; a geometric bundle to another kind, `gen_range(0..3)` over
+/// `DirectedVoteKind::ALL` minus its own. Every member moves by coordinate.
 pub(crate) fn retarget(
     def: &mut CgpGraphBackendDef,
     rng: &mut impl Rng,
@@ -373,13 +357,10 @@ pub(crate) fn retarget(
     let wiring = def.bundles()[id.index()].wiring();
     let target = match wiring {
         Wiring::Plain { sink } => {
-            let others: Vec<Wiring> = cgp::plans(def, &MEMORY_BANK)
+            let others: Vec<Wiring> = cgp::plans(&MEMORY_BANK)
                 .into_iter()
                 .filter(|plan| *plan != Wiring::Plain { sink })
                 .collect();
-            if others.is_empty() {
-                return Err(MutationSkipReason::NoApplicableTarget);
-            }
             others[rng.gen_range(0..others.len())]
         }
         Wiring::Ring { kind, offset } | Wiring::DirectionPair { kind, offset } => {
@@ -392,9 +373,6 @@ pub(crate) fn retarget(
             wiring.rotated(other, offset)
         }
     };
-    if !cgp::hosts(def, &target) {
-        return Err(MutationSkipReason::NoApplicableTarget);
-    }
     Ok(def.relocate_bundle(id, target))
 }
 

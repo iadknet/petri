@@ -124,7 +124,7 @@ impl NodeGenome {
                     let set = descriptor
                         .field_set(birth.field_set)
                         .ok_or(NodeEditError::Coverage)?;
-                    if !plans(def, &set).contains(&birth.wiring) {
+                    if !plans(&set).contains(&birth.wiring) {
                         return Err(NodeEditError::Inadmissible);
                     }
                 }

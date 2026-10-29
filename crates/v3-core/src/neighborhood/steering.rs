@@ -296,9 +296,7 @@ mod tests {
         };
         let graph_into = |kind: DirectedVoteKind| {
             let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-            let surface = def
-                .sink_surface(OutputSinkKind::ActionVote(kind.drive()))
-                .unwrap();
+            let surface = def.sink_surface(OutputSinkKind::ActionVote(kind.drive()));
             def.push_edge(
                 surface,
                 GraphEdge::new(
@@ -451,9 +449,7 @@ mod tests {
     }
 
     fn wire(graph: &mut CgpGraphBackendDef, sink: VoteSink, edge: GraphEdge) {
-        let surface = graph
-            .sink_surface(OutputSinkKind::ActionVote(sink))
-            .expect("catalog sink");
+        let surface = graph.sink_surface(OutputSinkKind::ActionVote(sink));
         graph.push_edge(surface, edge);
     }
 
@@ -582,7 +578,7 @@ mod tests {
             unreachable!()
         };
         let mover = OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2));
-        let edges = graph.sink(mover).unwrap().inputs.to_vec();
+        let edges = graph.sink(mover).inputs.to_vec();
         crate::genome::cgp::test_support::set_sink_inputs(graph, mover, Vec::new());
         wire(graph, VoteSink::Eat, edges[0]);
         assert!(!votes_move(&eater, &node0));

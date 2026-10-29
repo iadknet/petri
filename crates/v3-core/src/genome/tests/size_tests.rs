@@ -9,7 +9,7 @@ use crate::contracts::votes::DirectedVoteKind;
 use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::genome::cgp::{
     detach, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource,
-    OutputSink, OutputSinkKind,
+    OutputSinkKind,
 };
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 
@@ -52,20 +52,18 @@ fn genome_size_charges_no_wired_sink_unit() {
     assert_eq!(unwired.genome_size(), 2);
 
     let wired = graph_genome(
-        CgpGraphBackendDef::new_with_fixed_outputs().with_output_sinks(vec![OutputSink::new(
+        CgpGraphBackendDef::new_with_fixed_outputs().with_sink_inputs(
             OutputSinkKind::CustomOutput(0),
             vec![GraphEdge::new(leaf(0), 1.0), GraphEdge::new(leaf(0), -0.5)],
-        )]),
+        ),
         1,
         0,
     );
     assert_eq!(wired.genome_size(), 2 + 2);
 
     let empty_sink = graph_genome(
-        CgpGraphBackendDef::new_with_fixed_outputs().with_output_sinks(vec![OutputSink::new(
-            OutputSinkKind::CustomOutput(0),
-            Vec::new(),
-        )]),
+        CgpGraphBackendDef::new_with_fixed_outputs()
+            .with_sink_inputs(OutputSinkKind::CustomOutput(0), Vec::new()),
         1,
         0,
     );

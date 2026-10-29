@@ -91,8 +91,8 @@ mod tests {
         for direction in 0..8u8 {
             let sink =
                 OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, direction));
-            let edges = &graph.sink(sink).unwrap().inputs;
-            let before = &vector.sink(sink).unwrap().inputs;
+            let edges = &graph.sink(sink).inputs;
+            let before = &vector.sink(sink).inputs;
             let ring: Vec<&GraphEdge> = edges
                 .iter()
                 .filter(|e| matches!(e.source(), GraphSource::InputLeaf { ref_idx: 8, .. }))

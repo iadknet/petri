@@ -4,11 +4,11 @@ use crate::contracts::OutcomeChannel;
 use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{DynamicIntrospectionKey, InputReference, NodeId};
 use crate::genome::cgp::test_support::{
-    plastic_node, push_sink, set_compute_inputs, set_surface_plasticity,
+    plastic_node, set_compute_inputs, set_sink_inputs, set_surface_plasticity,
 };
 use crate::genome::cgp::{
     validate_graph, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface,
-    GraphEdge, GraphInvariantViolation, GraphSource, OutputSink, OutputSinkKind,
+    GraphEdge, GraphInvariantViolation, GraphSource, OutputSinkKind,
 };
 use crate::genome::learning::{InheritanceMapping, Seeds};
 use crate::genome::{
@@ -80,19 +80,17 @@ fn config(rule: HebbianRule, eta: f32, lambda: f32) -> Learning {
 }
 
 fn graph(rule: HebbianRule, eta: f32, lambda: f32) -> CgpGraphBackendDef {
-    CgpGraphBackendDef::new_with_fixed_outputs()
-        .with_compute_nodes(vec![plastic_node(
-            ComputeNodeKind::Constant(1.0),
-            vec![GraphEdge::new(
-                GraphSource::SharedMemory {
-                    slot: 0,
-                    previous: false,
-                },
-                0.5,
-            )],
-            Some(config(rule, eta, lambda)),
-        )])
-        .with_output_sinks(vec![])
+    CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![plastic_node(
+        ComputeNodeKind::Constant(1.0),
+        vec![GraphEdge::new(
+            GraphSource::SharedMemory {
+                slot: 0,
+                previous: false,
+            },
+            0.5,
+        )],
+        Some(config(rule, eta, lambda)),
+    )])
 }
 
 /// Rewrite the learning attributes of every input edge of compute node
@@ -268,13 +266,12 @@ fn a_recurrent_hebbian_edge_learns_from_the_value_its_evaluation_read() {
         weight_clamp: 10.0,
         ..config(HebbianRule::Classic, 0.1, 0.0)
     };
-    let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
-        .with_compute_nodes(vec![plastic_node(
+    let mut def =
+        CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![plastic_node(
             ComputeNodeKind::Add,
             vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.5)],
             Some(hebbian),
-        )])
-        .with_output_sinks(vec![]);
+        )]);
     def.push_edge(
         EdgeSurface::ComputeInput(0),
         GraphEdge::new(
@@ -458,12 +455,10 @@ fn clock_does_not_initialize_unvisited_modules_or_charge_reward_work() {
 #[test]
 fn first_tick_repeated_visits_have_zero_base_and_ordinary_traced_parity() {
     let mut def = graph(HebbianRule::Oja, 0.4, 0.7);
-    push_sink(
+    set_sink_inputs(
         &mut def,
-        OutputSink::new(
-            OutputSinkKind::ActionVote(VoteSink::Eat),
-            vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-        ),
+        OutputSinkKind::ActionVote(VoteSink::Eat),
+        vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
     );
     let runtime = RuntimeConfig::default();
     let mut ordinary =
@@ -584,10 +579,10 @@ fn constructed_controller_adapts_to_reversal_while_frozen_weights_do_not() {
     let edge = |index, weight| GraphEdge::new(GraphSource::ComputeNode(index), weight);
     // Eat when the learned gate fires; otherwise nothing is voted and the
     // tick is `NoOp`.
-    def = def.with_output_sinks(vec![OutputSink::new(
+    def = def.with_sink_inputs(
         OutputSinkKind::ActionVote(VoteSink::Eat),
         vec![edge(1, 1.0)],
-    )]);
+    );
     let genome = genome(&def);
     let run = |state: &mut GraphRuntimeState, acquisition: bool, frozen: bool| {
         let mut correct = Vec::new();
@@ -661,11 +656,10 @@ fn out_of_range_learning_attributes_are_rejected_at_the_load_boundary() {
         )
     };
     let node = |plasticity: &str| {
-        let json = format!(
-            r#"{{"compute_nodes":[{{"kind":"Add","inputs":[{}]}}],"output_sinks":[]}}"#,
+        let def = crate::genome::cgp::test_support::def_with_compute_json(&format!(
+            r#"[{{"kind":"Add","inputs":[{}]}}]"#,
             edge(plasticity)
-        );
-        let def: CgpGraphBackendDef = serde_json::from_str(&json).unwrap();
+        ));
         NodeGenome::new(NodeId::new(0), vec![], BackendDef::Graph(def), vec![])
     };
     let modulated = |decay: &str| {
@@ -800,9 +794,7 @@ fn a_mixed_seed_backend_initializes_only_its_seeded_slot() {
             vec![memory, memory],
             Some(lamarckian),
         )]);
-    let vote = def
-        .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
-        .unwrap();
+    let vote = def.sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat));
     def.push_edge(vote, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
     def.push_edge(vote, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
     set_surface_plasticity(&mut def, vote, Some(lamarckian));
@@ -909,7 +901,7 @@ fn push_plastic_sink_edge(
     edge: GraphEdge,
     config: Option<Learning>,
 ) {
-    let surface = def.sink_surface(kind).unwrap();
+    let surface = def.sink_surface(kind);
     def.push_edge(surface, edge);
     let index = def.surface_edges(surface).len() - 1;
     def.edge_mut(EdgeOccurrence::new(surface, index))
@@ -1068,9 +1060,7 @@ fn the_sink_trace_carries_weighted_inputs_at_the_applied_weight() {
         &mut memory,
         &[0.0; 16],
     );
-    let EdgeSurface::SinkInput(eat) = def
-        .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
-        .unwrap()
+    let EdgeSurface::SinkInput(eat) = def.sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
     else {
         unreachable!()
     };

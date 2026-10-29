@@ -306,22 +306,15 @@ fn pick_random_edge(def: &CgpGraphBackendDef, rng: &mut impl Rng) -> Option<Edge
 /// Pick a random edge container (surface) to add an edge to: one uniform
 /// draw over every compute node, then every sink in vector order. Every sink
 /// is drawable, since the catalog holds only decoded parameter fields
-/// (T11.F27). Returns `None`, consuming no RNG, when the def has neither.
-pub(crate) fn pick_random_surface(
-    def: &CgpGraphBackendDef,
-    rng: &mut impl Rng,
-) -> Option<EdgeSurface> {
+/// (T11.F27), and the fixed catalog makes the draw total.
+pub(crate) fn pick_random_surface(def: &CgpGraphBackendDef, rng: &mut impl Rng) -> EdgeSurface {
     let compute = def.compute_nodes().len();
-    let total = compute + def.output_sinks().len();
-    if total == 0 {
-        return None;
-    }
-    let pick = rng.gen_range(0..total);
-    Some(if pick < compute {
+    let pick = rng.gen_range(0..compute + def.output_sinks().len());
+    if pick < compute {
         EdgeSurface::ComputeInput(pick)
     } else {
         EdgeSurface::SinkInput(pick - compute)
-    })
+    }
 }
 
 // ─── Topology operators ────────────────────────────────────────────────────
@@ -561,7 +554,7 @@ pub(crate) fn add_edge(
     inputs: NodeInputs<'_>,
     rng: &mut impl Rng,
 ) -> Result<(Option<BirthEdgeClass>, GraphMapping), MutationSkipReason> {
-    let surface = pick_random_surface(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
+    let surface = pick_random_surface(def, rng);
     let compute_count = def.compute_nodes().len() as u16;
     let source = random_graph_source(compute_count, inputs, rng);
     let weight = rng.gen_range(-1.0f32..=1.0);
@@ -935,20 +928,13 @@ pub(super) const fn can_add_compute_node(_def: &CgpGraphBackendDef) -> bool {
     true
 }
 
-/// `AddGraphEdge`: any compute node or sink is a surface, the set
-/// `pick_random_surface` draws from. Every graph built on the fixed catalog
-/// qualifies.
-pub(super) fn can_add_edge(def: &CgpGraphBackendDef) -> bool {
-    !def.compute_nodes().is_empty() || !def.output_sinks().is_empty()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::config::OrdinaryFoodTypeId;
     use crate::contracts::votes::{ActionParamField, VoteSink};
     use crate::contracts::{InputReference, WorldInputKey};
-    use crate::genome::cgp::{OutputSink, OutputSinkKind};
+    use crate::genome::cgp::OutputSinkKind;
     use rand::SeedableRng;
 
     use super::test_inputs as inputs;
@@ -966,16 +952,14 @@ mod tests {
                 ),
                 ComputeNode::new(ComputeNodeKind::Constant(0.5), Vec::new()),
             ])
-            .with_output_sinks(vec![
-                OutputSink::new(
-                    OutputSinkKind::CustomOutput(0),
-                    vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                ),
-                OutputSink::new(
-                    OutputSinkKind::ActionVote(VoteSink::Eat),
-                    vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                ),
-            ])
+            .with_sink_inputs(
+                OutputSinkKind::CustomOutput(0),
+                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+            )
+            .with_sink_inputs(
+                OutputSinkKind::ActionVote(VoteSink::Eat),
+                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+            )
     }
 
     // ── Topology tests ──────────────────────────────────────────────────────
@@ -1053,12 +1037,9 @@ mod tests {
 
     #[test]
     fn split_existing_edge_no_edges_is_skip() {
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(vec![ComputeNode::new(
-                ComputeNodeKind::Constant(1.0),
-                Vec::new(),
-            )])
-            .with_output_sinks(Vec::new());
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+            ComputeNode::new(ComputeNodeKind::Constant(1.0), Vec::new()),
+        ]);
         let mut rng = test_rng();
         assert_eq!(
             split_existing_edge(&mut def, inputs(&[]), &mut rng),
@@ -1073,10 +1054,10 @@ mod tests {
                 ComputeNodeKind::Constant(1.0),
                 Vec::new(),
             )])
-            .with_output_sinks(vec![OutputSink::new(
+            .with_sink_inputs(
                 OutputSinkKind::CustomOutput(0),
                 vec![GraphEdge::new(GraphSource::ComputeNode(u16::MAX), 1.0)],
-            )]);
+            );
         let mut rng = test_rng();
         assert_eq!(
             split_existing_edge(&mut def, inputs(&[]), &mut rng),
@@ -1093,10 +1074,10 @@ mod tests {
                 ComputeNodeKind::Constant(1.0),
                 Vec::new(),
             )])
-            .with_output_sinks(vec![OutputSink::new(
+            .with_sink_inputs(
                 OutputSinkKind::CustomOutput(0),
                 vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
-            )]);
+            );
         let mut rng = test_rng();
         assert_eq!(
             split_existing_edge(&mut def, inputs(&[]), &mut rng),
@@ -1120,10 +1101,10 @@ mod tests {
                     vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.75)],
                 ),
             ])
-            .with_output_sinks(vec![OutputSink::new(
+            .with_sink_inputs(
                 OutputSinkKind::ActionVote(VoteSink::Terminate),
                 vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
-            )]);
+            );
         // Force selection of the only edge (ComputeInput(1), edge 0).
         let mut rng = test_rng();
         split_existing_edge(&mut def, inputs(&[]), &mut rng).unwrap();
@@ -1148,7 +1129,9 @@ mod tests {
         // The vote sink's unrelated reference to the shifted Sigmoid is
         // remapped too.
         assert_eq!(
-            def.output_sinks()[0].inputs[0].source(),
+            def.sink(OutputSinkKind::ActionVote(VoteSink::Terminate))
+                .inputs[0]
+                .source(),
             GraphSource::ComputeNode(2)
         );
     }
@@ -1158,12 +1141,12 @@ mod tests {
     /// value one pass later rather than reproducing a stale reference.
     #[test]
     fn split_existing_edge_self_loop_shifts_consistently() {
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(vec![ComputeNode::new(
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+            ComputeNode::new(
                 ComputeNodeKind::DecayIntegrator(0.5),
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-            )])
-            .with_output_sinks(Vec::new());
+            ),
+        ]);
         let mut rng = test_rng();
         split_existing_edge(&mut def, inputs(&[]), &mut rng).unwrap();
 
@@ -1190,10 +1173,10 @@ mod tests {
                 ComputeNodeKind::Constant(0.5),
                 Vec::new(),
             )])
-            .with_output_sinks(vec![OutputSink::new(
+            .with_sink_inputs(
                 OutputSinkKind::CustomOutput(0),
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 2.0)],
-            )]);
+            );
         let mut rng = test_rng();
         split_existing_edge(&mut def, inputs(&[]), &mut rng).unwrap();
 
@@ -1205,10 +1188,13 @@ mod tests {
         );
         assert_eq!(def.compute_nodes()[1].inputs[0].own_weight(), 1.0);
         assert_eq!(
-            def.output_sinks()[0].inputs[0].source(),
+            def.sink(OutputSinkKind::CustomOutput(0)).inputs[0].source(),
             GraphSource::ComputeNode(1)
         );
-        assert_eq!(def.output_sinks()[0].inputs[0].own_weight(), 2.0);
+        assert_eq!(
+            def.sink(OutputSinkKind::CustomOutput(0)).inputs[0].own_weight(),
+            2.0
+        );
     }
 
     #[test]
@@ -1222,9 +1208,7 @@ mod tests {
 
     #[test]
     fn remove_compute_node_empty_is_skip() {
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(Vec::new())
-            .with_output_sinks(Vec::new());
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(Vec::new());
         let mut rng = test_rng();
         assert!(remove_compute_node(&mut def, &mut rng).is_err());
     }
@@ -1269,8 +1253,7 @@ mod tests {
     #[test]
     fn copy_cgp_subgraph_too_small_is_skip() {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(vec![ComputeNode::new(ComputeNodeKind::Add, Vec::new())])
-            .with_output_sinks(Vec::new());
+            .with_compute_nodes(vec![ComputeNode::new(ComputeNodeKind::Add, Vec::new())]);
         let mut rng = test_rng();
         assert!(copy_cgp_subgraph(&mut def, &mut rng).is_err());
     }
@@ -1280,12 +1263,10 @@ mod tests {
         // Both nodes read `ComputeNode(2)`, one past the end, and neither
         // reads the other, so the walk finds no neighbor and copies the seed.
         let dangling = || vec![GraphEdge::new(GraphSource::ComputeNode(2), 1.0)];
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(vec![
-                ComputeNode::new(ComputeNodeKind::Add, dangling()),
-                ComputeNode::new(ComputeNodeKind::Add, dangling()),
-            ])
-            .with_output_sinks(Vec::new());
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+            ComputeNode::new(ComputeNodeKind::Add, dangling()),
+            ComputeNode::new(ComputeNodeKind::Add, dangling()),
+        ]);
         let mut rng = test_rng();
         copy_cgp_subgraph(&mut def, &mut rng).unwrap();
         assert_eq!(def.compute_nodes().len(), 3);
@@ -1315,12 +1296,12 @@ mod tests {
     #[test]
     fn retarget_edge_changes_source() {
         // Single edge for targeted testing
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(vec![ComputeNode::new(
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+            ComputeNode::new(
                 ComputeNodeKind::Add,
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-            )])
-            .with_output_sinks(Vec::new());
+            ),
+        ]);
         let original = def.compute_nodes()[0].inputs[0].source();
         let input_refs = sample_input_refs();
         let mut changed = false;
@@ -1338,12 +1319,12 @@ mod tests {
     #[test]
     fn alter_edge_weight_modifies_weight() {
         // Use a single compute node with one edge for targeted testing
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(vec![ComputeNode::new(
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+            ComputeNode::new(
                 ComputeNodeKind::Add,
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-            )])
-            .with_output_sinks(Vec::new());
+            ),
+        ]);
         let original_weight = 1.0f32;
         let mut rng = test_rng();
         for _ in 0..10 {
@@ -1397,8 +1378,7 @@ mod tests {
     #[test]
     fn mutate_compute_param_no_parameterized_is_skip() {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(vec![ComputeNode::new(ComputeNodeKind::Add, Vec::new())])
-            .with_output_sinks(Vec::new());
+            .with_compute_nodes(vec![ComputeNode::new(ComputeNodeKind::Add, Vec::new())]);
         let mut rng = test_rng();
         assert!(mutate_compute_param(&mut def, &mut rng).is_err());
     }
@@ -1501,16 +1481,14 @@ mod tests {
         // Non-parameterized kinds throughout, so `param_count == 0` and the
         // only eligible target is the Add node's one edge — every trial
         // mutates that edge's ComputeNode index.
-        let def = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(vec![
-                ComputeNode::new(ComputeNodeKind::WeightedSum, Vec::new()),
-                ComputeNode::new(ComputeNodeKind::Negate, Vec::new()),
-                ComputeNode::new(
-                    ComputeNodeKind::Add,
-                    vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
-                ),
-            ])
-            .with_output_sinks(Vec::new());
+        let def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+            ComputeNode::new(ComputeNodeKind::WeightedSum, Vec::new()),
+            ComputeNode::new(ComputeNodeKind::Negate, Vec::new()),
+            ComputeNode::new(
+                ComputeNodeKind::Add,
+                vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
+            ),
+        ]);
         for seed in 0u64..64 {
             let mut d = def.clone();
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
@@ -1524,8 +1502,8 @@ mod tests {
 
     #[test]
     fn raw_field_mutation_shared_memory_slot_wraps_modulo_16() {
-        let def = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(vec![ComputeNode::new(
+        let def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+            ComputeNode::new(
                 ComputeNodeKind::Add,
                 vec![GraphEdge::new(
                     GraphSource::SharedMemory {
@@ -1534,8 +1512,8 @@ mod tests {
                     },
                     1.0,
                 )],
-            )])
-            .with_output_sinks(Vec::new());
+            ),
+        ]);
         for seed in 0u64..64 {
             let mut d = def.clone();
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
@@ -1562,31 +1540,29 @@ mod tests {
             InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())),
             InputReference::World(WorldInputKey::NeighborBarrierRing),
         ];
-        let def = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(vec![
-                ComputeNode::new(ComputeNodeKind::Constant(0.5), Vec::new()),
-                ComputeNode::new(
-                    ComputeNodeKind::Add,
-                    vec![
-                        GraphEdge::new(GraphSource::ComputeNode(0), 1.0),
-                        GraphEdge::new(
-                            GraphSource::InputLeaf {
-                                ref_idx: 1,
-                                sub_idx: 3,
-                            },
-                            1.0,
-                        ),
-                        GraphEdge::new(
-                            GraphSource::SharedMemory {
-                                slot: 5,
-                                previous: false,
-                            },
-                            1.0,
-                        ),
-                    ],
-                ),
-            ])
-            .with_output_sinks(Vec::new());
+        let def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+            ComputeNode::new(ComputeNodeKind::Constant(0.5), Vec::new()),
+            ComputeNode::new(
+                ComputeNodeKind::Add,
+                vec![
+                    GraphEdge::new(GraphSource::ComputeNode(0), 1.0),
+                    GraphEdge::new(
+                        GraphSource::InputLeaf {
+                            ref_idx: 1,
+                            sub_idx: 3,
+                        },
+                        1.0,
+                    ),
+                    GraphEdge::new(
+                        GraphSource::SharedMemory {
+                            slot: 5,
+                            previous: false,
+                        },
+                        1.0,
+                    ),
+                ],
+            ),
+        ]);
         for seed in 0u64..500 {
             let mut d = def.clone();
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
@@ -1616,12 +1592,12 @@ mod tests {
     fn raw_field_mutation_skips_single_compute_node_index_move() {
         // A single compute node's self-referencing edge has no valid
         // ComputeNode index move (0 is the only valid index).
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(vec![ComputeNode::new(
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+            ComputeNode::new(
                 ComputeNodeKind::Add,
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-            )])
-            .with_output_sinks(Vec::new());
+            ),
+        ]);
         let mut rng = test_rng();
         assert_eq!(
             raw_field_mutation(&mut def, inputs(&[]), &mut rng),
@@ -1700,10 +1676,10 @@ mod tests {
         fn fixture() -> CgpGraphBackendDef {
             CgpGraphBackendDef::new_with_fixed_outputs()
                 .with_compute_nodes(vec![ComputeNode::new(ComputeNodeKind::Negate, Vec::new())])
-                .with_output_sinks(vec![OutputSink::new(
+                .with_sink_inputs(
                     OutputSinkKind::ActionVote(VoteSink::Terminate),
                     vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.5)],
-                )])
+                )
         }
 
         let input_refs = sample_input_refs();
@@ -1720,12 +1696,17 @@ mod tests {
                 "every form appends exactly one node"
             );
             let new_node = &def.compute_nodes()[1];
-            let gate_source = def.output_sinks()[0].inputs[0].source();
+            let gate_source = def
+                .sink(OutputSinkKind::ActionVote(VoteSink::Terminate))
+                .inputs[0]
+                .source();
             if gate_source == GraphSource::ComputeNode(1) {
                 // Split: the pre-existing edge now sources the new identity
                 // node, which reproduces the old source exactly.
                 assert_eq!(
-                    def.output_sinks()[0].inputs[0].own_weight(),
+                    def.sink(OutputSinkKind::ActionVote(VoteSink::Terminate))
+                        .inputs[0]
+                        .own_weight(),
                     0.5,
                     "split preserves the old weight"
                 );
@@ -2024,12 +2005,10 @@ mod tests {
         let input_refs = sample_input_refs();
 
         // Arm 1 only: a parameterized compute node, and no edge anywhere.
-        let mut params_only = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(vec![ComputeNode::new(
-                ComputeNodeKind::Constant(0.5),
-                Vec::new(),
-            )])
-            .with_output_sinks(Vec::new());
+        let mut params_only =
+            CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+                ComputeNode::new(ComputeNodeKind::Constant(0.5), Vec::new()),
+            ]);
         assert_eq!(total_edge_count(&params_only), 0);
         assert!(has_parameterized_compute_node(&params_only));
         assert!(
@@ -2039,15 +2018,13 @@ mod tests {
         assert!(raw_field_mutation(&mut params_only, inputs(&input_refs), &mut test_rng()).is_ok());
 
         // Arm 2 only: no parameterized compute node, but a movable edge.
-        let mut edges_only = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(vec![
-                ComputeNode::new(
-                    ComputeNodeKind::Add,
-                    vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                ),
-                ComputeNode::new(ComputeNodeKind::Add, Vec::new()),
-            ])
-            .with_output_sinks(Vec::new());
+        let mut edges_only = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+            ComputeNode::new(
+                ComputeNodeKind::Add,
+                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+            ),
+            ComputeNode::new(ComputeNodeKind::Add, Vec::new()),
+        ]);
         assert!(!has_parameterized_compute_node(&edges_only));
         assert!(raw_field_edge_sites(&edges_only, inputs(&input_refs))
             .next()
@@ -2065,10 +2042,6 @@ mod tests {
         crate::creature::cgp_founder::build_cgp_founder_graph_with_thresholds(0.5, 100, 500)
     }
 
-    fn sink(kind: OutputSinkKind) -> OutputSink {
-        OutputSink::new(kind, Vec::new())
-    }
-
     /// The draw is one uniform `gen_range` over every compute node, then every
     /// sink in vector order (T11.F27): on the fixed catalog that is one
     /// `gen_range(0..c + 108)`, `k < c` naming `ComputeInput(k)` and otherwise
@@ -2081,7 +2054,7 @@ mod tests {
         let mut drawn = std::collections::HashSet::new();
         for seed in 0u64..16_384 {
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
-            let surface = pick_random_surface(&def, &mut rng).expect("founder graph has surfaces");
+            let surface = pick_random_surface(&def, &mut rng);
             let mut replay = rand::rngs::SmallRng::seed_from_u64(seed);
             let k = replay.gen_range(0..compute + 108);
             let expected = if k < compute {
@@ -2094,14 +2067,6 @@ mod tests {
             drawn.insert(surface);
         }
         assert_eq!(drawn.len(), compute + 108, "every candidate stays drawable");
-        let empty = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(Vec::new())
-            .with_output_sinks(Vec::new());
-        let mut rng = test_rng();
-        let mut untouched = rng.clone();
-        assert!(!can_add_edge(&empty));
-        assert!(pick_random_surface(&empty, &mut rng).is_none());
-        assert_eq!(rng.gen::<u64>(), untouched.gen::<u64>(), "no RNG consumed");
     }
 
     /// Fresh `AddGraphEdge` targets reach each of the four parameter sinks.
@@ -2113,58 +2078,34 @@ mod tests {
             add_edge(&mut def, inputs(&[]), &mut rng).expect("fixed catalog has surfaces");
         }
         for field in ActionParamField::ALL {
-            let sink = def
-                .sink(OutputSinkKind::ActionParam(field))
-                .expect("fixed catalog carries every field");
+            let sink = def.sink(OutputSinkKind::ActionParam(field));
             assert!(!sink.inputs.is_empty(), "{field:?}");
         }
     }
 
-    fn arb_sink_kind() -> impl proptest::strategy::Strategy<Value = OutputSinkKind> {
-        use proptest::prelude::*;
-        prop_oneof![
-            (0..ActionParamField::ALL.len())
-                .prop_map(|f| OutputSinkKind::ActionParam(ActionParamField::ALL[f])),
-            (0u8..12).prop_map(OutputSinkKind::CustomOutput),
-            (0u8..16).prop_map(OutputSinkKind::WriteSlot),
-            Just(OutputSinkKind::ActionVote(VoteSink::Eat)),
-        ]
-    }
-
     proptest::proptest! {
-        /// T11.F27 Graph draw row: over generated sink lists and compute
-        /// counts, the surface draw is one `gen_range` over compute nodes then
-        /// every sink by vector index; `can_add_edge` holds exactly when the
-        /// draw returns `Some`; `None` consumes no RNG.
+        /// T11.F27 Graph draw row: over compute counts on the fixed catalog,
+        /// the surface draw is one `gen_range` over compute nodes then every
+        /// sink by vector index.
         #[test]
         fn pick_random_surface_matches_the_reference(
-            kinds in proptest::collection::vec(arb_sink_kind(), 0..12),
             compute in 0usize..4,
             seed in proptest::prelude::any::<u64>(),
         ) {
             use proptest::prelude::*;
             let def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes((0..compute)
                     .map(|_| ComputeNode::new(ComputeNodeKind::WeightedSum, Vec::new()))
-                    .collect()).with_output_sinks(kinds.into_iter().map(sink).collect());
+                    .collect());
             let reference: Vec<EdgeSurface> = (0..compute)
                 .map(EdgeSurface::ComputeInput)
                 .chain((0..def.output_sinks().len()).map(EdgeSurface::SinkInput))
                 .collect();
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
             let mut replay = rng.clone();
-            let drawn = pick_random_surface(&def, &mut rng);
-            prop_assert_eq!(can_add_edge(&def), drawn.is_some());
-            prop_assert_eq!(drawn.is_some(), !reference.is_empty());
-            match drawn {
-                None => {
-                    prop_assert_eq!(rng.gen::<u64>(), replay.gen::<u64>(), "no RNG consumed");
-                }
-                Some(surface) => {
-                    let expected = reference[replay.gen_range(0..reference.len())];
-                    prop_assert_eq!(surface, expected);
-                    prop_assert_eq!(rng.gen::<u64>(), replay.gen::<u64>(), "one draw only");
-                }
-            }
+            let surface = pick_random_surface(&def, &mut rng);
+            let expected = reference[replay.gen_range(0..reference.len())];
+            prop_assert_eq!(surface, expected);
+            prop_assert_eq!(rng.gen::<u64>(), replay.gen::<u64>(), "one draw only");
         }
     }
 }

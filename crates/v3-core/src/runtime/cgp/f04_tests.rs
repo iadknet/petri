@@ -88,9 +88,7 @@ fn memory(slot: u8, weight: f32) -> GraphEdge {
 }
 
 fn wire(def: &mut CgpGraphBackendDef, kind: OutputSinkKind, edge: GraphEdge) {
-    let sink = def
-        .sink_surface(kind)
-        .expect("fixed output catalog contains every sink kind");
+    let sink = def.sink_surface(kind);
     def.push_edge(sink, edge);
 }
 

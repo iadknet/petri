@@ -72,9 +72,7 @@ fn with_edge(
     let BackendDef::Graph(graph) = edited.nodes[node].backend_edit().1 else {
         panic!("the one-edge census reads a Graph node");
     };
-    let surface = graph
-        .sink_surface(OutputSinkKind::ActionVote(sink))
-        .expect("every Graph node carries the fixed vote sinks");
+    let surface = graph.sink_surface(OutputSinkKind::ActionVote(sink));
     graph.push_edge(surface, GraphEdge::new(source, 1.0));
     edited
 }

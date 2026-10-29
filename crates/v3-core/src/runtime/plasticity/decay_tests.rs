@@ -52,19 +52,17 @@ fn state(def: &CgpGraphBackendDef, seeds: Option<Seeds>) -> LearnedState {
 /// One compute node whose single input edge has genomic weight `weight`
 /// and learning attributes `config`.
 fn ungrouped(weight: f32, config: Learning) -> CgpGraphBackendDef {
-    CgpGraphBackendDef::new_with_fixed_outputs()
-        .with_compute_nodes(vec![plastic_node(
-            ComputeNodeKind::Add,
-            vec![GraphEdge::new(
-                GraphSource::SharedMemory {
-                    slot: 0,
-                    previous: false,
-                },
-                weight,
-            )],
-            Some(config),
-        )])
-        .with_output_sinks(vec![])
+    CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![plastic_node(
+        ComputeNodeKind::Add,
+        vec![GraphEdge::new(
+            GraphSource::SharedMemory {
+                slot: 0,
+                previous: false,
+            },
+            weight,
+        )],
+        Some(config),
+    )])
 }
 
 /// A full catalog with one `Ring` bundle (pattern 1) at genomic scale

@@ -2101,16 +2101,14 @@ mod tests {
     }
 
     fn graph_reading(node_id: NodeId, key: WorldInputKey) -> NodeGenome {
-        use crate::genome::cgp::{
-            CgpGraphBackendDef, GraphEdge, GraphSource, OutputSink, OutputSinkKind,
-        };
+        use crate::genome::cgp::{CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind};
         NodeGenome::new(
             node_id,
             vec![InputReference::World(key)],
             BackendDef::Graph(
                 CgpGraphBackendDef::new_with_fixed_outputs()
                     .with_compute_nodes(Vec::new())
-                    .with_output_sinks(vec![OutputSink::new(
+                    .with_sink_inputs(
                         OutputSinkKind::CustomOutput(0),
                         vec![GraphEdge::new(
                             GraphSource::InputLeaf {
@@ -2119,7 +2117,7 @@ mod tests {
                             },
                             1.0,
                         )],
-                    )]),
+                    ),
             ),
             vec![],
         )
@@ -2243,8 +2241,8 @@ mod tests {
                 NodeId::new(0),
                 vec![InputReference::World(key)],
                 BackendDef::Graph(
-                    CgpGraphBackendDef::new_with_fixed_outputs()
-                        .with_compute_nodes(vec![ComputeNode::new(
+                    CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+                        ComputeNode::new(
                             ComputeNodeKind::Add,
                             vec![GraphEdge::new(
                                 GraphSource::InputLeaf {
@@ -2253,8 +2251,8 @@ mod tests {
                                 },
                                 1.0,
                             )],
-                        )])
-                        .with_output_sinks(Vec::new()),
+                        ),
+                    ]),
                 ),
                 vec![],
             )],

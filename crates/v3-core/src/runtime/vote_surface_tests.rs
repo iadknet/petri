@@ -8,8 +8,7 @@ use crate::contracts::votes::VoteVector;
 use crate::contracts::votes::{ActionParamField, VoteSink, VOTE_SINK_COUNT};
 use crate::contracts::{NodeId, RouteTarget};
 use crate::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
-    OutputSinkKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use crate::runtime::mesh::{execute_creature_mesh_impl, ObservedMeshExecution};
@@ -83,24 +82,14 @@ fn voting_graph_node(
     NodeGenome::new(
         NodeId::new(id),
         vec![],
-        BackendDef::Graph(
-            CgpGraphBackendDef::new_with_fixed_outputs()
-                .with_compute_nodes(vec![ComputeNode::new(
-                    ComputeNodeKind::Constant(value),
-                    vec![],
-                )])
-                .with_output_sinks(
-                    sinks
-                        .iter()
-                        .map(|kind| {
-                            OutputSink::new(
-                                *kind,
-                                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                            )
-                        })
-                        .collect(),
-                ),
-        ),
+        BackendDef::Graph(sinks.iter().fold(
+            CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+                ComputeNode::new(ComputeNodeKind::Constant(value), vec![]),
+            ]),
+            |def, &kind| {
+                def.with_sink_inputs(kind, vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)])
+            },
+        )),
         targets(target_ids),
     )
 }

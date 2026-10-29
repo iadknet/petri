@@ -82,18 +82,17 @@ fn gate_rejects(edit: impl FnOnce(&mut CreatureGenome, usize, u16)) {
 }
 
 /// A Graph-domain edit that leaves a member on a sink its shape does not
-/// name is rolled back.
+/// name is rolled back: the members on `Move(2)` move to `Eat`.
 #[test]
 fn the_gate_rolls_back_a_graph_event_that_breaks_an_invariant() {
     gate_rejects(|genome, idx, _| {
         edit_sinks(graph_mut(&mut genome.nodes[idx]), |sinks| {
-            for sink in sinks.iter_mut() {
-                if sink.kind
-                    == OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2))
-                {
-                    sink.kind = OutputSinkKind::ActionVote(VoteSink::Eat);
-                }
-            }
+            let from = OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2))
+                .catalog_index();
+            let moved = std::mem::take(&mut sinks[from].inputs);
+            sinks[OutputSinkKind::ActionVote(VoteSink::Eat).catalog_index()]
+                .inputs
+                .extend(moved);
         });
     });
 }

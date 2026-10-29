@@ -17,9 +17,7 @@ pub(super) fn graph_genome(
     eat_votes: Vec<GraphEdge>,
 ) -> CreatureGenome {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(compute_nodes);
-    let eat = def
-        .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
-        .expect("the fixed catalog carries every vote sink");
+    let eat = def.sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat));
     for edge in eat_votes {
         def.push_edge(eat, edge);
     }

@@ -250,9 +250,7 @@ pub(crate) fn build_cgp_founder_decision_graph(
 
 /// Append `edges` to the catalog sink of `kind`.
 fn wire(def: &mut CgpGraphBackendDef, kind: OutputSinkKind, edges: Vec<GraphEdge>) {
-    let surface = def
-        .sink_surface(kind)
-        .expect("the fixed catalog holds every vote and parameter sink");
+    let surface = def.sink_surface(kind);
     for edge in edges {
         def.push_edge(surface, edge);
     }

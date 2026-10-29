@@ -606,8 +606,7 @@ mod tests {
     use crate::contracts::votes::VoteSink;
     use crate::genome::cgp::test_support::plastic_node;
     use crate::genome::cgp::{
-        ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource, OutputSink,
-        OutputSinkKind,
+        ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, GraphSource, OutputSinkKind,
     };
     use crate::genome::BackendDef;
     use rand::rngs::SmallRng;
@@ -618,9 +617,7 @@ mod tests {
     }
 
     fn def_with_nodes(nodes: Vec<ComputeNode>) -> CgpGraphBackendDef {
-        CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(nodes)
-            .with_output_sinks(Vec::new())
+        CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(nodes)
     }
 
     fn hebbian() -> Learning {
@@ -704,10 +701,10 @@ mod tests {
     /// ignored, so it has nothing to learn.
     #[test]
     fn enable_hebbian_never_targets_a_clear_slot_edge() {
-        let mut def = def_with_nodes(Vec::new()).with_output_sinks(vec![OutputSink::new(
+        let mut def = def_with_nodes(Vec::new()).with_sink_inputs(
             OutputSinkKind::ClearSlot(3),
             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-        )]);
+        );
         assert!(!any_target(&def, can_enable_hebbian));
         assert_eq!(
             enable_hebbian_in_def(&mut def, &mut rng(42)),
@@ -897,7 +894,7 @@ mod tests {
             (OutputSinkKind::ClearSlot(2), None),
             (OutputSinkKind::WriteSlot(4), None),
         ] {
-            let surface = def.sink_surface(kind).unwrap();
+            let surface = def.sink_surface(kind);
             def.push_edge(surface, edge(2));
             if config.is_some() {
                 let index = def.surface_edges(surface).len() - 1;
@@ -951,9 +948,7 @@ mod tests {
         for target in [
             EdgeOccurrence::new(EdgeSurface::ComputeInput(1), 0),
             EdgeOccurrence::new(
-                original
-                    .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
-                    .unwrap(),
+                original.sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat)),
                 0,
             ),
         ] {
@@ -1523,9 +1518,7 @@ mod tests {
         let id = BundleId::new(0);
         // A lone sink edge beside the bundle, and the slots: one present
         // per operator family, or absent for the enables.
-        let surface = original
-            .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
-            .unwrap();
+        let surface = original.sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat));
         original.push_edge(surface, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
         let lone = EdgeOccurrence::new(surface, 0);
         let slotted = |scale: Option<Learning>, default: Option<Learning>| {

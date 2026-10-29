@@ -3,8 +3,8 @@ use crate::config::test_sensor_context;
 use crate::contracts::votes::{DirectedVoteKind, VoteSink};
 use crate::contracts::{FieldSet, InputReference, NodeId, WorldInputKey, MEMORY_BANK};
 use crate::genome::cgp::{
-    bundle_capacity_admits, plans, test_support::edit_sinks, BundleBirth, BundleSource,
-    CgpGraphBackendDef, GraphEdge, GraphSource, OutputSinkKind, Wiring,
+    bundle_capacity_admits, plans, BundleBirth, BundleSource, CgpGraphBackendDef, GraphEdge,
+    GraphSource, OutputSinkKind, Wiring,
 };
 use crate::genome::learning::GraphMapping;
 use crate::genome::{BackendDef, NodeEditError, NodeGenome, VmBackendDef, VmInstruction};
@@ -39,7 +39,7 @@ fn ring_birth(kind: DirectedVoteKind, offset: u8) -> BundleBirth {
 }
 
 #[test]
-fn plans_of_a_plain_set_are_every_present_vote_sink_in_catalog_order() {
+fn plans_of_a_plain_set_are_every_vote_sink_in_catalog_order() {
     let def = CgpGraphBackendDef::new_with_fixed_outputs();
     let expected: Vec<Wiring> = def
         .output_sinks()
@@ -49,14 +49,13 @@ fn plans_of_a_plain_set_are_every_present_vote_sink_in_catalog_order() {
             _ => None,
         })
         .collect();
-    assert_eq!(plans(&def, &MEMORY_BANK), expected);
+    assert_eq!(plans(&MEMORY_BANK), expected);
     assert_eq!(expected.len(), crate::contracts::votes::VOTE_SINK_COUNT);
 }
 
 #[test]
-fn plans_of_a_geometric_set_are_hostable_kinds_by_eight_offsets() {
-    let full = CgpGraphBackendDef::new_with_fixed_outputs();
-    let ring = plans(&full, &FieldSet::Ring);
+fn plans_of_a_geometric_set_are_every_kind_by_eight_offsets() {
+    let ring = plans(&FieldSet::Ring);
     assert_eq!(ring.len(), DirectedVoteKind::ALL.len() * 8);
     assert_eq!(
         ring[..2],
@@ -71,27 +70,16 @@ fn plans_of_a_geometric_set_are_hostable_kinds_by_eight_offsets() {
             }
         ]
     );
-    // Without Move's drive a pair cannot be wired to Move, a ring still can.
-    let mut no_drive = full.clone();
-    edit_sinks(&mut no_drive, |sinks| {
-        sinks.retain(|sink| {
-            sink.kind != OutputSinkKind::ActionVote(VoteSink::Drive(DirectedVoteKind::Move))
-        });
-    });
+    // A pair set takes the same kinds and offsets.
     let pair = InputReference::World(WorldInputKey::AreaBarrierSummary);
     let set = crate::contracts::SensorDescriptor::of(&pair, &test_sensor_context(1))
         .field_set(0)
         .unwrap();
-    let pairs = plans(&no_drive, &set);
-    assert_eq!(pairs.len(), (DirectedVoteKind::ALL.len() - 1) * 8);
-    assert!(pairs.iter().all(|wiring| !matches!(
-        wiring,
-        Wiring::DirectionPair {
-            kind: DirectedVoteKind::Move,
-            ..
-        }
-    )));
-    assert_eq!(plans(&no_drive, &FieldSet::Ring).len(), ring.len());
+    let pairs = plans(&set);
+    assert_eq!(pairs.len(), ring.len());
+    for (pair, ring) in pairs.iter().zip(&ring) {
+        assert_eq!((pair.kind(), pair.offset()), (ring.kind(), ring.offset()));
+    }
 }
 
 #[test]
@@ -248,9 +236,7 @@ fn prune_refuses_an_addressed_declaration_and_renumbers_the_rest() {
         )
     };
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let surface = def
-        .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
-        .unwrap();
+    let surface = def.sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat));
     def.push_edge(surface, leaf(2));
     let mut node = graph_node(
         vec![InputReference::ActionVotes, barrier_ring(), barrier_ring()],

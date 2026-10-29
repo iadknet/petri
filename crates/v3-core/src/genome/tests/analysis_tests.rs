@@ -4,8 +4,7 @@ use crate::contracts::{
     WorldInputKey,
 };
 use crate::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
-    OutputSinkKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
 use crate::genome::{BackendDef, NodeGenome, VmBackendDef};
 use rand::SeedableRng;
@@ -714,10 +713,10 @@ fn functional_complexity_excludes_dead_graph_nodes() {
                         ),
                         ComputeNode::new(ComputeNodeKind::Sigmoid, vec![]),
                     ])
-                    .with_output_sinks(vec![OutputSink::new(
+                    .with_sink_inputs(
                         OutputSinkKind::CustomOutput(0),
                         vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                    )]),
+                    ),
             ),
             vec![],
         )],

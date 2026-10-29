@@ -2843,9 +2843,7 @@ async fn get_creature_learning_and_learners_follow_the_runtime() {
                 unreachable!()
             };
             let members: Vec<_> = def.members(bundle).collect();
-            let vote_sink = def
-                .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
-                .unwrap();
+            let vote_sink = def.sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat));
             def.push_edge(
                 vote_sink,
                 GraphEdge::new(
@@ -3230,9 +3228,7 @@ async fn live_circuit_slot_lists_are_the_reachable_live_bus_slots() {
         )
     };
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let sink = def
-        .sink_surface(OutputSinkKind::CustomOutput(5))
-        .expect("the fixed catalog");
+    let sink = def.sink_surface(OutputSinkKind::CustomOutput(5));
     let leaf = GraphSource::InputLeaf {
         ref_idx: 0,
         sub_idx: 0,

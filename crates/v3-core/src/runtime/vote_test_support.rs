@@ -115,7 +115,7 @@ impl GraphBuilder {
         kind: OutputSinkKind,
         inputs: &[(GraphSource, f32)],
     ) -> &mut Self {
-        let sink = self.0.sink_surface(kind).expect("catalog sink");
+        let sink = self.0.sink_surface(kind);
         for &(source, weight) in inputs {
             self.0.push_edge(sink, GraphEdge::new(source, weight));
         }

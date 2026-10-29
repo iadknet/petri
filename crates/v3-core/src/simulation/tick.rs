@@ -1008,12 +1008,12 @@ mod final_action_observation_tests {
                             ComputeNodeKind::DecayIntegrator(0.0),
                             vec![],
                         )])
-                        .with_output_sinks(vec![crate::genome::cgp::OutputSink::new(
+                        .with_sink_inputs(
                             crate::genome::cgp::OutputSinkKind::ActionVote(
                                 crate::contracts::votes::VoteSink::Eat,
                             ),
                             vec![runtime_output],
-                        )]),
+                        ),
                 ),
                 vec![],
             )],

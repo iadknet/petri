@@ -110,7 +110,7 @@ mod tests {
     use crate::contracts::votes::DirectedVoteKind;
     use crate::contracts::votes::{ActionParamField, VoteSink};
     use crate::contracts::WorldInputKey;
-    use crate::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, OutputSink, OutputSinkKind};
+    use crate::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, OutputSinkKind};
 
     /// A node wired only through a bundle's members writes the action
     /// channel and reads its ring (T25.F03).
@@ -129,9 +129,7 @@ mod tests {
 
     #[test]
     fn empty_graph_no_annotations() {
-        let def = CgpGraphBackendDef::new_with_fixed_outputs()
-            .with_compute_nodes(Vec::new())
-            .with_output_sinks(Vec::new());
+        let def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(Vec::new());
         let (reads, writes, stateful, live) = derive_cgp_annotations(&def, &[]);
         assert!(reads.is_empty());
         assert!(writes.is_empty());
@@ -152,13 +150,11 @@ mod tests {
                     1.0,
                 )],
             )])
-            .with_output_sinks(vec![
-                OutputSink::new(
-                    OutputSinkKind::CustomOutput(0),
-                    vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                ),
-                OutputSink::new(OutputSinkKind::RouterGate(0), Vec::new()),
-            ]);
+            .with_sink_inputs(
+                OutputSinkKind::CustomOutput(0),
+                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+            )
+            .with_sink_inputs(OutputSinkKind::RouterGate(0), Vec::new());
         let input_refs = vec![InputReference::World(WorldInputKey::FoodHere {
             type_idx: OrdinaryFoodTypeId::default(),
         })];
@@ -177,10 +173,10 @@ mod tests {
                 ComputeNodeKind::DecayIntegrator(0.5),
                 Vec::new(),
             )])
-            .with_output_sinks(vec![OutputSink::new(
+            .with_sink_inputs(
                 OutputSinkKind::CustomOutput(0),
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-            )]);
+            );
         let (_, _, stateful, _) = derive_cgp_annotations(&def, &[]);
         assert!(stateful);
     }
@@ -196,10 +192,7 @@ mod tests {
                     ComputeNodeKind::Constant(1.0),
                     Vec::new(),
                 )])
-                .with_output_sinks(vec![OutputSink::new(
-                    kind,
-                    vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-                )]);
+                .with_sink_inputs(kind, vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)]);
             let (_, writes, _, _) = derive_cgp_annotations(&def, &[]);
             assert_eq!(writes, vec![MeshWriteClass::Action], "{kind:?}");
         }
@@ -212,10 +205,10 @@ mod tests {
                 ComputeNodeKind::Constant(1.0),
                 Vec::new(),
             )])
-            .with_output_sinks(vec![OutputSink::new(
+            .with_sink_inputs(
                 OutputSinkKind::WriteSlot(0),
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-            )]);
+            );
         let (_, writes, stateful, _) = derive_cgp_annotations(&def, &[]);
         assert!(stateful);
         assert!(writes.contains(&MeshWriteClass::Memory));
@@ -234,10 +227,10 @@ mod tests {
                     1.0,
                 )],
             )])
-            .with_output_sinks(vec![OutputSink::new(
+            .with_sink_inputs(
                 OutputSinkKind::CustomOutput(0),
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-            )]);
+            );
         let (_, _, stateful, _) = derive_cgp_annotations(&def, &[]);
         assert!(stateful);
     }
@@ -255,16 +248,14 @@ mod tests {
         };
         let def = CgpGraphBackendDef::new_with_fixed_outputs()
             .with_compute_nodes(Vec::new())
-            .with_output_sinks(vec![
-                OutputSink::new(
-                    OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 0)),
-                    vec![leaf_edge(0)],
-                ),
-                OutputSink::new(
-                    OutputSinkKind::ActionVote(VoteSink::Terminate),
-                    vec![leaf_edge(1)],
-                ),
-            ]);
+            .with_sink_inputs(
+                OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 0)),
+                vec![leaf_edge(0)],
+            )
+            .with_sink_inputs(
+                OutputSinkKind::ActionVote(VoteSink::Terminate),
+                vec![leaf_edge(1)],
+            );
         let input_refs = vec![
             InputReference::World(WorldInputKey::FoodHere {
                 type_idx: OrdinaryFoodTypeId::default(),

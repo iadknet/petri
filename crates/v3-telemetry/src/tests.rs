@@ -1221,11 +1221,9 @@ fn a_snapshot_counts_drive_carriers_and_fanout_creatures_per_kind() {
             let BackendDef::Graph(def) = genome.nodes[entry].backend_edit().1 else {
                 panic!("the default founder's entry node is a Graph node");
             };
-            let surface = def
-                .sink_surface(OutputSinkKind::ActionVote(VoteSink::Drive(
-                    DirectedVoteKind::Move,
-                )))
-                .unwrap();
+            let surface = def.sink_surface(OutputSinkKind::ActionVote(VoteSink::Drive(
+                DirectedVoteKind::Move,
+            )));
             def.push_edge(
                 surface,
                 GraphEdge::new(

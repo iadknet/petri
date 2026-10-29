@@ -455,21 +455,25 @@ fn the_json_and_debug_text_of_a_def_name_own_weight_and_print_bundles() {
             ComputeNodeKind::Add,
             vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.5)],
         )])
-        .with_output_sinks(vec![OutputSink::new(
+        .with_sink_inputs(
             OutputSinkKind::CustomOutput(0),
             vec![GraphEdge::new(leaf(1), 1.0)],
-        )]);
-    assert_eq!(
-        serde_json::to_string(&def).unwrap(),
-        r#"{"compute_nodes":[{"kind":"Add","inputs":[{"source":{"ComputeNode":0},"own_weight":0.5}]}],"output_sinks":[{"kind":{"CustomOutput":0},"inputs":[{"source":{"InputLeaf":{"ref_idx":1,"sub_idx":0}},"own_weight":1.0}]}]}"#
-    );
-    assert_eq!(
-        format!("{def:?}"),
+        );
+    let json = serde_json::to_string(&def).unwrap();
+    assert!(json.starts_with(
+        r#"{"compute_nodes":[{"kind":"Add","inputs":[{"source":{"ComputeNode":0},"own_weight":0.5}]}],"output_sinks":[{"kind":{"CustomOutput":0},"inputs":[{"source":{"InputLeaf":{"ref_idx":1,"sub_idx":0}},"own_weight":1.0}]},{"kind":{"CustomOutput":1},"inputs":[]},"#
+    ));
+    assert!(json.ends_with(r#"{"kind":{"ActionParam":"GiveEffort"},"inputs":[]}]}"#));
+    let debug = format!("{def:?}");
+    assert!(debug.starts_with(
         "CgpGraphBackendDef { compute_nodes: [ComputeNode { kind: Add, inputs: \
          [GraphEdge { source: ComputeNode(0), own_weight: 0.5, role: Lone(None) }] }], \
          output_sinks: [OutputSink { kind: CustomOutput(0), inputs: \
          [GraphEdge { source: InputLeaf { ref_idx: 1, sub_idx: 0 }, own_weight: 1.0, \
-         role: Lone(None) }] }], bundles: [] }"
+         role: Lone(None) }] }, OutputSink { kind: CustomOutput(1), inputs: [] }, "
+    ));
+    assert!(
+        debug.ends_with("OutputSink { kind: ActionParam(GiveEffort), inputs: [] }], bundles: [] }")
     );
 }
 
@@ -626,7 +630,14 @@ fn def_strategy() -> impl Strategy<Value = CgpGraphBackendDef> {
         prop::collection::vec((0u8..24, edges_strategy()), 0..4),
     )
         .prop_map(|(nodes, sinks)| {
-            CgpGraphBackendDef::new_with_fixed_outputs()
+            sinks
+                .into_iter()
+                .fold(
+                    CgpGraphBackendDef::new_with_fixed_outputs(),
+                    |def, (slot, inputs)| {
+                        def.with_sink_inputs(OutputSinkKind::CustomOutput(slot), inputs)
+                    },
+                )
                 .with_compute_nodes(
                     nodes
                         .into_iter()
@@ -636,14 +647,6 @@ fn def_strategy() -> impl Strategy<Value = CgpGraphBackendDef> {
                                 inputs,
                                 learns.then(plastic).flatten(),
                             )
-                        })
-                        .collect(),
-                )
-                .with_output_sinks(
-                    sinks
-                        .into_iter()
-                        .map(|(slot, inputs)| {
-                            OutputSink::new(OutputSinkKind::CustomOutput(slot), inputs)
                         })
                         .collect(),
                 )
@@ -928,42 +931,20 @@ fn splitting_a_member_detaches_it_inside_the_container() {
     );
 }
 
-/// `plans` admits a geometric kind only with every sink it needs (T25.F11
-/// invariant 5): a ring the eight direction sinks, a pair those and the
-/// drive; a `Plain` set one plan per present vote sink.
+/// `plans` depends on the set's geometry alone (T25.F11 invariant 5): a
+/// `Plain` set one plan per vote sink, a ring or pair set every kind by
+/// eight offsets.
 #[test]
-fn plans_need_every_sink_a_wiring_names() {
+fn plans_follow_the_set_geometry() {
     use crate::contracts::FieldSet;
-    let full = CgpGraphBackendDef::new_with_fixed_outputs();
     let plain = FieldSet::Plain { width: 3 };
     let pair = FieldSet::Pair(pair_layout());
-    assert_eq!(plans(&full, &plain).len(), VoteSink::all().count());
-    assert_eq!(plans(&full, &FieldSet::Ring).len(), 4 * 8);
-    assert_eq!(plans(&full, &pair).len(), 4 * 8);
-    let without = |vote: VoteSink| {
-        let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-        crate::genome::cgp::test_support::edit_sinks(&mut def, |sinks| {
-            sinks.retain(|sink| sink.kind != OutputSinkKind::ActionVote(vote));
-        });
-        def
-    };
-    let steal = DirectedVoteKind::StealEnergy;
-    let partial = without(VoteSink::Directed(steal, 7));
-    for set in [FieldSet::Ring, pair] {
-        let kinds: Vec<_> = plans(&partial, &set)
-            .iter()
-            .filter_map(|w| w.kind())
-            .collect();
-        assert_eq!(kinds.len(), 3 * 8, "{set:?}");
-        assert!(!kinds.contains(&steal));
-    }
-    assert_eq!(plans(&partial, &plain).len(), VoteSink::all().count() - 1);
-    let driveless = without(steal.drive());
-    assert_eq!(plans(&driveless, &FieldSet::Ring).len(), 4 * 8);
-    assert_eq!(plans(&driveless, &pair).len(), 3 * 8);
+    assert_eq!(plans(&plain).len(), VoteSink::all().count());
+    assert_eq!(plans(&FieldSet::Ring).len(), 4 * 8);
+    assert_eq!(plans(&pair).len(), 4 * 8);
     // Kinds in `ALL` order, offsets ascending.
     assert_eq!(
-        plans(&full, &FieldSet::Ring)[..9],
+        plans(&FieldSet::Ring)[..9],
         (0..8)
             .map(|offset| ring_wiring(DirectedVoteKind::Move, offset))
             .chain([ring_wiring(DirectedVoteKind::Reproduce, 0)])
@@ -1786,8 +1767,8 @@ fn learning_node(def: CgpGraphBackendDef, input_refs: Vec<InputReference>) -> No
 #[test]
 fn clear_slot_edges_are_never_eligible() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let clear = def.sink_surface(OutputSinkKind::ClearSlot(3)).unwrap();
-    let write = def.sink_surface(OutputSinkKind::WriteSlot(3)).unwrap();
+    let clear = def.sink_surface(OutputSinkKind::ClearSlot(3));
+    let write = def.sink_surface(OutputSinkKind::WriteSlot(3));
     def.push_edge(clear, GraphEdge::new(leaf(0), 1.0));
     def.push_edge(write, GraphEdge::new(leaf(0), 1.0));
     assert!(!def.can_learn(EdgeOccurrence::new(clear, 0)));
@@ -1819,7 +1800,7 @@ fn compute_edge_free_occurrence() -> EdgeOccurrence {
 #[should_panic(expected = "a ClearSlot edge does not learn")]
 fn set_learning_on_a_clear_slot_edge_is_a_debug_assertion() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let clear = def.sink_surface(OutputSinkKind::ClearSlot(0)).unwrap();
+    let clear = def.sink_surface(OutputSinkKind::ClearSlot(0));
     def.push_edge(clear, GraphEdge::new(leaf(0), 1.0));
     def.edge_mut(EdgeOccurrence::new(clear, 0))
         .set_learning(plastic());
@@ -1840,7 +1821,7 @@ fn validate_graph_admits_a_learning_member_and_rejects_a_learning_clear_slot_edg
         validate_graph(&learning_node(def.clone(), ring_refs())),
         Ok(())
     );
-    let clear = def.sink_surface(OutputSinkKind::ClearSlot(0)).unwrap();
+    let clear = def.sink_surface(OutputSinkKind::ClearSlot(0));
     def.push_edge(clear, GraphEdge::new(leaf(0), 1.0));
     let EdgeSurface::SinkInput(sink) = clear else {
         unreachable!()
@@ -2398,7 +2379,6 @@ fn fact_members(def: &CgpGraphBackendDef, id: BundleId) -> Vec<EdgeOccurrence> {
 
 fn drive_sink(def: &CgpGraphBackendDef, kind: DirectedVoteKind) -> EdgeSurface {
     def.sink_surface(OutputSinkKind::ActionVote(kind.drive()))
-        .unwrap()
 }
 
 /// The pair gene is the record, twelve direction members and one fact
@@ -2772,13 +2752,13 @@ fn the_widest_queue_bundle_lists_every_coordinate_present() {
         .resolve_in(&refs, &context)
         .expect("the queue resolves");
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let wiring = *plans(&def, &set).first().expect("an admissible plan");
+    let wiring = *plans(&set).first().expect("an admissible plan");
     let coordinates = wiring.coordinates(&set);
     assert_eq!(coordinates.len(), 65_536);
     let id = BundleId::new(0);
     def.bundles.push(Bundle::new(source, wiring));
     for &(field, site) in &coordinates {
-        let sink = def.site_sink(&wiring, site).expect("a sink of the wiring");
+        let sink = CgpGraphBackendDef::site_sink(&wiring, site).expect("a sink of the wiring");
         let member = CgpGraphBackendDef::new_member(id, source, field);
         def.output_sinks.0[sink].inputs.0.push(member);
     }
@@ -2940,5 +2920,58 @@ proptest! {
         prop_assert_eq!(layout.scales.len(), usize::from(scale_learning.is_some()));
         // The lone independent edge never learns here.
         prop_assert!(layout.edges.iter().all(|learner| learner.member.is_some()));
+    }
+}
+
+// ── The whole catalog at deserialization (T30.F12) ──────────────────────────
+
+fn founder_def() -> CgpGraphBackendDef {
+    crate::creature::cgp_founder::build_cgp_founder_graph_with_thresholds(0.5, 100, 500)
+}
+
+/// A founder def serializes, deserializes and serializes again to the same
+/// bytes.
+#[test]
+fn a_founder_def_round_trips_byte_identically() {
+    let json = serde_json::to_string(&founder_def()).unwrap();
+    let decoded: CgpGraphBackendDef = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded, founder_def());
+    assert_eq!(serde_json::to_string(&decoded).unwrap(), json);
+}
+
+/// A sink list that is not the fixed catalog in catalog order fails to
+/// deserialize, with an error naming the catalog: missing, extra, reordered,
+/// duplicated, or of a kind outside the catalog.
+#[test]
+fn any_other_sink_list_is_rejected_at_deserialization() {
+    type Edit = fn(&mut Vec<serde_json::Value>);
+    let edits: [(&str, Edit); 5] = [
+        ("missing", |sinks| {
+            sinks.pop();
+        }),
+        ("extra", |sinks| {
+            let last = sinks.last().unwrap().clone();
+            sinks.push(last);
+        }),
+        ("reordered", |sinks| sinks.swap(0, 1)),
+        ("duplicated", |sinks| sinks[1] = sinks[0].clone()),
+        ("outside the catalog", |sinks| {
+            sinks[0]["kind"] =
+                serde_json::json!({ "CustomOutput": crate::genome::cgp::CUSTOM_OUTPUT_COUNT });
+        }),
+    ];
+    for (name, edit) in edits {
+        let mut value = serde_json::to_value(founder_def()).unwrap();
+        let serde_json::Value::Array(sinks) = &mut value["output_sinks"] else {
+            panic!("output_sinks is a list");
+        };
+        edit(sinks);
+        let error = serde_json::from_value::<CgpGraphBackendDef>(value)
+            .expect_err(name)
+            .to_string();
+        assert!(
+            error.contains("fixed 108-sink catalog in catalog order"),
+            "{name}: {error}"
+        );
     }
 }

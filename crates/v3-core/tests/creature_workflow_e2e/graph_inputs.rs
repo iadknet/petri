@@ -247,12 +247,11 @@ fn graph_reads_inputs_and_writes_outputs_e2e() {
             ));
             // Wire CustomOutput(i) sink to the compute node we just added
             let cn_idx = def.compute_nodes().len() - 1;
-            if let Some(sink) = def.sink_surface(OutputSinkKind::CustomOutput(i as u8)) {
-                def.push_edge(
-                    sink,
-                    GraphEdge::new(GraphSource::ComputeNode(cn_idx as u16), 1.0),
-                );
-            }
+            let sink = def.sink_surface(OutputSinkKind::CustomOutput(i as u8));
+            def.push_edge(
+                sink,
+                GraphEdge::new(GraphSource::ComputeNode(cn_idx as u16), 1.0),
+            );
         }
         def
     };

@@ -115,12 +115,6 @@ fn resolver_boundaries_preserve_wrap_scalar_raw_queue_and_soft_zero_semantics() 
         u16::try_from(refs.len()).is_err(),
         "a next index cannot be represented; no truncating admission"
     );
-    let empty = CgpGraphBackendDef::new_with_fixed_outputs()
-        .with_compute_nodes(vec![])
-        .with_output_sinks(vec![]);
-    assert!(empty
-        .sink(OutputSinkKind::ActionVote(VoteSink::Eat))
-        .is_none());
 }
 
 #[test]

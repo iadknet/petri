@@ -413,7 +413,7 @@ fn craft(index: usize, genome: &mut CreatureGenome, config: &SimulationConfig) {
         }
         1 => {
             let area = InputReference::World(WorldInputKey::AreaBarrierSummary);
-            let BackendDef::Graph(def) = node.backend_def() else {
+            let BackendDef::Graph(_def) = node.backend_def() else {
                 unreachable!("a Graph node");
             };
             let births: Vec<BundleBirth> =
@@ -421,7 +421,7 @@ fn craft(index: usize, genome: &mut CreatureGenome, config: &SimulationConfig) {
                     .field_sets()
                     .enumerate()
                     .map(|(field_set, set)| {
-                        let plans = v3_core::genome::cgp::plans(def, &set);
+                        let plans = v3_core::genome::cgp::plans(&set);
                         BundleBirth {
                             field_set: field_set as u8,
                             wiring: plans[index % plans.len()],

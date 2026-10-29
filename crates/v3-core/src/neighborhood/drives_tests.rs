@@ -24,7 +24,7 @@ fn memory(slot: u8) -> GraphSource {
 }
 
 fn wire(def: &mut CgpGraphBackendDef, sink: VoteSink, source: GraphSource, weight: f32) {
-    let surface = def.sink_surface(OutputSinkKind::ActionVote(sink)).unwrap();
+    let surface = def.sink_surface(OutputSinkKind::ActionVote(sink));
     def.push_edge(surface, GraphEdge::new(source, weight));
 }
 

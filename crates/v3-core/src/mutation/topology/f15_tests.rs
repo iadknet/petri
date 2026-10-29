@@ -110,7 +110,7 @@ fn copy_and_backend_growth_skip_unsafe_predecessors_atomically() {
 fn branch_failure_is_atomic_and_orphan_writes_are_preserved() {
     // A sole self-target is no longer a failure case (T19.F02); the
     // routing tests cover the detour it grows.
-    for case in 0..4 {
+    for case in 0..3 {
         let mut g = genome(vec![node(0, &[1]), node(1, &[])]);
         match case {
             0 => g.nodes[0].targets[0].target_id = NodeId::new(99),
@@ -118,17 +118,10 @@ fn branch_failure_is_atomic_and_orphan_writes_are_preserved() {
                 let target = g.nodes[0].targets[0];
                 g.nodes[0].targets.push(target);
             }
-            2 => {
+            _ => {
                 if let BackendDef::Vm(vm) = g.nodes[0].backend_edit().1 {
                     vm.register_count = 0;
                 }
-            }
-            _ => {
-                let mut graph = CgpGraphBackendDef::new_with_fixed_outputs();
-                crate::genome::cgp::test_support::edit_sinks(&mut graph, |sinks| {
-                    sinks.retain(|s| !matches!(s.kind, OutputSinkKind::RouterGate(1)));
-                });
-                *g.nodes[0].backend_edit().1 = BackendDef::Graph(graph);
             }
         }
         let old = g.clone();
@@ -322,9 +315,7 @@ fn conditional_fixture(graph: bool) -> CreatureGenome {
                 1.0,
             )],
         ));
-        let surface = backend
-            .sink_surface(OutputSinkKind::CustomOutput(0))
-            .unwrap();
+        let surface = backend.sink_surface(OutputSinkKind::CustomOutput(0));
         backend.push_edge(
             surface,
             GraphEdge::new(

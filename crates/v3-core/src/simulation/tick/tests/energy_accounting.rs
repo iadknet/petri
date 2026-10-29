@@ -386,8 +386,8 @@ fn learning_genome(reward: bool) -> crate::genome::CreatureGenome {
             NodeId::new(0),
             vec![],
             BackendDef::Graph(
-                CgpGraphBackendDef::new_with_fixed_outputs()
-                    .with_compute_nodes(vec![crate::genome::cgp::test_support::plastic_node(
+                CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
+                    crate::genome::cgp::test_support::plastic_node(
                         ComputeNodeKind::Constant(1.0),
                         vec![GraphEdge::new(
                             GraphSource::SharedMemory {
@@ -407,8 +407,8 @@ fn learning_genome(reward: bool) -> crate::genome::CreatureGenome {
                             }),
                             retention: 1.0,
                         }),
-                    )])
-                    .with_output_sinks(vec![]),
+                    ),
+                ]),
             ),
             vec![],
         )],
@@ -466,9 +466,7 @@ fn sink_learning_genome() -> crate::genome::CreatureGenome {
     use crate::genome::{BackendDef, HebbianRule, Learning, RewardModulationConfig};
     let mut genome = learning_genome(true);
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
-    let eat = def
-        .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
-        .unwrap();
+    let eat = def.sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat));
     def.push_edge(
         eat,
         GraphEdge::new(

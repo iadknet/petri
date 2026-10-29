@@ -7,7 +7,8 @@ use v3_core::contracts::votes::DirectedVoteKind;
 use v3_core::contracts::WorldInputKey;
 use v3_core::creature::founder::founder_genome_with_age_gate;
 use v3_core::genome::cgp::{
-    BundleId, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge, OutputSink,
+    BundleId, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeSurface, GraphEdge,
+    OutputSinkKind,
 };
 use v3_core::genome::VmBackendDef;
 
@@ -662,20 +663,13 @@ fn a_ring_read_only_through_a_bundle_is_causal() {
                 ComputeNode::new(compute.kind, inputs)
             })
             .collect();
-        let sinks = graph
-            .output_sinks()
-            .iter()
-            .map(|sink| {
-                OutputSink::new(
-                    sink.kind,
-                    sink.inputs.iter().copied().filter(&mut keep).collect(),
-                )
-            })
-            .collect();
-        *graph = graph
-            .clone()
-            .with_compute_nodes(nodes)
-            .with_output_sinks(sinks);
+        let rebuilt = graph.clone().with_compute_nodes(nodes);
+        *graph = graph.output_sinks().iter().fold(rebuilt, |def, sink| {
+            def.with_sink_inputs(
+                sink.kind,
+                sink.inputs.iter().copied().filter(&mut keep).collect(),
+            )
+        });
         moved += rings.len();
         for ring_ref in rings {
             let id = add_geometric(node, ring_ref, 0, DirectedVoteKind::Move, 0);
@@ -797,14 +791,10 @@ fn with_reads(picks: &[usize], idxs: &[u16], vm: bool) -> CreatureGenome {
                 )
             })
             .collect();
-        let sinks = graph
-            .output_sinks()
-            .iter()
-            .map(|sink| OutputSink::new(sink.kind, std::mem::take(&mut first)))
-            .collect();
-        graph = graph
-            .with_compute_nodes(Vec::new())
-            .with_output_sinks(sinks);
+        graph = OutputSinkKind::catalog()
+            .fold(graph.with_compute_nodes(Vec::new()), |def, kind| {
+                def.with_sink_inputs(kind, std::mem::take(&mut first))
+            });
         BackendDef::Graph(graph)
     };
     genome

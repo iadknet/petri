@@ -5,7 +5,7 @@
 
 use super::{
     BundleBirth, BundleId, BundleSource, CgpGraphBackendDef, ComputeNode, ComputeNodeKind,
-    EdgeOccurrence, EdgeSurface, GraphEdge, OutputSink, OutputSinkKind,
+    EdgeOccurrence, EdgeSurface, GraphEdge, OutputSinkKind,
 };
 use crate::contracts::{FieldSet, InputReference, NodeId, SensorDescriptor};
 use crate::genome::{BackendDef, CreatureGenome, Learning, NodeGenome};
@@ -25,10 +25,14 @@ pub(crate) struct NodeDraft {
     pub inputs: Vec<GraphEdge>,
 }
 
-/// Edit `def`'s sink catalog as drafts; the def keeps its compute nodes,
-/// bundle records and seeds (a member stays a member: the caller keeps the
-/// bundle invariants).
-pub(crate) fn edit_sinks(def: &mut CgpGraphBackendDef, edit: impl FnOnce(&mut Vec<SinkDraft>)) {
+/// Edit the inputs of `def`'s sink catalog as drafts, in catalog order; the
+/// kinds stay fixed, and the def keeps its compute nodes, bundle records and
+/// seeds (a member stays a member: the caller keeps the bundle invariants).
+///
+/// # Panics
+///
+/// If `edit` changes a draft's kind.
+pub(crate) fn edit_sinks(def: &mut CgpGraphBackendDef, edit: impl FnOnce(&mut [SinkDraft])) {
     let mut drafts: Vec<SinkDraft> = def
         .output_sinks()
         .iter()
@@ -38,11 +42,13 @@ pub(crate) fn edit_sinks(def: &mut CgpGraphBackendDef, edit: impl FnOnce(&mut Ve
         })
         .collect();
     edit(&mut drafts);
-    let sinks = drafts
-        .into_iter()
-        .map(|draft| OutputSink::new(draft.kind, draft.inputs))
-        .collect();
-    *def = def.clone().with_output_sinks(sinks);
+    *def = drafts.into_iter().zip(OutputSinkKind::catalog()).fold(
+        def.clone(),
+        |def, (draft, kind)| {
+            assert_eq!(draft.kind, kind, "a fixture edits sink inputs only");
+            def.with_sink_inputs(kind, draft.inputs)
+        },
+    );
 }
 
 /// Edit `def`'s compute nodes as drafts. The rebuilt def carries no seeds.
@@ -153,30 +159,13 @@ pub(crate) fn runtime_for(def: &CgpGraphBackendDef) -> GraphRuntimeState {
     runtime_for_defs(&[def])
 }
 
-/// Append `sink` to `def`'s catalog, exactly as given.
-pub(crate) fn push_sink(def: &mut CgpGraphBackendDef, sink: OutputSink) {
-    let mut sinks = def.output_sinks().to_vec();
-    sinks.push(sink);
-    *def = def.clone().with_output_sinks(sinks);
-}
-
-/// Replace the edges of `def`'s first sink of `kind` with `edges`.
-///
-/// # Panics
-///
-/// If `def` carries no sink of `kind`.
+/// Replace the edges of `def`'s sink of `kind` with `edges`.
 pub(crate) fn set_sink_inputs(
     def: &mut CgpGraphBackendDef,
     kind: OutputSinkKind,
     edges: Vec<GraphEdge>,
 ) {
-    edit_sinks(def, |sinks| {
-        sinks
-            .iter_mut()
-            .find(|sink| sink.kind == kind)
-            .expect("the catalog holds the sink")
-            .inputs = edges;
-    });
+    *def = def.clone().with_sink_inputs(kind, edges);
 }
 
 /// Replace the edges of compute node `idx` with `edges`. The rebuilt def
@@ -195,9 +184,9 @@ pub(crate) fn set_compute_inputs(def: &mut CgpGraphBackendDef, idx: usize, edges
 pub(crate) fn add_first_plan_sensor(node: &mut NodeGenome, reference: InputReference) -> u16 {
     let context = crate::config::test_sensor_context(1);
     let births = match &node.backend_def {
-        BackendDef::Graph(def) => SensorDescriptor::of(&reference, &context)
+        BackendDef::Graph(_) => SensorDescriptor::of(&reference, &context)
             .indexed_field_sets()
-            .map(|(index, set)| first_plan_birth(def, index, &set))
+            .map(|(index, set)| first_plan_birth(index, &set))
             .collect(),
         BackendDef::Vm(_) => Vec::new(),
     };
@@ -218,10 +207,10 @@ pub(crate) fn add_first_plan_bundle(node: &mut NodeGenome, source: BundleSource)
     let set = node
         .field_set(source, &context)
         .expect("a resolvable source");
-    let BackendDef::Graph(def) = &node.backend_def else {
+    let BackendDef::Graph(_) = &node.backend_def else {
         panic!("add_first_plan_bundle: a Graph node");
     };
-    let birth = first_plan_birth(def, source.field_set(), &set);
+    let birth = first_plan_birth(source.field_set(), &set);
     node.add_bundle(source, birth, &context)
         .expect("a first-plan bundle fixture")
         .0
@@ -258,10 +247,24 @@ pub(crate) fn add_bundle_on(
     id
 }
 
-fn first_plan_birth(def: &CgpGraphBackendDef, field_set: u8, set: &FieldSet) -> BundleBirth {
+fn first_plan_birth(field_set: u8, set: &FieldSet) -> BundleBirth {
     BundleBirth {
         field_set,
-        wiring: *super::plans(def, set).first().expect("an admissible plan"),
+        wiring: *super::plans(set).first().expect("an admissible plan"),
         scale: 0.0,
     }
+}
+
+/// A def on the fixed catalog whose compute nodes deserialize from
+/// `compute_nodes`, the JSON of a compute-node list: the load boundary a
+/// genome file crosses.
+///
+/// # Panics
+///
+/// If the JSON does not deserialize.
+pub(crate) fn def_with_compute_json(compute_nodes: &str) -> CgpGraphBackendDef {
+    let mut value = serde_json::to_value(CgpGraphBackendDef::new_with_fixed_outputs())
+        .expect("a def serializes");
+    value["compute_nodes"] = serde_json::from_str(compute_nodes).expect("compute-node JSON");
+    serde_json::from_value(value).expect("a def on the fixed catalog")
 }

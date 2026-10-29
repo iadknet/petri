@@ -2,7 +2,7 @@ use rand::Rng;
 
 use super::{birth, structural::next_node_id};
 use crate::contracts::{InputReference, NodeId, RouteTarget, SensorContext, MAX_GATE_SLOTS};
-use crate::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge, OutputSinkKind};
+use crate::genome::cgp::{GraphEdge, OutputSinkKind};
 use crate::genome::learning::{GraphMapping, InheritanceMapping};
 use crate::genome::CreatureGenome;
 use crate::genome::{BackendDef, NodeGenome, VmInstruction};
@@ -43,14 +43,6 @@ pub(super) fn free_gate_slot(node: &NodeGenome) -> Option<u8> {
     })
 }
 
-/// The index of `graph`'s `RouterGate(slot)` output sink, if it has one.
-fn gate_sink(graph: &CgpGraphBackendDef, slot: u8) -> Option<usize> {
-    graph
-        .output_sinks()
-        .iter()
-        .position(|s| matches!(s.kind, OutputSinkKind::RouterGate(written) if written == slot))
-}
-
 /// Give `backend` its own write to `slot` (T11.F15's construction): VM
 /// `WriteRouteGate` from a uniform register before the first `Halt`, with
 /// reference repair; Graph one weight-1 edge from `random_graph_source` into
@@ -80,7 +72,7 @@ fn add_gate_write(
                 .map(|()| GraphMapping::Identity)
         }
         BackendDef::Graph(graph) => {
-            let sink = gate_sink(graph, slot).ok_or(MutationSkipReason::NoApplicableTarget)?;
+            let sink = graph.sink_surface(OutputSinkKind::RouterGate(slot));
             let source = random_graph_source(
                 graph.compute_nodes().len() as u16,
                 NodeInputs {
@@ -89,7 +81,7 @@ fn add_gate_write(
                 },
                 rng,
             );
-            Ok(graph.push_edge(EdgeSurface::SinkInput(sink), GraphEdge::new(source, 1.0)))
+            Ok(graph.push_edge(sink, GraphEdge::new(source, 1.0)))
         }
     }
 }
@@ -247,7 +239,7 @@ fn feedback_slot(genome: &CreatureGenome, executed: &[usize], idx: usize) -> Opt
     let slot = free_gate_slot(node)?;
     let writable = match node.backend_def() {
         BackendDef::Vm(vm) => vm.register_count > 0,
-        BackendDef::Graph(graph) => gate_sink(graph, slot).is_some(),
+        BackendDef::Graph(_) => true,
     };
     (writable && !feedback_destinations(genome, executed, idx).is_empty()).then_some(slot)
 }

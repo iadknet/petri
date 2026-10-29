@@ -106,15 +106,17 @@ impl DriveCensus {
                 BackendDef::Graph(def) => {
                     for kind in DirectedVoteKind::ALL {
                         let row = &mut one[kind.index()];
-                        if let Some(sink) = def.sink(OutputSinkKind::ActionVote(kind.drive())) {
-                            for edge in sink.inputs.iter().filter(|edge| carries(edge.own_weight()))
-                            {
-                                row.drive_edges += 1;
-                                if edge.own_weight() > 0.0 {
-                                    row.drive_edges_positive += 1;
-                                } else {
-                                    row.drive_edges_negative += 1;
-                                }
+                        let drive = def.sink(OutputSinkKind::ActionVote(kind.drive()));
+                        for edge in drive
+                            .inputs
+                            .iter()
+                            .filter(|edge| carries(edge.own_weight()))
+                        {
+                            row.drive_edges += 1;
+                            if edge.own_weight() > 0.0 {
+                                row.drive_edges_positive += 1;
+                            } else {
+                                row.drive_edges_negative += 1;
                             }
                         }
                         let (fanouts, edges) = node_fanouts(def, kind);

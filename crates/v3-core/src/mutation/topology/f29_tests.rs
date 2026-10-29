@@ -294,13 +294,6 @@ fn ineligible_sources_skip_atomically() {
         vm.register_count = 0;
     }
     cases.push(("zero-register VM", zero_registers));
-    let mut no_sink = base();
-    let mut backend = CgpGraphBackendDef::new_with_fixed_outputs();
-    crate::genome::cgp::test_support::edit_sinks(&mut backend, |sinks| {
-        sinks.retain(|s| !matches!(s.kind, OutputSinkKind::RouterGate(1)));
-    });
-    *no_sink.nodes[0].backend_edit().1 = BackendDef::Graph(backend);
-    cases.push(("missing RouterGate sink", no_sink));
     let mut full = base();
     full.nodes[0].targets = (0..MAX_GATE_SLOTS as u8)
         .map(|slot| RouteTarget {

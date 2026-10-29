@@ -36,9 +36,8 @@ fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
             Vec::new(),
         ));
         // Wire RouterGate(0) sink to CN0
-        if let Some(sink) = def.sink_surface(OutputSinkKind::RouterGate(0)) {
-            def.push_edge(sink, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
-        }
+        let sink = def.sink_surface(OutputSinkKind::RouterGate(0));
+        def.push_edge(sink, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
         def
     };
     let entry = NodeGenome::new(
@@ -143,9 +142,8 @@ fn graph_state_persists_across_ticks_e2e() {
             vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
         ));
         // Wire CustomOutput(0) sink to CN1
-        if let Some(sink) = def.sink_surface(OutputSinkKind::CustomOutput(0)) {
-            def.push_edge(sink, GraphEdge::new(GraphSource::ComputeNode(1), 1.0));
-        }
+        let sink = def.sink_surface(OutputSinkKind::CustomOutput(0));
+        def.push_edge(sink, GraphEdge::new(GraphSource::ComputeNode(1), 1.0));
         def
     };
     let genome = CreatureGenome {

@@ -27,8 +27,7 @@ fn graph_node(id: u32) -> NodeGenome {
         vec![InputReference::ActionQueue],
         BackendDef::Graph(
             crate::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs()
-                .with_compute_nodes(Vec::new())
-                .with_output_sinks(Vec::new()),
+                .with_compute_nodes(Vec::new()),
         ),
         vec![RouteTarget {
             target_id: NodeId::new(0),

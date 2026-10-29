@@ -153,8 +153,9 @@ fn an_uninitialized_edge_has_no_drift_and_is_never_at_its_clamp() {
 /// normalized by the reader.
 #[test]
 fn an_out_of_range_clamp_is_rejected_at_the_load_boundary() {
-    let json = r#"{"compute_nodes":[{"kind":"Add","inputs":[{"source":{"ComputeNode":0},"own_weight":0.0,"learning":{"rule":"Oja","learning_rate":0.1,"weight_clamp":50.0,"lamarckian":false,"retention":1.0}}]}],"output_sinks":[]}"#;
-    let def: CgpGraphBackendDef = serde_json::from_str(json).unwrap();
+    let def = crate::genome::cgp::test_support::def_with_compute_json(
+        r#"[{"kind":"Add","inputs":[{"source":{"ComputeNode":0},"own_weight":0.0,"learning":{"rule":"Oja","learning_rate":0.1,"weight_clamp":50.0,"lamarckian":false,"retention":1.0}}]}]"#,
+    );
     let node = genome_of(def).nodes.remove(0);
     assert_eq!(
         validate_graph(&node),
@@ -175,9 +176,7 @@ fn edges_land_in_their_pathway_surface_rule_and_inheritance() {
     let BackendDef::Graph(def) = genome.nodes[0].backend_edit().1 else {
         unreachable!()
     };
-    let vote = def
-        .sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat))
-        .unwrap();
+    let vote = def.sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat));
     def.push_edge(vote, GraphEdge::new(GraphSource::ComputeNode(0), 1.0));
     def.edge_mut(EdgeOccurrence::new(vote, 0))
         .set_learning(Some(plastic(HebbianRule::Oja, true, false)));

@@ -19,7 +19,7 @@ use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{DynamicIntrospectionKey, InputReference, WorldAction};
 use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
-    GraphSource, OutputSink, OutputSinkKind,
+    GraphSource, OutputSinkKind,
 };
 use crate::genome::Learning;
 use crate::mutation::event::MutationSkipReason;
@@ -185,24 +185,22 @@ pub(super) fn phase_def() -> CgpGraphBackendDef {
                 vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
             ),
         ])
-        .with_output_sinks(vec![
-            OutputSink::new(
-                OutputSinkKind::CustomOutput(0),
-                vec![GraphEdge::new(GraphSource::ComputeNode(2), 1.0)],
-            ),
-            OutputSink::new(
-                OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2)),
-                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-            ),
-            OutputSink::new(
-                OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
-                vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
-            ),
-            OutputSink::new(
-                OutputSinkKind::ActionVote(VoteSink::Terminate),
-                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-            ),
-        ])
+        .with_sink_inputs(
+            OutputSinkKind::CustomOutput(0),
+            vec![GraphEdge::new(GraphSource::ComputeNode(2), 1.0)],
+        )
+        .with_sink_inputs(
+            OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2)),
+            vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+        )
+        .with_sink_inputs(
+            OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
+            vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
+        )
+        .with_sink_inputs(
+            OutputSinkKind::ActionVote(VoteSink::Terminate),
+            vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+        )
 }
 
 fn activation_fixtures() -> [(&'static str, CgpGraphBackendDef, Vec<InputReference>); 3] {
@@ -327,12 +325,10 @@ fn copy_operators_skip_when_the_copy_would_exceed_the_index_space() {
     // One below the limit: the copy lands at index `u16::MAX - 1`, the
     // highest index that is not `remove_compute_node`'s sentinel, so it
     // still applies.
-    let mut def = CgpGraphBackendDef::new_with_fixed_outputs()
-        .with_compute_nodes(vec![
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs().with_compute_nodes(vec![
             ComputeNode::new(ComputeNodeKind::Add, Vec::new());
             u16::MAX as usize - 1
-        ])
-        .with_output_sinks(Vec::new());
+        ]);
     assert_eq!(
         copy_compute_node(&mut def, &mut SmallRng::seed_from_u64(1)).map(|_| ()),
         Ok(())
@@ -450,14 +446,14 @@ fn introspection_edge_def(
                 retention: 1.0,
             }),
         )])
-        .with_output_sinks(vec![OutputSink::new(
+        .with_sink_inputs(
             sink,
             if on_compute_input {
                 Vec::new()
             } else {
                 vec![edge]
             },
-        )])
+        )
 }
 
 fn introspection_refs() -> Vec<InputReference> {

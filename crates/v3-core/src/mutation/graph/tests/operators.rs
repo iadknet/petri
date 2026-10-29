@@ -16,8 +16,7 @@ use crate::contracts::votes::{ActionParamField, VoteSink};
 use crate::contracts::OUTPUT_SLOT_COUNT;
 use crate::contracts::{InputReference, WorldAction, WorldInputKey};
 use crate::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSink,
-    OutputSinkKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
 use crate::mutation::event::MutationSkipReason;
 use crate::mutation::graph::operators::{
@@ -172,24 +171,22 @@ pub(super) fn base_def() -> CgpGraphBackendDef {
                 vec![GraphEdge::new(GraphSource::ComputeNode(2), 0.3)],
             ),
         ])
-        .with_output_sinks(vec![
-            OutputSink::new(
-                OutputSinkKind::CustomOutput(0),
-                vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
-            ),
-            OutputSink::new(
-                OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2)),
-                vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
-            ),
-            OutputSink::new(
-                OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
-                vec![GraphEdge::new(GraphSource::ComputeNode(2), 1.0)],
-            ),
-            OutputSink::new(
-                OutputSinkKind::ActionVote(VoteSink::Terminate),
-                vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
-            ),
-        ])
+        .with_sink_inputs(
+            OutputSinkKind::CustomOutput(0),
+            vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
+        )
+        .with_sink_inputs(
+            OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2)),
+            vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
+        )
+        .with_sink_inputs(
+            OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
+            vec![GraphEdge::new(GraphSource::ComputeNode(2), 1.0)],
+        )
+        .with_sink_inputs(
+            OutputSinkKind::ActionVote(VoteSink::Terminate),
+            vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
+        )
 }
 
 pub(super) fn base_input_refs() -> Vec<InputReference> {
@@ -234,30 +231,28 @@ pub(super) fn plasticity_def() -> CgpGraphBackendDef {
                 vec![GraphEdge::new(GraphSource::ComputeNode(0), 0.7)],
             ),
         ])
-        .with_output_sinks(vec![
-            OutputSink::new(
-                OutputSinkKind::CustomOutput(0),
-                vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
-            ),
-            OutputSink::new(
-                OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2)),
-                vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
-            ),
-            OutputSink::new(
-                OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
-                vec![GraphEdge::new(
-                    GraphSource::InputLeaf {
-                        ref_idx: 2,
-                        sub_idx: 0,
-                    },
-                    1.0,
-                )],
-            ),
-            OutputSink::new(
-                OutputSinkKind::ActionVote(VoteSink::Terminate),
-                vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
-            ),
-        ])
+        .with_sink_inputs(
+            OutputSinkKind::CustomOutput(0),
+            vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
+        )
+        .with_sink_inputs(
+            OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Move, 2)),
+            vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
+        )
+        .with_sink_inputs(
+            OutputSinkKind::ActionParam(ActionParamField::ReproduceTransferFraction),
+            vec![GraphEdge::new(
+                GraphSource::InputLeaf {
+                    ref_idx: 2,
+                    sub_idx: 0,
+                },
+                1.0,
+            )],
+        )
+        .with_sink_inputs(
+            OutputSinkKind::ActionVote(VoteSink::Terminate),
+            vec![GraphEdge::new(GraphSource::ComputeNode(1), 1.0)],
+        )
 }
 
 pub(super) fn plasticity_input_refs() -> Vec<InputReference> {

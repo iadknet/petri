@@ -745,9 +745,7 @@ fn applied_weight_agrees_with_the_executor_and_the_view() {
     member(&mut def, all[0], MemberPolicy::Own(learning), false);
     member(&mut def, all[1], MemberPolicy::Static, true);
     def.edge_mut(all[2]).set_weight(-0.5);
-    let lone_surface = def
-        .sink_surface(OutputSinkKind::CustomOutput(0))
-        .expect("a custom output sink");
+    let lone_surface = def.sink_surface(OutputSinkKind::CustomOutput(0));
     def.push_edge(
         lone_surface,
         GraphEdge::new(

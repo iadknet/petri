@@ -17,7 +17,7 @@ use super::bundle::{
 };
 use super::edge::{EdgeRole, Membership};
 use super::edge::{GraphEdge, GraphSource};
-use super::{ComputeNodeKind, OutputSinkKind};
+use super::{ComputeNodeKind, OutputSinkKind, FIXED_SINK_COUNT};
 use crate::contracts::votes::VOTE_DIRECTION_COUNT;
 use crate::contracts::{FieldSet, InputReference, SensorContext};
 use crate::genome::learning::{Composed, GraphMapping, Origin, OriginRows};
@@ -32,6 +32,9 @@ macro_rules! read_only_list {
         #[serde(transparent)]
         pub struct $name(Vec<$item>);
 
+        read_only_list!(@reads $name, $item);
+    };
+    (@reads $name:ident, $item:ty) => {
         impl Deref for $name {
             type Target = [$item];
 
@@ -82,11 +85,48 @@ read_only_list!(
     ComputeNodes,
     ComputeNode
 );
-read_only_list!(
-    /// A graph's output sinks, in catalog order.
-    OutputSinks,
-    OutputSink
-);
+/// A graph's output sinks: the fixed catalog, sink `i` of
+/// [`OutputSinkKind::at_catalog_index`]`(i)`. Built only by
+/// [`CgpGraphBackendDef::new_with_fixed_outputs`]; deserializing any other
+/// list fails.
+#[derive(Clone, PartialEq, serde::Deserialize)]
+#[serde(try_from = "Vec<OutputSink>")]
+pub struct OutputSinks(Vec<OutputSink>);
+
+read_only_list!(@reads OutputSinks, OutputSink);
+
+impl serde::Serialize for OutputSinks {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.0.serialize(serializer)
+    }
+}
+
+impl TryFrom<Vec<OutputSink>> for OutputSinks {
+    type Error = String;
+
+    /// Accepts exactly the fixed catalog: [`FIXED_SINK_COUNT`] sinks, each of
+    /// its catalog kind.
+    fn try_from(sinks: Vec<OutputSink>) -> Result<Self, Self::Error> {
+        let mismatch = |detail: String| {
+            format!(
+                "output sinks must be the fixed {FIXED_SINK_COUNT}-sink catalog in catalog order: \
+                 {detail}"
+            )
+        };
+        if sinks.len() != FIXED_SINK_COUNT {
+            return Err(mismatch(format!("found {} sinks", sinks.len())));
+        }
+        for (index, (sink, kind)) in sinks.iter().zip(OutputSinkKind::catalog()).enumerate() {
+            if sink.kind != kind {
+                return Err(mismatch(format!(
+                    "sink {index} is {:?}, the catalog's is {kind:?}",
+                    sink.kind
+                )));
+            }
+        }
+        Ok(Self(sinks))
+    }
+}
 
 // ── Node and sink ───────────────────────────────────────────────────────────
 
@@ -120,7 +160,7 @@ pub struct OutputSink {
 
 impl OutputSink {
     #[must_use]
-    pub fn new(kind: OutputSinkKind, inputs: Vec<GraphEdge>) -> Self {
+    fn new(kind: OutputSinkKind, inputs: Vec<GraphEdge>) -> Self {
         Self {
             kind,
             inputs: EdgeList(inputs),
@@ -437,11 +477,15 @@ impl CgpGraphBackendDef {
         self
     }
 
-    /// Replace the sink catalog with `output_sinks`, exactly as given: no
-    /// filling, sorting, deduplication or kind validation.
+    /// Replace the inputs of the catalog sink of `kind` with `inputs`, exactly
+    /// as given; the sink keeps its kind and place.
+    ///
+    /// # Panics
+    ///
+    /// If `kind` is outside the catalog.
     #[must_use = "the builder returns the modified def"]
-    pub fn with_output_sinks(mut self, output_sinks: Vec<OutputSink>) -> Self {
-        self.output_sinks = OutputSinks(output_sinks);
+    pub fn with_sink_inputs(mut self, kind: OutputSinkKind, inputs: Vec<GraphEdge>) -> Self {
+        self.output_sinks.0[kind.catalog_index()].inputs = EdgeList(inputs);
         self
     }
 
@@ -461,19 +505,24 @@ impl CgpGraphBackendDef {
         &self.output_sinks
     }
 
-    /// The output sink of `kind`, when the graph carries it.
+    /// The catalog sink of `kind`.
+    ///
+    /// # Panics
+    ///
+    /// If `kind` is outside the catalog.
     #[must_use]
-    pub fn sink(&self, kind: OutputSinkKind) -> Option<&OutputSink> {
-        self.output_sinks.iter().find(|sink| sink.kind == kind)
+    pub fn sink(&self, kind: OutputSinkKind) -> &OutputSink {
+        &self.output_sinks[kind.catalog_index()]
     }
 
-    /// The surface of the first sink of `kind`, when the graph carries it.
+    /// The surface of the catalog sink of `kind`.
+    ///
+    /// # Panics
+    ///
+    /// If `kind` is outside the catalog.
     #[must_use]
-    pub fn sink_surface(&self, kind: OutputSinkKind) -> Option<EdgeSurface> {
-        self.output_sinks
-            .iter()
-            .position(|sink| sink.kind == kind)
-            .map(EdgeSurface::SinkInput)
+    pub const fn sink_surface(&self, kind: OutputSinkKind) -> EdgeSurface {
+        EdgeSurface::SinkInput(kind.catalog_index())
     }
 
     /// Every edge, in the canonical order of [`Self::edge_sites`].
@@ -1084,13 +1133,10 @@ impl CgpGraphBackendDef {
 
     // ── Bundle primitives (T25.F03, T25.F11) ─────────────────────────────────
 
-    /// The catalog index of the sink `site` names under `wiring`, when
-    /// present.
-    fn site_sink(&self, wiring: &Wiring, site: Site) -> Option<usize> {
-        let target = site.sink(wiring)?;
-        self.output_sinks
-            .iter()
-            .position(|sink| sink.kind == target)
+    /// The catalog index of the sink `site` names under `wiring`; `None` for
+    /// a site the wiring has no sink for ([`Site::sink`]).
+    fn site_sink(wiring: &Wiring, site: Site) -> Option<usize> {
+        site.sink(wiring).map(OutputSinkKind::catalog_index)
     }
 
     /// Every member of `bundle`, in canonical edge order.
@@ -1165,7 +1211,7 @@ impl CgpGraphBackendDef {
         set: FieldSet,
         birth: BundleBirth,
     ) -> Result<(BundleId, GraphMapping), NodeEditError> {
-        if !plans(self, &set).contains(&birth.wiring) {
+        if !plans(&set).contains(&birth.wiring) {
             return Err(NodeEditError::Inadmissible);
         }
         if !bundle_capacity_admits(self.bundles.len(), 1) {
@@ -1234,7 +1280,7 @@ impl CgpGraphBackendDef {
     /// # Panics
     ///
     /// If `wiring` is of another variant than the bundle's, a geometric
-    /// offset is not below 8, or the graph lacks a sink `wiring` needs.
+    /// offset is not below 8.
     pub fn relocate_bundle(&mut self, bundle: BundleId, wiring: Wiring) -> GraphMapping {
         self.mapped(|def, map| def.relocate_bundle_in(bundle, wiring, map))
             .1
@@ -1377,9 +1423,8 @@ impl CgpGraphBackendDef {
     fn insert_member(&mut self, edge: GraphEdge, site: Site, origin: Origin, map: &mut OriginRows) {
         let key = Self::member_key(&edge);
         let (bundle, _) = key.expect("a member");
-        let sink = self
-            .site_sink(&self.bundles[bundle.index()].wiring, site)
-            .expect("a bundle's graph carries every sink its members sit on");
+        let sink = Self::site_sink(&self.bundles[bundle.index()].wiring, site)
+            .expect("a member's site is one its bundle's wiring names");
         let inputs = &mut self.output_sinks.0[sink].inputs.0;
         let at = inputs
             .iter()
