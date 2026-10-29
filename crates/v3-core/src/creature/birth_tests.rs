@@ -349,6 +349,7 @@ proptest! {
             &mut SmallRng::seed_from_u64(seed),
             &context,
         );
+        prop_assert!(summary.attempted_events > 0);
         prop_assert_eq!(summary.applied_events, 0);
         prop_assert_eq!(&child, &parent);
         prop_assert_eq!(inheritance.apply(&parent_seeds), parent_seeds);
