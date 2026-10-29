@@ -323,17 +323,17 @@ mod tests {
         let node = super::super::controls::graph_genome(Vec::new(), Vec::new(), Vec::new()).nodes
             [0]
         .clone();
-        CreatureGenome {
-            entry_node_id: NodeId::new(ids[0]),
-            nodes: ids
-                .iter()
+        CreatureGenome::new(
+            NodeId::new(ids[0]),
+            ids.iter()
                 .map(|&id| {
                     let mut copy = node.clone();
                     copy.node_id = NodeId::new(id);
                     copy
                 })
                 .collect(),
-        }
+            crate::creature::founder::default_founder_body(),
+        )
     }
 
     fn runtime(node_state: Vec<Vec<f32>>) -> GraphRuntimeState {

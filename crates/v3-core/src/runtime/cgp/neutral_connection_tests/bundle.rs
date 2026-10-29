@@ -366,15 +366,16 @@ fn one_scale_step_from_zero_moves_the_move_vote_toward_every_food_direction() {
 fn visit(def: &CgpGraphBackendDef, energy: f32, traced: bool) -> (MeshSideOutputs, f32, Vec<f32>) {
     let mut energy = energy;
     let refs = rings();
-    let genome = crate::genome::CreatureGenome {
-        entry_node_id: crate::contracts::NodeId(0),
-        nodes: vec![crate::genome::NodeGenome::new(
+    let genome = crate::genome::CreatureGenome::new(
+        crate::contracts::NodeId(0),
+        vec![crate::genome::NodeGenome::new(
             crate::contracts::NodeId(0),
             refs.clone(),
             crate::genome::BackendDef::Graph(def.clone()),
             Vec::new(),
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let mut state =
         GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
     let mut side = side();
@@ -486,11 +487,10 @@ mod pair {
     use super::*;
     use crate::config::{SimulationConfig, WorldEdgeMode};
     use crate::contracts::{CreatureId, Position};
-    use crate::creature::body::HeritableBody;
     use crate::creature::founder::v3alpha1_founder_genome;
-    use crate::creature::identity::CreatureIdentityState;
-    use crate::creature::phenotype::Phenotype;
     use crate::creature::state::CreatureState;
+    use crate::genome::body::BodyGenome;
+    use crate::genome::body::Phenotype;
     use crate::kernel::WorldState;
     use crate::sensors::perception::PerceptionConfig;
     use crate::sensors::reducers::assemble_perception;
@@ -516,18 +516,14 @@ mod pair {
 
     fn creature(id: CreatureId, position: Position) -> CreatureState {
         crate::creature::birth::Zygote::founder(
-            v3alpha1_founder_genome(),
-            HeritableBody {
-                phenotype: Phenotype {
-                    channels: [0; 6],
-                    active_channel: 0,
-                    polarity: [true; 6],
-                },
-                identity: CreatureIdentityState::default(),
-                capacity: 200.0,
-                steal_share: 0.2,
-                give_share: 0.2,
-            },
+            v3alpha1_founder_genome().with_body(BodyGenome::new(
+                Phenotype::new([0; 6], 0, [true; 6]).expect("an in-range active channel"),
+                0,
+                200.0,
+                0.2,
+                0.2,
+            )),
+            0,
         )
         .born_at(id, position, 50.0)
     }

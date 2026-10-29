@@ -296,62 +296,68 @@ fn simple_vm_node(id: u32, targets: Vec<u32>) -> NodeGenome {
 #[test]
 fn mesh_reachable_both_nodes_in_founder_style() {
     // Node 0 -> Node 1, entry at node 0
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![simple_vm_node(0, vec![1]), simple_vm_node(1, vec![])],
-    };
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![simple_vm_node(0, vec![1]), simple_vm_node(1, vec![])],
+        crate::creature::founder::default_founder_body(),
+    );
     assert_eq!(mesh_reachable_nodes(&genome), vec![0, 1]);
 }
 
 #[test]
 fn mesh_reachable_excludes_unreachable_node() {
     // Node 0 -> Node 1, Node 2 is unreachable
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             simple_vm_node(0, vec![1]),
             simple_vm_node(1, vec![]),
             simple_vm_node(2, vec![]),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     assert_eq!(mesh_reachable_nodes(&genome), vec![0, 1]);
 }
 
 #[test]
 fn mesh_reachable_entry_only_when_no_targets() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![simple_vm_node(0, vec![])],
-    };
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![simple_vm_node(0, vec![])],
+        crate::creature::founder::default_founder_body(),
+    );
     assert_eq!(mesh_reachable_nodes(&genome), vec![0]);
 }
 
 #[test]
 fn mesh_reachable_empty_genome() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![],
-    };
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![],
+        crate::creature::founder::default_founder_body(),
+    );
     assert_eq!(mesh_reachable_nodes(&genome), Vec::<usize>::new());
 }
 
 #[test]
 fn mesh_reachable_handles_dangling_target() {
     // Node 0 targets node 99 which doesn't exist
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![simple_vm_node(0, vec![99])],
-    };
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![simple_vm_node(0, vec![99])],
+        crate::creature::founder::default_founder_body(),
+    );
     assert_eq!(mesh_reachable_nodes(&genome), vec![0]);
 }
 
 #[test]
 fn mesh_reachable_handles_cycle() {
     // Node 0 -> Node 1 -> Node 0 (cycle)
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![simple_vm_node(0, vec![1]), simple_vm_node(1, vec![0])],
-    };
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![simple_vm_node(0, vec![1]), simple_vm_node(1, vec![0])],
+        crate::creature::founder::default_founder_body(),
+    );
     assert_eq!(mesh_reachable_nodes(&genome), vec![0, 1]);
 }
 
@@ -361,9 +367,12 @@ fn mesh_reachable_handles_cycle() {
 #[test]
 fn mesh_cycle_nodes_names_reachable_nodes_on_a_cycle() {
     let ids = |ids: &[u32]| ids.iter().map(|&i| NodeId::new(i)).collect::<BTreeSet<_>>();
-    let genome = |nodes| CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes,
+    let genome = |nodes| {
+        CreatureGenome::new(
+            NodeId::new(0),
+            nodes,
+            crate::creature::founder::default_founder_body(),
+        )
     };
     assert!(mesh_cycle_nodes(&genome(vec![
         simple_vm_node(0, vec![1]),
@@ -405,81 +414,88 @@ fn mesh_cycle_nodes_names_reachable_nodes_on_a_cycle() {
 
 #[test]
 fn mesh_backward_slice_finds_feeding_pipeline() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             simple_vm_node(0, vec![1]),
             simple_vm_node(1, vec![2]),
             simple_vm_node(2, vec![]),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let gene = mesh_backward_slice(&genome, 2, 8).unwrap();
     assert_eq!(gene.indices, vec![0, 1, 2]);
 }
 
 #[test]
 fn mesh_backward_slice_excludes_unconnected_nodes() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             simple_vm_node(0, vec![1]),
             simple_vm_node(1, vec![]),
             simple_vm_node(2, vec![1]),
             simple_vm_node(3, vec![]),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let gene = mesh_backward_slice(&genome, 1, 8).unwrap();
     assert_eq!(gene.indices, vec![0, 1, 2]);
 }
 
 #[test]
 fn mesh_backward_slice_anchor_only_when_nothing_targets_it() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![simple_vm_node(0, vec![1]), simple_vm_node(1, vec![])],
-    };
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![simple_vm_node(0, vec![1]), simple_vm_node(1, vec![])],
+        crate::creature::founder::default_founder_body(),
+    );
     let gene = mesh_backward_slice(&genome, 0, 8).unwrap();
     assert_eq!(gene.indices, vec![0]);
 }
 
 #[test]
 fn mesh_backward_slice_respects_max_size() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             simple_vm_node(0, vec![1]),
             simple_vm_node(1, vec![2]),
             simple_vm_node(2, vec![]),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let gene = mesh_backward_slice(&genome, 2, 2).unwrap();
     assert_eq!(gene.indices.len(), 2);
 }
 
 #[test]
 fn mesh_backward_slice_out_of_bounds_returns_none() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![simple_vm_node(0, vec![])],
-    };
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![simple_vm_node(0, vec![])],
+        crate::creature::founder::default_founder_body(),
+    );
     assert_eq!(mesh_backward_slice(&genome, 5, 8), None);
 }
 
 #[test]
 fn mesh_backward_slice_empty_genome_returns_none() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![],
-    };
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![],
+        crate::creature::founder::default_founder_body(),
+    );
     assert_eq!(mesh_backward_slice(&genome, 0, 8), None);
 }
 
 #[test]
 fn mesh_backward_slice_handles_cycle() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![simple_vm_node(0, vec![1]), simple_vm_node(1, vec![0])],
-    };
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![simple_vm_node(0, vec![1]), simple_vm_node(1, vec![0])],
+        crate::creature::founder::default_founder_body(),
+    );
     let gene = mesh_backward_slice(&genome, 0, 8).unwrap();
     assert_eq!(gene.indices, vec![0, 1]);
 }
@@ -488,95 +504,103 @@ fn mesh_backward_slice_handles_cycle() {
 
 #[test]
 fn mesh_forward_slice_finds_downstream_subtree() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             simple_vm_node(0, vec![1]),
             simple_vm_node(1, vec![2]),
             simple_vm_node(2, vec![]),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let gene = mesh_forward_slice(&genome, 0, 8).unwrap();
     assert_eq!(gene.indices, vec![0, 1, 2]);
 }
 
 #[test]
 fn mesh_forward_slice_excludes_upstream_nodes() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             simple_vm_node(0, vec![1]),
             simple_vm_node(1, vec![2]),
             simple_vm_node(2, vec![]),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let gene = mesh_forward_slice(&genome, 1, 8).unwrap();
     assert_eq!(gene.indices, vec![1, 2]);
 }
 
 #[test]
 fn mesh_forward_slice_seed_only_when_no_targets() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![simple_vm_node(0, vec![1]), simple_vm_node(1, vec![])],
-    };
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![simple_vm_node(0, vec![1]), simple_vm_node(1, vec![])],
+        crate::creature::founder::default_founder_body(),
+    );
     let gene = mesh_forward_slice(&genome, 1, 8).unwrap();
     assert_eq!(gene.indices, vec![1]);
 }
 
 #[test]
 fn mesh_forward_slice_handles_branching() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             simple_vm_node(0, vec![1, 2]),
             simple_vm_node(1, vec![]),
             simple_vm_node(2, vec![]),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let gene = mesh_forward_slice(&genome, 0, 8).unwrap();
     assert_eq!(gene.indices, vec![0, 1, 2]);
 }
 
 #[test]
 fn mesh_forward_slice_respects_max_size() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             simple_vm_node(0, vec![1]),
             simple_vm_node(1, vec![2]),
             simple_vm_node(2, vec![]),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let gene = mesh_forward_slice(&genome, 0, 2).unwrap();
     assert_eq!(gene.indices.len(), 2);
 }
 
 #[test]
 fn mesh_forward_slice_out_of_bounds_returns_none() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![simple_vm_node(0, vec![])],
-    };
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![simple_vm_node(0, vec![])],
+        crate::creature::founder::default_founder_body(),
+    );
     assert_eq!(mesh_forward_slice(&genome, 5, 8), None);
 }
 
 #[test]
 fn mesh_forward_slice_handles_dangling_target() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![simple_vm_node(0, vec![99])],
-    };
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![simple_vm_node(0, vec![99])],
+        crate::creature::founder::default_founder_body(),
+    );
     let gene = mesh_forward_slice(&genome, 0, 8).unwrap();
     assert_eq!(gene.indices, vec![0]);
 }
 
 #[test]
 fn mesh_forward_slice_handles_cycle() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![simple_vm_node(0, vec![1]), simple_vm_node(1, vec![0])],
-    };
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![simple_vm_node(0, vec![1]), simple_vm_node(1, vec![0])],
+        crate::creature::founder::default_founder_body(),
+    );
     let gene = mesh_forward_slice(&genome, 0, 8).unwrap();
     assert_eq!(gene.indices, vec![0, 1]);
 }
@@ -585,19 +609,20 @@ fn mesh_forward_slice_handles_cycle() {
 
 #[test]
 fn functional_complexity_empty_genome() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![],
-    };
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![],
+        crate::creature::founder::default_founder_body(),
+    );
     assert_eq!(functional_complexity(&genome), 0);
 }
 
 #[test]
 fn functional_complexity_excludes_unreachable_nodes() {
     // Node 0 (entry) → Node 1. Node 2 is unreachable.
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             NodeGenome::new(
                 NodeId::new(0),
                 vec![],
@@ -648,7 +673,8 @@ fn functional_complexity_excludes_unreachable_nodes() {
                 vec![],
             ),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let fc = functional_complexity(&genome);
     // Node 0: 1 + 1 target + 2 live instrs = 4
     // Node 1: 1 + 0 targets + 2 live instrs = 3
@@ -659,9 +685,9 @@ fn functional_complexity_excludes_unreachable_nodes() {
 #[test]
 fn functional_complexity_excludes_dead_vm_instructions() {
     // Single reachable node with dead instructions
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -682,7 +708,8 @@ fn functional_complexity_excludes_dead_vm_instructions() {
             }),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let fc = functional_complexity(&genome);
     // 1 node + 0 targets + 3 live instrs (0,2,3) + 1 live const (const_idx=0) + 0 refs = 5
     assert_eq!(fc, 5);
@@ -691,9 +718,9 @@ fn functional_complexity_excludes_dead_vm_instructions() {
 #[test]
 fn functional_complexity_excludes_dead_graph_nodes() {
     // CGP graph: CN0 (Add) wired to sink, CN1 (Sigmoid) disconnected (dead)
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![InputReference::World(WorldInputKey::FoodHere {
                 type_idx: crate::config::OrdinaryFoodTypeId::default(),
@@ -720,7 +747,8 @@ fn functional_complexity_excludes_dead_graph_nodes() {
             ),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let fc = functional_complexity(&genome);
     // 1 mesh node + 0 targets
     // CGP: 1 wired sink + 1 live compute node (CN0) + 1 edge (CN0's InputLeaf) + 1 consumed ref
@@ -731,9 +759,9 @@ fn functional_complexity_excludes_dead_graph_nodes() {
 #[test]
 fn functional_complexity_counts_store_slot_as_output() {
     // StoreSlot should be treated as output instruction
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -756,7 +784,8 @@ fn functional_complexity_counts_store_slot_as_output() {
             }),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let fc = functional_complexity(&genome);
     // 1 node + 0 targets + 2 live instrs (LoadConst@0, StoreSlot@2) + 1 const + 0 refs = 4
     assert_eq!(fc, 4);
@@ -765,9 +794,9 @@ fn functional_complexity_counts_store_slot_as_output() {
 #[test]
 fn functional_complexity_counts_only_consumed_input_refs() {
     // Node with 3 input_refs but only ref_idx=0 consumed by live code
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![
                 InputReference::World(WorldInputKey::FoodHere {
@@ -790,7 +819,8 @@ fn functional_complexity_counts_only_consumed_input_refs() {
             }),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let fc = functional_complexity(&genome);
     // 1 node + 0 targets + 2 live instrs + 0 consts + 1 consumed ref = 4
     // (not 6, which would include all 3 input_refs)
@@ -800,9 +830,9 @@ fn functional_complexity_counts_only_consumed_input_refs() {
 #[test]
 fn functional_complexity_equals_genome_size_fully_connected() {
     // All nodes reachable, all instructions live, all input_refs consumed
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![InputReference::World(WorldInputKey::FoodHere {
                 type_idx: crate::config::OrdinaryFoodTypeId::default(),
@@ -821,6 +851,7 @@ fn functional_complexity_equals_genome_size_fully_connected() {
             }),
             vec![],
         )],
-    };
-    assert_eq!(functional_complexity(&genome), genome.genome_size());
+        crate::creature::founder::default_founder_body(),
+    );
+    assert_eq!(functional_complexity(&genome), genome.brain_units());
 }

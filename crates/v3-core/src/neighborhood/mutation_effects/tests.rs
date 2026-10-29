@@ -60,7 +60,10 @@ fn traced_battery_actions_equal_the_battery_signature() {
     let (config, battery) = fixture();
     let context = EvalContext::from_config(&config);
     for genome in [
-        founder_genome(FounderProfile::V3Alpha1),
+        founder_genome(
+            FounderProfile::V3Alpha1,
+            crate::creature::founder::default_founder_body(),
+        ),
         eater(1.0, vec![unwired_integrator(0.5)]),
         controls::integrator_pair().1,
     ] {
@@ -79,6 +82,40 @@ fn traced_battery_actions_equal_the_battery_signature() {
             traced.dispatched,
             battery.executed_node_ids(&genome, context.runtime, context.shared_memory_decay_rate)
         );
+    }
+}
+
+/// The one-event screen draws on one brain unit and no body unit
+/// (T29.F02): at rate 1.0 every proposal attempts exactly one brain event
+/// and never a body event.
+#[test]
+fn the_one_event_screen_draws_no_body_event() {
+    let (config, _) = fixture();
+    let context = EvalContext::from_config(&config);
+    let genome = founder_genome(
+        FounderProfile::V3Alpha1,
+        crate::creature::founder::default_founder_body(),
+    );
+    let one_event = MutationConfig {
+        per_unit_rate: 1.0,
+        ..config.mutation.clone()
+    };
+    let proposals = Proposals {
+        genome: &genome,
+        reachable: &[0, 1],
+        executed: &[],
+        seed_base: 0,
+        one_event: &one_event,
+        sensors: context.sensors,
+        body_ranges: context.body_ranges,
+    };
+    for proposal in 0..64 {
+        let (child, summary) = proposals.propose(proposal);
+        assert_eq!(summary.attempted_events, 1);
+        assert!(!summary
+            .attempted_by_domain
+            .contains_key(&MutationDomain::Body));
+        assert_eq!(child.body(), genome.body());
     }
 }
 
@@ -225,7 +262,10 @@ fn controls_pass_on_the_authored_extension() {
     let (config, battery) = fixture();
     let context = EvalContext::from_config(&config);
     let extension = Extension::new(Vec::new(), &battery);
-    let founder = founder_genome(FounderProfile::V3Alpha1);
+    let founder = founder_genome(
+        FounderProfile::V3Alpha1,
+        crate::creature::founder::default_founder_body(),
+    );
     let controls = run_controls(&founder, &extension, &battery, &context);
     assert_eq!(controls.len(), 3);
     for control in &controls {
@@ -331,7 +371,10 @@ fn small_sim(creatures: u32) -> Simulation {
 fn small_reading(sim: &Simulation) -> Reading {
     let (config, battery) = fixture();
     let context = EvalContext::from_config(&config);
-    let founder = founder_genome(FounderProfile::V3Alpha1);
+    let founder = founder_genome(
+        FounderProfile::V3Alpha1,
+        crate::creature::founder::default_founder_body(),
+    );
     let drift = vec![CohortParent {
         index: 0,
         depth_or_generation: 2,
@@ -500,7 +543,10 @@ proptest! {
 #[test]
 fn recorded_contexts_assemble_perception_whatever_the_donor_reads() {
     let sim = small_sim(6);
-    let founder = founder_genome(FounderProfile::V3Alpha1);
+    let founder = founder_genome(
+        FounderProfile::V3Alpha1,
+        crate::creature::founder::default_founder_body(),
+    );
     assert!(!crate::genome::sensor_analysis::perception_requirements(&founder).extended_perception);
     let contexts = contexts::recorded_contexts(&sim, 11, 4);
     assert_eq!(contexts.len(), 4);
@@ -622,8 +668,9 @@ fn exhausted_domains_count_as_skips_and_pairs_are_the_first_qualifying_proposals
             let seed = PROPOSAL_SEED_BASE + COHORT_SEED_MULTIPLIER + PARENT_SEED_MULTIPLIER;
             MutationEngine::apply_mutations_on_units(
                 &mut child,
-                1,
+                crate::mutation::engine::ChromosomeUnits { brain: 1, body: 0 },
                 &one_event,
+                &crate::creature::body::default_body_ranges(),
                 &reachable,
                 ParentExecuted::Indices(&executed),
                 &mut SmallRng::seed_from_u64(seed + proposal as u64),

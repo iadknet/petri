@@ -5,8 +5,9 @@ use super::recruitment::{BirthObservation, RecruitmentCheckpoint, RecruitmentTra
 use super::{births, Battery, BirthExposure, BirthResult, EvalContext};
 use crate::config::MutationConfig;
 use crate::contracts::NodeId;
-use crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS;
+use crate::creature::founder::v3alpha1_founder_genome;
 use crate::genome::{analysis::mesh_reachable_nodes, CreatureGenome};
+use crate::mutation::engine::ChromosomeUnits;
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
 use rand::{rngs::SmallRng, SeedableRng};
@@ -133,15 +134,23 @@ pub struct DriftWalk {
     pub final_birth_genomes: Vec<CreatureGenome>,
 }
 
+/// The walk's supply exposure (T11.F20, T29.F02): the canonical V3Alpha1
+/// founder's per-chromosome units, whatever genome the walk is on.
+#[must_use]
+pub fn walk_units() -> ChromosomeUnits {
+    ChromosomeUnits::of(&v3alpha1_founder_genome())
+}
+
 /// The supply rule and values a walk over `mutation` runs, for the report's
 /// `supply_rule` metadata.
 #[must_use]
 pub fn supply_rule(mutation: &MutationConfig) -> String {
     let rate = mutation.per_unit_rate;
+    let ChromosomeUnits { brain, body } = walk_units();
     format!(
-        "per-unit draw on the canonical V3Alpha1 founder's genome_size() \
-         {FOUNDER_GENOME_SIZE_UNITS} at per_unit_rate {rate}: \
-         Binomial({FOUNDER_GENOME_SIZE_UNITS}, {rate}) events per walk and checkpoint birth",
+        "per-unit draws on the canonical V3Alpha1 founder's units, brain {brain} \
+         and body {body}, at per_unit_rate {rate}: Binomial({brain}, {rate}) brain and \
+         Binomial({body}, {rate}) body events per walk and checkpoint birth",
     )
 }
 
@@ -149,8 +158,8 @@ pub fn supply_rule(mutation: &MutationConfig) -> String {
 /// and use separate trial RNGs; they never consume the persistent walk streams.
 ///
 /// Every walk birth and checkpoint birth draws the production per-unit rule
-/// on the instrument constant [`FOUNDER_GENOME_SIZE_UNITS`], not on the walked
-/// genome's own size (see [`supply_rule`], T11.F20): under drift the own-size
+/// on the instrument constant [`walk_units`], not on the walked genome's own
+/// size (see [`supply_rule`], T11.F20): under drift the own-size
 /// draw would grow the mesh without bound, so the fixed units keep the walk's
 /// exposure an instrument constant.
 #[must_use]
@@ -198,8 +207,9 @@ pub fn observe(
                 let executed = indices_for_node_ids(genome, ids);
                 let summary = MutationEngine::apply_mutations_on_units(
                     genome,
-                    FOUNDER_GENOME_SIZE_UNITS,
+                    walk_units(),
                     mutation,
+                    &context.body_ranges,
                     &reachable,
                     ParentExecuted::Indices(&executed),
                     rng,
@@ -289,7 +299,7 @@ fn observe_checkpoint(
             let base = battery.signature(genome, context.runtime, context.shared_memory_decay_rate);
             let (births, exposure) = births::per_birth_reading_on_units(
                 genome,
-                FOUNDER_GENOME_SIZE_UNITS,
+                walk_units(),
                 &base,
                 battery,
                 mutation,
@@ -313,7 +323,7 @@ mod tests {
     use proptest::prelude::*;
 
     /// The production config; a hand replay of the walk's births draws on
-    /// [`FOUNDER_GENOME_SIZE_UNITS`] as the walk does.
+    /// [`walk_units`] as the walk does.
     fn replay_config() -> SimulationConfig {
         SimulationConfig::default()
     }
@@ -388,7 +398,10 @@ mod tests {
         let battery = Battery::generate(context.sensors.food_type_count);
         // The founder with every vote and parameter edge removed votes
         // nothing, so every execution is `NoOp`.
-        let mut dead = founder_genome(FounderProfile::V3Alpha1);
+        let mut dead = founder_genome(
+            FounderProfile::V3Alpha1,
+            crate::creature::founder::default_founder_body(),
+        );
         for node in &mut dead.nodes {
             if let BackendDef::Graph(graph) = node.backend_edit().1 {
                 crate::genome::cgp::test_support::edit_sinks(graph, |sinks| {
@@ -427,8 +440,9 @@ mod tests {
             let executed = replay_executed(depth - 1, &genomes[0], &battery, &context, &mut ids);
             let summary = MutationEngine::apply_mutations_on_units(
                 &mut genomes[0],
-                FOUNDER_GENOME_SIZE_UNITS,
+                walk_units(),
                 &config.mutation,
+                &context.body_ranges,
                 &reachable,
                 ParentExecuted::Indices(&executed),
                 &mut rng,
@@ -477,8 +491,9 @@ mod tests {
                 let next_executed = indices_for_node_ids(&genomes[0], &ids);
                 MutationEngine::apply_mutations_on_units(
                     &mut without,
-                    FOUNDER_GENOME_SIZE_UNITS,
+                    walk_units(),
                     &config.mutation,
+                    &context.body_ranges,
                     &mesh_reachable_nodes(&before[0]),
                     ParentExecuted::Indices(&next_executed),
                     &mut rng_before.clone(),
@@ -486,8 +501,9 @@ mod tests {
                 );
                 MutationEngine::apply_mutations_on_units(
                     &mut with,
-                    FOUNDER_GENOME_SIZE_UNITS,
+                    walk_units(),
                     &config.mutation,
+                    &context.body_ranges,
                     &mesh_reachable_nodes(&genomes[0]),
                     ParentExecuted::Indices(&next_executed),
                     &mut rng.clone(),
@@ -507,7 +523,10 @@ mod tests {
     #[test]
     fn checkpoints_replay_the_production_walk_and_fixed_birth_subset() {
         let config = replay_config();
-        let founder = founder_genome(FounderProfile::V3Alpha1);
+        let founder = founder_genome(
+            FounderProfile::V3Alpha1,
+            crate::creature::founder::default_founder_body(),
+        );
         let before = founder.clone();
         let battery = Battery::generate(2);
         let context = EvalContext::from_config(&config);
@@ -533,8 +552,9 @@ mod tests {
                         replay_executed(depth - 1, &genome, &battery, &context, &mut ids);
                     applied += MutationEngine::apply_mutations_on_units(
                         &mut genome,
-                        FOUNDER_GENOME_SIZE_UNITS,
+                        walk_units(),
                         &config.mutation,
+                        &context.body_ranges,
                         &reachable,
                         ParentExecuted::Indices(&executed),
                         &mut rng,
@@ -559,7 +579,7 @@ mod tests {
                         );
                         let (births, exposure) = births::per_birth_reading_on_units(
                             &genome,
-                            FOUNDER_GENOME_SIZE_UNITS,
+                            walk_units(),
                             &base,
                             &battery,
                             &config.mutation,
@@ -595,7 +615,10 @@ mod tests {
     #[test]
     fn the_walk_refreshes_executed_sets_along_the_way_not_only_at_depth_zero() {
         let config = replay_config();
-        let founder = founder_genome(FounderProfile::V3Alpha1);
+        let founder = founder_genome(
+            FounderProfile::V3Alpha1,
+            crate::creature::founder::default_founder_body(),
+        );
         let battery = Battery::generate(2);
         let context = EvalContext::from_config(&config);
         const DEPTH: u64 = 30;
@@ -622,8 +645,9 @@ mod tests {
                         let reachable = mesh_reachable_nodes(&genome);
                         MutationEngine::apply_mutations_on_units(
                             &mut genome,
-                            FOUNDER_GENOME_SIZE_UNITS,
+                            walk_units(),
                             &config.mutation,
+                            &context.body_ranges,
                             &reachable,
                             ParentExecuted::Indices(&executed),
                             &mut rng,
@@ -663,7 +687,10 @@ mod tests {
     #[test]
     fn recruitment_readings_track_the_walk_without_changing_it() {
         let config = replay_config();
-        let founder = founder_genome(FounderProfile::V3Alpha1);
+        let founder = founder_genome(
+            FounderProfile::V3Alpha1,
+            crate::creature::founder::default_founder_body(),
+        );
         let battery = Battery::generate(2);
         let context = EvalContext::from_config(&config);
         const DEPTH: u64 = 22;
@@ -686,8 +713,9 @@ mod tests {
                 let reachable = mesh_reachable_nodes(&genome);
                 MutationEngine::apply_mutations_on_units(
                     &mut genome,
-                    FOUNDER_GENOME_SIZE_UNITS,
+                    walk_units(),
                     &config.mutation,
+                    &context.body_ranges,
                     &reachable,
                     ParentExecuted::Indices(&executed),
                     &mut rng,
@@ -750,7 +778,10 @@ mod tests {
     #[test]
     fn zero_mutation_and_observation_changes_leave_walk_readings_unchanged() {
         let mut config = SimulationConfig::default();
-        let founder = founder_genome(FounderProfile::V3Alpha1);
+        let founder = founder_genome(
+            FounderProfile::V3Alpha1,
+            crate::creature::founder::default_founder_body(),
+        );
         let battery = Battery::generate(2);
         let sizes = DriftSizes {
             lineages: 2,
@@ -782,15 +813,17 @@ mod tests {
 
     /// T11.F20: every walk birth and every checkpoint birth draws the per-unit
     /// rule on the instrument constant, whatever the walked genome's size. At
-    /// rate 1.0 each such birth requests exactly `FOUNDER_GENOME_SIZE_UNITS`
-    /// events, from a subject of another size and from the grown genomes the
-    /// walk reaches; the metadata names the pinned draw.
+    /// rate 1.0 each such birth requests exactly the founder's 80 brain and 5
+    /// body events, from a subject of another size and from the grown genomes
+    /// the walk reaches; the metadata names the pinned draw.
     #[test]
     fn the_walk_draws_on_the_founder_unit_count_whatever_the_walked_size() {
+        use crate::creature::founder::FOUNDER_GENOME_SIZE_UNITS;
         let mut config = SimulationConfig::default();
         config.mutation.per_unit_rate = 1.0;
         let subject = crate::creature::founder::vm_decision_founder_genome();
         assert_ne!(subject.genome_size(), FOUNDER_GENOME_SIZE_UNITS);
+        assert_eq!(walk_units(), ChromosomeUnits { brain: 80, body: 5 });
         let battery = Battery::generate(2);
         let context = EvalContext::from_config(&config);
         let sizes = DriftSizes {
@@ -814,12 +847,13 @@ mod tests {
             3 * 2 * units,
             "walk births draw on the constant"
         );
+        let rate = SimulationConfig::default().mutation.per_unit_rate;
         assert_eq!(
             supply_rule(&SimulationConfig::default().mutation),
             format!(
-                "per-unit draw on the canonical V3Alpha1 founder's genome_size() \
-                 {FOUNDER_GENOME_SIZE_UNITS} at per_unit_rate 0.0060625: \
-                 Binomial({FOUNDER_GENOME_SIZE_UNITS}, 0.0060625) events per walk and checkpoint birth"
+                "per-unit draws on the canonical V3Alpha1 founder's units, brain 80 \
+                 and body 5, at per_unit_rate {rate}: Binomial(80, {rate}) brain and \
+                 Binomial(5, {rate}) body events per walk and checkpoint birth"
             )
         );
     }
@@ -842,7 +876,10 @@ mod tests {
         const BORN: u64 = 3;
         const CHANGED: u64 = 5;
         const CHECKPOINT: u64 = 2 * EXECUTED_REFRESH_INTERVAL;
-        let founder = founder_genome(FounderProfile::V3Alpha1);
+        let founder = founder_genome(
+            FounderProfile::V3Alpha1,
+            crate::creature::founder::default_founder_body(),
+        );
         // The child adds one module: a copy of node 1 that node 1 routes to.
         let mut child = founder.clone();
         let added = NodeId::new(2);
@@ -928,7 +965,10 @@ mod tests {
         let config = SimulationConfig::default();
         let context = EvalContext::from_config(&config);
         let battery = Battery::generate(context.sensors.food_type_count);
-        let founder = founder_genome(FounderProfile::V3Alpha1);
+        let founder = founder_genome(
+            FounderProfile::V3Alpha1,
+            crate::creature::founder::default_founder_body(),
+        );
         let walk = |checkpoints: &'static [u64]| -> Vec<RecruitmentCheckpoint> {
             observe(
                 &founder,

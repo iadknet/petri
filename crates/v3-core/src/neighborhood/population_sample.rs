@@ -241,7 +241,7 @@ pub fn read_observation(
         read.genomes.push(ReadGenome {
             rank,
             creature_id,
-            lineage_id: creature.body.identity.lineage_id,
+            lineage_id: creature.lineage_id,
             generation: creature.generation,
             genome_size,
             total_nodes: nodes,

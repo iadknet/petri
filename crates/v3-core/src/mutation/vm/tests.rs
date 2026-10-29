@@ -1622,9 +1622,9 @@ fn vm_insert_read_bid_motif_inserts_read_input_and_priority_bid_pair() {
 
 #[test]
 fn vm_insert_read_store_motif_skips_on_empty_input_refs() {
-    let mut genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let mut genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             // empty — no valid ref_idx targets
             vec![],
@@ -1635,7 +1635,8 @@ fn vm_insert_read_store_motif_skips_on_empty_input_refs() {
             }),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let mut r = rng(42);
     let result = VmMutator::apply(
         &mut genome,
@@ -2042,9 +2043,9 @@ fn vm_raw_field_mutation_sub_idx_bounded() {
 
 /// A single-VM-node genome running `program`.
 fn slot_program_genome(program: Vec<VmInstruction>) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -2054,7 +2055,8 @@ fn slot_program_genome(program: Vec<VmInstruction>) -> CreatureGenome {
             }),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 /// One paired slot bundle per entry of `slots`: each slot gets both a load and

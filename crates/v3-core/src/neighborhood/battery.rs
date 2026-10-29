@@ -19,7 +19,7 @@ use rand::{Rng, SeedableRng};
 use crate::config::{EnergyLifecycleConfig, RuntimeConfig};
 use crate::contracts::{WorldAction, SHARED_MEMORY_SLOTS};
 use crate::creature::colour::unit_rgb;
-use crate::creature::phenotype::Phenotype;
+use crate::genome::body::Phenotype;
 use crate::genome::CreatureGenome;
 use crate::runtime::mesh::{execute_creature_mesh_impl, MeshExecutionMode, UntracedMeshExecution};
 use crate::runtime::state::GraphRuntimeState;
@@ -89,7 +89,7 @@ fn draw_scenario(rng: &mut SmallRng, food_type_count: usize) -> Scenario {
             neighbor_barrier: [0.0; 8],
             neighbor_occupied,
             age_ticks: age_fraction(age, lifecycle.age_reference_ticks),
-            own_colour: unit_rgb(Phenotype::FOUNDER.channels),
+            own_colour: unit_rgb(Phenotype::FOUNDER.channels()),
             energy_scale: crate::config::EnergyCapacityConfig::default().reference,
             previous_outcome: [0.0; 4],
         },
@@ -509,7 +509,7 @@ mod tests {
 
     #[test]
     fn every_scenario_reads_the_founder_colour_as_its_own() {
-        let founder = crate::creature::colour::unit_rgb(Phenotype::FOUNDER.channels);
+        let founder = crate::creature::colour::unit_rgb(Phenotype::FOUNDER.channels());
         let battery = Battery::generate(2);
         for scenario in battery
             .snapshots
@@ -538,7 +538,10 @@ mod tests {
     #[test]
     fn signature_execution_count_matches_the_battery_size() {
         let battery = Battery::generate(2);
-        let founder = founder_genome(FounderProfile::V3Alpha1);
+        let founder = founder_genome(
+            FounderProfile::V3Alpha1,
+            crate::creature::founder::default_founder_body(),
+        );
         let signature = battery.signature(&founder, &RuntimeConfig::default(), 0.0);
         assert_eq!(
             signature.execution_count(),
@@ -549,7 +552,10 @@ mod tests {
     #[test]
     fn signature_is_a_pure_function_of_the_genome_and_battery() {
         let battery = Battery::generate(2);
-        let founder = founder_genome(FounderProfile::V3Alpha1);
+        let founder = founder_genome(
+            FounderProfile::V3Alpha1,
+            crate::creature::founder::default_founder_body(),
+        );
         let runtime = RuntimeConfig::default();
         let a = battery.signature(&founder, &runtime, 0.0);
         let b = battery.signature(&founder, &runtime, 0.0);
@@ -565,7 +571,10 @@ mod tests {
         // subject's single-tick action queue is never empty; a stub that
         // always returns `vec![]` would fail this on every scenario.
         let battery = Battery::generate(2);
-        let founder = founder_genome(FounderProfile::V3Alpha1);
+        let founder = founder_genome(
+            FounderProfile::V3Alpha1,
+            crate::creature::founder::default_founder_body(),
+        );
         let runtime = RuntimeConfig::default();
         for scenario in &battery.snapshots {
             let actions = battery.execute_single_tick(&founder, scenario, &runtime);
@@ -652,8 +661,8 @@ mod drift_characterization {
                 MutationEngine::apply_mutations_in(
                     &mut genome,
                     &config.mutation,
-                    &reachable,
-                    // Historical pre-T11.F17 characterization: no executed layer.
+                    &crate::creature::body::default_body_ranges(),
+                    &reachable, // Historical pre-T11.F17 characterization: no executed layer.
                     ParentExecuted::NONE,
                     &mut rng,
                     &crate::config::test_sensor_context(config.world.food.types.len()),

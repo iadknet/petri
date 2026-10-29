@@ -26,7 +26,9 @@ use rayon::prelude::*;
 use crate::config::MutationConfig;
 use crate::contracts::{NodeId, SensorContext, WorldAction};
 use crate::genome::analysis::mesh_reachable_nodes;
+use crate::genome::body::BodyRanges;
 use crate::genome::CreatureGenome;
+use crate::mutation::engine::ChromosomeUnits;
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::{MutationDomain, MutationEngine, MutationOperator, MutationSummary};
 use crate::simulation::Simulation;
@@ -436,9 +438,13 @@ pub(in crate::neighborhood) fn proposal_seed_base(cohort: Cohort, position: usiz
         + PARENT_SEED_MULTIPLIER * (position as u64 + 1)
 }
 
+/// The one-event screen's exposure: one brain unit and no body unit, so at
+/// rate 1.0 a proposal requests exactly one brain event (T29.F02).
+const ONE_EVENT_UNITS: ChromosomeUnits = ChromosomeUnits { brain: 1, body: 0 };
+
 /// One parent's single-event diagnostic proposals: one requested event under
-/// `one_event` (units 1, rate 1.0), the parent's reachable nodes and
-/// battery-executed indices, proposal `i` seeded `seed_base + i`.
+/// `one_event` ([`ONE_EVENT_UNITS`], rate 1.0), the parent's reachable nodes
+/// and battery-executed indices, proposal `i` seeded `seed_base + i`.
 pub(in crate::neighborhood) struct Proposals<'a> {
     pub(in crate::neighborhood) genome: &'a CreatureGenome,
     pub(in crate::neighborhood) reachable: &'a [usize],
@@ -446,6 +452,7 @@ pub(in crate::neighborhood) struct Proposals<'a> {
     pub(in crate::neighborhood) seed_base: u64,
     pub(in crate::neighborhood) one_event: &'a MutationConfig,
     pub(in crate::neighborhood) sensors: SensorContext,
+    pub(in crate::neighborhood) body_ranges: BodyRanges,
 }
 
 impl Proposals<'_> {
@@ -458,8 +465,9 @@ impl Proposals<'_> {
         let mut rng = SmallRng::seed_from_u64(self.seed_base + u64::from(proposal));
         let summary = MutationEngine::apply_mutations_on_units(
             &mut child,
-            1,
+            ONE_EVENT_UNITS,
             self.one_event,
+            &self.body_ranges,
             self.reachable,
             ParentExecuted::Indices(self.executed),
             &mut rng,
@@ -585,6 +593,7 @@ fn evaluate_parent(
         seed_base: proposal_seed_base(cohort, position),
         one_event,
         sensors: context.sensors,
+        body_ranges: context.body_ranges,
     };
 
     let proposals: Vec<(ProposalOutcome, Option<CreatureGenome>)> = (0..sizes.proposals)

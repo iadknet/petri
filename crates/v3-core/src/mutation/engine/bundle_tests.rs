@@ -342,15 +342,16 @@ fn sole_member_genome(fact: bool) -> CreatureGenome {
         def.site_of(kept) == Some(crate::genome::cgp::Site::Drive),
         fact
     );
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![area],
             BackendDef::Graph(def),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 /// The `genome_size` change of the record and member a sole member's detach
@@ -826,15 +827,7 @@ proptest! {
         for _ in 0..32 {
             let before = genome.clone();
             let reachable: Vec<usize> = (0..genome.nodes.len()).collect();
-            let summary = MutationEngine::apply_mutations_on_units(
-                &mut genome,
-                1,
-                &config,
-                &reachable,
-                ParentExecuted::NONE,
-                &mut rng,
-                &crate::config::test_sensor_context(2),
-            ).0;
+            let summary = MutationEngine::apply_mutations_on_units(&mut genome, crate::mutation::engine::ChromosomeUnits { brain: 1, body: 0 }, &config, &crate::creature::body::default_body_ranges(), &reachable, ParentExecuted::NONE, &mut rng, &crate::config::test_sensor_context(2)).0;
             // Every committed learning edit reports one reach (T25.F12).
             let attribute_events: u32 = ATTRIBUTE_OPERATORS
                 .iter()

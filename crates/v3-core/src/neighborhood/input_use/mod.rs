@@ -494,6 +494,7 @@ fn observe_cohort(
                         seed_base: proposal_seed_base(cohort, position),
                         one_event,
                         sensors: context.sensors,
+                        body_ranges: context.body_ranges,
                     };
                     retention_children(&source, sizes.proposals, wanted)
                 },

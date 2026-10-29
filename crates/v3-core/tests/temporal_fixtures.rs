@@ -122,9 +122,9 @@ fn reactive_control_vm_genome() -> CreatureGenome {
         VmInstruction::Noop,
         VmInstruction::Halt,
     ];
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![food_here_ref()],
             BackendDef::Vm(VmBackendDef {
@@ -134,7 +134,8 @@ fn reactive_control_vm_genome() -> CreatureGenome {
             }),
             vec![],
         )],
-    }
+        v3_core::creature::founder::default_founder_body(),
+    )
 }
 
 /// B1's genome: on any tick with `FoodHere > 0`, latch `shared_memory[0] =
@@ -184,9 +185,9 @@ fn delayed_cue_vm_genome() -> CreatureGenome {
         VmInstruction::Noop,                         // idx14
         VmInstruction::Halt,                         // idx15
     ];
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![food_here_ref()],
             BackendDef::Vm(VmBackendDef {
@@ -196,7 +197,8 @@ fn delayed_cue_vm_genome() -> CreatureGenome {
             }),
             vec![],
         )],
-    }
+        v3_core::creature::founder::default_founder_body(),
+    )
 }
 
 /// B2's genome: at `AgeTicks == 1`, latch `shared_memory[0] = 1.0`; at
@@ -268,9 +270,9 @@ fn previous_slot_cue_vm_genome() -> CreatureGenome {
         VmInstruction::Noop,                              // idx19
         VmInstruction::Halt,                              // idx20
     ];
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![age_ticks_ref()],
             BackendDef::Vm(VmBackendDef {
@@ -280,7 +282,8 @@ fn previous_slot_cue_vm_genome() -> CreatureGenome {
             }),
             vec![],
         )],
-    }
+        v3_core::creature::founder::default_founder_body(),
+    )
 }
 
 /// C1/C2's genome: at `AgeTicks == 1`, latch `shared_memory[slot] = value`;
@@ -319,9 +322,9 @@ fn slot_write_once_vm_genome(slot: u8, value: f32) -> CreatureGenome {
         VmInstruction::Noop,                              // idx7
         VmInstruction::Halt,                              // idx8
     ];
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![age_ticks_ref()],
             BackendDef::Vm(VmBackendDef {
@@ -331,7 +334,8 @@ fn slot_write_once_vm_genome(slot: u8, value: f32) -> CreatureGenome {
             }),
             vec![],
         )],
-    }
+        v3_core::creature::founder::default_founder_body(),
+    )
 }
 
 /// C3's genome: `Constant(0.6)` wired to `WriteSlot(0)`; a second node reads
@@ -351,15 +355,16 @@ fn slot_write_and_previous_read_graph_genome() -> CreatureGenome {
     ));
     wire_custom_write_slot(&mut def, OutputSinkKind::WriteSlot(0), 0);
     wire_custom_write_slot(&mut def, OutputSinkKind::WriteSlot(1), 1);
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Graph(def),
             vec![],
         )],
-    }
+        v3_core::creature::founder::default_founder_body(),
+    )
 }
 
 fn wire_custom_write_slot(def: &mut CgpGraphBackendDef, kind: OutputSinkKind, source_node: u16) {
@@ -378,15 +383,16 @@ fn decay_integrator_graph_genome() -> CreatureGenome {
         ComputeNodeKind::DecayIntegrator(0.5),
         vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
     ));
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Graph(def),
             vec![],
         )],
-    }
+        v3_core::creature::founder::default_founder_body(),
+    )
 }
 
 /// D2's genome: D1 plus an `Oscillator(0.25)` node with no inputs and no
@@ -417,15 +423,16 @@ fn backward_edge_recurrence_graph_genome() -> CreatureGenome {
         ],
     ));
     wire_custom_write_slot(&mut def, OutputSinkKind::WriteSlot(0), 1);
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Graph(def),
             vec![],
         )],
-    }
+        v3_core::creature::founder::default_founder_body(),
+    )
 }
 
 /// E1/E2's reward-modulated graph node: `Constant(1.0)` feeding an `Add`
@@ -478,15 +485,16 @@ fn reward_modulated_node_genome_impl(
         let surface = def.sink_surface(OutputSinkKind::ActionVote(VoteSink::Eat));
         def.push_edge(surface, GraphEdge::new(GraphSource::ComputeNode(1), 1.0));
     }
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Graph(def),
             vec![],
         )],
-    }
+        v3_core::creature::founder::default_founder_body(),
+    )
 }
 
 /// E3's entry VM node: routes to `graph_target` only on ticks where
@@ -996,14 +1004,15 @@ fn revisit_genome(module: CreatureGenome, visits: f32) -> CreatureGenome {
         slot: 0,
         gate_bias: 0.0,
     }];
-    CreatureGenome {
-        entry_node_id: id_entry,
-        nodes: vec![
+    CreatureGenome::new(
+        id_entry,
+        vec![
             revisit_entry_node(id_entry, id_module, id_exit, visits),
             module,
             revisit_exit_node(id_exit),
         ],
-    }
+        v3_core::creature::founder::default_founder_body(),
+    )
 }
 
 // ── D4: integrator visited twice per tick ───────────────────────────────────
@@ -1161,9 +1170,9 @@ fn e3_skipped_module_visits() {
     let BackendDef::Graph(graph_def) = node.backend_def() else {
         unreachable!("constructed as a graph backend");
     };
-    let genome = CreatureGenome {
-        entry_node_id: id_vm,
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        id_vm,
+        vec![
             conditional_route_vm_node(id_vm, id_graph, id_alt),
             NodeGenome::new(
                 id_graph,
@@ -1173,7 +1182,8 @@ fn e3_skipped_module_visits() {
             ),
             noop_vm_node(id_alt),
         ],
-    };
+        v3_core::creature::founder::default_founder_body(),
+    );
 
     let (mut sim, target) = one_creature_sim(genome, pos, 500.0);
 
@@ -1333,15 +1343,16 @@ fn one_step_stateful_genome(node1_kind: ComputeNodeKind, input: f32) -> Creature
         node1_kind,
         vec![GraphEdge::new(GraphSource::ComputeNode(0), 1.0)],
     ));
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Graph(def),
             vec![],
         )],
-    }
+        v3_core::creature::founder::default_founder_body(),
+    )
 }
 
 proptest! {

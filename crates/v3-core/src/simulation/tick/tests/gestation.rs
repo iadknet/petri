@@ -303,10 +303,9 @@ fn assert_gestation_identities(lower_cap_at: Option<u64>) {
     let mut c_max = sim.config.energy.lifecycle.max_energy;
     for tick in 0..250 {
         if lower_cap_at == Some(tick) {
+            // A body changes only by a birth (T29.F02): the lowered bound
+            // reaches every newborn through conception's clamp.
             sim.config.energy.lifecycle.max_energy = LOWERED_CAP;
-            for creature in sim.creatures.values_mut() {
-                creature.body.capacity = LOWERED_CAP;
-            }
             assert!(
                 sim.creatures.values().any(|c| c.energy > LOWERED_CAP),
                 "creatures must hold energy above the lowered cap"

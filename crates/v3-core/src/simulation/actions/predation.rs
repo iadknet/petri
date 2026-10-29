@@ -92,7 +92,7 @@ pub(crate) fn apply_steal_energy(
 
     // Deduct the effort, known from the attacker alone.
     let attacker = &mut inputs.creatures[attacker_id];
-    let intensity = super::exchange_intensity(attacker.body.steal_share, effort);
+    let intensity = super::exchange_intensity(attacker.genome().body().steal_share(), effort);
     let effort = super::pay_exchange_effort(
         attacker,
         inputs.config,
@@ -154,11 +154,10 @@ mod tests {
     use super::*;
     use crate::config::SimulationConfig;
     use crate::contracts::{CreatureId, Position};
-    use crate::creature::body::HeritableBody;
     use crate::creature::founder::v3alpha1_founder_genome;
-    use crate::creature::identity::CreatureIdentityState;
-    use crate::creature::phenotype::Phenotype;
     use crate::creature::state::CreatureState;
+    use crate::genome::body::BodyGenome;
+    use crate::genome::body::Phenotype;
     use crate::kernel::WorldState;
     use crate::simulation::simulation::Simulation;
     use crate::simulation::tick::steal_now;
@@ -166,14 +165,8 @@ mod tests {
     use slotmap::SlotMap;
 
     /// A founder-phenotype body with the default identity.
-    fn founder_body() -> HeritableBody {
-        HeritableBody {
-            phenotype: Phenotype::FOUNDER,
-            identity: CreatureIdentityState::default(),
-            capacity: 200.0,
-            steal_share: 0.2,
-            give_share: 0.2,
-        }
+    fn founder_body() -> BodyGenome {
+        BodyGenome::new(Phenotype::FOUNDER, 0, 200.0, 0.2, 0.2)
     }
 
     /// Create a simulation with two creatures: attacker at `pos_a` and victim at `pos_v`.
@@ -192,14 +185,20 @@ mod tests {
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
 
         let attacker_id = creatures.insert_with_key(|id| {
-            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
-                .born_at(id, pos_a, energy_a)
+            crate::creature::birth::Zygote::founder(
+                v3alpha1_founder_genome().with_body(founder_body()),
+                0,
+            )
+            .born_at(id, pos_a, energy_a)
         });
         world.place_creature(pos_a, attacker_id);
 
         let victim_id = creatures.insert_with_key(|id| {
-            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
-                .born_at(id, pos_v, energy_v)
+            crate::creature::birth::Zygote::founder(
+                v3alpha1_founder_genome().with_body(founder_body()),
+                0,
+            )
+            .born_at(id, pos_v, energy_v)
         });
         world.place_creature(pos_v, victim_id);
 
@@ -227,8 +226,11 @@ mod tests {
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
 
         let id = creatures.insert_with_key(|id| {
-            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
-                .born_at(id, pos, energy)
+            crate::creature::birth::Zygote::founder(
+                v3alpha1_founder_genome().with_body(founder_body()),
+                0,
+            )
+            .born_at(id, pos, energy)
         });
         world.place_creature(pos, id);
 
@@ -270,7 +272,10 @@ mod tests {
         for (share, effort, expected) in [(0.2, 2.0, 12.0), (0.5, 0.25, 3.75), (0.5, 4.0, 30.0)] {
             let (mut sim, attacker_id, victim_id) =
                 make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 30.0);
-            sim.creatures[attacker_id].body.steal_share = share;
+            sim.creatures[attacker_id] =
+                crate::creature::birth::Zygote::reborn(&sim.creatures[attacker_id], |body| {
+                    body.with_steal_share(share)
+                });
             let outcome = steal_now(attacker_id, &mut sim, Direction::N, effort);
             assert_eq!(outcome.result.amount, expected, "{share} × {effort}");
             assert_eq!(
@@ -602,7 +607,10 @@ mod tests {
         let tiny = f32::from_bits(1);
         let (mut sim, attacker_id, victim_id) =
             make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), tiny);
-        sim.creatures[attacker_id].body.steal_share = sim.config.exchange.share_min;
+        sim.creatures[attacker_id] =
+            crate::creature::birth::Zygote::reborn(&sim.creatures[attacker_id], |body| {
+                body.with_steal_share(sim.config.exchange.share_min)
+            });
 
         let outcome = steal_now(attacker_id, &mut sim, Direction::N, 1.0);
 
@@ -618,7 +626,10 @@ mod tests {
         let tiny = f32::from_bits(1);
         let (mut sim, attacker_id, victim_id) =
             make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), tiny);
-        sim.creatures[attacker_id].body.steal_share = 0.6;
+        sim.creatures[attacker_id] =
+            crate::creature::birth::Zygote::reborn(&sim.creatures[attacker_id], |body| {
+                body.with_steal_share(0.6)
+            });
 
         let outcome = steal_now(attacker_id, &mut sim, Direction::N, 1.0);
 

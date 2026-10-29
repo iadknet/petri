@@ -127,10 +127,11 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
         vec![],
     );
 
-    let genome = CreatureGenome {
-        entry_node_id: id_a,
-        nodes: vec![node_a, node_b, node_c],
-    };
+    let genome = CreatureGenome::new(
+        id_a,
+        vec![node_a, node_b, node_c],
+        v3_core::creature::founder::default_founder_body(),
+    );
 
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let target = insert_creature(&mut creatures, &mut world, genome, pos, 100.0, 0);
@@ -270,10 +271,11 @@ fn vm_reads_all_inputs_e2e() {
         vec![],
     );
 
-    let genome = CreatureGenome {
-        entry_node_id: id_graph,
-        nodes: vec![graph_node, vm_node],
-    };
+    let genome = CreatureGenome::new(
+        id_graph,
+        vec![graph_node, vm_node],
+        v3_core::creature::founder::default_founder_body(),
+    );
 
     let target = insert_creature(&mut creatures, &mut world, genome, pos, 150.0, 9);
     creatures.get_mut(target).expect("target creature").age = 2;
@@ -421,10 +423,11 @@ fn vm_uses_neighbor_barrier_sensor_to_choose_action_e2e() {
             vec![],
         );
 
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![vm_node],
-        };
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![vm_node],
+            v3_core::creature::founder::default_founder_body(),
+        );
 
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
         let target = insert_creature(&mut creatures, &mut world, genome, pos, 100.0, 0);

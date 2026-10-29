@@ -34,15 +34,16 @@ fn config(rule: HebbianRule, eta: f32, clamp: f32, retention: f32) -> Learning {
 }
 
 fn genome(def: &CgpGraphBackendDef) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             refs(),
             BackendDef::Graph(def.clone()),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 fn state(def: &CgpGraphBackendDef, seeds: Option<Seeds>) -> LearnedState {

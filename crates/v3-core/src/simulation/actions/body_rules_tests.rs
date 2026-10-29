@@ -1,7 +1,7 @@
 //! Characterization of the body rules (T26.F01): the energy cap at the three
-//! credit sites, the uncapped birth, the move charge and the order of the
-//! body inheritance draws. Each assertion pins main's behavior before the
-//! refactor, so a moved booking or draw is a defect.
+//! credit sites, the uncapped birth, the move charge and a birth's body
+//! supply. Each assertion pins main's behavior before the refactor, so a
+//! moved booking or draw is a defect.
 
 use crate::creature::action_log::ActionType;
 use rand::SeedableRng;
@@ -11,11 +11,9 @@ use super::{apply_typed_eat, move_effort, resolve};
 use super::{PredationActionResult, ReproductionActionResult};
 use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{ActionOutcome, CreatureId, Direction, Position, WorldAction};
-use crate::creature::body::HeritableBody;
 use crate::creature::founder::v3alpha1_founder_genome;
-use crate::creature::identity::CreatureIdentityState;
-use crate::creature::phenotype::Phenotype;
 use crate::creature::state::CreatureState;
+use crate::genome::body::{BodyGenome, Phenotype};
 use crate::kernel::WorldState;
 use crate::ledger::{DeathCause, EnergyFlows};
 use crate::simulation::simulation::Simulation;
@@ -42,8 +40,12 @@ fn sim_with(creatures_at: &[(Position, f32)]) -> (Simulation, Vec<CreatureId>) {
         let id = creatures.insert_with_key(|id| {
             {
                 let mut founder = crate::creature::birth::Zygote::founder(
-                    v3alpha1_founder_genome(),
-                    HeritableBody::founder(3, 77, 200.0, 0.2),
+                    v3alpha1_founder_genome().with_body(crate::creature::founder::founder_body(
+                        3,
+                        77,
+                        &crate::config::SimulationConfig::default(),
+                    )),
+                    0,
                 )
                 .born_at(id, position, energy);
                 // A fixture keeps its requested energy past the body cap.
@@ -276,18 +278,17 @@ fn predation_under_the_cap_books_no_clamp_loss() {
 // ── birth ────────────────────────────────────────────────────────────────────
 
 /// T26.F02 invariant 7's required fixture: a parent at the reference (200)
-/// delivers a litter of 100 to a child of capacity 50. Every fired capacity
-/// draw lands on 50 in a `[50, 50]` range, so the child is built with 100,
+/// delivers a litter of 100 to a child of capacity 50. Every capacity, drawn
+/// or not, lands on 50 in a `[50, 50]` range, so the child is built with 100,
 /// capped to 50, and the overflow and the credit book 50 each; the parent's
 /// debit is their sum, exactly.
 #[test]
 fn a_litter_above_the_childs_capacity_is_capped_and_the_overflow_booked() {
     let (mut sim, ids) = sim_with(&[(Position::new(5, 5), 200.0)]);
     let parent = ids[0];
-    sim.config.mutation.capacity.chance = 1.0;
     sim.config.energy.lifecycle.max_energy = 50.0;
     sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
-    assert_eq!(sim.creatures[parent].body.capacity, 200.0);
+    assert_eq!(sim.creatures[parent].genome().body().capacity(), 200.0);
     let mut rng = rand::rngs::SmallRng::seed_from_u64(5);
     let result = reproduce_now(parent, &mut sim, Direction::N, 0.75, &mut rng);
     assert_eq!(result, ReproductionActionResult::Conceived);
@@ -296,7 +297,7 @@ fn a_litter_above_the_childs_capacity_is_capped_and_the_overflow_booked() {
         .values()
         .find(|creature| creature.id != parent)
         .expect("one child");
-    assert_eq!(child.body.capacity, 50.0);
+    assert_eq!(child.genome().body().capacity(), 50.0);
     assert_eq!(child.energy, 50.0);
     let flows = &sim.stats.energy_flows;
     assert_eq!(flows.parental_transfer_debit, 100.0);
@@ -313,7 +314,7 @@ fn a_litter_above_the_childs_capacity_is_capped_and_the_overflow_booked() {
 fn a_lowered_range_clamps_the_next_unmutated_newborn_but_not_its_parent() {
     let (mut sim, ids) = sim_with(&[(Position::new(2, 2), 200.0), (Position::new(7, 7), 200.0)]);
     let (early, late) = (ids[0], ids[1]);
-    sim.config.mutation.capacity.chance = 0.0;
+    sim.config.mutation.per_unit_rate = 0.0;
     for &id in &ids {
         sim.creatures[id].age = sim.config.energy.lifecycle.min_reproduce_age;
     }
@@ -331,12 +332,12 @@ fn a_lowered_range_clamps_the_next_unmutated_newborn_but_not_its_parent() {
         newborn
     };
     let first = deliver(&mut sim, early);
-    assert_eq!(sim.creatures[first].body.capacity, 200.0);
+    assert_eq!(sim.creatures[first].genome().body().capacity(), 200.0);
 
     sim.config.energy.lifecycle.max_energy = 100.0;
     let newborn = deliver(&mut sim, late);
-    assert_eq!(sim.creatures[newborn].body.capacity, 100.0);
-    assert_eq!(sim.creatures[late].body.capacity, 200.0);
+    assert_eq!(sim.creatures[newborn].genome().body().capacity(), 100.0);
+    assert_eq!(sim.creatures[late].genome().body().capacity(), 200.0);
 
     for (id, cap) in [(late, 200.0), (newborn, 100.0)] {
         sim.creatures[id].energy = 1_000.0;
@@ -368,7 +369,8 @@ fn eat_caps_at_the_bodys_own_capacity() {
     let pos = Position::new(3, 3);
     let (mut sim, ids) = sim_with(&[(pos, 45.0)]);
     let id = ids[0];
-    sim.creatures[id].body.capacity = 50.0;
+    sim.creatures[id] =
+        crate::creature::birth::Zygote::reborn(&sim.creatures[id], |body| body.with_capacity(50.0));
     sim.config.world.food.types[0].energy_per_unit = Some(40.0);
     sim.world
         .set_food_type(pos, OrdinaryFoodTypeId::new(0), 0.5);
@@ -395,7 +397,9 @@ fn eat_caps_at_the_bodys_own_capacity() {
 fn a_large_body_pays_its_move_factor_on_the_move_base() {
     let (mut sim, ids) = sim_with(&[(Position::new(5, 5), 50.0)]);
     let id = ids[0];
-    sim.creatures[id].body.capacity = 800.0;
+    sim.creatures[id] = crate::creature::birth::Zygote::reborn(&sim.creatures[id], |body| {
+        body.with_capacity(800.0)
+    });
     sim.config.energy.capacity.move_cost_slope = 0.5;
     let creature = &sim.creatures[id];
     let expected = sim.config.energy.action_effort(
@@ -405,7 +409,7 @@ fn a_large_body_pays_its_move_factor_on_the_move_base() {
     );
     assert_eq!(
         move_effort(
-            &creature.body,
+            creature.genome().body(),
             &sim.config.energy,
             creature.complexity(),
             creature.age
@@ -435,9 +439,11 @@ proptest::proptest! {
         energy.costs.move_cost = move_cost;
         energy.lifecycle.max_energy = reference * 4.0;
         let creature = &mut sim.creatures[id];
+        *creature = crate::creature::birth::Zygote::reborn(creature, |body| {
+            body.with_capacity(1.0 + share * (reference * 4.0 - 1.0))
+        });
         creature.age = age;
-        creature.body.capacity = 1.0 + share * (reference * 4.0 - 1.0);
-        let effort = move_effort(&creature.body, &sim.config.energy, creature.complexity(), creature.age);
+        let effort = move_effort(creature.genome().body(), &sim.config.energy, creature.complexity(), creature.age);
         let noop = sim.config.energy.action_effort(
             sim.config.energy.costs.noop_cost,
             creature.complexity(),
@@ -445,14 +451,15 @@ proptest::proptest! {
         );
         proptest::prop_assert!(effort > 0.0);
         proptest::prop_assert!(effort >= noop);
-        creature.body.capacity = reference;
+        *creature = crate::creature::birth::Zygote::reborn(creature, |body| body.with_capacity(reference));
+        creature.age = age;
         let today = sim.config.energy.action_effort(
             move_cost,
             creature.complexity(),
             creature.age,
         );
         proptest::prop_assert_eq!(
-            move_effort(&creature.body, &sim.config.energy, creature.complexity(), creature.age).to_bits(),
+            move_effort(creature.genome().body(), &sim.config.energy, creature.complexity(), creature.age).to_bits(),
             today.to_bits()
         );
     }
@@ -516,85 +523,54 @@ fn a_blocked_move_charges_the_move_effort_as_failed() {
 // ── inheritance ──────────────────────────────────────────────────────────────
 
 /// The parent body every fixture creature carries.
-fn parent_body() -> HeritableBody {
-    HeritableBody::founder(3, 77, 200.0, 0.2)
+fn parent_body() -> BodyGenome {
+    crate::creature::founder::founder_body(3, 77, &crate::config::SimulationConfig::default())
 }
 
 /// A birth from a founder whose genome mutates (`per_unit_rate`) with
-/// phenotype switch and flip chances that make every phenotype draw count.
-/// Returns the child's body.
-fn child_body(per_unit_rate: f64, seed: u64) -> HeritableBody {
+/// colour switch and flip chances that make every colour draw count.
+/// Returns the child's body and lineage.
+fn child_body(per_unit_rate: f64, seed: u64) -> (BodyGenome, u32) {
     let (mut sim, ids) = sim_with(&[(Position::new(5, 5), 80.0)]);
     let parent = ids[0];
     sim.config.mutation.per_unit_rate = per_unit_rate;
     sim.config.mutation.phenotype.channel_change_chance = 0.5;
     sim.config.mutation.phenotype.polarity_flip_chance = 0.5;
-    // The capacity coin is still drawn after the kin tag (T26.F02), but at
-    // chance 0 it never fires, so the pins below read the phenotype and
-    // kin-tag rules rather than whether the coin missed at this seed.
-    sim.config.mutation.capacity.chance = 0.0;
     sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
     let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
     let result = reproduce_now(parent, &mut sim, Direction::N, 0.5, &mut rng);
     assert_eq!(result, ReproductionActionResult::Conceived);
-    sim.creatures
+    let child = sim
+        .creatures
         .values()
         .find(|creature| creature.id != parent)
-        .expect("one child")
-        .body
+        .expect("one child");
+    (*child.genome().body(), child.lineage_id)
 }
 
-/// The draws after genome mutation, phenotype first and kin tag second,
-/// pinned on main: swapping them moves these values. Re-pinned by T27.F01
-/// (rebase: T27.F01 combined with T26.F01 + T25.F10): the 40-wide
-/// `NearbyCreature` family and the 30-bucket key draw change the genome
-/// mutation's draws before the phenotype step (channels
-/// `[0, 0, 92, 91, 138, 138]`, active 3 -> `[0, 0, 93, 92, 138, 138]`,
-/// active 2, polarity all adding); the kin tag holds. Re-pinned by T27.F03
-/// commit 3: the four-kind bundle draws, the 39 / 106 sink draws and the
-/// widened decision sub-index draws change the genome mutation's draws
-/// (channels `[0, 0, 93, 92, 138, 138]` -> `[0, 0, 91, 92, 138, 138]`, the
-/// third polarity subtracting, kin tag 3_756_156_572 -> 3_756_156_052).
-/// Re-pinned by T25.F11 commit 3: the four creation operators replace
-/// `InputRef.Add`, recruitment and the four `Add*Group` (Graph weight 78,
-/// InputRef 12) and every birth draws whole field sets, which changes the
-/// genome mutation's draws (channels `[0, 0, 91, 92, 138, 138]` ->
-/// `[1, 0, 92, 92, 138, 138]`, active 2 -> 0, polarity all adding, kin tag
-/// 3_756_156_052 -> 3_756_156_044). Re-pinned by T25.F12 commit 2: the
-/// learning catalog (Graph weight 78 -> 73), the target draw over edges and
-/// slots and the bundle birth draws change the genome mutation's draws
-/// (channels `[1, 0, 92, 92, 138, 138]` -> `[0, 0, 92, 92, 137, 138]`,
-/// active 0 -> 4, the fifth polarity subtracting, kin tag 3_756_156_044 ->
-/// 3_756_156_061).
+/// A birth's body supply (T29.F02 invariant 3): at rate 0.5 the five body
+/// units draw their events after the brain's, each on a uniformly drawn gene,
+/// and the child keeps its parent's lineage. Pinned on this seed: any change
+/// to a body draw, its order or its arithmetic moves the child.
 #[test]
-fn a_mutated_birth_draws_phenotype_then_kin_tag() {
+fn a_mutated_birth_applies_the_body_supply() {
     let parent = parent_body();
-    let child = child_body(0.5, 7);
-    assert_eq!(child.identity.lineage_id, parent.identity.lineage_id);
-    assert_eq!(
-        (child.identity.kin_tag ^ parent.identity.kin_tag).count_ones(),
-        1
-    );
+    let (child, lineage) = child_body(0.5, 7);
+    assert_eq!(lineage, 0);
+    assert_ne!(child, parent);
+    let colour = Phenotype::new(
+        [255, 0, 92, 92, 138, 138],
+        0,
+        [false, true, true, true, true, true],
+    )
+    .expect("channel 0 is in range");
     assert_eq!(
         child,
-        HeritableBody {
-            phenotype: Phenotype {
-                channels: [0, 0, 92, 92, 137, 138],
-                active_channel: 4,
-                polarity: [true, true, true, true, false, true],
-            },
-            identity: CreatureIdentityState {
-                lineage_id: 3,
-                kin_tag: 3_756_156_061,
-            },
-            capacity: 200.0,
-            steal_share: 0.2,
-            give_share: 0.2,
-        }
+        BodyGenome::new(colour, 3_757_204_636, 220.680_02, 0.238_271_95, 0.2)
     );
 }
 
 #[test]
 fn an_unmutated_birth_copies_the_parent_body() {
-    assert_eq!(child_body(0.0, 7), parent_body());
+    assert_eq!(child_body(0.0, 7), (parent_body(), 0));
 }

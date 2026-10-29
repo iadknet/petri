@@ -20,7 +20,11 @@ use v3_core::mutation::{
 
 fn founder() -> CreatureGenome {
     let config = arena_config(48);
-    founder_genome_with_age_gate(config.population.founder_profile, &config.energy.lifecycle)
+    founder_genome_with_age_gate(
+        config.population.founder_profile,
+        &config.energy.lifecycle,
+        v3_core::creature::founder::default_founder_body(),
+    )
 }
 
 fn node(id: u32, input_refs: Vec<InputReference>, backend_def: BackendDef) -> NodeGenome {
@@ -36,10 +40,11 @@ fn vm(program: Vec<VmInstruction>) -> BackendDef {
 }
 
 fn one_node(node: NodeGenome) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: node.node_id,
-        nodes: vec![node],
-    }
+    CreatureGenome::new(
+        node.node_id,
+        vec![node],
+        v3_core::creature::founder::default_founder_body(),
+    )
 }
 
 /// A graph node holding the full fixed sink catalog, every sink unconnected
@@ -410,6 +415,7 @@ proptest! {
         MutationEngine::apply_mutations_in(
             &mut child,
             &config.mutation,
+            &v3_core::creature::body::body_ranges(&config),
             &mesh_reachable_nodes(&parent),
             ParentExecuted::NONE,
             &mut SmallRng::seed_from_u64(seed),

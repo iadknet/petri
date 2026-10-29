@@ -20,6 +20,35 @@ use crate::testing::{decode_metrics, MetricKind, PointValue, ReceivedSnapshot};
 
 const MS: Duration = Duration::from_millis(1);
 
+/// `creature` born again from its genome carrying capacity `capacity` (a
+/// body changes only by a birth, T29.F02), holding the same energy.
+fn with_capacity(
+    creature: &v3_core::creature::state::CreatureState,
+    capacity: f32,
+) -> v3_core::creature::state::CreatureState {
+    let body = creature.genome().body();
+    let body = v3_core::genome::body::BodyGenome::new(
+        *body.colour(),
+        body.kin_tag(),
+        capacity,
+        body.steal_share(),
+        body.give_share(),
+    );
+    let place = v3_core::creature::birth::BirthPlace {
+        position: creature.position,
+        heading: creature.heading,
+        energy: creature.energy,
+    };
+    let mut reborn = v3_core::creature::birth::Zygote::founder(
+        creature.genome().clone().with_body(body),
+        creature.lineage_id,
+    )
+    .finalize(creature.id, place)
+    .creature;
+    reborn.energy = creature.energy;
+    reborn
+}
+
 /// A 16x16 world seeded with three creatures.
 fn three_creatures() -> Simulation {
     let mut config = v3_core::config::SimulationConfig::default();
@@ -33,7 +62,7 @@ fn three_creatures() -> Simulation {
 fn the_census_mean_capacity_is_the_living_population_mean_and_zero_at_extinction() {
     let mut sim = three_creatures();
     for (creature, capacity) in sim.creatures.values_mut().zip([40.0, 60.0, 110.0]) {
-        creature.body.capacity = capacity;
+        *creature = with_capacity(creature, capacity);
     }
 
     let census = Census::of(&sim);
@@ -60,8 +89,8 @@ fn the_census_means_are_the_readers_definitions_uncast_and_zero_at_extinction() 
         .zip([16_777_216.0_f32, 1.0, 1.0])
         .zip([9_007_199_254_740_992.0_f32, 1.0, 1.0])
     {
+        *creature = with_capacity(creature, capacity);
         creature.energy = energy;
-        creature.body.capacity = capacity;
     }
 
     let census = Census::of(&sim);
@@ -72,7 +101,7 @@ fn the_census_means_are_the_readers_definitions_uncast_and_zero_at_extinction() 
     let creature_order = sim
         .creatures
         .values()
-        .map(|creature| f64::from(creature.body.capacity))
+        .map(|creature| f64::from(creature.genome().body().capacity()))
         .sum::<f64>()
         / 3.0;
     sim.creatures.clear();
@@ -1166,6 +1195,8 @@ fn the_tick_census_keeps_its_pre_move_values() {
 
 /// T25.F12 commit 2 re-pinned every field: the learning catalog and birth
 /// draws move the living population. `mean_energy` is `f64` since T30.F15,
-/// core's mean uncast (it was the `f32` sum before).
-const LIVING_CENSUS_PIN: &str = "population=93 mean_energy=0x403eabebc5def7be mean_capacity=0x40690f7644791e48 mean_genome_size=0x4054042108421084 mean_mesh_nodes=0x40002c0b02c0b02c mean_generation=0x3fe44d1344d1344d";
+/// core's mean uncast (it was the `f32` sum before). T29.F02 re-pinned every
+/// field: the 85-unit founder and the body's own supply move the living
+/// population.
+const LIVING_CENSUS_PIN: &str = "population=92 mean_energy=0x403f50feb0de9bd3 mean_capacity=0x4069000000000000 mean_genome_size=0x4055537a6f4de9bd mean_mesh_nodes=0x40006f4de9bd37a7 mean_generation=0x3fe48590b21642c8";
 const EMPTY_CENSUS_PIN: &str = "population=0 mean_energy=0x0 mean_capacity=0x0 mean_genome_size=0x0 mean_mesh_nodes=0x0 mean_generation=0x0";

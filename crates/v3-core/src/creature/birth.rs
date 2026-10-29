@@ -1,11 +1,12 @@
 //! One birth transaction (T29.F01): every creature, founder or child, is
-//! built from a [`Zygote`] (its genome, its body, its birth payload, its
-//! provenance and the birth's inheritance mapping) by one finalization,
+//! built from a [`Zygote`] (its genome, body chromosome included, its birth
+//! payload, its provenance and the birth's inheritance mapping) by one finalization,
 //! [`Zygote::finalize`], the only caller of the creature constructor.
 //!
 //! An egg is a nucleus and its cytoplasm, assembled once: conception clones
-//! the parent's genome, captures its learned values and memory, mutates,
-//! draws the body and records the provenance; finalization carries the
+//! the parent's genome, captures its learned values and memory, mutates both
+//! chromosomes, clamps the body to the ranges in force and records the
+//! provenance; finalization carries the
 //! learned values across the birth's edits, builds the derived state and the
 //! runtime, zeroes per-life state, sets the heading and provisions energy
 //! within the body's capacity. World placement, the action log, the parent's
@@ -15,11 +16,10 @@ use rand::Rng;
 
 use crate::config::SimulationConfig;
 use crate::contracts::{CreatureId, Direction, Position, SHARED_MEMORY_SLOTS};
-use crate::creature::body::HeritableBody;
+use crate::creature::body::body_ranges;
 use crate::creature::state::CreatureState;
 use crate::genome::learning::{InheritanceMapping, Seeds};
 use crate::genome::CreatureGenome;
-use crate::mutation::body::sample_body_draws;
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::{BirthEdgeClass, MutationEngine, MutationOperator, MutationSummary};
 
@@ -62,11 +62,16 @@ impl BirthPayload {
     }
 }
 
-/// Where a creature comes from (T29.F01 invariant 3): its generation and its
-/// birth record, derived from the birth's mutation summary; a founder's is
-/// generation 0 with an empty record.
+/// Where a creature comes from (T29.F01 invariant 3): its lineage, its
+/// generation and its birth record, derived from the birth's mutation
+/// summary; a founder's is its own lineage at generation 0 with an empty
+/// record.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Provenance {
+    /// The founder this creature descends from (T29.F02 invariant 6): a
+    /// founder's index, a child's parent's. Observation only: no rule,
+    /// sensor or draw reads it.
+    pub lineage_id: u32,
     pub generation: u64,
     /// The operators applied at this birth, sorted by key.
     pub birth_mutation_operators: Box<[MutationOperator]>,
@@ -76,14 +81,14 @@ pub struct Provenance {
 }
 
 impl Provenance {
-    /// A child of a parent of `parent_generation` whose birth `summary`
-    /// reports.
+    /// A child of `parent` whose birth `summary` reports.
     #[must_use]
-    fn of_child(parent_generation: u64, summary: &MutationSummary) -> Self {
+    fn of_child(parent: &CreatureState, summary: &MutationSummary) -> Self {
         let mut operators: Vec<_> = summary.applied_by_operator.keys().copied().collect();
         operators.sort_by_key(|operator| operator.as_key());
         Self {
-            generation: parent_generation + 1,
+            lineage_id: parent.lineage_id,
+            generation: parent.generation + 1,
             birth_mutation_operators: operators.into_boxed_slice(),
             birth_edge_class: summary.birth_edge_class(),
         }
@@ -103,8 +108,6 @@ pub struct BirthPlace {
 #[derive(Debug, Clone)]
 pub struct Zygote {
     genome: CreatureGenome,
-    /// The body until T29.F02 moves it into the genome.
-    body: HeritableBody,
     payload: BirthPayload,
     provenance: Provenance,
     /// Where every learnable of `genome` inherits from among the payload's.
@@ -120,22 +123,28 @@ pub struct Newborn {
 }
 
 impl Zygote {
-    /// A founder: `genome` and `body`, an empty payload, generation 0.
+    /// A founder of lineage `lineage_id` (its founder index): `genome`, an
+    /// empty payload, generation 0.
     #[must_use]
-    pub fn founder(genome: CreatureGenome, body: HeritableBody) -> Self {
+    pub fn founder(genome: CreatureGenome, lineage_id: u32) -> Self {
         Self {
             genome,
-            body,
             payload: BirthPayload::default(),
-            provenance: Provenance::default(),
+            provenance: Provenance {
+                lineage_id,
+                ..Provenance::default()
+            },
             inheritance: InheritanceMapping::Identity,
         }
     }
 
     /// Conceive a child of `parent` under `config` (T29.F01 invariant 9):
-    /// clone the parent's genome, capture the payload, mutate (the parent's
-    /// reachable nodes and dispatch record as its `ParentExecuted`), draw and
-    /// apply the body, derive the provenance. Returns the zygote beside the
+    /// clone the parent's genome, capture the payload, mutate both
+    /// chromosomes under the config's body ranges (the parent's reachable
+    /// nodes and dispatch record as its `ParentExecuted`), clamp the body's
+    /// scalars to the same ranges, so a live patch of a bound reaches the
+    /// next generation without a draw (T29.F02 invariant 5), derive the
+    /// provenance. Returns the zygote beside the
     /// birth's mutation summary, which the simulation folds into its stats.
     pub(crate) fn conceive(
         parent: &CreatureState,
@@ -155,21 +164,21 @@ impl Zygote {
                 .dispatch_record
                 .executed_indices(parent.age, window)
         };
+        let ranges = body_ranges(config);
         let (summary, inheritance) = MutationEngine::apply_mutations_in(
             &mut genome,
             &config.mutation,
+            &ranges,
             parent.reachable_nodes(),
             ParentExecuted::Query(&executed_within),
             rng,
             &config.sensor_context(config.world.food.types.len()),
         );
-        let draws = sample_body_draws(summary.applied_events > 0, &config.mutation, rng);
-        let body = HeritableBody::inherit(&parent.body, &draws, &config.energy, &config.exchange);
-        let provenance = Provenance::of_child(parent.generation, &summary);
+        genome.body_mut().clamp(&ranges);
+        let provenance = Provenance::of_child(parent, &summary);
         (
             Self {
                 genome,
-                body,
                 payload,
                 provenance,
                 inheritance,
@@ -200,7 +209,6 @@ impl Zygote {
     pub fn finalize(self, id: CreatureId, place: BirthPlace) -> Newborn {
         let Self {
             genome,
-            body,
             payload,
             provenance,
             inheritance,
@@ -211,10 +219,10 @@ impl Zygote {
             genome,
             place.position,
             place.energy,
-            body,
             payload.shared_memory,
             &seeds,
         );
+        creature.lineage_id = provenance.lineage_id;
         creature.generation = provenance.generation;
         creature.birth_mutation_operators = provenance.birth_mutation_operators;
         creature.birth_edge_class = provenance.birth_edge_class;
@@ -238,6 +246,30 @@ impl Zygote {
             },
         )
         .creature
+    }
+
+    /// A fixture's `creature` born again from its genome carrying the body
+    /// `edit` makes of its own (T29.F02 invariant 10: a body changes only by
+    /// a birth): the same id, lineage, cell and heading, holding the same
+    /// energy, uncapped.
+    pub(crate) fn reborn(
+        creature: &CreatureState,
+        edit: impl FnOnce(crate::genome::body::BodyGenome) -> crate::genome::body::BodyGenome,
+    ) -> CreatureState {
+        let genome = creature.genome().clone();
+        let body = edit(*genome.body());
+        let mut reborn = Self::founder(genome.with_body(body), creature.lineage_id)
+            .finalize(
+                creature.id,
+                BirthPlace {
+                    position: creature.position,
+                    heading: creature.heading,
+                    energy: creature.energy,
+                },
+            )
+            .creature;
+        reborn.energy = creature.energy;
+        reborn
     }
 }
 

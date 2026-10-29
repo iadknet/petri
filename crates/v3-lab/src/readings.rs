@@ -768,6 +768,7 @@ fn mutants(
             MutationEngine::apply_mutations_in(
                 &mut child,
                 &config.mutation,
+                &v3_core::creature::body::body_ranges(config),
                 reachable,
                 ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                 &mut seed.rng(k),

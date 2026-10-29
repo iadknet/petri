@@ -66,7 +66,8 @@ describe("ConfigPanel", () => {
 	it("edits the per-unit rate in the runtime draft and offers no retired supply control", () => {
 		render(<ConfigPanel />);
 		const rate = screen.getByTestId("config-field-mutation-per-unit-rate");
-		expect(rate).toHaveValue(0.0060625);
+		// The field shows the default 0.485 / 85 to nine decimals.
+		expect(rate).toHaveValue(0.005705882);
 		for (const retired of [
 			"config-field-mutation-per-unit-supply-enabled",
 			"config-field-mutation-mutation-probability",

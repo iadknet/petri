@@ -222,9 +222,7 @@ pub(super) fn run_one_seed(
         let actions = observe_final_actions(&sim);
         let lineage_diversity_seed = lineage_diversity(
             seed,
-            sim.creatures
-                .values()
-                .map(|creature| creature.body.identity.lineage_id),
+            sim.creatures.values().map(|creature| creature.lineage_id),
         );
         let memory_sensitivity_seed = memory_sensitivity(seed, &actions);
         let structural_companions = structural_companions_census(

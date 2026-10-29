@@ -399,7 +399,7 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             y: creature.position.y,
             energy: creature.energy,
             generation: creature.generation,
-            phenotype_rgb: channels_to_rgb(creature.body.phenotype.channels),
+            phenotype_rgb: channels_to_rgb(creature.genome().body().colour().channels()),
         });
     }
 

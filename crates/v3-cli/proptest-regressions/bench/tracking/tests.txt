@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 1cb9eb6c75dac056d7f940b24fc6fef1b619eb61c660dcd7196db6ae94485e6e # shrinks to mean_genome_size = None, mean_mesh_nodes = None, mean_generation = None, mean_wired_sinks = None, surviving_founder_clade_count = None, shannon_entropy_nats = None, population = 1

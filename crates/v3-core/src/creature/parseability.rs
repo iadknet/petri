@@ -60,10 +60,11 @@ mod tests {
 
     #[test]
     fn empty_node_list_fails() {
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![],
-        };
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![],
+            crate::creature::founder::default_founder_body(),
+        );
         assert_eq!(
             ParseabilityGate::validate(&genome),
             Err(ParseabilityError::EmptyNodeList)
@@ -72,10 +73,11 @@ mod tests {
 
     #[test]
     fn duplicate_node_ids_fail() {
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![make_minimal_node(0), make_minimal_node(0)],
-        };
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![make_minimal_node(0), make_minimal_node(0)],
+            crate::creature::founder::default_founder_body(),
+        );
         assert_eq!(
             ParseabilityGate::validate(&genome),
             Err(ParseabilityError::DuplicateNodeId(0))
@@ -85,19 +87,20 @@ mod tests {
     #[test]
     fn unresolved_entry_node_passes_parseability() {
         // entry_node_id resolution is NOT a parseability requirement
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(99),
-            nodes: vec![make_minimal_node(0)],
-        };
+        let genome = CreatureGenome::new(
+            NodeId::new(99),
+            vec![make_minimal_node(0)],
+            crate::creature::founder::default_founder_body(),
+        );
         assert!(ParseabilityGate::validate(&genome).is_ok());
     }
 
     #[test]
     fn dangling_route_targets_pass_parseability() {
         // targets may reference non-existent nodes (junk DNA)
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![],
                 BackendDef::Vm(VmBackendDef {
@@ -112,7 +115,8 @@ mod tests {
                     gate_bias: 0.0,
                 }],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         assert!(ParseabilityGate::validate(&genome).is_ok());
     }
 }

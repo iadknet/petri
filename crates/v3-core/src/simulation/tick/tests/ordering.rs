@@ -2,10 +2,7 @@ use super::super::{run_tick, sort_by_priority_bid};
 use super::support::*;
 use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{CreatureId, Position, WorldAction};
-use crate::creature::body::HeritableBody;
 use crate::creature::founder::v3alpha1_founder_genome;
-use crate::creature::identity::CreatureIdentityState;
-use crate::creature::phenotype::Phenotype;
 use crate::creature::state::CreatureState;
 use crate::runtime::trace::domain::TerminationReason;
 use crate::runtime::types::{ComputeCostReport, MeshOutput};
@@ -92,16 +89,7 @@ fn insert_test_creature(
     position: Position,
 ) -> CreatureId {
     creatures.insert_with_key(|id| {
-        crate::creature::birth::Zygote::founder(
-            v3alpha1_founder_genome(),
-            HeritableBody {
-                phenotype: Phenotype::FOUNDER,
-                identity: CreatureIdentityState::default(),
-                capacity: 200.0,
-                steal_share: 0.2,
-                give_share: 0.2,
-            },
-        )
-        .born_at(id, position, 50.0)
+        crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), 0)
+            .born_at(id, position, 50.0)
     })
 }

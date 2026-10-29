@@ -93,6 +93,7 @@ fn e3_fixed_pool_selection_audit() {
     let founder = founder_genome_with_age_gate(
         setup.config.population.founder_profile,
         &setup.config.energy.lifecycle,
+        v3_core::creature::founder::default_founder_body(),
     );
     let reachable = mesh_reachable_nodes(&founder);
     let bank = scenes(0xE3_BA_4C, 32, &setup);
@@ -115,6 +116,7 @@ fn e3_fixed_pool_selection_audit() {
                 let summary = MutationEngine::apply_mutations_in(
                     &mut child,
                     &setup.config.mutation,
+                    &v3_core::creature::body::body_ranges(&setup.config),
                     &reachable,
                     ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                     &mut rng,
@@ -247,6 +249,7 @@ fn e4_elite_neighbourhood_audit() {
     let founder = founder_genome_with_age_gate(
         setup.config.population.founder_profile,
         &setup.config.energy.lifecycle,
+        v3_core::creature::founder::default_founder_body(),
     );
     let bank = scenes(0xE3_BA_4C, 32, &setup);
     let batch = scenes(0xE4_A0_00, 4, &setup);
@@ -275,6 +278,7 @@ fn e4_elite_neighbourhood_audit() {
                 let summary = MutationEngine::apply_mutations_in(
                     &mut child,
                     &setup.config.mutation,
+                    &v3_core::creature::body::body_ranges(&setup.config),
                     &reachable,
                     ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                     &mut rng,
@@ -348,6 +352,7 @@ fn child_of(setup: &Setup, parent: &CreatureGenome, frozen: &Frozen, seed: u64) 
     MutationEngine::apply_mutations_in(
         &mut child,
         &setup.config.mutation,
+        &v3_core::creature::body::body_ranges(&setup.config),
         &mesh_reachable_nodes(parent),
         ParentExecuted::Query(&|window| frozen.executed_indices(window)),
         &mut rng,
@@ -370,6 +375,7 @@ fn e7_two_step_and_sterility() {
     let founder = founder_genome_with_age_gate(
         setup.config.population.founder_profile,
         &setup.config.energy.lifecycle,
+        v3_core::creature::founder::default_founder_body(),
     );
     let dir = std::env::var("PETRI_E4_ELITES").expect("PETRI_E4_ELITES");
     let parent = std::env::var("PETRI_E7_PARENT").unwrap_or_else(|_| "native-1".into());
@@ -535,6 +541,7 @@ fn p1_sterility_diagnostics() {
     let founder = founder_genome_with_age_gate(
         setup.config.population.founder_profile,
         &setup.config.energy.lifecycle,
+        v3_core::creature::founder::default_founder_body(),
     );
     let dir = std::env::var("PETRI_E4_ELITES").expect("PETRI_E4_ELITES");
     let plateau = elite(&dir, "native-1");
@@ -682,7 +689,6 @@ fn eval_rule(
     use slotmap::SlotMap;
     use v3_core::contracts::{CreatureId, OrdinaryFoodTypeId};
     use v3_core::creature::action_log::ActionType;
-    use v3_core::creature::body::HeritableBody;
     use v3_core::creature::state::CreatureState;
     use v3_core::kernel::WorldState;
     use v3_core::simulation::{run_tick, Simulation};
@@ -704,13 +710,10 @@ fn eval_rule(
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let id = creatures.insert_with_key(|id| {
         v3_core::creature::birth::Zygote::founder(
-            expressed(genome),
-            HeritableBody::founder(
-                0,
-                scene.seed,
-                config.energy.capacity.founder,
-                config.exchange.founder_share,
-            ),
+            expressed(genome).with_body(v3_core::creature::founder::founder_body(
+                0, scene.seed, &config,
+            )),
+            0,
         )
         .finalize(
             id,
@@ -863,6 +866,7 @@ fn p2e_exact_zero_charge() {
     let founder = founder_genome_with_age_gate(
         setup.config.population.founder_profile,
         &setup.config.energy.lifecycle,
+        v3_core::creature::founder::default_founder_body(),
     );
     let dir = std::env::var("PETRI_E4_ELITES").expect("PETRI_E4_ELITES");
     let comparator = v3_lab::comparator::area_food(&founder);
@@ -938,6 +942,7 @@ fn p2d_active_genomes() {
     let founder = founder_genome_with_age_gate(
         setup.config.population.founder_profile,
         &setup.config.energy.lifecycle,
+        v3_core::creature::founder::default_founder_body(),
     );
     let dir = std::env::var("PETRI_E4_ELITES").expect("PETRI_E4_ELITES");
     let comparator = v3_lab::comparator::area_food(&founder);
@@ -1014,6 +1019,7 @@ fn p2_repair_candidates() {
     let founder = founder_genome_with_age_gate(
         food_setup.config.population.founder_profile,
         &food_setup.config.energy.lifecycle,
+        v3_core::creature::founder::default_founder_body(),
     );
     let dir = std::env::var("PETRI_E4_ELITES").expect("PETRI_E4_ELITES");
     let wall_dir = dir.replace("base-food-s1", "base-wall-s1");
@@ -1132,6 +1138,7 @@ fn p2c_barrier_comparator_silencing() {
     let founder = founder_genome_with_age_gate(
         setup.config.population.founder_profile,
         &setup.config.energy.lifecycle,
+        v3_core::creature::founder::default_founder_body(),
     );
     let comparator = v3_lab::comparator::barrier_comparator(&founder);
     let quiet = silenced(&comparator);
@@ -1173,6 +1180,7 @@ fn p2b_comparator_silencing() {
     let founder = founder_genome_with_age_gate(
         setup.config.population.founder_profile,
         &setup.config.energy.lifecycle,
+        v3_core::creature::founder::default_founder_body(),
     );
     let comparator = v3_lab::comparator::area_food(&founder);
     let quiet = silenced(&comparator);

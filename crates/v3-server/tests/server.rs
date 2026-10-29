@@ -66,7 +66,7 @@ fn rebuild_seeded<R>(
         energy: creature.energy,
     };
     let (age, generation) = (creature.age, creature.generation);
-    *creature = Zygote::founder(genome, creature.body)
+    *creature = Zygote::founder(genome, creature.lineage_id)
         .with_payload(BirthPayload::new(seeds, creature.shared_memory))
         .finalize(creature.id, place)
         .creature;
@@ -1695,7 +1695,7 @@ async fn health_carries_population_census_and_cumulative_vitals() {
         / count;
     let mut lineages: HashMap<u32, f64> = HashMap::new();
     for c in &creatures {
-        *lineages.entry(c.body.identity.lineage_id).or_insert(0.0) += 1.0;
+        *lineages.entry(c.lineage_id).or_insert(0.0) += 1.0;
     }
     let entropy: f64 = lineages
         .values()
@@ -3244,10 +3244,11 @@ async fn live_circuit_slot_lists_are_the_reachable_live_bus_slots() {
             gate_bias: 0.0,
         }],
     );
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(1),
-        nodes: vec![entry, vm(2, 9, 11), vm(3, 0, 4)],
-    };
+    let genome = CreatureGenome::new(
+        NodeId::new(1),
+        vec![entry, vm(2, 9, 11), vm(3, 0, 4)],
+        v3_core::creature::founder::default_founder_body(),
+    );
     let state = test_state();
     let creature_id = {
         let mut handle = state.sim.lock().await;
@@ -3377,7 +3378,7 @@ async fn get_creature_brain_resolves_pair_coordinates_and_fact_members() {
     };
     let (status, body) = do_request(router(state), get_req(&uri)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    assert_eq!(body["protocol_version"], "v3alpha18");
+    assert_eq!(body["protocol_version"], "v3alpha19");
     let graph = brain_graph(&body, node_id);
 
     let gene = &graph["bundles"][bundle];
@@ -4671,7 +4672,7 @@ async fn patch_config_applies_the_per_unit_rate() {
         .unwrap();
 
     let (_, before) = do_request(a.clone(), get_req("/v3/simulation/config")).await;
-    assert_json_f64_close(&before["config"]["mutation"]["per_unit_rate"], 0.006_062_5);
+    assert_json_f64_close(&before["config"]["mutation"]["per_unit_rate"], 0.485 / 85.0);
 
     let patch = r#"{"mutation":{"per_unit_rate":0.02}}"#;
     let (status, body) = do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;

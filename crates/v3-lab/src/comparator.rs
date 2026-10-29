@@ -65,7 +65,11 @@ mod tests {
 
     fn founder() -> CreatureGenome {
         let config = arena_config(64);
-        founder_genome_with_age_gate(config.population.founder_profile, &config.energy.lifecycle)
+        founder_genome_with_age_gate(
+            config.population.founder_profile,
+            &config.energy.lifecycle,
+            v3_core::creature::founder::default_founder_body(),
+        )
     }
 
     #[test]

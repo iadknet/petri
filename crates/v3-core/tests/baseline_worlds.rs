@@ -269,10 +269,15 @@ fn fbm_threshold_is_strict_at_zero_and_clips_coordinate_edges() {
 /// target draw over edges and slots and the bundle birth draws (default
 /// 7093485144231482914 -> 14525610195308079782, rate 0.0
 /// 5095409984910669136 -> 16460463457823769532).
+/// Re-pinned by T29.F02 after two agreeing runs: the 85-unit founder's
+/// carrying units, the rate 0.485 / 85 and the body's own supply in place
+/// of the per-birth body draws (default 14525610195308079782 ->
+/// 1980607843120964359, rate 0.0 16460463457823769532 ->
+/// 5154707634105745401).
 #[test]
 fn legacy_default_short_run_identity() {
-    assert_eq!(short_run_identity(None), 14525610195308079782);
-    assert_eq!(short_run_identity(Some(0.0)), 16460463457823769532);
+    assert_eq!(short_run_identity(None), 1980607843120964359);
+    assert_eq!(short_run_identity(Some(0.0)), 5154707634105745401);
 }
 
 /// The short-run identity hash at the default gestation rate or `rate`.
@@ -769,7 +774,10 @@ fn food_choice_mutation_diagnostic() {
     };
     let mut cfg = SimulationConfig::default();
     cfg.world.food.types.push(FoodTypeConfig::default());
-    let parent = founder_genome(cfg.population.founder_profile);
+    let parent = founder_genome(
+        cfg.population.founder_profile,
+        v3_core::creature::founder::default_founder_body(),
+    );
     let battery = Battery::generate(2);
     let base = battery.signature(&parent, &cfg.runtime, cfg.shared_memory.decay_rate);
     let executed = battery.executed_indices(&parent, &cfg.runtime, cfg.shared_memory.decay_rate);
@@ -783,6 +791,7 @@ fn food_choice_mutation_diagnostic() {
         let summary = MutationEngine::apply_mutations_in(
             &mut child,
             &cfg.mutation,
+            &v3_core::creature::body::body_ranges(&cfg),
             &reachable,
             ParentExecuted::Indices(&executed),
             &mut rng,

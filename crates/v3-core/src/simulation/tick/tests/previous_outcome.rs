@@ -15,9 +15,9 @@ use crate::sensors::static_inputs::assemble_static_inputs;
 /// A one-node VM genome over `PreviousOutcome` running `program` with the
 /// constants `[1.0, 0.0]`.
 fn outcome_genome(program: Vec<VmInstruction>) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![InputReference::PreviousOutcome],
             BackendDef::Vm(VmBackendDef {
@@ -27,7 +27,8 @@ fn outcome_genome(program: Vec<VmInstruction>) -> CreatureGenome {
             }),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 /// `Move N = PreviousOutcome[ActionSuccess]`, or `Move N = 0` in the control.

@@ -83,6 +83,7 @@ pub(super) fn observe_world(sim: &v3_core::simulation::Simulation) -> Drives {
     let founder = founder_genome_with_age_gate(
         sim.config.population.founder_profile,
         &sim.config.energy.lifecycle,
+        v3_core::creature::founder::default_founder_body(),
     );
     let reachable = mesh_reachable_nodes(&founder);
     Drives::new(

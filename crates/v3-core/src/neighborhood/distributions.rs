@@ -3,6 +3,7 @@
 //! exchange shares), the generation median and maximum, and the
 //! rounded-index percentiles of reachable structure size.
 
+use crate::genome::body::BodyGenome;
 use crate::simulation::Simulation;
 
 /// A trait's distribution at one sampled tick. Percentiles are nearest-rank
@@ -66,7 +67,7 @@ pub fn capacity_distribution(sim: &Simulation) -> Option<TraitDistribution> {
     TraitDistribution::of(
         sim.creatures
             .values()
-            .map(|creature| creature.body.capacity),
+            .map(|creature| creature.genome().body().capacity()),
         sim.config.energy.capacity.min,
         sim.config.energy.lifecycle.max_energy,
     )
@@ -83,16 +84,18 @@ pub struct ShareDistributions {
 #[must_use]
 pub fn share_distributions(sim: &Simulation) -> Option<ShareDistributions> {
     let share_min = sim.config.exchange.share_min;
-    let of = |share: fn(&crate::creature::body::HeritableBody) -> f32| {
+    let of = |share: fn(&BodyGenome) -> f32| {
         TraitDistribution::of(
-            sim.creatures.values().map(|creature| share(&creature.body)),
+            sim.creatures
+                .values()
+                .map(|creature| share(creature.genome().body())),
             share_min,
             1.0,
         )
     };
     Some(ShareDistributions {
-        steal_share: of(|body| body.steal_share)?,
-        give_share: of(|body| body.give_share)?,
+        steal_share: of(BodyGenome::steal_share)?,
+        give_share: of(BodyGenome::give_share)?,
     })
 }
 

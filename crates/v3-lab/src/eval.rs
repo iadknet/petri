@@ -21,7 +21,7 @@ use rand::{Rng, SeedableRng};
 use slotmap::SlotMap;
 use v3_core::config::{OrdinaryFoodTypeId, SimulationConfig};
 use v3_core::contracts::{ActionOutcome, CreatureId, Direction, Position};
-use v3_core::creature::body::HeritableBody;
+use v3_core::creature::founder::founder_body;
 use v3_core::creature::state::CreatureState;
 use v3_core::genome::CreatureGenome;
 use v3_core::kernel::WorldState;
@@ -115,14 +115,11 @@ impl Setup {
         seed: u64,
         position: Position,
     ) -> CreatureState {
+        // Every assay runs the genome in the config's founder body
+        // (T29.F02 invariant 11), whatever body it carries.
         v3_core::creature::birth::Zygote::founder(
-            genome,
-            HeritableBody::founder(
-                0,
-                seed,
-                self.config.energy.capacity.founder,
-                self.config.exchange.founder_share,
-            ),
+            genome.with_body(founder_body(0, seed, &self.config)),
+            0,
         )
         .finalize(
             id,
@@ -693,6 +690,7 @@ mod tests {
         founder_genome_with_age_gate(
             setup.config.population.founder_profile,
             &setup.config.energy.lifecycle,
+            v3_core::creature::founder::default_founder_body(),
         )
     }
 
@@ -817,7 +815,7 @@ mod tests {
         // The body's move rule at age 0 (T26.F02): the founder body sits at
         // the reference, so the factor is 1.
         let per_tick = move_effort(
-            &actor.body,
+            actor.genome().body(),
             &setup.config.energy,
             actor.complexity(),
             actor.age,
@@ -880,7 +878,12 @@ mod tests {
         for age in 0..u64::from(LIFETIME) {
             // The body's move rule at each age (T26.F02).
             actor.age = age;
-            expected -= move_effort(&actor.body, energy_config, actor.complexity(), actor.age);
+            expected -= move_effort(
+                actor.genome().body(),
+                energy_config,
+                actor.complexity(),
+                actor.age,
+            );
             expected -= energy_config.lifecycle.energy_decay_per_tick;
         }
         let energy = score.energy_end.value();

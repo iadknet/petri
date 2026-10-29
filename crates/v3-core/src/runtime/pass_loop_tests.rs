@@ -111,7 +111,10 @@ fn w2_founder_forage_without_food_is_the_best_move() {
 fn w3_founder_reproduce_tick_commits_once_whatever_the_live_gate_reads() {
     use crate::config::FounderProfile;
     use crate::creature::founder::founder_genome;
-    let g = founder_genome(FounderProfile::V3Alpha1);
+    let g = founder_genome(
+        FounderProfile::V3Alpha1,
+        crate::creature::founder::default_founder_body(),
+    );
     let mut senses = w1_senses(1.0);
     senses.age = 1.0;
     // Energy just above the 0.16 gate at 200 max: each graph visit costs

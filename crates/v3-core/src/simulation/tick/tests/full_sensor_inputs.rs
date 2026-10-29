@@ -57,15 +57,16 @@ fn an_added_sensor_triggers_native_declaration_driven_sensor_assembly() {
     use crate::genome::cgp::test_support::add_first_plan_sensor;
     use crate::genome::cgp::CgpGraphBackendDef;
     use crate::genome::{BackendDef, NodeGenome};
-    let parent = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let parent = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     for (key, extended, typed) in [
         (
             WorldInputKey::area_food_summary(OrdinaryFoodTypeId::new(0)),

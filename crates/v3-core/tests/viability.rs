@@ -27,24 +27,16 @@ use v3_core::config::SimulationConfig;
 use v3_core::contracts::ActionOutcome;
 use v3_core::contracts::{CreatureId, Position};
 use v3_core::creature::action_log::ActionType;
-use v3_core::creature::body::HeritableBody;
-use v3_core::creature::identity::CreatureIdentityState;
-use v3_core::creature::phenotype::Phenotype;
+use v3_core::genome::body::{BodyGenome, Phenotype};
 use v3_core::mutation::reachability::ParentExecuted;
 use v3_core::mutation::MutationEngine;
 use v3_core::neighborhood::population::PopulationCensus;
 use v3_core::simulation::actions::ReproductionActionResult;
 use v3_core::simulation::{run_tick, seed_simulation, Simulation};
 
-/// A founder-phenotype body with the default identity.
-fn founder_body() -> HeritableBody {
-    HeritableBody {
-        phenotype: Phenotype::FOUNDER,
-        identity: CreatureIdentityState::default(),
-        capacity: 200.0,
-        steal_share: 0.2,
-        give_share: 0.2,
-    }
+/// A founder-colour body with kin tag 0.
+fn founder_body() -> BodyGenome {
+    BodyGenome::new(Phenotype::FOUNDER, 0, 200.0, 0.2, 0.2)
 }
 
 /// A hand-placed founder: the V3Alpha1 genome in a founder body at
@@ -55,8 +47,8 @@ fn founder_at(
     energy: f32,
 ) -> v3_core::creature::state::CreatureState {
     v3_core::creature::birth::Zygote::founder(
-        v3_core::creature::founder::v3alpha1_founder_genome(),
-        founder_body(),
+        v3_core::creature::founder::v3alpha1_founder_genome().with_body(founder_body()),
+        0,
     )
     .finalize(
         id,
@@ -583,8 +575,9 @@ fn founder_moves_when_no_food_and_below_reproduce_threshold() {
 #[test]
 fn mutation_offspring_diverge_from_parent_over_time() {
     let mut cfg = viability_config();
-    // About two requested events per founder birth (0.02 per unit).
-    cfg.mutation.per_unit_rate = 0.02;
+    // About 0.2 colour events per founder birth (0.2 per unit on the five
+    // body genes, one in five a colour step).
+    cfg.mutation.per_unit_rate = 0.2;
 
     let mut sim = seed_simulation(cfg, 42);
     let mut ever_diverged = false;
@@ -593,7 +586,7 @@ fn mutation_offspring_diverge_from_parent_over_time() {
         if sim
             .creatures
             .values()
-            .any(|c| c.body.phenotype.channels != Phenotype::FOUNDER.channels)
+            .any(|c| c.genome().body().colour() != &Phenotype::FOUNDER)
         {
             ever_diverged = true;
             break;
@@ -602,7 +595,7 @@ fn mutation_offspring_diverge_from_parent_over_time() {
 
     assert!(
         ever_diverged,
-        "after 30 ticks at per_unit_rate 0.02, no creature ever diverged from founder phenotype"
+        "after 30 ticks at per_unit_rate 0.2, no creature ever diverged from founder phenotype"
     );
 }
 
@@ -614,18 +607,20 @@ fn mutation_accounting_invariant_in_viability() {
     use v3_core::creature::founder::v3alpha1_founder_genome;
 
     let mut cfg = SimulationConfig::default().mutation;
-    // Rate 1.0 on three units: exactly three requested events per call. The
-    // genome carries its mutations from seed to seed, so a draw on its own
-    // growing size would compound.
+    // Rate 1.0 on three brain units and the five body units: exactly eight
+    // requested events per call. The genome carries its mutations from seed
+    // to seed, so a draw on its own growing size would compound.
     cfg.per_unit_rate = 1.0;
+    let ranges = v3_core::creature::body::body_ranges(&SimulationConfig::default());
 
     let mut genome = v3alpha1_founder_genome();
     for seed in 0u64..1000 {
         let mut rng = SmallRng::seed_from_u64(seed);
         let summary = MutationEngine::apply_mutations_on_units(
             &mut genome,
-            3,
+            v3_core::mutation::engine::ChromosomeUnits { brain: 3, body: 5 },
             &cfg,
+            &ranges,
             &[],
             ParentExecuted::NONE,
             &mut rng,
@@ -670,6 +665,7 @@ fn mutation_reachability_telemetry_accumulates() {
         let summary = MutationEngine::apply_mutations_in(
             &mut g,
             &cfg,
+            &v3_core::creature::body::body_ranges(&SimulationConfig::default()),
             &reachable,
             ParentExecuted::NONE,
             &mut rng,
@@ -728,21 +724,20 @@ fn phenotype_inherits_unchanged_when_no_genome_mutation() {
 
     if let Some(child) = child {
         assert_eq!(
-            child.body.phenotype.channels,
-            Phenotype::FOUNDER.channels,
-            "child phenotype must be identical to parent when per_unit_rate=0.0"
+            child.genome().body(),
+            &founder_body(),
+            "child body must be identical to parent when per_unit_rate=0.0"
         );
     }
     // If no child was produced this tick, the test is vacuously satisfied (no mutation check needed).
 }
 
-/// When per_unit_rate=0.0, child must inherit parent identity unchanged
-/// (same lineage_id, same kin_tag since applied_events == 0).
+/// When per_unit_rate=0.0, child must inherit parent lineage and kin tag
+/// unchanged.
 #[test]
 fn identity_inherits_unchanged_when_no_genome_mutation() {
     use slotmap::SlotMap;
     use v3_core::creature::founder::v3alpha1_founder_genome;
-    use v3_core::creature::identity::CreatureIdentityState;
     use v3_core::creature::state::CreatureState;
     use v3_core::kernel::WorldState;
 
@@ -754,20 +749,14 @@ fn identity_inherits_unchanged_when_no_genome_mutation() {
     cfg.energy.costs.reproduce_cost = 1.0;
     cfg.runtime.graph_node_base_cost = 0.1;
 
-    let parent_identity = CreatureIdentityState::founder(0, 7);
+    let parent_body = v3_core::creature::founder::founder_body(3, 7, &cfg);
     let pos = Position::new(5, 5);
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let parent_id = creatures.insert_with_key(|id| {
         v3_core::creature::birth::Zygote::founder(
-            v3alpha1_founder_genome(),
-            HeritableBody {
-                phenotype: Phenotype::FOUNDER,
-                identity: parent_identity,
-                capacity: 200.0,
-                steal_share: 0.2,
-                give_share: 0.2,
-            },
+            v3alpha1_founder_genome().with_body(parent_body),
+            3,
         )
         .finalize(
             id,
@@ -785,12 +774,10 @@ fn identity_inherits_unchanged_when_no_genome_mutation() {
     run_tick(&mut sim, &mut None);
 
     if let Some(child) = sim.creatures.values().find(|c| c.generation == 1) {
+        assert_eq!(child.lineage_id, 3, "child lineage_id must match parent");
         assert_eq!(
-            child.body.identity.lineage_id, parent_identity.lineage_id,
-            "child lineage_id must match parent"
-        );
-        assert_eq!(
-            child.body.identity.kin_tag, parent_identity.kin_tag,
+            child.genome().body().kin_tag(),
+            parent_body.kin_tag(),
             "child kin_tag must be unchanged when per_unit_rate=0.0"
         );
     }
@@ -1107,13 +1094,19 @@ fn founder_only_trajectory_digest_is_pinned() {
     // re-measured at the same births the same way as T26.F02's, a binary
     // cross-built for x86_64-unknown-linux-gnu run under emulated Ubuntu
     // 24.04 (glibc 2.39), which reproduced the three T27.F03 commit-2 pins.
+    // T29.F02 (body genes: 85-unit founder carrying 5 more units, the body's
+    // own supply replacing the gated colour and kin draws and the three
+    // per-birth chances): default 87 -> 98 births (old digest 53890c1d...),
+    // rate 0.0 94 -> 94 (old digest e6616f37...), carrying cost off 95 -> 89
+    // (old digest 094c1347...). Measured on macOS aarch64; the GNU/Linux
+    // x86_64 pins are not re-measured.
     assert_eq!(
         founder_only_trajectory(None),
         (
-            87,
+            98,
             0,
             platform_digest(
-                "53890c1d7aec0c27f5cfa7968d33ee51e3c1e3414c341cb3f35e27be64200ae8",
+                "b5a5cd1f5016164f1fd179e231ff14fd44f81f049ec85a67b00681e5b93ed221",
                 "787559b66c042542208c1602e16e74ec43836f738dd83ec0ad2db6728381ca1e"
             )
         )
@@ -1130,7 +1123,7 @@ fn founder_only_trajectory_without_gestation_is_pinned() {
             94,
             0,
             platform_digest(
-                "e6616f37fe83d13fc7f4442738db77248cb06ac2f0892d879eb4310c91335a2b",
+                "5a77e0e598a85c441e598b557efe7c0a3d857785185444ad2b091cda9e968bf9",
                 "23c5e4b0ce2e85544d89a0a551970e7cf4026251b8a80eb9d43676ae72b57bf5"
             )
         )
@@ -1165,10 +1158,10 @@ fn founder_only_trajectory_without_carrying_cost_is_pinned() {
     assert_eq!(
         founder_only_trajectory_with(None, Some(0.0)),
         (
-            95,
+            89,
             0,
             platform_digest(
-                "094c1347e4ca8d5604c170ebbbd2c583402de6820dd685706b39682265f7f168",
+                "361f913dd917ab505098a7305dcaaaf665590bc20cff3fbd0a1f3ee1b26ea65f",
                 "32b19ad41f360bd43ec3876af1c427a889f5c7162576b7613a929d513e7f5771"
             )
         )

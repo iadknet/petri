@@ -491,6 +491,7 @@ fn the_byte_cap_stops_the_run_and_marks_replicates_incomplete() {
     let founder = v3_core::creature::founder::founder_genome_with_age_gate(
         reference.population.founder_profile,
         &reference.energy.lifecycle,
+        v3_core::creature::founder::default_founder_body(),
     );
     let setup = Setup::new(reference, 100.0, 60);
     let arms = vec![
@@ -620,6 +621,7 @@ fn validation_evaluations_count_toward_creature_ticks() {
     let founder = v3_core::creature::founder::founder_genome_with_age_gate(
         reference.population.founder_profile,
         &reference.energy.lifecycle,
+        v3_core::creature::founder::default_founder_body(),
     );
     let setup = Setup::new(reference, 100.0, 60);
     let arms = vec![Arm {
@@ -696,6 +698,7 @@ fn hot_arm_files(scratch: &Scratch) -> (PathBuf, PathBuf, CreatureGenome) {
     let founder = v3_core::creature::founder::founder_genome_with_age_gate(
         reference.population.founder_profile,
         &reference.energy.lifecycle,
+        v3_core::creature::founder::default_founder_body(),
     );
     let genome = v3_lab::controllers::controller(&founder, v3_lab::controllers::Family::Vector);
     let genome_path = scratch.lab.join("hot-genome.json");

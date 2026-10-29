@@ -208,6 +208,7 @@ fn operator_domain_mapping_is_consistent() {
             MutationOperator::Vm(_) => MutationDomain::Vm,
             MutationOperator::Graph(_) => MutationDomain::Graph,
             MutationOperator::InputRef(_) => MutationDomain::InputRef,
+            MutationOperator::Body(_) => MutationDomain::Body,
         };
         assert_eq!(operator.domain(), domain);
     }
@@ -320,7 +321,7 @@ fn the_graph_catalog_is_a_bijection_onto_its_engine_operators() {
         12
     );
     assert_eq!(InputRefOperator::ALL.len(), 5);
-    assert_eq!(MutationOperator::ALL.len(), 67);
+    assert_eq!(MutationOperator::ALL.len(), 72);
 
     let image: HashSet<MutationOperator> = GraphOperator::ALL
         .into_iter()
@@ -346,6 +347,7 @@ fn the_graph_catalog_is_a_bijection_onto_its_engine_operators() {
             + VmOperator::ALL.len()
             + GraphOperator::ALL.len()
             + InputRefOperator::ALL.len()
+            + crate::mutation::body::BodyOperator::ALL.len()
     );
     let all_keys: HashSet<&str> = MutationOperator::ALL
         .into_iter()
@@ -446,7 +448,7 @@ fn operator_keys_are_unique_and_domain_qualified() {
 /// Every operator's key in the flat order (T30.F10 invariant 2, T25.F12
 /// invariant 9's catalog): the nested catalog reproduces it verbatim.
 #[rustfmt::skip]
-const KEYS: [&str; 67] = [
+const KEYS: [&str; 72] = [
     "Topology.AddNode", "Topology.RemoveNode", "Topology.RetargetNodeTarget",
     "Topology.AddRouteTarget", "Topology.AddFeedbackRoute", "Topology.RemoveRouteTarget",
     "Topology.ChangeEntryNode", "Topology.SwapNodeBackend", "Topology.CopyNode",
@@ -471,6 +473,7 @@ const KEYS: [&str; 67] = [
     "Graph.DisableRetention", "Graph.MutateRetention",
     "InputRef.AddSensorLive", "InputRef.AddSensorSilent", "InputRef.Prune", "InputRef.Swap",
     "InputRef.RawFieldMutation",
+    "Body.Colour", "Body.KinTag", "Body.Capacity", "Body.StealShare", "Body.GiveShare",
 ];
 
 /// T30.F10 invariants 1-3: the nested catalog derives every operator fact
@@ -505,6 +508,11 @@ fn the_nested_catalog_derives_every_operator_fact() {
                 .into_iter()
                 .map(MutationOperator::from),
         )
+        .chain(
+            crate::mutation::body::BodyOperator::ALL
+                .into_iter()
+                .map(MutationOperator::from),
+        )
         .collect();
     assert_eq!(MutationOperator::ALL.to_vec(), expected);
     let catalog: Vec<MutationOperator> = MutationDomain::all()
@@ -528,10 +536,11 @@ fn the_nested_catalog_derives_every_operator_fact() {
     }
     for &op in &MutationOperator::ALL {
         let (effect, weight) = match op {
-            MutationOperator::Topology(o) => (o.complexity_effect(), o.tuned_weight(30)),
-            MutationOperator::Vm(o) => (o.complexity_effect(), u16::from(o.weight())),
-            MutationOperator::Graph(o) => (o.complexity_effect(), u16::from(o.weight())),
-            MutationOperator::InputRef(o) => (o.complexity_effect(), u16::from(o.weight())),
+            MutationOperator::Topology(o) => (o.complexity_effect(), Some(o.tuned_weight(30))),
+            MutationOperator::Vm(o) => (o.complexity_effect(), Some(u16::from(o.weight()))),
+            MutationOperator::Graph(o) => (o.complexity_effect(), Some(u16::from(o.weight()))),
+            MutationOperator::InputRef(o) => (o.complexity_effect(), Some(u16::from(o.weight()))),
+            MutationOperator::Body(o) => (o.complexity_effect(), None),
         };
         assert_eq!(op.complexity_effect(), effect, "{op:?}");
         assert_eq!(op.weight(&config), weight, "{op:?}");

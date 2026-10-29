@@ -217,10 +217,12 @@ fn drift_is_goal_only_once_and_historical_fields_are_unavailable() {
     );
     assert_eq!(
         drift.supply_rule,
-        // T25.F02: the instrument anchor is 80 (commit 1; 97 restores) and the
-        // rate 0.0060625 (commit 2; 0.005 restores).
-        "per-unit draw on the canonical V3Alpha1 founder's genome_size() 80 at \
-         per_unit_rate 0.0060625: Binomial(80, 0.0060625) events per walk and checkpoint birth"
+        // T29.F02: per-chromosome draws on the founder's 80 brain and 5 body
+        // units at the rate 0.485 / 85 (T25.F02: one draw on 80 units at
+        // 0.0060625).
+        "per-unit draws on the canonical V3Alpha1 founder's units, brain 80 and body 5, at \
+         per_unit_rate 0.005705882352941176: Binomial(80, 0.005705882352941176) brain and \
+         Binomial(5, 0.005705882352941176) body events per walk and checkpoint birth"
     );
     assert_eq!(
         (
@@ -554,8 +556,11 @@ fn persistence_samples_carry_world_tracking_on_the_births_cadence() {
     // survives (9, 37, 43, 53, 60 and 75 are the first six). T25.F12 commit
     // 2 (the learning catalog, the target draw over edges and slots and the
     // bundle birth draws remap every Graph draw): seed 9 goes extinct at
-    // tick 79; seed 1 is the lowest of 0..=200 that survives.
-    params.seeds = vec![1];
+    // tick 79; seed 1 is the lowest of 0..=200 that survives. T29.F02 (the
+    // body genes' carrying units and the body's own supply): seed 1 goes
+    // extinct at tick 87; seed 102 is the lowest of 0..=400 that survives
+    // (102, 112, 149, 182, 193 and 227 are the first six).
+    params.seeds = vec![102];
     params.ticks = SAMPLE_EVERY_TICKS + 5;
     let (report, _) = run_deterministic(&params).expect("a valid profile");
     let seed = &report.goal_indicators.population_persistence.per_seed[0];

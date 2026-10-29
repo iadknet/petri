@@ -91,7 +91,10 @@ fn a_give_moves_the_share_of_the_giver_store_and_books_each_side() {
 fn the_give_intensity_scales_the_share_by_the_effort_up_to_one() {
     for (share, effort, intensity) in [(0.2, 2.0, 0.4), (0.5, 0.25, 0.125), (0.5, 4.0, 1.0)] {
         let (mut sim, giver, recipient) = make_sim_two_creatures(50.0, 30.0);
-        sim.creatures[giver].body.give_share = share;
+        sim.creatures[giver] =
+            crate::creature::birth::Zygote::reborn(&sim.creatures[giver], |body| {
+                body.with_give_share(share)
+            });
         let after_effort = 50.0f32 - exchange_effort(&sim, giver, intensity);
         let outcome = give_now(giver, &mut sim, Direction::N, effort);
         assert_eq!(outcome.result.outcome, ActionOutcome::Success);
@@ -159,7 +162,9 @@ fn a_give_with_nothing_to_give_logs_nothing_to_give() {
     let (mut sim, giver, recipient) = make_sim_two_creatures(tiny, 30.0);
     sim.config.exchange.effort_rate = 0.0;
     sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
-    sim.creatures[giver].body.give_share = sim.config.exchange.share_min;
+    sim.creatures[giver] = crate::creature::birth::Zygote::reborn(&sim.creatures[giver], |body| {
+        body.with_give_share(sim.config.exchange.share_min)
+    });
 
     let entries = logged(&mut sim, giver, vec![give_north(1.0)]);
 
@@ -196,7 +201,9 @@ fn a_give_with_nothing_to_give_logs_nothing_to_give() {
 #[test]
 fn a_giver_exhausted_by_its_gift_is_removed_after_its_dispatch() {
     let (mut sim, giver, recipient) = make_sim_two_creatures(5.0, 30.0);
-    sim.creatures[giver].body.give_share = 1.0;
+    sim.creatures[giver] = crate::creature::birth::Zygote::reborn(&sim.creatures[giver], |body| {
+        body.with_give_share(1.0)
+    });
     let giver_cell = sim.creatures[giver].position;
     let after_effort = 5.0f32 - exchange_effort(&sim, giver, 1.0);
 

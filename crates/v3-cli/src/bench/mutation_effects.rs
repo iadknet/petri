@@ -7,8 +7,8 @@
 //! keeping the committed summary inside its storage budget.
 
 use serde::{Deserialize, Serialize};
-use v3_core::creature::founder::FOUNDER_GENOME_SIZE_UNITS;
 use v3_core::neighborhood::births::{CapabilitySplit, QUEUE_BUCKETS};
+use v3_core::neighborhood::drift::walk_units;
 use v3_core::neighborhood::mutation_effects::{
     self as effects, contexts, Category, CohortReading, EffectCounts, Group, TargetClass,
 };
@@ -281,7 +281,11 @@ pub fn project(
     exposure: &ExposureInputs<'_>,
     sizes: effects::Sizes,
 ) -> MutationEffects {
-    let pinned = format!("pinned {FOUNDER_GENOME_SIZE_UNITS} units (drift chart)");
+    let units = walk_units();
+    let pinned = format!(
+        "pinned {} brain and {} body units (drift chart)",
+        units.brain, units.body
+    );
     let mut rows: Vec<ExposureRow> = exposure
         .drift
         .iter()
@@ -323,9 +327,10 @@ pub fn project(
     MutationEffects {
         version: effects::VERSION.to_string(),
         battery_version: BATTERY_VERSION.to_string(),
-        proposal_rule: "one requested event per proposal: apply_mutations_on_units with units 1 \
-                        and per_unit_rate 1.0, the production operator mix, and the parent's \
-                        battery-executed set; skipped proposals stay in denominators, no retry"
+        proposal_rule: "one requested event per proposal: apply_mutations_on_units with one \
+                        brain unit, no body unit and per_unit_rate 1.0, the production operator \
+                        mix, and the parent's battery-executed set; skipped proposals stay in \
+                        denominators, no retry"
             .to_string(),
         // Stored verbatim in committed summaries, so the text stays fixed:
         // `parent_index` here is the zero-based ordinal within the cohort,
@@ -448,8 +453,10 @@ pub(super) fn observe_world(
     observation: WorldObservation<'_>,
 ) -> MutationEffects {
     let parents = selected_cohort(seed, sim, observation.read_sample, observation.sizes);
-    let founder =
-        v3_core::creature::founder::founder_genome(v3_core::config::FounderProfile::V3Alpha1);
+    let founder = v3_core::creature::founder::founder_genome(
+        v3_core::config::FounderProfile::V3Alpha1,
+        v3_core::creature::founder::default_founder_body(),
+    );
     let context = v3_core::neighborhood::EvalContext::from_config(observation.config);
     let reading = effects::observe(
         effects::WorldInputs {

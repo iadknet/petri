@@ -48,10 +48,11 @@ fn graph_node(
 }
 
 fn genome(nodes: Vec<NodeGenome>) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: nodes[0].node_id,
+    CreatureGenome::new(
+        nodes[0].node_id,
         nodes,
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 const EAT: OutputSinkKind = OutputSinkKind::ActionVote(VoteSink::Eat);
@@ -105,6 +106,7 @@ impl Fixture {
             sensors: self
                 .config
                 .sensor_context(self.config.world.food.types.len()),
+            body_ranges: crate::creature::body::body_ranges(&self.config),
         };
         let scenes = Scenes {
             battery: &self.battery,
@@ -358,7 +360,10 @@ fn a_family_union_counts_each_parent_once() {
 #[test]
 fn ablation_is_the_identity_for_unread_and_all_zero_channels() {
     let fixture = Fixture::new();
-    let founder = founder_genome(FounderProfile::V3Alpha1);
+    let founder = founder_genome(
+        FounderProfile::V3Alpha1,
+        crate::creature::founder::default_founder_body(),
+    );
     let unread = channel(&barriers(), 0);
     assert_eq!(
         ablated(
@@ -379,6 +384,7 @@ fn ablation_is_the_identity_for_unread_and_all_zero_channels() {
         runtime: &fixture.runtime,
         shared_memory_decay_rate: fixture.config.shared_memory.decay_rate,
         sensors: crate::config::test_sensor_context(1),
+        body_ranges: crate::creature::body::default_body_ranges(),
     };
     let scenes = Scenes {
         battery: &fixture.battery,
@@ -448,7 +454,10 @@ fn retention_counts_pairs_and_still_causal_children() {
 /// On the founder, every row keeps the funnel's order.
 #[test]
 fn founder_rows_keep_the_stage_invariant() {
-    let parent = Fixture::new().read(&founder_genome(FounderProfile::V3Alpha1));
+    let parent = Fixture::new().read(&founder_genome(
+        FounderProfile::V3Alpha1,
+        crate::creature::founder::default_founder_body(),
+    ));
     let cohort = fold_cohort(Cohort::Founder, 1, &[parent], RETENTION_CHILDREN);
     assert_eq!(cohort.consistency_violations, 0);
     assert!(cohort.rows.iter().any(|row| row.causal_original > Some(0)));
@@ -536,7 +545,10 @@ fn an_extinct_world_is_undefined_and_thread_count_does_not_matter() {
     for id in ids {
         sim.remove_creature(id);
     }
-    let founder = founder_genome(FounderProfile::V3Alpha1);
+    let founder = founder_genome(
+        FounderProfile::V3Alpha1,
+        crate::creature::founder::default_founder_body(),
+    );
     let drift = [CohortParent {
         index: 0,
         depth_or_generation: 7,
@@ -587,7 +599,10 @@ impl ParentUse {
 fn mutated_founder(seed: u64, events: u32) -> CreatureGenome {
     use rand::SeedableRng;
     let config = SimulationConfig::default();
-    let mut genome = founder_genome(FounderProfile::V3Alpha1);
+    let mut genome = founder_genome(
+        FounderProfile::V3Alpha1,
+        crate::creature::founder::default_founder_body(),
+    );
     let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
     let one_event = crate::config::MutationConfig {
         per_unit_rate: 1.0,
@@ -597,8 +612,9 @@ fn mutated_founder(seed: u64, events: u32) -> CreatureGenome {
         let reachable = mesh_reachable_nodes(&genome);
         crate::mutation::MutationEngine::apply_mutations_on_units(
             &mut genome,
-            1,
+            crate::mutation::engine::ChromosomeUnits { brain: 1, body: 0 },
             &one_event,
+            &crate::creature::body::default_body_ranges(),
             &reachable,
             crate::mutation::reachability::ParentExecuted::Indices(&reachable),
             &mut rng,
@@ -640,7 +656,7 @@ proptest! {
     /// idempotent, and moves only reference indices of the ablated channels.
     #[test]
     fn ablation_preserves_structure(channels in proptest::collection::btree_set(0u16..8, 0..8)) {
-        let founder = founder_genome(FounderProfile::V3Alpha1);
+        let founder = founder_genome(FounderProfile::V3Alpha1, crate::creature::founder::default_founder_body());
         let pick = |c: Channel| c.family == Family::UpstreamSlot && channels.contains(&c.channel);
         let once = ablated(&founder, pick, &crate::config::test_sensor_context(1));
         prop_assert_eq!(once.genome_size(), founder.genome_size());

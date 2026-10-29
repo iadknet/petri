@@ -5,19 +5,43 @@ use rand::Rng;
 use crate::config::MutationConfig;
 use crate::contracts::{NodeId, SensorContext};
 use crate::creature::parseability::ParseabilityGate;
+use crate::genome::body::{BodyGenome, BodyRanges};
 use crate::genome::cgp::validate_graph;
 use crate::genome::learning::InheritanceMapping;
 use crate::genome::{BackendDef, CreatureGenome};
+use crate::mutation::body::sample_body_edit;
 use crate::mutation::graph::{GraphMutator, GraphOperator};
 use crate::mutation::input_ref::InputRefMutator;
 use crate::mutation::pressure;
 use crate::mutation::reachability::{BirthMembership, ParentExecuted, TargetSelector, TargetSets};
 use crate::mutation::topology::{TopologyMutator, TopologyOperator};
 use crate::mutation::types::{
-    EventReport, MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
+    BrainDomain, EventReport, MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
     MutationEventRecord, MutationOperator, MutationSkipReason, MutationSummary, TargetReachability,
 };
 use crate::mutation::vm::VmMutator;
+
+/// The genome units each chromosome exposes to the per-unit supply
+/// (T29.F02 invariant 3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ChromosomeUnits {
+    /// The brain's units: its trials before the brain events.
+    pub brain: u32,
+    /// The body's units: its trials after the brain events.
+    pub body: u32,
+}
+
+impl ChromosomeUnits {
+    /// A genome's own exposure: its [`CreatureGenome::brain_units`] and
+    /// [`BodyGenome::UNITS`].
+    #[must_use]
+    pub fn of(genome: &CreatureGenome) -> Self {
+        Self {
+            brain: genome.brain_units(),
+            body: BodyGenome::UNITS,
+        }
+    }
+}
 
 /// Draw requested supply from normalized config, independently of operator success.
 ///
@@ -63,7 +87,7 @@ impl BirthDraw<'_> {
     /// the rest. `None` when every operator of the domain was discarded.
     fn select_and_apply(
         &self,
-        domain: MutationDomain,
+        domain: BrainDomain,
         genome: &mut CreatureGenome,
         sets: &TargetSets<'_>,
         node_ids: &[NodeId],
@@ -71,20 +95,20 @@ impl BirthDraw<'_> {
         rng: &mut impl Rng,
     ) -> Option<SelectedEvent> {
         let config = self.config;
-        let mut available: Vec<MutationOperator> = domain
+        let mut available: Vec<(MutationOperator, u16)> = domain
             .catalog()
             .iter()
             .copied()
             .filter(|op| !self.restricted || op.complexity_effect().is_decreasing())
-            .filter(|op| op.weight(config) > 0)
+            .filter_map(|op| Some((op, op.weight(config).filter(|&weight| weight > 0)?)))
             .collect();
         let bias = pressure_adjusted_bias(
             domain.reachable_bias(&config.reachable_bias),
             self.restricted,
         );
         while !available.is_empty() {
-            let idx = select_weighted_index(&available, |op| op.weight(config), rng);
-            let operator = available[idx];
+            let idx = select_weighted_index(&available, |(_, weight)| weight, rng);
+            let (operator, _) = available[idx];
             let tracked_before =
                 operator_requires_added_node_input_tracking(operator).then(|| genome.clone());
             let mut targets = sets.selector(bias, self.executed_bias);
@@ -113,52 +137,31 @@ impl BirthDraw<'_> {
 pub struct MutationEngine;
 
 impl MutationEngine {
-    /// Apply mutation events to a child genome and return a summary.
-    ///
-    /// `parent_reachable_nodes` is the parent's cached reachable set (sorted ascending),
-    /// used to bias mutation target selection toward functional structure.
-    /// The parent carries no executed set here, so the executed layer never fires.
-    ///
-    /// Accounting invariant: `summary.attempted_events == summary.applied_events + summary.skipped_events`.
-    #[cfg(test)]
-    pub fn apply_mutations(
-        genome: &mut CreatureGenome,
-        config: &MutationConfig,
-        parent_reachable_nodes: &[usize],
-        rng: &mut impl Rng,
-    ) -> (MutationSummary, InheritanceMapping) {
-        Self::apply_mutations_in(
-            genome,
-            config,
-            parent_reachable_nodes,
-            ParentExecuted::NONE,
-            rng,
-            &crate::config::SimulationConfig::default().sensor_context(1),
-        )
-    }
-
     /// Apply mutation events to a child genome using the configured number of
     /// available food types for typed input-ref/topology sampling.
     ///
-    /// Every production birth and reading comes through here: the supply draw
-    /// runs on the genome's own `genome_size()`, read once before any event.
-    /// The child starts as the parent's copy, so this is the parent's size.
+    /// Every production birth and reading comes through here: the supply
+    /// draws run on the genome's own [`ChromosomeUnits`], read once before
+    /// any event. The child starts as the parent's copy, so these are the
+    /// parent's. Body edits apply under `ranges` (`creature::body`).
     /// Returns the summary beside the birth's inheritance mapping: every
     /// committed event's mapping composed in order (T29.F01 invariant 5);
     /// callers that only screen genomes ignore it.
     pub fn apply_mutations_in(
         genome: &mut CreatureGenome,
         config: &MutationConfig,
+        ranges: &BodyRanges,
         parent_reachable_nodes: &[usize],
         parent_executed: ParentExecuted<'_>,
         rng: &mut impl Rng,
         context: &SensorContext,
     ) -> (MutationSummary, InheritanceMapping) {
-        let units = genome.genome_size();
+        let units = ChromosomeUnits::of(genome);
         Self::apply_mutations_on_units(
             genome,
             units,
             config,
+            ranges,
             parent_reachable_nodes,
             parent_executed,
             rng,
@@ -166,30 +169,65 @@ impl MutationEngine {
         )
     }
 
-    /// [`Self::apply_mutations_in`] with the supply draw on
-    /// a caller-supplied unit count: `Binomial(units, per_unit_rate)`
-    /// requested events. The drift walk, the one instrument on this draw, passes
-    /// the constant `FOUNDER_GENOME_SIZE_UNITS` (T11.F20); engine
+    /// [`Self::apply_mutations_in`] with the supply draws on caller-supplied
+    /// per-chromosome counts (T29.F02 invariant 3): `Binomial(units.brain,
+    /// per_unit_rate)` brain events run first (the size-pressure draw, the
+    /// two-layer dispatch, the gate, the mappings), then
+    /// `Binomial(units.body, per_unit_rate)` body events, each drawing its
+    /// gene uniformly and that gene's draws (`mutation::body`), applied under
+    /// `ranges`. A body event is never rejected, ignores the size-pressure
+    /// restriction and maps every learnable to itself. The drift walk passes
+    /// the founder's counts (T11.F20), the one-event screen `(1, 0)`; engine
     /// tests pass explicit counts (rate 1.0 on N units requests exactly N).
     ///
     /// `parent_reachable_nodes` and `parent_executed` are sorted parent node
     /// indices. Every target draw sees them through [`BirthMembership`]: a
     /// child node counts as a member only when the parent carried it, however
     /// earlier events of this birth removed or added nodes (T11.F24).
+    #[allow(clippy::too_many_arguments)]
     pub fn apply_mutations_on_units(
         genome: &mut CreatureGenome,
-        units: u32,
+        units: ChromosomeUnits,
+        config: &MutationConfig,
+        ranges: &BodyRanges,
+        parent_reachable_nodes: &[usize],
+        parent_executed: ParentExecuted<'_>,
+        rng: &mut impl Rng,
+        context: &SensorContext,
+    ) -> (MutationSummary, InheritanceMapping) {
+        let brain_events = requested_event_count(config, units.brain, rng);
+        let (mut summary, inheritance) = if brain_events == 0 {
+            (MutationSummary::zero(), InheritanceMapping::Identity)
+        } else {
+            Self::apply_brain_events(
+                genome,
+                brain_events,
+                config,
+                parent_reachable_nodes,
+                parent_executed,
+                rng,
+                context,
+            )
+        };
+        for _ in 0..requested_event_count(config, units.body, rng) {
+            let edit = sample_body_edit(config, rng);
+            genome.body_mut().apply(edit, ranges);
+            summary.record_body_event(edit.gene().into());
+        }
+        (summary, inheritance)
+    }
+
+    /// The brain loop of one birth: `event_count` brain events, each through
+    /// the two-layer dispatch and the gate.
+    fn apply_brain_events(
+        genome: &mut CreatureGenome,
+        event_count: u32,
         config: &MutationConfig,
         parent_reachable_nodes: &[usize],
         parent_executed: ParentExecuted<'_>,
         rng: &mut impl Rng,
         context: &SensorContext,
     ) -> (MutationSummary, InheritanceMapping) {
-        let event_count = requested_event_count(config, units, rng);
-        if event_count == 0 {
-            return (MutationSummary::zero(), InheritanceMapping::Identity);
-        }
-
         // Genome size pressure: compute once before the event loop.
         let restricted = config.genome_size_pressure_enabled
             && pressure::is_restricted(genome.genome_size(), config.genome_size_cap, rng);
@@ -234,17 +272,18 @@ impl MutationEngine {
             let mut discarded: Vec<(MutationOperator, Option<NodeId>)> = Vec::new();
             // Two-layer dispatch: mesh (Topology) vs node-internal (VM, Graph,
             // InputRef at equal probability).
-            let domain = if rng.gen_bool(config.mesh_layer_probability) {
-                MutationDomain::Topology
+            let brain_domain = if rng.gen_bool(config.mesh_layer_probability) {
+                BrainDomain::Topology
             } else {
                 match rng.gen_range(0u8..3) {
-                    0 => MutationDomain::Vm,
-                    1 => MutationDomain::Graph,
-                    _ => MutationDomain::InputRef,
+                    0 => BrainDomain::Vm,
+                    1 => BrainDomain::Graph,
+                    _ => BrainDomain::InputRef,
                 }
             };
+            let domain = MutationDomain::from(brain_domain);
             let selected = draw.select_and_apply(
-                domain,
+                brain_domain,
                 genome,
                 &membership.sets(),
                 &node_ids,
@@ -517,6 +556,10 @@ pub(crate) fn dispatch(
         MutationOperator::InputRef(op) => {
             InputRefMutator::apply_classified(genome, op, targets, rng, config, context)
         }
+        // A body gene is no brain site: body events are drawn by gene and
+        // applied by `MutationEngine::apply_mutations_on_units`, never
+        // dispatched to a target.
+        MutationOperator::Body(_) => Err(MutationSkipReason::NoApplicableTarget),
     }
 }
 
@@ -537,6 +580,9 @@ pub(crate) fn apply_event(
 }
 
 #[cfg(test)]
+mod test_support;
+
+#[cfg(test)]
 mod tests;
 
 #[cfg(test)]
@@ -547,3 +593,6 @@ mod bundle_tests;
 
 #[cfg(test)]
 mod draw_stream_tests;
+
+#[cfg(test)]
+mod body_supply_tests;

@@ -199,7 +199,7 @@ impl<'a> PopulationCensus<'a> {
 
     /// The creatures' lineage ids, in population order.
     pub fn lineage_ids(&self) -> impl Iterator<Item = u32> + '_ {
-        self.creatures.iter().map(|c| c.body.identity.lineage_id)
+        self.creatures.iter().map(|c| c.lineage_id)
     }
 
     /// The creatures, in population order.

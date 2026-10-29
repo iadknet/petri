@@ -2,6 +2,7 @@ use super::*;
 use crate::config::SimulationConfig;
 use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
+use crate::genome::body::BodyGenome;
 use crate::genome::cgp::{CgpGraphBackendDef, EdgeSurface, GraphEdge, GraphSource};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::graph::GraphOperator;
@@ -35,8 +36,12 @@ fn apply_events(
     );
     MutationEngine::apply_mutations_on_units(
         genome,
-        events,
+        crate::mutation::engine::ChromosomeUnits {
+            brain: events,
+            body: 0,
+        },
         config,
+        &crate::creature::body::default_body_ranges(),
         parent_reachable_nodes,
         ParentExecuted::NONE,
         rng,
@@ -86,15 +91,16 @@ fn classify_expected_added_input_classes(
 }
 
 fn single_graph_genome_with_inputs(input_refs: Vec<InputReference>) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             input_refs,
             BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
             Vec::new(),
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 fn genome_has_non_default_food_input_ref(genome: &CreatureGenome) -> bool {
@@ -180,8 +186,9 @@ fn engine_with_food_type_count_can_introduce_non_default_food_input_refs() {
         let mut genome = v3alpha1_founder_genome();
         let summary = MutationEngine::apply_mutations_on_units(
             &mut genome,
-            1,
+            crate::mutation::engine::ChromosomeUnits { brain: 1, body: 0 },
             &config,
+            &crate::creature::body::default_body_ranges(),
             &[],
             ParentExecuted::NONE,
             &mut r,
@@ -210,9 +217,9 @@ fn engine_with_food_type_count_can_introduce_non_default_food_input_refs() {
 #[test]
 fn engine_records_added_input_classes_for_topology_splice_node() {
     let config = forced_topology_config();
-    let base_genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let base_genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             NodeGenome::new(
                 NodeId::new(0),
                 vec![],
@@ -230,7 +237,8 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
                 vec![],
             ),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
 
     for seed in 0u64..2_000 {
         let mut genome = base_genome.clone();
@@ -356,10 +364,11 @@ fn graph_add_internal_node_reads_inputs_of_the_graph_that_grew_not_the_first_gra
             Vec::new(),
         )
     };
-    let before = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![graph_node(0, food), graph_node(1, barrier)],
-    };
+    let before = CreatureGenome::new(
+        NodeId::new(0),
+        vec![graph_node(0, food), graph_node(1, barrier)],
+        crate::creature::founder::default_founder_body(),
+    );
     let mut after = before.clone();
     let BackendDef::Graph(grown) = after.nodes[1].backend_edit().1 else {
         unreachable!("node 1 is a Graph node");
@@ -548,7 +557,7 @@ fn engine_attempted_counters_cover_all_domains_and_hit_each_domain_operator_surf
         }
     }
 
-    for domain in MutationDomain::all() {
+    for domain in BrainDomain::ALL.map(MutationDomain::from) {
         assert!(
             domain_hits.get(&domain).copied().unwrap_or(0) > 0,
             "expected attempted events for domain {:?}",
@@ -560,7 +569,7 @@ fn engine_attempted_counters_cover_all_domains_and_hit_each_domain_operator_surf
     for operator in operator_hits.keys().copied() {
         attempted_domains.insert(operator.domain());
     }
-    for domain in MutationDomain::all() {
+    for domain in BrainDomain::ALL.map(MutationDomain::from) {
         assert!(
             attempted_domains.contains(&domain),
             "expected at least one attempted operator in domain {:?}",
@@ -918,9 +927,9 @@ fn engine_with_bias_1_targets_only_reachable_vm_nodes() {
 
     // Build a 3-node genome: entry=0 -> 1, node 2 is unreachable.
     // All three are VM backends so VM domain mutations can target any.
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             NodeGenome::new(
                 NodeId::new(0),
                 vec![],
@@ -956,7 +965,8 @@ fn engine_with_bias_1_targets_only_reachable_vm_nodes() {
                 vec![],
             ),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
 
     // Reachable set: only nodes 0 and 1 (sorted).
     let reachable: &[usize] = &[0, 1];
@@ -996,9 +1006,9 @@ fn engine_pressure_restricted_deletions_bias_toward_unreachable_nodes() {
 
     // Build a 3-node VM genome: entry=0 -> 1, node 2 is unreachable.
     // Each node has 2 instructions so VmDeleteInstruction is always applicable.
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             NodeGenome::new(
                 NodeId::new(0),
                 vec![],
@@ -1034,7 +1044,8 @@ fn engine_pressure_restricted_deletions_bias_toward_unreachable_nodes() {
                 vec![],
             ),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
 
     let reachable: &[usize] = &[0, 1];
 
@@ -1077,7 +1088,7 @@ fn per_unit_config(rate: f64) -> MutationConfig {
 }
 
 /// The default rule on the founder: 0.485 requested events per birth
-/// (0.0060625 per unit over 80 units), with a Binomial's spread.
+/// (0.485 / 85 per unit over 85 units), with a Binomial's spread.
 #[test]
 fn per_unit_supply_founder_mean_matches_rate_times_genome_size() {
     let config = MutationConfig::default();
@@ -1125,22 +1136,26 @@ proptest::proptest! {
         proptest::prop_assert_eq!(requested_event_count(&per_unit_config(1.0), units, &mut rng(seed)), units);
     }
 
-    /// The engine attempts exactly the drawn count on the per-unit rule and
-    /// the accounting invariant holds.
+    /// The engine attempts exactly the drawn brain count on the brain's
+    /// units, then at most the body's units of body events, every one
+    /// applied, and the accounting invariant holds.
     #[test]
     fn per_unit_supply_engine_accounting(
         seed in proptest::prelude::any::<u64>(), rate in 0.0f64..=0.05,
     ) {
         let config = per_unit_config(rate);
         let founder = v3alpha1_founder_genome();
-        let requested = requested_event_count(&config, founder.genome_size(), &mut rng(seed));
+        let requested = requested_event_count(&config, founder.brain_units(), &mut rng(seed));
         let summary = MutationEngine::apply_mutations(&mut founder.clone(), &config, &[], &mut rng(seed)).0;
-        proptest::prop_assert_eq!(summary.attempted_events, requested);
+        let body = summary.attempted_by_domain.get(&MutationDomain::Body).copied().unwrap_or(0);
+        proptest::prop_assert_eq!(summary.attempted_events - body, requested);
+        proptest::prop_assert!(body <= BodyGenome::UNITS);
+        proptest::prop_assert_eq!(summary.applied_by_domain.get(&MutationDomain::Body).copied().unwrap_or(0), body);
         proptest::prop_assert_eq!(summary.attempted_events, summary.applied_events + summary.skipped_events);
     }
 
     /// The production entry point is the unit-count entry point on the
-    /// genome's own `genome_size()`: same summary, same child, same stream.
+    /// genome's own chromosome units: same summary, same child, same stream.
     #[test]
     fn production_supply_draws_on_the_genome_s_own_size(
         seed in proptest::prelude::any::<u64>(), rate in 0.0f64..=0.05,
@@ -1149,12 +1164,8 @@ proptest::proptest! {
         let founder = v3alpha1_founder_genome();
         let (mut own, mut explicit) = (founder.clone(), founder.clone());
         let (mut own_rng, mut explicit_rng) = (rng(seed), rng(seed));
-        let own_summary = MutationEngine::apply_mutations_in(
-            &mut own, &config, &[], ParentExecuted::NONE, &mut own_rng, &crate::config::test_sensor_context(1),
-        ).0;
-        let explicit_summary = MutationEngine::apply_mutations_on_units(
-            &mut explicit, founder.genome_size(), &config, &[], ParentExecuted::NONE, &mut explicit_rng, &crate::config::test_sensor_context(1),
-        ).0;
+        let own_summary = MutationEngine::apply_mutations_in(&mut own, &config, &crate::creature::body::default_body_ranges(), &[], ParentExecuted::NONE, &mut own_rng, &crate::config::test_sensor_context(1)).0;
+        let explicit_summary = MutationEngine::apply_mutations_on_units(&mut explicit, ChromosomeUnits::of(&founder), &config, &crate::creature::body::default_body_ranges(), &[], ParentExecuted::NONE, &mut explicit_rng, &crate::config::test_sensor_context(1)).0;
         proptest::prop_assert_eq!(own_summary.attempted_events, explicit_summary.attempted_events);
         proptest::prop_assert_eq!(own_summary.applied_events, explicit_summary.applied_events);
         proptest::prop_assert_eq!(own_summary.events, explicit_summary.events);
@@ -1172,9 +1183,7 @@ proptest::proptest! {
         let config = per_unit_config(rate);
         let expected = requested_event_count(&config, units, &mut rng(seed));
         for mut genome in [v3alpha1_founder_genome(), core_and_junk_genome()] {
-            let summary = MutationEngine::apply_mutations_on_units(
-                &mut genome, units, &config, &[], ParentExecuted::NONE, &mut rng(seed), &crate::config::test_sensor_context(1),
-            ).0;
+            let summary = MutationEngine::apply_mutations_on_units(&mut genome, crate::mutation::engine::ChromosomeUnits { brain: units, body: 0 }, &config, &crate::creature::body::default_body_ranges(), &[], ParentExecuted::NONE, &mut rng(seed), &crate::config::test_sensor_context(1)).0;
             proptest::prop_assert_eq!(summary.attempted_events, expected);
         }
     }
@@ -1232,16 +1241,17 @@ fn core_and_junk_genome() -> CreatureGenome {
             }),
         )
     };
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             vm_node(0, 1.0, Some(1)),
             vm_node(1, 2.0, None),
             vm_node(2, 3.0, None),
             vm_node(3, 4.0, None),
             vm_node(4, 5.0, None),
         ],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 /// Requested events per birth under [`node_internal_config`].
@@ -1267,8 +1277,12 @@ fn full_executed_bias_leaves_junk_nodes_untouched_and_counts_every_target() {
         let mut genome = subject.clone();
         let summary = MutationEngine::apply_mutations_on_units(
             &mut genome,
-            NODE_INTERNAL_EVENTS,
+            crate::mutation::engine::ChromosomeUnits {
+                brain: NODE_INTERNAL_EVENTS,
+                body: 0,
+            },
             &config,
+            &crate::creature::body::default_body_ranges(),
             &[0, 1],
             ParentExecuted::Indices(&[0, 1]),
             &mut rng(seed),
@@ -1303,8 +1317,12 @@ fn zero_executed_bias_reaches_junk_nodes_in_the_same_fixture() {
         let mut genome = subject.clone();
         let summary = MutationEngine::apply_mutations_on_units(
             &mut genome,
-            NODE_INTERNAL_EVENTS,
+            crate::mutation::engine::ChromosomeUnits {
+                brain: NODE_INTERNAL_EVENTS,
+                body: 0,
+            },
             &config,
+            &crate::creature::body::default_body_ranges(),
             &[0, 1],
             ParentExecuted::Indices(&[0, 1]),
             &mut rng(seed),
@@ -1362,8 +1380,12 @@ fn an_all_executed_eligible_set_reproduces_the_pre_feature_draw_byte_for_byte() 
             let mut layer_rng = rng(seed);
             let summary = MutationEngine::apply_mutations_on_units(
                 &mut with_layer,
-                units,
+                crate::mutation::engine::ChromosomeUnits {
+                    brain: units,
+                    body: 0,
+                },
                 config,
+                &crate::creature::body::default_body_ranges(),
                 &reachable,
                 ParentExecuted::Indices(&all_nodes),
                 &mut layer_rng,
@@ -1375,8 +1397,12 @@ fn an_all_executed_eligible_set_reproduces_the_pre_feature_draw_byte_for_byte() 
             let mut plain_rng = rng(seed);
             MutationEngine::apply_mutations_on_units(
                 &mut without_layer,
-                units,
+                crate::mutation::engine::ChromosomeUnits {
+                    brain: units,
+                    body: 0,
+                },
                 &plain,
+                &crate::creature::body::default_body_ranges(),
                 &reachable,
                 ParentExecuted::NONE,
                 &mut plain_rng,
@@ -1431,8 +1457,12 @@ fn size_pressure_restriction_disables_the_executed_layer() {
         let mut restricted_rng = rng(seed);
         let summary = MutationEngine::apply_mutations_on_units(
             &mut restricted_child,
-            NODE_INTERNAL_EVENTS,
+            crate::mutation::engine::ChromosomeUnits {
+                brain: NODE_INTERNAL_EVENTS,
+                body: 0,
+            },
             &restricted,
+            &crate::creature::body::default_body_ranges(),
             &[0, 1],
             ParentExecuted::Indices(&[0, 1]),
             &mut restricted_rng,
@@ -1443,8 +1473,12 @@ fn size_pressure_restriction_disables_the_executed_layer() {
         let mut reference_rng = rng(seed);
         let reference_summary = MutationEngine::apply_mutations_on_units(
             &mut reference_child,
-            NODE_INTERNAL_EVENTS,
+            crate::mutation::engine::ChromosomeUnits {
+                brain: NODE_INTERNAL_EVENTS,
+                body: 0,
+            },
             &reference,
+            &crate::creature::body::default_body_ranges(),
             &[0, 1],
             ParentExecuted::Indices(&[0, 1]),
             &mut reference_rng,
@@ -1465,8 +1499,12 @@ fn size_pressure_restriction_disables_the_executed_layer() {
         let mut unpressured = subject.clone();
         MutationEngine::apply_mutations_on_units(
             &mut unpressured,
-            NODE_INTERNAL_EVENTS,
+            crate::mutation::engine::ChromosomeUnits {
+                brain: NODE_INTERNAL_EVENTS,
+                body: 0,
+            },
             &node_internal_config(1.0),
+            &crate::creature::body::default_body_ranges(),
             &[0, 1],
             ParentExecuted::Indices(&[0, 1]),
             &mut rng(seed),
@@ -1495,6 +1533,7 @@ fn a_zero_event_birth_never_resolves_the_parent_dispatch_record() {
     let summary = MutationEngine::apply_mutations_in(
         &mut genome,
         &config,
+        &crate::creature::body::default_body_ranges(),
         &[0],
         ParentExecuted::Query(&query),
         &mut rng(1),
@@ -1521,6 +1560,7 @@ fn a_birth_with_events_asks_the_parent_query_once_for_the_configured_window() {
     let summary = MutationEngine::apply_mutations_in(
         &mut genome,
         &config,
+        &crate::creature::body::default_body_ranges(),
         &[0],
         ParentExecuted::Query(&query),
         &mut rng(1),
@@ -1674,9 +1714,9 @@ fn an_event_with_no_eligible_node_records_no_target() {
     // The same domain on a genome carrying no Graph node: nothing is ever
     // selected, so the record carries no target at all.
     let config = single_node_internal_event_config();
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             Vec::new(),
             BackendDef::Vm(crate::genome::VmBackendDef {
@@ -1686,7 +1726,8 @@ fn an_event_with_no_eligible_node_records_no_target() {
             }),
             Vec::new(),
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let summary = first_event_in_domain(&genome, &config, MutationDomain::Graph);
     let [event] = &summary.events[..] else {
         panic!("one event: {:?}", summary.events);

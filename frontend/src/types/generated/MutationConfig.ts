@@ -9,9 +9,10 @@ import type { ReachableBiasConfig } from "./ReachableBiasConfig.ts";
 export type MutationConfig = {
 	/**
 	 * Chance that one genome unit requests a mutation event at birth: the
-	 * only supply rule (T11.F19, T11.F20). A birth draws one Bernoulli trial
-	 * per unit, so the requested event count is `Binomial(units, per_unit_rate)`
-	 * with `units` the parent's own `genome_size()`.
+	 * only supply rule (T11.F19, T11.F20, T29.F02). A birth draws one
+	 * Bernoulli trial per unit of each chromosome, brain then body, so the
+	 * requested event count is `Binomial(units, per_unit_rate)` with `units`
+	 * the parent's own `genome_size()`.
 	 */
 	per_unit_rate: number;
 	/**
@@ -46,12 +47,11 @@ export type MutationConfig = {
 	 */
 	executed_window_ticks: number;
 	/**
-	 * The heritable energy capacity's mutation (T26.F02).
+	 * The capacity gene's step (T26.F02).
 	 */
 	capacity: LogStepMutationConfig;
 	/**
-	 * The two heritable exchange shares' mutation (T27.F03), each drawn on
-	 * every birth after the capacity.
+	 * The two share genes' step (T27.F03).
 	 */
 	share: LogStepMutationConfig;
 };

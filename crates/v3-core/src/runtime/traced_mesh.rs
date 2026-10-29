@@ -506,10 +506,11 @@ mod tests {
 
         let vm_node = vm_emit_node(id_vm, vec![]);
 
-        let genome = CreatureGenome {
-            entry_node_id: id_graph,
-            nodes: vec![graph_node, vm_node],
-        };
+        let genome = CreatureGenome::new(
+            id_graph,
+            vec![graph_node, vm_node],
+            crate::creature::founder::default_founder_body(),
+        );
         let ss = empty_ss();
         let config = default_config();
 
@@ -621,10 +622,11 @@ mod tests {
             vec![],
         );
 
-        let genome = CreatureGenome {
-            entry_node_id: id_graph,
-            nodes: vec![graph_node, vm_node],
-        };
+        let genome = CreatureGenome::new(
+            id_graph,
+            vec![graph_node, vm_node],
+            crate::creature::founder::default_founder_body(),
+        );
         let ss = empty_ss();
         let config = default_config();
         let mut energy = 1000.0f32;
@@ -657,9 +659,9 @@ mod tests {
     #[test]
     fn graph_effect_trace_captures_value_vote_and_parameter_sinks() {
         let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            id0,
+            vec![NodeGenome::new(
                 id0,
                 vec![],
                 BackendDef::Graph(
@@ -687,7 +689,8 @@ mod tests {
                 ),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
 
         let ss = empty_ss();
         let mut energy = 100.0f32;
@@ -747,9 +750,9 @@ mod tests {
     #[test]
     fn energy_exhaustion_termination() {
         let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            id0,
+            vec![NodeGenome::new(
                 id0,
                 vec![],
                 BackendDef::Vm(VmBackendDef {
@@ -759,7 +762,8 @@ mod tests {
                 }),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         let ss = empty_ss();
         // Boost opcode cost multiplier so Noop actually exhausts energy
         let mut config = default_config();
@@ -792,9 +796,9 @@ mod tests {
     #[test]
     fn graph_energy_exhaustion_traces_cgp_route_kind() {
         let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            id0,
+            vec![NodeGenome::new(
                 id0,
                 vec![],
                 BackendDef::Graph(
@@ -804,7 +808,8 @@ mod tests {
                 ),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
 
         let ss = empty_ss();
         let mut config = default_config();
@@ -841,9 +846,9 @@ mod tests {
     #[test]
     fn graph_plasticity_charges_nothing_so_effects_commit() {
         let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            id0,
+            vec![NodeGenome::new(
                 id0,
                 vec![],
                 BackendDef::Graph(
@@ -873,7 +878,8 @@ mod tests {
                 ),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
 
         let ss = empty_ss();
         let mut config = default_config();
@@ -916,9 +922,9 @@ mod tests {
 
         let id0 = NodeId::new(0);
         // Genome that loads 3.0, sets priority bid, then emits Eat.
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            id0,
+            vec![NodeGenome::new(
                 id0,
                 vec![],
                 BackendDef::Vm(VmBackendDef {
@@ -940,7 +946,8 @@ mod tests {
                 }),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
 
         let ss = empty_ss();
         let config = default_config();
@@ -1004,9 +1011,9 @@ mod tests {
     #[test]
     fn traced_and_untraced_meshes_receive_live_energy() {
         let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            id0,
+            vec![NodeGenome::new(
                 id0,
                 vec![InputReference::DynamicIntrospection(
                     DynamicIntrospectionKey::EnergyCurrent,
@@ -1029,7 +1036,8 @@ mod tests {
                 }),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         let ss = empty_ss();
         let config = default_config();
         let mut energy_a = 100.0;
@@ -1144,30 +1152,33 @@ mod tests {
         let config = default_config();
         assert_mesh_equivalent_for_termination(
             "missing entry",
-            &CreatureGenome {
-                entry_node_id: missing,
-                nodes: vec![],
-            },
+            &CreatureGenome::new(
+                missing,
+                vec![],
+                crate::creature::founder::default_founder_body(),
+            ),
             &config,
             100.0,
             |reason| matches!(reason, TerminationReason::NoDecision),
         );
         assert_mesh_equivalent_for_termination(
             "no targets",
-            &CreatureGenome {
-                entry_node_id: id,
-                nodes: vec![halt_node(vec![])],
-            },
+            &CreatureGenome::new(
+                id,
+                vec![halt_node(vec![])],
+                crate::creature::founder::default_founder_body(),
+            ),
             &config,
             100.0,
             |reason| matches!(reason, TerminationReason::NoDecision),
         );
         assert_mesh_equivalent_for_termination(
             "missing routed node",
-            &CreatureGenome {
-                entry_node_id: id,
-                nodes: vec![halt_node(wrap_targets(vec![missing]))],
-            },
+            &CreatureGenome::new(
+                id,
+                vec![halt_node(wrap_targets(vec![missing]))],
+                crate::creature::founder::default_founder_body(),
+            ),
             &config,
             100.0,
             |reason| matches!(reason, TerminationReason::NoDecision),
@@ -1177,13 +1188,14 @@ mod tests {
         max_hops_config.max_mesh_hops = 1;
         assert_mesh_equivalent_for_termination(
             "maximum hops",
-            &CreatureGenome {
-                entry_node_id: id,
-                nodes: vec![
+            &CreatureGenome::new(
+                id,
+                vec![
                     halt_node(wrap_targets(vec![missing])),
                     vm_emit_node(missing, vec![]),
                 ],
-            },
+                crate::creature::founder::default_founder_body(),
+            ),
             &max_hops_config,
             100.0,
             |reason| matches!(reason, TerminationReason::NoDecision),
@@ -1191,10 +1203,11 @@ mod tests {
 
         assert_mesh_equivalent_for_termination(
             "action committed",
-            &CreatureGenome {
-                entry_node_id: id,
-                nodes: vec![vm_emit_node(id, vec![])],
-            },
+            &CreatureGenome::new(
+                id,
+                vec![vm_emit_node(id, vec![])],
+                crate::creature::founder::default_founder_body(),
+            ),
             &config,
             100.0,
             |reason| matches!(reason, TerminationReason::NoDecision),
@@ -1203,10 +1216,11 @@ mod tests {
         cap_config.max_actions_per_turn = 1;
         assert_mesh_equivalent_for_termination(
             "action cap",
-            &CreatureGenome {
-                entry_node_id: id,
-                nodes: vec![vm_emit_node(id, vec![])],
-            },
+            &CreatureGenome::new(
+                id,
+                vec![vm_emit_node(id, vec![])],
+                crate::creature::founder::default_founder_body(),
+            ),
             &cap_config,
             100.0,
             |reason| matches!(reason, TerminationReason::ActionCapReached),
@@ -1215,9 +1229,9 @@ mod tests {
         exhaustion_config.vm.opcode_cost_multiplier = 1.0;
         assert_mesh_equivalent_for_termination(
             "energy exhausted",
-            &CreatureGenome {
-                entry_node_id: id,
-                nodes: vec![NodeGenome::new(
+            &CreatureGenome::new(
+                id,
+                vec![NodeGenome::new(
                     id,
                     vec![],
                     BackendDef::Vm(VmBackendDef {
@@ -1227,7 +1241,8 @@ mod tests {
                     }),
                     vec![],
                 )],
-            },
+                crate::creature::founder::default_founder_body(),
+            ),
             &exhaustion_config,
             0.01,
             |reason| matches!(reason, TerminationReason::EnergyExhausted),
@@ -1298,10 +1313,11 @@ mod tests {
                 },
             );
         }
-        CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![reader, voter],
-        }
+        CreatureGenome::new(
+            NodeId::new(0),
+            vec![reader, voter],
+            crate::creature::founder::default_founder_body(),
+        )
     }
 
     #[test]
@@ -1385,9 +1401,12 @@ mod tests {
                 wrap_targets(vec![target]),
             )
         };
-        let genome = |node| CreatureGenome {
-            entry_node_id: id,
-            nodes: vec![node],
+        let genome = |node| {
+            CreatureGenome::new(
+                id,
+                vec![node],
+                crate::creature::founder::default_founder_body(),
+            )
         };
 
         let mut exhausting = default_config();
@@ -1430,9 +1449,9 @@ mod tests {
     #[cfg(feature = "telemetry-seams")]
     fn looping_two_vote_genome() -> CreatureGenome {
         let id = NodeId::new(0);
-        CreatureGenome {
-            entry_node_id: id,
-            nodes: vec![NodeGenome::new(
+        CreatureGenome::new(
+            id,
+            vec![NodeGenome::new(
                 id,
                 vec![],
                 BackendDef::Vm(VmBackendDef {
@@ -1450,7 +1469,8 @@ mod tests {
                 }),
                 wrap_targets(vec![id]),
             )],
-        }
+            crate::creature::founder::default_founder_body(),
+        )
     }
 
     #[cfg(feature = "telemetry-seams")]

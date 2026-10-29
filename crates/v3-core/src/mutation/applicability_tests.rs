@@ -192,10 +192,11 @@ pub(in crate::mutation) fn genome(seed: u64, sizes: &[ModuleSize]) -> CreatureGe
             NodeGenome::new(NodeId::new(i as u32), refs, backend_def, Vec::new())
         })
         .collect();
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
+    CreatureGenome::new(
+        NodeId::new(0),
         nodes,
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 /// The blank Graph module the mesh birth operators create.
@@ -531,10 +532,11 @@ proptest! {
 #[test]
 fn growth_operators_reach_a_blank_graph_module() {
     let config = MutationConfig::default();
-    let mut genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![blank_graph_node(0)],
-    };
+    let mut genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![blank_graph_node(0)],
+        crate::creature::founder::default_founder_body(),
+    );
     for op in [
         GraphOperator::AddInternalGraphNode,
         GraphOperator::AddGraphEdge,
@@ -584,10 +586,11 @@ fn growth_operators_reach_a_blank_graph_module() {
 #[test]
 fn growth_operators_reach_a_dormant_vm_module() {
     let config = MutationConfig::default();
-    let mut genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![blank_vm_node(0)],
-    };
+    let mut genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![blank_vm_node(0)],
+        crate::creature::founder::default_founder_body(),
+    );
     for op in [
         VmOperator::VmInstructionMutation,
         VmOperator::VmInsertLoadCompareMotif,

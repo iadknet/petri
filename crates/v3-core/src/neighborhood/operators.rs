@@ -12,7 +12,7 @@ use crate::genome::analysis::mesh_reachable_nodes;
 use crate::genome::CreatureGenome;
 use crate::mutation::engine::dispatch;
 use crate::mutation::reachability::TargetSets;
-use crate::mutation::types::{MutationDomain, MutationOperator};
+use crate::mutation::types::{BrainDomain, MutationOperator};
 use crate::neighborhood::battery::{Battery, Signature};
 use crate::neighborhood::classify::{classify, Tally};
 use crate::neighborhood::EvalContext;
@@ -37,38 +37,38 @@ pub struct OperatorRow {
 
 /// The battery's row order: the VM, graph, topology and input-reference
 /// catalogs, each in its domain enum's `ALL` order.
-const ROW_DOMAINS: [MutationDomain; 4] = [
-    MutationDomain::Vm,
-    MutationDomain::Graph,
-    MutationDomain::Topology,
-    MutationDomain::InputRef,
+const ROW_DOMAINS: [BrainDomain; 4] = [
+    BrainDomain::Vm,
+    BrainDomain::Graph,
+    BrainDomain::Topology,
+    BrainDomain::InputRef,
 ];
 
-/// Every operator in row order.
-fn row_operators() -> Vec<MutationOperator> {
+/// Every brain operator in row order, beside its domain.
+fn row_operators() -> Vec<(BrainDomain, MutationOperator)> {
     ROW_DOMAINS
         .into_iter()
-        .flat_map(|domain| domain.catalog().iter().copied())
+        .flat_map(|domain| domain.catalog().iter().map(move |&op| (domain, op)))
         .collect()
 }
 
 /// A domain's family label in the battery's rows.
-const fn family(domain: MutationDomain) -> &'static str {
+const fn family(domain: BrainDomain) -> &'static str {
     match domain {
-        MutationDomain::Vm => "vm",
-        MutationDomain::Graph => "graph",
-        MutationDomain::Topology => "topology",
-        MutationDomain::InputRef => "input_ref",
+        BrainDomain::Vm => "vm",
+        BrainDomain::Graph => "graph",
+        BrainDomain::Topology => "topology",
+        BrainDomain::InputRef => "input_ref",
     }
 }
 
 /// A domain's trial seed base.
-const fn seed_base(domain: MutationDomain) -> u64 {
+const fn seed_base(domain: BrainDomain) -> u64 {
     match domain {
-        MutationDomain::Vm => VM_SEED_BASE,
-        MutationDomain::Graph => GRAPH_SEED_BASE,
-        MutationDomain::Topology => TOPOLOGY_SEED_BASE,
-        MutationDomain::InputRef => INPUT_REF_SEED_BASE,
+        BrainDomain::Vm => VM_SEED_BASE,
+        BrainDomain::Graph => GRAPH_SEED_BASE,
+        BrainDomain::Topology => TOPOLOGY_SEED_BASE,
+        BrainDomain::InputRef => INPUT_REF_SEED_BASE,
     }
 }
 
@@ -80,7 +80,7 @@ const fn seed_base(domain: MutationDomain) -> u64 {
 pub fn operator_catalog() -> Vec<(&'static str, String)> {
     row_operators()
         .into_iter()
-        .map(|op| (family(op.domain()), op.inner_name()))
+        .map(|(domain, op)| (family(domain), op.inner_name()))
         .collect()
 }
 
@@ -120,12 +120,12 @@ pub fn per_operator_rows(
         .fold(
             || vec![Tally::default(); ops.len()],
             |mut acc, (op_idx, trial)| {
-                let op = ops[op_idx];
-                let seed = seed_offset + seed_base(op.domain()) + u64::from(trial);
+                let (domain, op) = ops[op_idx];
+                let seed = seed_offset + seed_base(domain) + u64::from(trial);
                 let mut rng = SmallRng::seed_from_u64(seed);
                 let mut genome = subject.clone();
                 let mut selector = targets.selector(
-                    op.domain().reachable_bias(&mutation_config.reachable_bias),
+                    domain.reachable_bias(&mutation_config.reachable_bias),
                     mutation_config.executed_bias,
                 );
                 let outcome = dispatch(
@@ -164,8 +164,8 @@ pub fn per_operator_rows(
 
     ops.into_iter()
         .zip(tallies)
-        .map(|(op, tally)| OperatorRow {
-            family: family(op.domain()),
+        .map(|((domain, op), tally)| OperatorRow {
+            family: family(domain),
             operator: op.inner_name(),
             tally,
         })
@@ -210,7 +210,10 @@ mod tests {
     #[test]
     fn per_operator_rows_is_deterministic_and_covers_the_full_catalog() {
         let config = crate::config::SimulationConfig::default();
-        let subject = founder_genome(FounderProfile::V3Alpha1);
+        let subject = founder_genome(
+            FounderProfile::V3Alpha1,
+            crate::creature::founder::default_founder_body(),
+        );
         let battery = Battery::generate(config.world.food.types.len());
         let context = EvalContext::from_config(&config);
         let base = battery.signature(&subject, context.runtime, context.shared_memory_decay_rate);
@@ -333,7 +336,10 @@ mod tests {
             input_ref: 0.9,
         };
         let config = config;
-        let subject = founder_genome(FounderProfile::V3Alpha1);
+        let subject = founder_genome(
+            FounderProfile::V3Alpha1,
+            crate::creature::founder::default_founder_body(),
+        );
         let battery = Battery::generate(config.world.food.types.len());
         let context = EvalContext::from_config(&config);
         let base = battery.signature(&subject, context.runtime, context.shared_memory_decay_rate);

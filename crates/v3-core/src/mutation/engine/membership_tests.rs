@@ -51,14 +51,15 @@ fn vm_node(id: u32, constant: f32, target: Option<u32>) -> NodeGenome {
 /// Entry `a` routes to `c`; `b` sits between them in the node vector and is
 /// disconnected, so it is the only node `RemoveNode` can take.
 fn entry_junk_core(a: u32, b: u32, c: u32) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(a),
-        nodes: vec![
+    CreatureGenome::new(
+        NodeId::new(a),
+        vec![
             vm_node(a, 1.0, Some(c)),
             vm_node(b, 2.0, None),
             vm_node(c, 3.0, None),
         ],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 fn config(mesh_layer_probability: f64, executed_bias: f64) -> MutationConfig {
@@ -88,8 +89,12 @@ fn birth(
     let mut random = rng(seed);
     let summary = MutationEngine::apply_mutations_on_units(
         &mut genome,
-        events,
+        crate::mutation::engine::ChromosomeUnits {
+            brain: events,
+            body: 0,
+        },
         config,
+        &crate::creature::body::default_body_ranges(),
         reachable,
         ParentExecuted::Indices(executed),
         &mut random,
@@ -303,14 +308,15 @@ fn a_node_created_on_a_removed_id_and_index_is_never_a_member() {
     // is the only removable node. Removing it makes id 2 the next free id, so
     // a later added node takes C's id and C's former index, both of which the
     // parent's sets hold.
-    let parent = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let parent = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             vm_node(0, 1.0, Some(1)),
             vm_node(1, 2.0, None),
             vm_node(2, 3.0, None),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let (reachable, executed) = ([0, 1, 2], [0, 1, 2]);
     let config = config(1.0, 0.5);
     let (seed, found) = first_birth(
@@ -453,8 +459,9 @@ fn grown_parent(seed: u64, growth: u8) -> CreatureGenome {
     for _ in 0..growth {
         MutationEngine::apply_mutations_on_units(
             &mut genome,
-            4,
+            crate::mutation::engine::ChromosomeUnits { brain: 4, body: 0 },
             &config,
+            &crate::creature::body::default_body_ranges(),
             &[],
             ParentExecuted::NONE,
             &mut random,

@@ -3,9 +3,8 @@ use crate::config::EnergyConfig;
 use crate::contracts::votes::{
     ActionParamField, VoteSink, ACTION_PARAM_FIELD_COUNT, VOTE_SINK_COUNT,
 };
-use crate::creature::body::HeritableBody;
-use crate::creature::identity::CreatureIdentityState;
-use crate::creature::phenotype::Phenotype;
+use crate::genome::body::BodyGenome;
+use crate::genome::body::Phenotype;
 
 // ── AddVote and WriteActionParam (T19.F04) ─────────────────────────────────
 
@@ -499,9 +498,9 @@ fn vm_eats_when_food_here() {
     let input_refs = vec![InputReference::World(WorldInputKey::FoodHere {
         type_idx: crate::config::OrdinaryFoodTypeId::default(),
     })];
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             input_refs.clone(),
             BackendDef::Vm(VmBackendDef {
@@ -524,20 +523,17 @@ fn vm_eats_when_food_here() {
             }),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let creature = crate::creature::birth::Zygote::founder(
-        genome,
-        HeritableBody {
-            phenotype: Phenotype {
-                channels: [0; 6],
-                active_channel: 0,
-                polarity: [true; 6],
-            },
-            identity: CreatureIdentityState::default(),
-            capacity: 200.0,
-            steal_share: 0.2,
-            give_share: 0.2,
-        },
+        genome.with_body(BodyGenome::new(
+            Phenotype::new([0; 6], 0, [true; 6]).expect("an in-range active channel"),
+            0,
+            200.0,
+            0.2,
+            0.2,
+        )),
+        0,
     )
     .born_at(id, pos, 30.0);
 
@@ -600,9 +596,9 @@ fn vm_noop_when_no_food() {
     let input_refs = vec![InputReference::World(WorldInputKey::FoodHere {
         type_idx: crate::config::OrdinaryFoodTypeId::default(),
     })];
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             input_refs.clone(),
             BackendDef::Vm(VmBackendDef {
@@ -624,20 +620,17 @@ fn vm_noop_when_no_food() {
             }),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let creature = crate::creature::birth::Zygote::founder(
-        genome,
-        HeritableBody {
-            phenotype: Phenotype {
-                channels: [0; 6],
-                active_channel: 0,
-                polarity: [true; 6],
-            },
-            identity: CreatureIdentityState::default(),
-            capacity: 200.0,
-            steal_share: 0.2,
-            give_share: 0.2,
-        },
+        genome.with_body(BodyGenome::new(
+            Phenotype::new([0; 6], 0, [true; 6]).expect("an in-range active channel"),
+            0,
+            200.0,
+            0.2,
+            0.2,
+        )),
+        0,
     )
     .born_at(id, pos, 30.0);
     let local = assemble_static_inputs(

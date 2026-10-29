@@ -246,11 +246,11 @@ export const RUNTIME_CATEGORIES: ConfigCategory[] = [
 			},
 			{
 				title: "Capacity drift",
-				fields: pick("mutation.capacity.chance", "mutation.capacity.log_step"),
+				fields: pick("mutation.capacity.log_step"),
 			},
 			{
 				title: "Share drift",
-				fields: pick("mutation.share.chance", "mutation.share.log_step"),
+				fields: pick("mutation.share.log_step"),
 			},
 			{
 				title: "Colour drift",

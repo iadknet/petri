@@ -102,9 +102,9 @@ mod tests {
     use crate::genome::{HebbianRule, Learning, NodeGenome, VmBackendDef};
 
     fn vm_genome(program: Vec<VmInstruction>) -> CreatureGenome {
-        CreatureGenome {
-            entry_node_id: NodeId::new(1),
-            nodes: vec![NodeGenome::new(
+        CreatureGenome::new(
+            NodeId::new(1),
+            vec![NodeGenome::new(
                 NodeId::new(1),
                 vec![],
                 BackendDef::Vm(VmBackendDef {
@@ -114,19 +114,21 @@ mod tests {
                 }),
                 vec![],
             )],
-        }
+            crate::creature::founder::default_founder_body(),
+        )
     }
 
     fn graph_genome(graph: CgpGraphBackendDef) -> CreatureGenome {
-        CreatureGenome {
-            entry_node_id: NodeId::new(1),
-            nodes: vec![NodeGenome::new(
+        CreatureGenome::new(
+            NodeId::new(1),
+            vec![NodeGenome::new(
                 NodeId::new(1),
                 vec![],
                 BackendDef::Graph(graph),
                 vec![],
             )],
-        }
+            crate::creature::founder::default_founder_body(),
+        )
     }
 
     #[test]

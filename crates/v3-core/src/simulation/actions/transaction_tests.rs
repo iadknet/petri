@@ -8,7 +8,6 @@ use crate::config::SimulationConfig;
 use crate::contracts::ActionOutcome;
 use crate::contracts::{CreatureId, Direction, Position, WorldAction};
 use crate::creature::action_log::ActionType;
-use crate::creature::body::HeritableBody;
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
@@ -28,8 +27,12 @@ fn sim_with(creatures_at: &[(Position, f32)]) -> (Simulation, Vec<CreatureId>) {
     for &(position, energy) in creatures_at {
         let id = creatures.insert_with_key(|id| {
             crate::creature::birth::Zygote::founder(
-                v3alpha1_founder_genome(),
-                HeritableBody::founder(3, 77, 200.0, 0.2),
+                v3alpha1_founder_genome().with_body(crate::creature::founder::founder_body(
+                    3,
+                    77,
+                    &crate::config::SimulationConfig::default(),
+                )),
+                0,
             )
             .born_at(id, position, energy)
         });
@@ -154,7 +157,10 @@ fn an_exhausted_victim_is_kept() {
 fn resolve_removes_no_killed_victim() {
     let (mut sim, ids) = sim_with(&[(at(), 100.0), (north(), 1.0)]);
     let (attacker, victim) = (ids[0], ids[1]);
-    sim.creatures[attacker].body.steal_share = 1.0;
+    sim.creatures[attacker] =
+        crate::creature::birth::Zygote::reborn(&sim.creatures[attacker], |body| {
+            body.with_steal_share(1.0)
+        });
 
     let applied = resolve(
         &mut sim.action_inputs(),

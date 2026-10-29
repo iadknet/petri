@@ -29,21 +29,25 @@ fn wire(def: &mut CgpGraphBackendDef, sink: VoteSink, source: GraphSource, weigh
 }
 
 fn graph_genome(def: CgpGraphBackendDef) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Graph(def),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 #[test]
 fn the_founder_carries_four_fanouts_of_sixteen_edges_and_no_drive() {
     for profile in [FounderProfile::default()] {
-        let census = census_of(&[founder_genome(profile)]);
+        let census = census_of(&[founder_genome(
+            profile,
+            crate::creature::founder::default_founder_body(),
+        )]);
         assert_eq!(census.fanout_totals(), (4, 16), "{profile:?}");
         let [moves, reproduce, steal, give] = census.kinds;
         assert_eq!((moves.fanouts, moves.fanout_edges), (3, 12));
@@ -67,9 +71,9 @@ fn drive_edges_are_signed_and_floored_and_vm_paths_unsigned() {
     // A second positive edge makes the sign split asymmetric.
     wire(&mut def, drive, memory(3), 0.75);
     let graph = graph_genome(def);
-    let vm = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let vm = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -88,11 +92,13 @@ fn drive_edges_are_signed_and_floored_and_vm_paths_unsigned() {
             }),
             vec![],
         )],
-    };
-    let empty = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
+    let empty = CreatureGenome::new(
+        NodeId::new(0),
+        vec![],
+        crate::creature::founder::default_founder_body(),
+    );
     let census = census_of(&[graph, vm, empty]);
     assert_eq!(census.creatures, 3);
     let moves = census.kinds[DirectedVoteKind::Move.index()];

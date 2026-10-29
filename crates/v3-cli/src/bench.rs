@@ -6,6 +6,7 @@
 //! wall-clock as an unasserted secondary signal.
 
 pub mod artifacts;
+pub mod body;
 pub mod bundles;
 pub mod capacity;
 #[cfg(test)]

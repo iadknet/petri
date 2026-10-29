@@ -229,13 +229,13 @@ fn phase_0_charges_the_founder_its_carrying_cost_beside_decay() {
     let decay = sim.config.energy.lifecycle.energy_decay_per_tick;
     let rate = sim.config.energy.lifecycle.genome_carry_cost_per_unit;
     assert_eq!(rate, 1e-4);
-    // The canonical founder carries 80 genome units under the T25.F02 unit
-    // rule (97 before it; the old rule restores 97).
-    assert_eq!(sim.creatures[id].genome_size(), 80);
+    // The canonical founder carries 85 genome units: 80 brain units under
+    // the T25.F02 unit rule and the five body genes (T29.F02).
+    assert_eq!(sim.creatures[id].genome_size(), 85);
 
     run_phase_0(&mut sim);
 
-    let expected = initial - (decay + 80.0 * rate);
+    let expected = initial - (decay + 85.0 * rate);
     assert_eq!(sim.creatures[id].energy, expected);
     // The carrying charge is visible: decay alone would leave more energy.
     assert!(sim.creatures[id].energy < initial - decay);
@@ -432,7 +432,9 @@ fn phase_0_charges_and_attributes_a_large_bodys_upkeep() {
     lifecycle.energy_decay_per_tick = 0.25;
     lifecycle.genome_carry_cost_per_unit = 0.0;
     sim.config.energy.capacity.upkeep_per_unit = 0.0025;
-    sim.creatures[id].body.capacity = 600.0; // upkeep 0.0025 × 400 = 1.0
+    sim.creatures[id] = crate::creature::birth::Zygote::reborn(&sim.creatures[id], |body| {
+        body.with_capacity(600.0)
+    }); // upkeep 0.0025 × 400 = 1.0
     run_phase_0(&mut sim);
     let flows = &sim.stats.energy_flows;
     assert_eq!(flows.lifecycle_decay, 0.25);
@@ -451,7 +453,8 @@ fn a_small_bodys_negative_upkeep_is_floored_at_zero_charge() {
     lifecycle.energy_decay_per_tick = 0.5;
     lifecycle.genome_carry_cost_per_unit = 0.0;
     sim.config.energy.capacity.upkeep_per_unit = 0.01;
-    sim.creatures[id].body.capacity = 50.0; // upkeep 0.01 × -150 = -1.5
+    sim.creatures[id] =
+        crate::creature::birth::Zygote::reborn(&sim.creatures[id], |body| body.with_capacity(50.0)); // upkeep 0.01 × -150 = -1.5
     run_phase_0(&mut sim);
     assert_eq!(sim.creatures[id].energy, 10.0);
     let flows = &sim.stats.energy_flows;

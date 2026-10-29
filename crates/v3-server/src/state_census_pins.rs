@@ -115,5 +115,7 @@ fn the_payloads_cast_the_readers_mean_energy_and_effective_lineages() {
     assert_eq!(empty.health.lineages_effective.to_bits(), 0.0_f32.to_bits());
 }
 
-const LIVING_PIN: &str = "status.mean_energy=0x41f55f5e health.mean_energy=0x41f55f5e complexity=0x42744d13/58/65 generation=0x3f22689a/1 genome_size=0x42a02108 lineages=45/0x42272ab5 world_inputs_read=0x40000000 population=93/93 vm_reads={}";
+/// Re-pinned by T29.F02: the 85-unit founder and the body's own supply move
+/// the living population.
+const LIVING_PIN: &str = "status.mean_energy=0x41fa87f6 health.mean_energy=0x41fa87f6 complexity=0x42752164/59/70 generation=0x3f242c86/1 genome_size=0x42aa9bd3 lineages=45/0x422854a4 world_inputs_read=0x40000000 population=92/92 vm_reads={}";
 const EMPTY_PIN: &str = "status.mean_energy=0x0 health.mean_energy=0x0 complexity=0x0/0/0 generation=0x0/0 genome_size=0x0 lineages=0/0x0 world_inputs_read=0x0 population=0/0 vm_reads={}";

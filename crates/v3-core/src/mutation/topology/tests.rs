@@ -318,9 +318,9 @@ fn copy_node_deep_copies_graph_backend() {
 
 #[test]
 fn copy_mesh_backward_slice_duplicates_feeding_pipeline() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             NodeGenome::new(
                 NodeId::new(0),
                 vec![],
@@ -352,7 +352,8 @@ fn copy_mesh_backward_slice_duplicates_feeding_pipeline() {
                 vec![],
             ),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let before = genome.nodes.len();
     let mut found_multi = false;
     for seed in 0u64..200 {
@@ -377,9 +378,9 @@ fn copy_mesh_backward_slice_duplicates_feeding_pipeline() {
 
 #[test]
 fn copy_mesh_backward_slice_remaps_internal_targets() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             NodeGenome::new(
                 NodeId::new(0),
                 vec![],
@@ -401,7 +402,8 @@ fn copy_mesh_backward_slice_remaps_internal_targets() {
                 vec![],
             ),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     for seed in 0u64..200 {
         let mut g = genome.clone();
         let mut r = rng(seed);
@@ -441,9 +443,9 @@ fn copy_mesh_backward_slice_remaps_internal_targets() {
 
 #[test]
 fn copy_mesh_forward_slice_duplicates_downstream_subtree() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             NodeGenome::new(
                 NodeId::new(0),
                 vec![],
@@ -475,7 +477,8 @@ fn copy_mesh_forward_slice_duplicates_downstream_subtree() {
                 vec![],
             ),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let before = genome.nodes.len();
     let mut found_multi = false;
     for seed in 0u64..200 {
@@ -503,9 +506,9 @@ fn copy_mesh_forward_slice_duplicates_downstream_subtree() {
 
 #[test]
 fn copy_mesh_operators_single_node_genome_returns_single_copy() {
-    let mut genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let mut genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -515,7 +518,8 @@ fn copy_mesh_operators_single_node_genome_returns_single_copy() {
             }),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let mut r = rng(42);
     apply(
         &mut genome,
@@ -533,9 +537,9 @@ fn copy_mesh_operators_single_node_genome_returns_single_copy() {
 #[test]
 fn swap_route_targets_changes_target_order() {
     // Create a genome with a node that has multiple targets.
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -545,7 +549,8 @@ fn swap_route_targets_changes_target_order() {
             }),
             wrap_targets(vec![NodeId::new(1), NodeId::new(2), NodeId::new(3)]),
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let original_targets = genome.nodes[0].targets.clone();
     let mut changed = false;
     for seed in 0u64..50 {
@@ -568,9 +573,9 @@ fn swap_route_targets_changes_target_order() {
 
 #[test]
 fn swap_route_targets_preserves_target_set() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -580,7 +585,8 @@ fn swap_route_targets_preserves_target_set() {
             }),
             wrap_targets(vec![NodeId::new(1), NodeId::new(2), NodeId::new(3)]),
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let mut original_ids: Vec<NodeId> = genome.nodes[0]
         .targets
         .iter()
@@ -608,9 +614,9 @@ fn swap_route_targets_preserves_target_set() {
 
 #[test]
 fn swap_route_targets_requires_at_least_two_targets() {
-    let mut genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let mut genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -620,7 +626,8 @@ fn swap_route_targets_requires_at_least_two_targets() {
             }),
             wrap_targets(vec![NodeId::new(1)]),
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let mut r = rng(0);
     let result = apply(
         &mut genome,
@@ -635,9 +642,9 @@ fn swap_route_targets_requires_at_least_two_targets() {
 
 #[test]
 fn splice_node_increases_node_count_by_one() {
-    let mut genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let mut genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             NodeGenome::new(
                 NodeId::new(0),
                 vec![],
@@ -659,7 +666,8 @@ fn splice_node_increases_node_count_by_one() {
                 vec![],
             ),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let before = genome.nodes.len();
     let mut r = rng(0);
     apply(
@@ -674,9 +682,9 @@ fn splice_node_increases_node_count_by_one() {
 
 #[test]
 fn splice_node_creates_a_to_c_to_b_chain() {
-    let mut genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let mut genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             NodeGenome::new(
                 NodeId::new(0),
                 vec![],
@@ -698,7 +706,8 @@ fn splice_node_creates_a_to_c_to_b_chain() {
                 vec![],
             ),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let b_id = NodeId::new(1);
     let mut r = rng(0);
     apply(
@@ -726,9 +735,9 @@ fn splice_node_creates_a_to_c_to_b_chain() {
 
 #[test]
 fn splice_node_new_node_is_blank() {
-    let mut genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let mut genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -738,7 +747,8 @@ fn splice_node_new_node_is_blank() {
             }),
             wrap_targets(vec![NodeId::new(1)]),
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     genome.nodes.push(crate::mutation::topology::birth::detour(
         NodeId::new(1),
         NodeId::new(0),
@@ -770,9 +780,9 @@ fn splice_node_new_node_is_blank() {
 
 #[test]
 fn splice_node_no_targets_returns_skip() {
-    let mut genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let mut genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -782,7 +792,8 @@ fn splice_node_no_targets_returns_skip() {
             }),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let mut r = rng(0);
     let result = apply(
         &mut genome,
@@ -1029,9 +1040,9 @@ fn exempt_operators_return_not_applicable() {
 #[test]
 fn mutate_gate_bias_changes_bias() {
     use crate::contracts::RouteTarget;
-    let mut genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let mut genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(crate::genome::VmBackendDef {
@@ -1045,7 +1056,8 @@ fn mutate_gate_bias_changes_bias() {
                 gate_bias: 0.0,
             }],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let mut r = rng(42);
     let result = apply(
         &mut genome,
@@ -1064,9 +1076,9 @@ fn mutate_gate_bias_changes_bias() {
 
 #[test]
 fn mutate_gate_bias_noop_on_empty_targets() {
-    let mut genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let mut genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(crate::genome::VmBackendDef {
@@ -1076,7 +1088,8 @@ fn mutate_gate_bias_noop_on_empty_targets() {
             }),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let mut r = rng(0);
     let result = apply(
         &mut genome,
@@ -1091,9 +1104,9 @@ fn mutate_gate_bias_noop_on_empty_targets() {
 fn mutate_gate_bias_clamps_to_range() {
     use crate::contracts::RouteTarget;
     // Set gate_bias near the upper boundary.
-    let mut genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let mut genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(crate::genome::VmBackendDef {
@@ -1107,7 +1120,8 @@ fn mutate_gate_bias_clamps_to_range() {
                 gate_bias: 3.9,
             }],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     // Apply multiple times -- at least one should push toward the boundary.
     let mut clamped_high = false;
     let mut clamped_low = false;
@@ -1166,9 +1180,9 @@ fn mutate_gate_bias_clamps_to_range() {
 /// always has `n` candidates for its backlink target, and slot 1 is free on
 /// every node so the backlink is always added.
 fn ring_genome(n: u32) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: (0..n)
+    CreatureGenome::new(
+        NodeId::new(0),
+        (0..n)
             .map(|i| {
                 NodeGenome::new(
                     NodeId::new(i),
@@ -1182,7 +1196,8 @@ fn ring_genome(n: u32) -> CreatureGenome {
                 )
             })
             .collect(),
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 #[test]

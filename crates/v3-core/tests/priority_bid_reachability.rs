@@ -197,6 +197,7 @@ fn lineage_match_exists(predicate: impl Fn(&CreatureGenome) -> bool) -> bool {
             MutationEngine::apply_mutations_in(
                 &mut genome,
                 &config,
+                &v3_core::creature::body::body_ranges(&SimulationConfig::default()),
                 &reachable_nodes,
                 ParentExecuted::NONE,
                 &mut rng,

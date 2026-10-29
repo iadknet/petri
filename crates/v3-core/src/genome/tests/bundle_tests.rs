@@ -244,15 +244,16 @@ fn a_bundle_only_learner_is_classified_as_learning() {
     assert!(layout.scales[0].contributors.is_empty());
     let (_, _, stateful, _) = derive_cgp_annotations(&def, &refs);
     assert!(stateful);
-    let genome = CreatureGenome {
-        entry_node_id: crate::contracts::NodeId(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        crate::contracts::NodeId(0),
+        vec![NodeGenome::new(
             crate::contracts::NodeId(0),
             refs,
             BackendDef::Graph(def),
             Vec::new(),
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     assert!(structural_companions(&genome).has_plasticity);
 }
 

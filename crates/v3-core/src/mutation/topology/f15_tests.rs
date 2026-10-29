@@ -24,10 +24,11 @@ fn node(id: u32, targets: &[u32]) -> NodeGenome {
     )
 }
 fn genome(nodes: Vec<NodeGenome>) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
+    CreatureGenome::new(
+        NodeId::new(0),
         nodes,
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 fn apply(
     g: &mut CreatureGenome,

@@ -1,4 +1,5 @@
 pub mod analysis;
+pub mod body;
 pub mod cgp;
 pub(crate) mod cgp_analysis;
 pub(crate) mod cgp_mesh_annotations;
@@ -15,6 +16,8 @@ pub use learning::{HebbianRule, Learning, MemberPolicy, RewardModulationConfig};
 pub use node_edit::{input_ref_kind, InputRefKind, NodeEditError};
 
 use crate::contracts::{InputReference, NodeId, RouteTarget};
+
+use body::BodyGenome;
 
 /// A single VM instruction. 39 opcodes per v3-vm-isa-spec.md.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -235,16 +238,47 @@ impl NodeGenome {
     }
 }
 
-/// The complete genome of a creature.
+/// The complete genome of a creature: the brain chromosome (its entry node
+/// and nodes) and the body chromosome (T29.F02).
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CreatureGenome {
     /// Node to begin mesh execution from each tick.
     pub entry_node_id: NodeId,
     // WORKAROUND(T29.F01): CreatureGenome.nodes private behind owner operations
     pub nodes: Vec<NodeGenome>,
+    body: BodyGenome,
 }
 
 impl CreatureGenome {
+    /// A genome of the brain `entry_node_id` and `nodes` and the body `body`.
+    #[must_use]
+    pub const fn new(entry_node_id: NodeId, nodes: Vec<NodeGenome>, body: BodyGenome) -> Self {
+        Self {
+            entry_node_id,
+            nodes,
+            body,
+        }
+    }
+
+    /// The body chromosome.
+    #[must_use]
+    pub const fn body(&self) -> &BodyGenome {
+        &self.body
+    }
+
+    /// This genome with `body` in place of its own: founders and the lab
+    /// give a brain a body.
+    #[must_use]
+    pub fn with_body(self, body: BodyGenome) -> Self {
+        Self { body, ..self }
+    }
+
+    /// The body chromosome, for the body policy's edits and conception's
+    /// clamp; only `mutation` and `creature` edit it.
+    pub(crate) fn body_mut(&mut self) -> &mut BodyGenome {
+        &mut self.body
+    }
+
     /// Look up a node by its ID. O(n) — genomes are small.
     pub fn find_node(&self, id: NodeId) -> Option<&NodeGenome> {
         self.nodes.iter().find(|n| n.node_id == id)
@@ -260,7 +294,16 @@ impl CreatureGenome {
         }
     }
 
-    /// Total structural size: sum of all discrete genome components.
+    /// Total genome size: [`Self::brain_units`] plus the body chromosome's
+    /// [`BodyGenome::UNITS`], one unit per body gene (T29.F02). Read by the
+    /// carrying cost, the replication cost, gestation and the size-pressure
+    /// gate (`genome_size_cap`).
+    pub fn genome_size(&self) -> u32 {
+        self.brain_units() + BodyGenome::UNITS
+    }
+
+    /// The brain chromosome's structural size: sum of all discrete brain
+    /// components.
     ///
     /// Counts every mesh node, input ref, route target, VM instruction and
     /// constant, graph compute node, compute edge and sink edge with no
@@ -270,10 +313,9 @@ impl CreatureGenome {
     /// retention (the genomic bottleneck, an explicit economic discount); a
     /// hole costs nothing and a detached member is an ordinary edge. A wired
     /// sink adds nothing of itself. Only genomic state counts. Equal
-    /// weights, includes junk DNA, no reachability analysis. Read by the
-    /// carrying cost, the per-unit mutation supply, the replication cost,
-    /// gestation and the size-pressure gate (`genome_size_cap`).
-    pub fn genome_size(&self) -> u32 {
+    /// weights, includes junk DNA, no reachability analysis. The brain's
+    /// exposure to the per-unit mutation supply.
+    pub fn brain_units(&self) -> u32 {
         let mut score: u32 = 0;
         for node in &self.nodes {
             score += 1;
@@ -530,9 +572,9 @@ mod tests {
 
     #[test]
     fn creature_genome_find_node() {
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![
                 NodeGenome::new(
                     NodeId::new(0),
                     vec![],
@@ -557,7 +599,8 @@ mod tests {
                     vec![],
                 ),
             ],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         assert!(genome.find_node(NodeId::new(0)).is_some());
         assert!(genome.find_node(NodeId::new(1)).is_some());
         assert!(genome.find_node(NodeId::new(99)).is_none());
@@ -565,19 +608,22 @@ mod tests {
 
     #[test]
     fn genome_size_empty_genome() {
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![],
-        };
-        assert_eq!(genome.genome_size(), 0);
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![],
+            crate::creature::founder::default_founder_body(),
+        );
+        assert_eq!(genome.brain_units(), 0);
+        assert_eq!(genome.genome_size(), BodyGenome::UNITS);
+        assert_eq!(BodyGenome::UNITS, 5);
     }
 
     #[test]
     fn genome_size_single_vm_node() {
         // 1 node + 2 input_refs + 1 target + 3 program + 2 constants = 9
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![
                     InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
@@ -601,8 +647,9 @@ mod tests {
                     gate_bias: 0.0,
                 }],
             )],
-        };
-        assert_eq!(genome.genome_size(), 9);
+            crate::creature::founder::default_founder_body(),
+        );
+        assert_eq!(genome.brain_units(), 9);
     }
 
     #[test]
@@ -638,9 +685,9 @@ mod tests {
                 ],
             ),
         ]);
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![InputReference::World(WorldInputKey::FoodHere {
                     type_idx: crate::config::OrdinaryFoodTypeId::default(),
@@ -648,8 +695,9 @@ mod tests {
                 BackendDef::Graph(cgp),
                 vec![],
             )],
-        };
-        assert_eq!(genome.genome_size(), 7);
+            crate::creature::founder::default_founder_body(),
+        );
+        assert_eq!(genome.brain_units(), 7);
     }
 
     #[test]
@@ -663,9 +711,9 @@ mod tests {
             ComputeNodeKind::Constant(1.0),
             vec![],
         )]);
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![
                 NodeGenome::new(
                     NodeId::new(0),
                     vec![],
@@ -689,8 +737,9 @@ mod tests {
                     vec![],
                 ),
             ],
-        };
-        assert_eq!(genome.genome_size(), 6);
+            crate::creature::founder::default_founder_body(),
+        );
+        assert_eq!(genome.brain_units(), 6);
     }
 
     #[test]
@@ -698,9 +747,9 @@ mod tests {
         // Node 0 (entry) → Node 1. Node 2 is unreachable.
         // Node 0: VM with output instructions (functional)
         // Node 2: also has output instructions but is unreachable
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![
                 NodeGenome::new(
                     NodeId::new(0),
                     vec![InputReference::World(WorldInputKey::FoodHere {
@@ -764,22 +813,23 @@ mod tests {
                     vec![],
                 ),
             ],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         // Node 0: 1 + 1 target + 2 live instrs + 0 consts + 1 consumed ref = 5
         // Node 1: 1 + 0 targets + 2 live instrs + 0 consts + 0 refs = 3
         // Node 2: excluded (unreachable)
         assert_eq!(genome.complexity(), 8);
         // genome_size counts everything including Node 2
-        assert_eq!(genome.genome_size(), 13);
-        assert!(genome.complexity() < genome.genome_size());
+        assert_eq!(genome.brain_units(), 13);
+        assert!(genome.complexity() < genome.brain_units());
     }
 
     #[test]
     fn complexity_equals_genome_size_when_fully_connected() {
         // All nodes reachable, all instructions live, all input_refs consumed
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![InputReference::World(WorldInputKey::FoodHere {
                     type_idx: crate::config::OrdinaryFoodTypeId::default(),
@@ -798,17 +848,18 @@ mod tests {
                 }),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         // Node: 1 + 0 targets + 2 live instrs + 0 consts + 1 consumed ref = 4
         // genome_size: 1 + 1 input_ref + 0 targets + 2 instrs + 0 consts = 4
-        assert_eq!(genome.complexity(), genome.genome_size());
+        assert_eq!(genome.complexity(), genome.brain_units());
     }
 
     #[test]
     fn creature_genome_serde_roundtrip() {
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![],
                 BackendDef::Vm(VmBackendDef {
@@ -821,7 +872,8 @@ mod tests {
                 }),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         let json = serde_json::to_string(&genome).unwrap();
         let genome2: CreatureGenome = serde_json::from_str(&json).unwrap();
         assert_eq!(genome, genome2);
@@ -846,9 +898,9 @@ mod tests {
                 ),
             );
         }
-        CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![
+        CreatureGenome::new(
+            NodeId::new(0),
+            vec![
                 NodeGenome::new(
                     NodeId::new(0),
                     vec![InputReference::DynamicIntrospection(
@@ -874,7 +926,8 @@ mod tests {
                     vec![],
                 ),
             ],
-        }
+            crate::creature::founder::default_founder_body(),
+        )
     }
 
     /// T11.F27 boundary: a current-format genome with every parameter field
@@ -923,11 +976,15 @@ mod tests {
     /// deserializes unchanged, because its meaning did not change.
     #[test]
     fn unaffected_pre_f27_vm_genome_deserializes() {
-        let pre_f27 = r#"{"entry_node_id":0,"nodes":[{"node_id":0,"input_refs":[],
-            "backend_def":{"Vm":{"register_count":2,"constants":[1.0,2.0],
-            "program":[{"Add":{"dst":0,"a":1,"b":1}},{"AddVote":{"sink":0,"src":0}},"Halt"]}},
-            "targets":[]}]}"#;
-        let genome: CreatureGenome = serde_json::from_str(pre_f27).unwrap();
+        let body =
+            serde_json::to_string(&crate::creature::founder::default_founder_body()).unwrap();
+        let pre_f27 = format!(
+            r#"{{"entry_node_id":0,"nodes":[{{"node_id":0,"input_refs":[],
+            "backend_def":{{"Vm":{{"register_count":2,"constants":[1.0,2.0],
+            "program":[{{"Add":{{"dst":0,"a":1,"b":1}}}},{{"AddVote":{{"sink":0,"src":0}}}},"Halt"]}}}},
+            "targets":[]}}],"body":{body}}}"#
+        );
+        let genome: CreatureGenome = serde_json::from_str(&pre_f27).unwrap();
         let BackendDef::Vm(ref vm) = genome.nodes[0].backend_def else {
             panic!("expected a VM node");
         };

@@ -15,9 +15,12 @@ fn companion_population() -> [v3_core::genome::CreatureGenome; 3] {
     use v3_core::genome::{
         BackendDef, CreatureGenome, HebbianRule, Learning, NodeGenome, VmBackendDef, VmInstruction,
     };
-    let make = |backend_def| CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(NodeId::new(0), vec![], backend_def, vec![])],
+    let make = |backend_def| {
+        CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(NodeId::new(0), vec![], backend_def, vec![])],
+            v3_core::creature::founder::default_founder_body(),
+        )
     };
     let reader_writer = make(BackendDef::Vm(VmBackendDef {
         register_count: 1,
@@ -148,7 +151,10 @@ fn drift_checkpoint_reports_recruitment_and_opportunities_and_still_loads_older_
         MutationSkipReason, MutationSummary, TargetReachability,
     };
 
-    let founder = founder_genome(v3_core::config::FounderProfile::V3Alpha1);
+    let founder = founder_genome(
+        v3_core::config::FounderProfile::V3Alpha1,
+        v3_core::creature::founder::default_founder_body(),
+    );
     let mut grown = founder.nodes.clone();
     let mut detour = grown[0].clone();
     detour.node_id = NodeId::new(900);
@@ -456,9 +462,9 @@ fn temporal_report_keeps_substrate_counts_separate() {
         },
         1.0,
     );
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Graph(
@@ -476,7 +482,8 @@ fn temporal_report_keeps_substrate_counts_separate() {
             ),
             vec![],
         )],
-    };
+        v3_core::creature::founder::default_founder_body(),
+    );
     let mut sim = v3_core::simulation::seeding::seed_simulation_with_founder_genomes(
         config,
         11,
@@ -960,7 +967,7 @@ fn neighborhood_read_samples_seeded_ranks_and_pools_its_rows_over_all_births() {
         let row = &actual.genomes[genome_index];
         assert_eq!(row.rank, rank as u64);
         assert_eq!(row.creature_id, format!("{creature_id:?}"));
-        assert_eq!(row.lineage_id, creature.body.identity.lineage_id);
+        assert_eq!(row.lineage_id, creature.lineage_id);
         assert_eq!(row.generation, creature.generation);
         assert_eq!(row.genome_size, creature.genome().genome_size());
         assert_eq!(row.total_nodes, creature.genome().nodes.len() as u64);
@@ -1154,10 +1161,11 @@ fn mesh_execution_block_carries_within_and_across_snapshot_route_flags() {
             VmInstruction::Halt,
         ],
     );
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![router, eater, vm_node(2, &[], vec![VmInstruction::Halt])],
-    };
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![router, eater, vm_node(2, &[], vec![VmInstruction::Halt])],
+        v3_core::creature::founder::default_founder_body(),
+    );
     let config = SimulationConfig::default();
     let context = EvalContext::from_config(&config);
     let battery = Battery::generate(context.sensors.food_type_count);

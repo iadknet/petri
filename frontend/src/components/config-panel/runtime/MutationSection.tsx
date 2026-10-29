@@ -8,9 +8,9 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		max: 0.1,
 		step: 0.0000625,
 		testId: "config-field-mutation-per-unit-rate",
-		defaultValue: 0.0060625,
+		defaultValue: 0.485 / 85,
 		tooltip:
-			"Chance that each genome unit requests one mutation event at birth; the founder's 80 units expect about 0.49 events. This field caps at 0.1; the runtime accepts up to 1.",
+			"Chance that each genome unit requests one mutation event at birth, brain and body alike; the founder's 85 units (80 brain, 5 body) expect about 0.49 events. This field caps at 0.1; the runtime accepts up to 1.",
 	},
 	{
 		path: "mutation.mesh_layer_probability",
@@ -155,17 +155,8 @@ export const MUTATION_TOGGLES: BooleanFieldDef[] = [
 	},
 ];
 
-/** The capacity mutation drawn on every birth (T26.F02). */
+/** The capacity gene's mutation step (T26.F02, T29.F02). */
 export const MUTATION_CAPACITY_FIELDS: FieldDef[] = [
-	{
-		path: "mutation.capacity.chance",
-		label: "Capacity Mutation Chance",
-		min: 0,
-		max: 1,
-		step: 0.01,
-		defaultValue: 0.1,
-		tooltip: "Chance per birth that the child's energy capacity changes",
-	},
 	{
 		path: "mutation.capacity.log_step",
 		label: "Capacity Log Step",
@@ -178,17 +169,8 @@ export const MUTATION_CAPACITY_FIELDS: FieldDef[] = [
 	},
 ];
 
-/** The exchange-share mutation drawn on every birth (T27.F03). */
+/** The share genes' mutation step (T27.F03, T29.F02). */
 export const MUTATION_SHARE_FIELDS: FieldDef[] = [
-	{
-		path: "mutation.share.chance",
-		label: "Share Mutation Chance",
-		min: 0,
-		max: 1,
-		step: 0.01,
-		defaultValue: 0.1,
-		tooltip: "Chance per birth that each of the child's exchange shares changes",
-	},
 	{
 		path: "mutation.share.log_step",
 		label: "Share Log Step",

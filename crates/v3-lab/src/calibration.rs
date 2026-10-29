@@ -356,6 +356,7 @@ mod tests {
         let founder = founder_genome_with_age_gate(
             config.population.founder_profile,
             &config.energy.lifecycle,
+            v3_core::creature::founder::default_founder_body(),
         );
         let comparator = controller(&founder, Family::Vector);
         (founder, comparator)

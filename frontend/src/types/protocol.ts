@@ -2,7 +2,7 @@ import type { CreatureSnapshot } from "./generated/CreatureSnapshot.ts";
 import type { FoodCell } from "./generated/FoodCell.ts";
 
 /** The wire protocol this frontend speaks: `v3-server`'s `PROTOCOL_VERSION`. */
-export const PROTOCOL_VERSION = "v3alpha18" as const;
+export const PROTOCOL_VERSION = "v3alpha19" as const;
 
 /** A byte grid as the frontend holds it: decoded from a wire `number[]` or
  * built locally as a typed array. */

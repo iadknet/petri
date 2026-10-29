@@ -7,8 +7,7 @@ use crate::config::{OrdinaryFoodTypeId, PatternBounds, SimulationConfig};
 use crate::contracts::{CreatureId, Direction, InputReference, Position, WorldInputKey};
 use crate::creature::action_log::ActionLog;
 use crate::creature::birth::{BirthPlace, Zygote};
-use crate::creature::body::HeritableBody;
-use crate::creature::founder::founder_genome_with_age_gate;
+use crate::creature::founder::{founder_body, founder_genome_with_age_gate};
 use crate::creature::state::CreatureState;
 use crate::genome::{CreatureGenome, NodeGenome};
 use crate::kernel::WorldState;
@@ -96,21 +95,14 @@ pub fn seed_simulation_with_founder_genomes(
         let mut genome = founder_genome_with_age_gate(
             config.population.founder_profile,
             &config.energy.lifecycle,
+            founder_body(founder_index, seed, &config),
         );
         edit(founder_index, &mut genome);
         let energy = config.energy.lifecycle.initial_energy;
         // One draw per founder, in placement order (T11.F30).
         let heading = Direction::ALL[rng.gen_range(0..Direction::ALL.len())];
         // Insert into slotmap to get an id, then fill with actual state.
-        let zygote = Zygote::founder(
-            genome,
-            HeritableBody::founder(
-                founder_index,
-                seed,
-                config.energy.capacity.founder,
-                config.exchange.founder_share,
-            ),
-        );
+        let zygote = Zygote::founder(genome, founder_index as u32);
         // A normalized founder's energy is within its capacity
         // (`config/simulation.rs` clamps it), so seeding books nothing.
         let id = creatures.insert_with_key(|id| {
@@ -195,7 +187,7 @@ pub fn seed_simulation_with_perception_mix(
 mod tests {
     use super::*;
     use crate::config::{FounderProfile, SimulationConfig};
-    use crate::creature::phenotype::Phenotype;
+    use crate::genome::body::Phenotype;
     use crate::genome::sensor_analysis::perception_requirements;
     use crate::genome::BackendDef;
     use std::collections::HashSet;
@@ -268,7 +260,7 @@ mod tests {
         let sim = seed_simulation(small_config(), 42);
         // All founders should have the canonical baseline phenotype.
         for (_, creature) in &sim.creatures {
-            assert_eq!(creature.body.phenotype, Phenotype::FOUNDER);
+            assert_eq!(creature.genome().body().colour(), &Phenotype::FOUNDER);
         }
     }
 
@@ -290,11 +282,7 @@ mod tests {
     #[test]
     fn founder_lineage_ids_are_sequential() {
         let sim = seed_simulation(small_config(), 42);
-        let mut lineage_ids: Vec<u32> = sim
-            .creatures
-            .values()
-            .map(|c| c.body.identity.lineage_id)
-            .collect();
+        let mut lineage_ids: Vec<u32> = sim.creatures.values().map(|c| c.lineage_id).collect();
         lineage_ids.sort();
         let expected: Vec<u32> = (0..lineage_ids.len() as u32).collect();
         assert_eq!(lineage_ids, expected);
@@ -306,7 +294,7 @@ mod tests {
         let kin_tags: HashSet<u32> = sim
             .creatures
             .values()
-            .map(|c| c.body.identity.kin_tag)
+            .map(|c| c.genome().body().kin_tag())
             .collect();
         assert_eq!(
             kin_tags.len(),
@@ -321,11 +309,16 @@ mod tests {
         let s1 = seed_simulation(cfg.clone(), 42);
         let s2 = seed_simulation(cfg, 42);
         // Collect identities in lineage_id order for stable comparison.
-        let mut ids1: Vec<_> = s1.creatures.values().map(|c| c.body.identity).collect();
-        let mut ids2: Vec<_> = s2.creatures.values().map(|c| c.body.identity).collect();
-        ids1.sort_by_key(|i| i.lineage_id);
-        ids2.sort_by_key(|i| i.lineage_id);
-        assert_eq!(ids1, ids2);
+        let identities = |sim: &Simulation| {
+            let mut ids: Vec<_> = sim
+                .creatures
+                .values()
+                .map(|c| (c.lineage_id, c.genome().body().kin_tag()))
+                .collect();
+            ids.sort_unstable();
+            ids
+        };
+        assert_eq!(identities(&s1), identities(&s2));
     }
 
     #[test]
@@ -333,6 +326,7 @@ mod tests {
         let founder = founder_genome_with_age_gate(
             small_config().population.founder_profile,
             &small_config().energy.lifecycle,
+            crate::creature::founder::default_founder_body(),
         );
         assert!(!perception_requirements(&founder).extended_perception);
         let sim = seed_simulation(small_config(), 42);
@@ -424,7 +418,15 @@ mod tests {
         let draws = |sim: &Simulation| {
             sim.creatures
                 .values()
-                .map(|c| (c.position, c.heading, c.body.identity, c.energy))
+                .map(|c| {
+                    (
+                        c.position,
+                        c.heading,
+                        c.lineage_id,
+                        *c.genome().body(),
+                        c.energy,
+                    )
+                })
                 .collect::<Vec<_>>()
         };
         assert_eq!(draws(&plain), draws(&mixed));
@@ -463,12 +465,13 @@ mod tests {
     fn seeding_uses_configured_founder_profile() {
         let mut cfg = small_config();
         cfg.population.founder_profile = FounderProfile::ForageFirstSparse;
+        let sim = seed_simulation(cfg.clone(), 42);
+        let founder = sim.creatures.values().next().expect("seeded founder");
         let expected = crate::creature::founder::founder_genome_with_age_gate(
             FounderProfile::ForageFirstSparse,
             &cfg.energy.lifecycle,
+            founder_body(founder.lineage_id as usize, 42, &cfg),
         );
-        let sim = seed_simulation(cfg, 42);
-        let founder = sim.creatures.values().next().expect("seeded founder");
         assert_eq!(*founder.genome(), expected);
         assert_ne!(
             *founder.genome(),

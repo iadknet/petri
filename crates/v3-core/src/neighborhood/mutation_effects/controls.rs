@@ -22,15 +22,16 @@ pub(super) fn graph_genome(
         def.push_edge(eat, edge);
     }
     let id = NodeId::new(0);
-    CreatureGenome {
-        entry_node_id: id,
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        id,
+        vec![NodeGenome::new(
             id,
             input_refs,
             BackendDef::Graph(def),
             Vec::new(),
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 /// A barrier-dependent action edit: the child votes `Eat` on any neighbor

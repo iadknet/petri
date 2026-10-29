@@ -263,12 +263,10 @@ fn expected_keys(food_types: usize) -> [BTreeSet<String>; 7] {
         "energy.capacity.min",
         "energy.capacity.move_cost_slope",
         "energy.lifecycle.max_energy",
-        "mutation.capacity.chance",
         "mutation.capacity.log_step",
         "exchange.effort_rate",
         "exchange.share_min",
         "exchange.founder_share",
-        "mutation.share.chance",
         "mutation.share.log_step",
         "predation.kill_complexity_bonus_multiplier",
     ]);

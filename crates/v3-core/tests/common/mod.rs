@@ -8,9 +8,6 @@
 use slotmap::SlotMap;
 use v3_core::config::SimulationConfig;
 use v3_core::contracts::{CreatureId, Position};
-use v3_core::creature::body::HeritableBody;
-use v3_core::creature::identity::CreatureIdentityState;
-use v3_core::creature::phenotype::Phenotype;
 use v3_core::creature::state::CreatureState;
 use v3_core::genome::CreatureGenome;
 use v3_core::kernel::WorldState;
@@ -47,25 +44,16 @@ pub(crate) fn insert_creature(
     generation: u64,
 ) -> CreatureId {
     let id = creatures.insert_with_key(|id| {
-        let mut born = v3_core::creature::birth::Zygote::founder(
-            genome,
-            HeritableBody {
-                phenotype: Phenotype::FOUNDER,
-                identity: CreatureIdentityState::default(),
-                capacity: 200.0,
-                steal_share: 0.2,
-                give_share: 0.2,
-            },
-        )
-        .finalize(
-            id,
-            v3_core::creature::birth::BirthPlace {
-                position,
-                heading: v3_core::contracts::Direction::N,
-                energy,
-            },
-        )
-        .creature;
+        let mut born = v3_core::creature::birth::Zygote::founder(genome, 0)
+            .finalize(
+                id,
+                v3_core::creature::birth::BirthPlace {
+                    position,
+                    heading: v3_core::contracts::Direction::N,
+                    energy,
+                },
+            )
+            .creature;
         born.generation = generation;
         born
     });

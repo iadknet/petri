@@ -169,8 +169,12 @@ fn the_real_run_path_reads_every_checkpoint_from_its_own_post_tick_state() {
     // learning catalog, the target draw over edges and slots and the bundle
     // birth draws remap every Graph draw and seed 148 goes extinct at tick
     // 139; 48 is the lowest of 0..=2000 that passes all three real-run-path
-    // tests.
-    const SEED: u64 = 48;
+    // tests. Moved from 48 to 167 by T29.F02: the body genes add five
+    // carried units and replace the per-birth body draws with the body's
+    // own supply, and seed 48 goes extinct at tick 156; of 0..=2000 seeds
+    // 167, 273, 398, 784, 831 and 1049 are the first to survive the horizon
+    // with more than one creature, and 167, the lowest, ends with six.
+    const SEED: u64 = 167;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -238,8 +242,9 @@ fn the_real_run_path_carries_a_census_of_the_whole_key_universe_at_every_checkpo
     // post-tick-state test). T27.F03 commit 3: 14 -> 41, commit 4: 41 ->
     // 199 (see the post-tick-state test). T25.F11 commit 3: 199 -> 148 (see
     // the post-tick-state test). T25.F12 commit 2: 148 -> 48 (see the
-    // post-tick-state test).
-    const SEED: u64 = 48;
+    // post-tick-state test). T29.F02: 48 -> 167 (see the post-tick-state
+    // test).
+    const SEED: u64 = 167;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 
@@ -393,9 +398,9 @@ fn the_real_run_path_carries_a_full_occupancy_grid_at_every_checkpoint() {
     // and ends over four cells. T26.F02 moved it 145 -> 831 -> 14 (see the
     // post-tick-state test). T27.F03 commit 3 moved it 14 -> 41 and commit 4
     // 41 -> 199 (see the post-tick-state test). T25.F11 commit 3 moved it
-    // 199 -> 148 and T25.F12 commit 2 148 -> 48 (see the post-tick-state
-    // test).
-    const SEED: u64 = 48;
+    // 199 -> 148, T25.F12 commit 2 148 -> 48 and T29.F02 48 -> 167 (see
+    // the post-tick-state test).
+    const SEED: u64 = 167;
     const HORIZON: u64 = 250;
     let config = small_sweep_config(SEED, HORIZON);
 

@@ -809,6 +809,10 @@ retained_struct! {
         /// `null` at extinction and absent in reports stored before T27.F03.
         #[serde(default)]
         pub shares: Option<super::capacity::ShareDistributions> => Retention::Kept,
+        /// The living population's colour and kin-tag spread (T29.F02).
+        /// `null` at extinction and absent in reports stored before T29.F02.
+        #[serde(default)]
+        pub body: Option<super::body::BodyBlock> => Retention::Kept,
     }
 }
 
@@ -837,6 +841,7 @@ impl SampleBlocks {
             plasticity_census: Some(PlasticityCensusBlock::observe(sim)),
             capacity: super::capacity::CapacityDistribution::observe(sim),
             shares: super::capacity::ShareDistributions::observe(sim),
+            body: super::body::BodyBlock::observe(sim),
         }
     }
 }
@@ -1017,7 +1022,7 @@ impl OccupancyGrid {
             sim.world.height,
             sim.creatures
                 .values()
-                .map(|creature| (creature.position, creature.body.identity.lineage_id)),
+                .map(|creature| (creature.position, creature.lineage_id)),
         );
         Self {
             cells_x: OCCUPANCY_CELLS_PER_AXIS,

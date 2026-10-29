@@ -136,10 +136,9 @@ pub(crate) fn reweighted(edge: GraphEdge, weight: f32) -> GraphEdge {
 /// constructor, [`GraphRuntimeState::for_genome`]. A graph with members
 /// needs its input references; build its genome and call `for_genome`.
 pub(crate) fn runtime_for_defs(defs: &[&CgpGraphBackendDef]) -> GraphRuntimeState {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId(0),
-        nodes: defs
-            .iter()
+    let genome = CreatureGenome::new(
+        NodeId(0),
+        defs.iter()
             .enumerate()
             .map(|(id, def)| {
                 NodeGenome::new(
@@ -150,7 +149,8 @@ pub(crate) fn runtime_for_defs(defs: &[&CgpGraphBackendDef]) -> GraphRuntimeStat
                 )
             })
             .collect(),
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default())
 }
 

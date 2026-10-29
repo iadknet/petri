@@ -625,7 +625,6 @@ const DEFAULT_INITIAL_ENERGY: f32 = 20.0;
 const DEFAULT_MOVE_COST_SLOPE: f32 = 1.0;
 /// u: the T26.F02 sweep's pick (`docs/progress/readings/t26-f02.md`).
 const DEFAULT_UPKEEP_PER_UNIT: f32 = 0.002;
-const DEFAULT_LOG_STEP_MUTATION_CHANCE: f32 = 0.1;
 const DEFAULT_LOG_STEP: f32 = 0.25;
 const DEFAULT_EFFORT_RATE: f32 = 0.05;
 const DEFAULT_SHARE_MIN: f32 = 0.01;
@@ -690,16 +689,14 @@ impl Default for EnergyCapacityConfig {
     }
 }
 
-/// A heritable scalar trait's mutation, drawn on every birth: the capacity
-/// (T26.F02) and the two exchange shares (T27.F03). Canonical owner:
-/// v3-runtime-config-spec.md Section 3. The capacity and the shares share
-/// the default `(0.1, 0.25)`.
+/// A scalar body gene's mutation step: the capacity (T26.F02) and the two
+/// exchange shares (T27.F03), each mutated by the body chromosome's per-unit
+/// supply (T29.F02). Canonical owner: v3-runtime-config-spec.md Section 3.
+/// The capacity and the shares share the default step 0.25.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(default, deny_unknown_fields)]
 pub struct LogStepMutationConfig {
-    /// Chance per birth that the child's trait mutates, in `[0, 1]`.
-    pub chance: f32,
     /// Half-width of the uniform log-space step, `≥ 0`.
     pub log_step: f32,
 }
@@ -707,19 +704,16 @@ pub struct LogStepMutationConfig {
 impl Default for LogStepMutationConfig {
     fn default() -> Self {
         Self {
-            chance: DEFAULT_LOG_STEP_MUTATION_CHANCE,
             log_step: DEFAULT_LOG_STEP,
         }
     }
 }
 
 impl LogStepMutationConfig {
-    /// The chance into `[0, 1]` and the step into `[0, log_step_bound]`,
-    /// the trait range's log width, so the sampler's `-step..=step` width
-    /// stays finite; each out-of-range value falls back to its default.
+    /// The step into `[0, log_step_bound]`, the trait range's log width, so
+    /// the sampler's `-step..=step` width stays finite; an out-of-range value
+    /// falls back to its default.
     fn normalize(&mut self, log_step_bound: f32) {
-        self.chance =
-            normalize_f32_finite_in(self.chance, 0.0, 1.0, DEFAULT_LOG_STEP_MUTATION_CHANCE);
         self.log_step = normalize_f32_finite_in(
             self.log_step,
             0.0,
@@ -941,9 +935,10 @@ impl Default for ReachableBiasConfig {
 #[serde(deny_unknown_fields)]
 pub struct MutationConfig {
     /// Chance that one genome unit requests a mutation event at birth: the
-    /// only supply rule (T11.F19, T11.F20). A birth draws one Bernoulli trial
-    /// per unit, so the requested event count is `Binomial(units, per_unit_rate)`
-    /// with `units` the parent's own `genome_size()`.
+    /// only supply rule (T11.F19, T11.F20, T29.F02). A birth draws one
+    /// Bernoulli trial per unit of each chromosome, brain then body, so the
+    /// requested event count is `Binomial(units, per_unit_rate)` with `units`
+    /// the parent's own `genome_size()`.
     #[serde(default = "default_per_unit_rate")]
     pub per_unit_rate: f64,
     /// Probability of selecting the mesh (Topology) layer per mutation event.
@@ -971,20 +966,20 @@ pub struct MutationConfig {
     /// How many ticks back a dispatch still counts as "recently executed".
     #[serde(default = "default_executed_window_ticks")]
     pub executed_window_ticks: u64,
-    /// The heritable energy capacity's mutation (T26.F02).
+    /// The capacity gene's step (T26.F02).
     #[serde(default)]
     pub capacity: LogStepMutationConfig,
-    /// The two heritable exchange shares' mutation (T27.F03), each drawn on
-    /// every birth after the capacity.
+    /// The two share genes' step (T27.F03).
     #[serde(default)]
     pub share: LogStepMutationConfig,
 }
 
-/// Per genome unit: `0.485 / 80`, so the 80-unit V3Alpha1 founder (T25.F02)
-/// requests 0.485 events per birth, the supply of the 97-unit founder at
-/// 0.005; the founder pin test holds the two together.
+/// Per genome unit: `0.485 / 85`, so the 85-unit V3Alpha1 founder (80 brain
+/// units, T25.F02, and 5 body genes, T29.F02) requests 0.485 events per
+/// birth, the supply of the 97-unit founder at 0.005; the founder pin test
+/// holds the two together.
 fn default_per_unit_rate() -> f64 {
-    0.006_062_5
+    0.485 / 85.0
 }
 
 fn default_executed_bias() -> f64 {
@@ -1582,16 +1577,16 @@ mod tests {
         }
     }
 
-    /// The default rate times the founder's genome size: `0.0060625 × 80 =
+    /// The default rate times the founder's genome size: `0.485 / 85 × 85 =
     /// 0.485` requested events per birth, the supply of the 97-unit founder at
-    /// rate 0.005 (T25.F02). The size itself is pinned by the creature state
-    /// test, not repeated here.
+    /// rate 0.005 (T25.F02, T29.F02). The size itself is pinned by the
+    /// creature state test, not repeated here.
     #[test]
-    fn default_per_unit_rate_keeps_the_founder_near_the_legacy_supply() {
+    fn default_per_unit_rate_keeps_the_founder_at_the_legacy_supply() {
         let founder = crate::creature::founder::v3alpha1_founder_genome();
         let expected = MutationConfig::default().per_unit_rate * f64::from(founder.genome_size());
         assert!(
-            (expected - 0.485).abs() <= 0.485 * 0.01,
+            (expected - 0.485).abs() < 1e-12,
             "founder expects {expected} requested events per birth"
         );
     }
@@ -1684,7 +1679,7 @@ mod tests {
         // Perception
         assert_eq!(cfg.runtime.perception.vision_radius, 5);
         // Mutation
-        assert!((cfg.mutation.per_unit_rate - 0.006_062_5).abs() < 1e-12);
+        assert!((cfg.mutation.per_unit_rate - 0.485 / 85.0).abs() < 1e-12);
         assert!((cfg.mutation.mesh_layer_probability - 0.2).abs() < 1e-9);
         // Complexity pressure
         assert_eq!(cfg.mutation.genome_size_cap, 1200);
@@ -1807,10 +1802,7 @@ mod tests {
         assert_eq!((cap.reference, cap.min, cap.founder), (200.0, 50.0, 200.0));
         assert_eq!((cap.move_cost_slope, cap.upkeep_per_unit), (1.0, 0.002));
         assert_eq!(cap.sensor_scale, SensorScale::Reference);
-        assert_eq!(
-            (cfg.mutation.capacity.chance, cfg.mutation.capacity.log_step),
-            (0.1, 0.25)
-        );
+        assert_eq!(cfg.mutation.capacity.log_step, 0.25);
     }
 
     /// `SensorScale::as_key` is the serialized config key of each scale.
@@ -1831,7 +1823,7 @@ mod tests {
         value["energy"]["capacity"] = serde_json::json!({
             "founder": 50.0, "sensor_scale": "own", "move_cost_slope": 0.0, "upkeep_per_unit": 0.0
         });
-        value["mutation"]["capacity"] = serde_json::json!({"chance": 0.0});
+        value["mutation"]["capacity"] = serde_json::json!({});
         value["mutation"]["per_unit_rate"] = serde_json::json!(0.0);
         let cfg: SimulationConfig = serde_json::from_value(value).unwrap();
         let cap = &cfg.energy.capacity;
@@ -1839,7 +1831,6 @@ mod tests {
         assert_eq!(cap.sensor_scale, SensorScale::Own);
         assert_eq!((cap.move_cost_slope, cap.upkeep_per_unit), (0.0, 0.0));
         assert_eq!(cap.reference, 200.0, "an omitted field keeps its default");
-        assert_eq!(cfg.mutation.capacity.chance, 0.0);
         assert_eq!(cfg.mutation.capacity.log_step, 0.25);
         assert_eq!(cfg.mutation.per_unit_rate, 0.0);
     }
@@ -1920,31 +1911,27 @@ mod tests {
 
     #[test]
     fn normalize_rejects_out_of_range_capacity_coefficients() {
-        for (slope, upkeep, chance, log_step) in [
-            (f32::NAN, f32::NAN, f32::NAN, f32::NAN),
-            (1.5, -1.0, 1.5, -0.1),
-            (-0.1, f32::INFINITY, -0.1, f32::INFINITY),
+        for (slope, upkeep, log_step) in [
+            (f32::NAN, f32::NAN, f32::NAN),
+            (1.5, -1.0, -0.1),
+            (-0.1, f32::INFINITY, f32::INFINITY),
         ] {
             let mut cfg = SimulationConfig::default();
             cfg.energy.capacity.move_cost_slope = slope;
             cfg.energy.capacity.upkeep_per_unit = upkeep;
-            cfg.mutation.capacity.chance = chance;
             cfg.mutation.capacity.log_step = log_step;
             cfg.normalize();
             assert_eq!(cfg.energy.capacity.move_cost_slope, 1.0);
             assert_eq!(cfg.energy.capacity.upkeep_per_unit, 0.002);
-            assert_eq!(cfg.mutation.capacity.chance, 0.1);
             assert_eq!(cfg.mutation.capacity.log_step, 0.25);
         }
         let mut cfg = SimulationConfig::default();
         cfg.energy.capacity.move_cost_slope = 0.25;
         cfg.energy.capacity.upkeep_per_unit = 0.0;
-        cfg.mutation.capacity.chance = 0.0;
         cfg.mutation.capacity.log_step = 0.0;
         cfg.normalize();
         assert_eq!(cfg.energy.capacity.move_cost_slope, 0.25);
         assert_eq!(cfg.energy.capacity.upkeep_per_unit, 0.0);
-        assert_eq!(cfg.mutation.capacity.chance, 0.0);
         assert_eq!(cfg.mutation.capacity.log_step, 0.0);
     }
 
@@ -2243,10 +2230,7 @@ mod tests {
                 founder_share: 0.2,
             }
         );
-        assert_eq!(
-            (cfg.mutation.share.chance, cfg.mutation.share.log_step),
-            (0.1, 0.25)
-        );
+        assert_eq!(cfg.mutation.share.log_step, 0.25);
         let json = serde_json::to_value(&cfg).unwrap();
         assert_eq!(
             json["exchange"],
@@ -2254,7 +2238,7 @@ mod tests {
         );
         assert_eq!(
             json["mutation"]["share"],
-            serde_json::json!({"chance": 0.1f32, "log_step": 0.25f32})
+            serde_json::json!({"log_step": 0.25f32})
         );
     }
 
@@ -2284,10 +2268,7 @@ mod tests {
                 founder_share: 0.1,
             },
             mutation: MutationConfig {
-                share: LogStepMutationConfig {
-                    chance: 0.0,
-                    log_step: 0.0,
-                },
+                share: LogStepMutationConfig { log_step: 0.0 },
                 ..MutationConfig::default()
             },
             ..SimulationConfig::default()
@@ -2301,10 +2282,7 @@ mod tests {
                 founder_share: 0.1,
             }
         );
-        assert_eq!(
-            (cfg.mutation.share.chance, cfg.mutation.share.log_step),
-            (0.0, 0.0)
-        );
+        assert_eq!(cfg.mutation.share.log_step, 0.0);
     }
 
     #[test]
@@ -2375,11 +2353,15 @@ mod tests {
         cfg.mutation.share.log_step = 3.0e38;
         cfg.normalize();
         assert_eq!(cfg.mutation.share.log_step, 0.25);
-        for bad in [1.5, -0.1, f32::NAN] {
-            let mut cfg = SimulationConfig::default();
-            cfg.mutation.share.chance = bad;
-            cfg.normalize();
-            assert_eq!(cfg.mutation.share.chance, 0.1, "{bad}");
+    }
+
+    /// The retired per-birth `chance` is no longer a config key (T29.F02).
+    #[test]
+    fn the_retired_scalar_mutation_chance_is_rejected() {
+        for section in ["capacity", "share"] {
+            let mut value = serde_json::to_value(SimulationConfig::default()).unwrap();
+            value["mutation"][section]["chance"] = serde_json::json!(0.1);
+            assert!(serde_json::from_value::<SimulationConfig>(value).is_err());
         }
     }
 

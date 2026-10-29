@@ -13,7 +13,7 @@ pub struct BodyView {
     pub position: Position,
     pub age: u64,
     pub energy: f32,
-    /// The body's energy sensor denominator (`HeritableBody::energy_scale`).
+    /// The body's energy sensor denominator (`creature::body::energy_scale`).
     pub energy_scale: f32,
     /// The seen colour on the unit scale (`creature::colour::unit_rgb`).
     pub colour: [f32; 3],
@@ -54,7 +54,7 @@ pub struct StaticInputs {
     /// (`creature::colour::unit_rgb`): `OwnRed`, `OwnGreen`, `OwnBlue`.
     pub own_colour: [f32; 3],
     /// The creature's energy sensor denominator
-    /// ([`HeritableBody::energy_scale`](crate::creature::body::HeritableBody::energy_scale),
+    /// ([`energy_scale`](crate::creature::body::energy_scale),
     /// T26.F02): the reference capacity or the creature's own, by
     /// `energy.capacity.sensor_scale`. Divides the live energy introspection
     /// reads and the `PreviousOutcome` energy channels.

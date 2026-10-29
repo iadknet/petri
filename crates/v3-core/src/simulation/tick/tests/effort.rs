@@ -32,7 +32,9 @@ impl Bucket {
             Self::Reproduce => costs.reproduce_attempt_cost,
             Self::Steal => {
                 let creature = &sim.creatures[id];
-                sim.config.exchange.effort_rate * creature.body.steal_share * creature.energy
+                sim.config.exchange.effort_rate
+                    * creature.genome().body().steal_share()
+                    * creature.energy
             }
         }
     }

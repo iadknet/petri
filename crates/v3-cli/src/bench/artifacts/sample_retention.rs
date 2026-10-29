@@ -150,6 +150,7 @@ mod tests {
                 "plasticity_census",
                 "capacity",
                 "shares",
+                "body",
             ])
         );
         assert_eq!(
@@ -172,6 +173,7 @@ mod tests {
                 "plasticity_census",
                 "capacity",
                 "shares",
+                "body",
             ])
         );
         assert_eq!(

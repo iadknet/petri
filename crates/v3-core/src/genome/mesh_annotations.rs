@@ -294,9 +294,9 @@ mod tests {
 
     #[test]
     fn derives_factual_vm_annotations_from_live_instructions() {
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(1),
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            NodeId::new(1),
+            vec![NodeGenome::new(
                 NodeId::new(1),
                 vec![
                     InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())),
@@ -329,7 +329,8 @@ mod tests {
                 }),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
 
         let annotations = derive_mesh_annotations(&genome);
         let annotation = &annotations[0];
@@ -389,10 +390,11 @@ mod tests {
             vec![],
         );
 
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(1),
-            nodes: vec![reachable_graph, unreachable_vm],
-        };
+        let genome = CreatureGenome::new(
+            NodeId::new(1),
+            vec![reachable_graph, unreachable_vm],
+            crate::creature::founder::default_founder_body(),
+        );
 
         let annotations = derive_mesh_annotations(&genome);
         let graph_annotation = annotations
@@ -426,9 +428,9 @@ mod tests {
     /// the same way as the graph side's vote sinks.
     #[test]
     fn classifies_add_vote_as_an_action_write() {
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(1),
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            NodeId::new(1),
+            vec![NodeGenome::new(
                 NodeId::new(1),
                 vec![],
                 BackendDef::Vm(VmBackendDef {
@@ -444,7 +446,8 @@ mod tests {
                 }),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
 
         let annotation = &derive_mesh_annotations(&genome)[0];
 
@@ -456,9 +459,9 @@ mod tests {
 
     #[test]
     fn classifies_write_internal_payload_as_a_payload_write() {
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(1),
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            NodeId::new(1),
+            vec![NodeGenome::new(
                 NodeId::new(1),
                 vec![],
                 BackendDef::Vm(VmBackendDef {
@@ -477,7 +480,8 @@ mod tests {
                 }),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
 
         let annotation = &derive_mesh_annotations(&genome)[0];
 
@@ -488,9 +492,9 @@ mod tests {
 
     #[test]
     fn helper_matches_wrapper_for_cached_reachable_indices() {
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(1),
-            nodes: vec![
+        let genome = CreatureGenome::new(
+            NodeId::new(1),
+            vec![
                 NodeGenome::new(
                     NodeId::new(1),
                     vec![],
@@ -543,7 +547,8 @@ mod tests {
                     vec![],
                 ),
             ],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
 
         let reachable_indices = mesh_reachable_nodes(&genome);
         let via_wrapper = derive_mesh_annotations(&genome);
@@ -555,10 +560,11 @@ mod tests {
 
     #[test]
     fn helper_matches_wrapper_for_empty_genome() {
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: Vec::new(),
-        };
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            Vec::new(),
+            crate::creature::founder::default_founder_body(),
+        );
 
         let reachable_indices = mesh_reachable_nodes(&genome);
         let via_wrapper = derive_mesh_annotations(&genome);
@@ -571,9 +577,9 @@ mod tests {
 
     #[test]
     fn helper_matches_wrapper_for_cycles_and_dangling_targets() {
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(10),
-            nodes: vec![
+        let genome = CreatureGenome::new(
+            NodeId::new(10),
+            vec![
                 NodeGenome::new(
                     NodeId::new(10),
                     vec![],
@@ -605,7 +611,8 @@ mod tests {
                     vec![],
                 ),
             ],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
 
         let reachable_indices = mesh_reachable_nodes(&genome);
         let via_wrapper = derive_mesh_annotations(&genome);

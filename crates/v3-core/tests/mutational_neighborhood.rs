@@ -29,7 +29,10 @@ fn founder_evaluation_with(
 ) -> GenomeEvaluation {
     let mut config = SimulationConfig::default();
     adjust(&mut config);
-    let subject = founder_genome(config.population.founder_profile);
+    let subject = founder_genome(
+        config.population.founder_profile,
+        v3_core::creature::founder::default_founder_body(),
+    );
     let battery = Battery::generate(config.world.food.types.len());
     let context = EvalContext::from_config(&config);
     let pool = rayon::ThreadPoolBuilder::new()

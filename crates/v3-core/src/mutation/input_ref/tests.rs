@@ -28,9 +28,9 @@ fn default_config() -> MutationConfig {
 }
 
 fn single_node_genome_with_input_ref(input_ref: InputReference) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![input_ref],
             BackendDef::Vm(VmBackendDef {
@@ -40,7 +40,8 @@ fn single_node_genome_with_input_ref(input_ref: InputReference) -> CreatureGenom
             }),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 #[test]
@@ -395,9 +396,9 @@ fn swap_on_the_graph_backend_keeps_every_edge() {
             OutputSinkKind::ActionVote(VoteSink::Terminate),
             vec![leaf(7)],
         );
-    let base_genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let base_genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![InputReference::World(WorldInputKey::neighbor_food_ring(
                 OrdinaryFoodTypeId::new(0),
@@ -405,7 +406,8 @@ fn swap_on_the_graph_backend_keeps_every_edge() {
             BackendDef::Graph(def),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
 
     for seed in 0u64..64 {
         let mut genome = base_genome.clone();
@@ -743,15 +745,16 @@ fn complexity_effect_consistent_with_types() {
 
 /// One Graph node with the full fixed sink catalog and no references.
 fn graph_node_genome_full_catalog() -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs()),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 fn graph_def(node: &NodeGenome) -> &CgpGraphBackendDef {
@@ -1276,9 +1279,9 @@ fn add_sensor_to_vm_node_leaves_program_unchanged() {
 
 #[test]
 fn reindex_vm_decrements_and_noops_orphans() {
-    let mut genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let mut genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![
                 InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())),
@@ -1309,7 +1312,8 @@ fn reindex_vm_decrements_and_noops_orphans() {
             }),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     // Remove input ref at index 1
     genome.nodes[0]
         .backend_edit()
@@ -1347,9 +1351,9 @@ fn reindex_vm_decrements_and_noops_orphans() {
 
 #[test]
 fn reindex_noop_on_empty_vm_program() {
-    let mut genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let mut genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![InputReference::World(WorldInputKey::food_here(
                 OrdinaryFoodTypeId::default(),
@@ -1361,7 +1365,8 @@ fn reindex_noop_on_empty_vm_program() {
             }),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     genome.nodes[0]
         .backend_edit()
         .1

@@ -154,10 +154,11 @@ fn run_mesh(
     energy: &mut f32,
     config: &RuntimeConfig,
 ) -> MeshOutput {
-    let genome = CreatureGenome {
-        entry_node_id: nodes[0].node_id,
+    let genome = CreatureGenome::new(
+        nodes[0].node_id,
         nodes,
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let mut state =
         GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
     state.begin_tick(0);
@@ -372,13 +373,14 @@ fn stateful_module_and_blank_neighbor_each_step_once_per_visit() {
         (blank(), BASE_COST, 0.0),
         (wired_blank, 2.0 * BASE_COST, LEAF_VALUE),
     ] {
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![
                 graph_node(0, stateful.clone(), &[(1, 0)]),
                 graph_node(1, blank_def, &[]),
             ],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         let mut state =
             GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         let mut memory_in = [0.0; 16];

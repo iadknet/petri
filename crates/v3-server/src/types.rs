@@ -2,7 +2,7 @@
 use v3_core::config::SimulationConfig;
 pub use v3_core::config::{config_digest, deep_merge, sort_json_keys_recursive};
 
-pub const PROTOCOL_VERSION: &str = "v3alpha18";
+pub const PROTOCOL_VERSION: &str = "v3alpha19";
 
 /// Request body for the `POST /v3/simulation/step` endpoint.
 #[derive(serde::Deserialize, Default)]
@@ -59,10 +59,11 @@ mod tests {
     /// T30.F01 replaces the creature's `genome`, `mesh_annotations` and
     /// `graph_weights` with `brain` and `learning`, makes a sampler hop's
     /// `input_refs` flat records and types every response: breaking payload
-    /// changes.
+    /// changes. T29.F02 deletes the `chance` of the config's capacity and
+    /// share mutation: the config schema on the wire changes.
     #[test]
-    fn protocol_version_is_v3alpha18() {
-        assert_eq!(PROTOCOL_VERSION, "v3alpha18");
+    fn protocol_version_is_v3alpha19() {
+        assert_eq!(PROTOCOL_VERSION, "v3alpha19");
     }
 
     #[test]

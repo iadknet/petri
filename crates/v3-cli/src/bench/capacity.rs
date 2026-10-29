@@ -112,9 +112,29 @@ mod tests {
             assert_eq!(share.at_min_fraction, six(0.0));
             assert_eq!(share.at_max_fraction, six(0.0));
         }
+        // A body changes only by a birth (T29.F02): the first founder is born
+        // again from its genome carrying the edge shares.
         let first = sim.creatures.keys().next().unwrap();
-        sim.creatures[first].body.steal_share = sim.config.exchange.share_min;
-        sim.creatures[first].body.give_share = 1.0;
+        let founder = &sim.creatures[first];
+        let body = founder.genome().body();
+        let body = v3_core::genome::body::BodyGenome::new(
+            *body.colour(),
+            body.kin_tag(),
+            body.capacity(),
+            sim.config.exchange.share_min,
+            1.0,
+        );
+        let place = v3_core::creature::birth::BirthPlace {
+            position: founder.position,
+            heading: founder.heading,
+            energy: founder.energy,
+        };
+        sim.creatures[first] = v3_core::creature::birth::Zygote::founder(
+            founder.genome().clone().with_body(body),
+            founder.lineage_id,
+        )
+        .finalize(first, place)
+        .creature;
         let block = ShareDistributions::observe(&sim).unwrap();
         assert_eq!(block.steal_share.at_min_fraction, six(1.0 / 3.0));
         assert_eq!(block.give_share.at_max_fraction, six(1.0 / 3.0));

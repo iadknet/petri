@@ -21,6 +21,7 @@
 
 pub mod battery;
 pub mod births;
+pub mod body_census;
 pub mod bundles;
 pub mod census;
 pub mod clades;
@@ -54,6 +55,8 @@ pub use sample::{
 
 use crate::config::{RuntimeConfig, SimulationConfig};
 use crate::contracts::SensorContext;
+use crate::creature::body::body_ranges;
+use crate::genome::body::BodyRanges;
 
 /// Multiplier for an evolved genome's seed offset:
 /// `EVOLVED_SEED_MULTIPLIER * (genome_index + 1)`, `genome_index` running
@@ -79,6 +82,9 @@ pub struct EvalContext<'a> {
     pub shared_memory_decay_rate: f32,
     /// The run's sensor descriptor context (T25.F11).
     pub sensors: SensorContext,
+    /// The ranges a body edit applies under (T29.F02), resolved from the
+    /// run's config as conception resolves them.
+    pub body_ranges: BodyRanges,
 }
 
 impl<'a> EvalContext<'a> {
@@ -88,6 +94,7 @@ impl<'a> EvalContext<'a> {
             runtime: &config.runtime,
             shared_memory_decay_rate: config.shared_memory.decay_rate,
             sensors: config.sensor_context(config.world.food.types.len()),
+            body_ranges: body_ranges(config),
         }
     }
 }

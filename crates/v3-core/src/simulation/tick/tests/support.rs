@@ -1,10 +1,9 @@
 use crate::config::SimulationConfig;
 use crate::contracts::{CreatureId, NodeId, Position, WorldAction};
-use crate::creature::body::HeritableBody;
 use crate::creature::founder::v3alpha1_founder_genome;
-use crate::creature::identity::CreatureIdentityState;
-use crate::creature::phenotype::Phenotype;
 use crate::creature::state::CreatureState;
+use crate::genome::body::BodyGenome;
+use crate::genome::body::Phenotype;
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use crate::kernel::WorldState;
 use crate::runtime::trace::domain::TerminationReason;
@@ -15,14 +14,8 @@ use rand::SeedableRng;
 use slotmap::SlotMap;
 
 /// A founder-phenotype body with the default identity.
-fn founder_body() -> HeritableBody {
-    HeritableBody {
-        phenotype: Phenotype::FOUNDER,
-        identity: CreatureIdentityState::default(),
-        capacity: 200.0,
-        steal_share: 0.2,
-        give_share: 0.2,
-    }
+fn founder_body() -> BodyGenome {
+    BodyGenome::new(Phenotype::FOUNDER, 0, 200.0, 0.2, 0.2)
 }
 
 /// A cognition result committing `actions` with no compute charge.
@@ -68,9 +61,9 @@ pub(super) fn small_config() -> SimulationConfig {
 /// A one-node VM genome running `program` exactly as given, with no
 /// constants and one register.
 pub(super) fn vm_raw_program_genome(program: Vec<VmInstruction>) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -80,13 +73,15 @@ pub(super) fn vm_raw_program_genome(program: Vec<VmInstruction>) -> CreatureGeno
             }),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
-/// A one-node VM genome of exactly `units` genome units (`units >= 1`):
-/// the node and `units - 1` `Halt` instructions.
+/// A one-node VM genome of exactly `units` genome units (`units >= 6`):
+/// the five body genes, the node and `units - 6` `Halt` instructions.
 pub(super) fn sized_genome(units: u32) -> CreatureGenome {
-    let genome = vm_raw_program_genome(vec![VmInstruction::Halt; units as usize - 1]);
+    let halts = units - 1 - crate::genome::body::BodyGenome::UNITS;
+    let genome = vm_raw_program_genome(vec![VmInstruction::Halt; halts as usize]);
     assert_eq!(genome.genome_size(), units);
     genome
 }
@@ -111,9 +106,9 @@ pub(super) fn vm_program_genome(program: Vec<VmInstruction>) -> CreatureGenome {
         const_idx: 0,
     }];
     with_unit.extend(program);
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -123,7 +118,8 @@ pub(super) fn vm_program_genome(program: Vec<VmInstruction>) -> CreatureGenome {
             }),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 pub(super) fn make_sim_two_creatures(
@@ -155,8 +151,9 @@ pub(super) fn make_sim_two_with_genomes(
 
     let a_id = creatures.insert_with_key(|id| {
         {
-            let mut founder = crate::creature::birth::Zygote::founder(genome_a, founder_body())
-                .born_at(id, Position::new(5, 5), energy_a);
+            let mut founder =
+                crate::creature::birth::Zygote::founder(genome_a.with_body(founder_body()), 0)
+                    .born_at(id, Position::new(5, 5), energy_a);
             // A fixture keeps its requested energy past the body cap.
             founder.energy = energy_a;
             founder
@@ -166,8 +163,9 @@ pub(super) fn make_sim_two_with_genomes(
 
     let b_id = creatures.insert_with_key(|id| {
         {
-            let mut founder = crate::creature::birth::Zygote::founder(genome_b, founder_body())
-                .born_at(id, Position::new(5, 4), energy_b);
+            let mut founder =
+                crate::creature::birth::Zygote::founder(genome_b.with_body(founder_body()), 0)
+                    .born_at(id, Position::new(5, 4), energy_b);
             // A fixture keeps its requested energy past the body cap.
             founder.energy = energy_b;
             founder
@@ -198,9 +196,11 @@ pub(super) fn make_sim_with_one_creature(energy: f32) -> (Simulation, CreatureId
     let pos = Position::new(5, 5);
     let id = creatures.insert_with_key(|id| {
         {
-            let mut founder =
-                crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
-                    .born_at(id, pos, energy);
+            let mut founder = crate::creature::birth::Zygote::founder(
+                v3alpha1_founder_genome().with_body(founder_body()),
+                0,
+            )
+            .born_at(id, pos, energy);
             // A fixture keeps its requested energy past the body cap.
             founder.energy = energy;
             founder
@@ -234,8 +234,9 @@ pub(super) fn make_sim_with_custom_genome(
     let pos = Position::new(5, 5);
     let id = creatures.insert_with_key(|id| {
         {
-            let mut founder = crate::creature::birth::Zygote::founder(genome, founder_body())
-                .born_at(id, pos, energy);
+            let mut founder =
+                crate::creature::birth::Zygote::founder(genome.with_body(founder_body()), 0)
+                    .born_at(id, pos, energy);
             // A fixture keeps its requested energy past the body cap.
             founder.energy = energy;
             founder

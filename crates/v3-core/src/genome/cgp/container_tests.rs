@@ -1660,9 +1660,12 @@ fn validate_graph_rejects_a_bad_pair_role_range_or_duplicate() {
 #[test]
 fn a_pair_gene_adds_one_unit() {
     let base = CgpGraphBackendDef::new_with_fixed_outputs();
-    let genome = |def| crate::genome::CreatureGenome {
-        entry_node_id: crate::contracts::NodeId(0),
-        nodes: vec![pair_node(def, pair_refs())],
+    let genome = |def| {
+        crate::genome::CreatureGenome::new(
+            crate::contracts::NodeId(0),
+            vec![pair_node(def, pair_refs())],
+            crate::creature::founder::default_founder_body(),
+        )
     };
     let mut grouped = base.clone();
     grouped.add_pair_bundle(PAIR_REF, 1, pair_layout(), DirectedVoteKind::Move, 0);

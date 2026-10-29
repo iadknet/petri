@@ -449,10 +449,11 @@ mod tests {
         )
     }
     fn genome(nodes: Vec<NodeGenome>) -> CreatureGenome {
-        CreatureGenome {
-            entry_node_id: NodeId::new(0),
+        CreatureGenome::new(
+            NodeId::new(0),
             nodes,
-        }
+            crate::creature::founder::default_founder_body(),
+        )
     }
     fn reading(g: &CreatureGenome) -> MeshExecutionReading {
         Battery::generate(2).mesh_execution(g, &RuntimeConfig::default(), 0.0)
@@ -579,15 +580,16 @@ mod tests {
         assert_eq!(battery.executed_indices(&g, &runtime, 0.0), vec![0, 1]);
 
         // Index mapping follows node order, not node id.
-        let reordered = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![
+        let reordered = CreatureGenome::new(
+            NodeId::new(0),
+            vec![
                 node(3, &[], false),
                 node(2, &[], true),
                 node(1, &[], true),
                 node(0, &[1], false),
             ],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         assert_eq!(
             battery.executed_indices(&reordered, &runtime, 0.0),
             vec![2, 3]
@@ -839,8 +841,10 @@ mod tests {
 
     #[test]
     fn founder_routes_vary_neither_within_nor_across_snapshots() {
-        let founder =
-            crate::creature::founder::founder_genome(crate::config::FounderProfile::V3Alpha1);
+        let founder = crate::creature::founder::founder_genome(
+            crate::config::FounderProfile::V3Alpha1,
+            crate::creature::founder::default_founder_body(),
+        );
         let r = reading(&founder);
         assert!(!r.route_varies_within_snapshot);
         assert!(!r.route_destination_varies_within_snapshot);
@@ -1213,8 +1217,10 @@ mod tests {
     fn mesh_execution_sets_carry_the_ids_behind_the_unchanged_counts() {
         let config = RuntimeConfig::default();
         let battery = Battery::generate(2);
-        let genome =
-            crate::creature::founder::founder_genome(crate::config::FounderProfile::V3Alpha1);
+        let genome = crate::creature::founder::founder_genome(
+            crate::config::FounderProfile::V3Alpha1,
+            crate::creature::founder::default_founder_body(),
+        );
         let sets = battery.mesh_execution_sets(&genome, &config, 0.0);
         assert_eq!(sets.reading, battery.mesh_execution(&genome, &config, 0.0));
         assert_eq!(sets.executed.len(), sets.reading.executed_node_count);

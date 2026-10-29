@@ -137,10 +137,11 @@ fn the_three_retention_operators_keep_their_slots_keys_and_tiers() {
 #[test]
 fn the_retention_operators_apply_exactly_where_their_predicate_admits() {
     let applies = |def: &CgpGraphBackendDef| -> Vec<bool> {
-        let genome = crate::genome::CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![node(def.clone())],
-        };
+        let genome = crate::genome::CreatureGenome::new(
+            NodeId::new(0),
+            vec![node(def.clone())],
+            crate::creature::founder::default_founder_body(),
+        );
         RETENTION_OPERATORS
             .iter()
             .map(|&op| {
@@ -301,10 +302,11 @@ fn the_dispatch_reports_the_reach_and_keeps_the_graph_valid() {
         .set_slot(LearningSlot::Scale, Some(plastic(0.5)));
     def.bundle_mut(id)
         .set_slot(LearningSlot::MemberDefault, Some(plastic(1.0)));
-    let genome = crate::genome::CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![node(def)],
-    };
+    let genome = crate::genome::CreatureGenome::new(
+        NodeId::new(0),
+        vec![node(def)],
+        crate::creature::founder::default_founder_body(),
+    );
     for op in RETENTION_OPERATORS {
         for seed in 0..16 {
             let mut changed = genome.clone();

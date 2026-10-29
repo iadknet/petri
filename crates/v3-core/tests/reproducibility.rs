@@ -99,7 +99,7 @@ fn population_fingerprint(sim: &Simulation) -> Vec<CreatureFingerprint<'_>> {
             (
                 c.position,
                 c.energy.to_bits(),
-                c.body.capacity.to_bits(),
+                c.genome().body().capacity().to_bits(),
                 c.age,
                 c.generation,
                 c.genome(),

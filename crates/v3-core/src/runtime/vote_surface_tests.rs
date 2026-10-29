@@ -162,9 +162,9 @@ fn run_with(genome: &CreatureGenome, energy: f32, config: RuntimeConfig) -> Run 
 
 #[test]
 fn a_vm_dispatch_sums_its_own_votes_and_commits_them() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -188,7 +188,8 @@ fn a_vm_dispatch_sums_its_own_votes_and_commits_them() {
             }),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let output = run(&genome, 100.0, 4);
     assert_eq!(
         output.votes[VoteSink::Directed(DirectedVoteKind::Move, 2).index()],
@@ -202,13 +203,14 @@ fn a_vm_dispatch_sums_its_own_votes_and_commits_them() {
 #[test]
 fn a_revisit_replaces_that_node_s_contribution_rather_than_adding_one() {
     // Node 0 votes 1.0 and routes to node 1, which routes back to node 0.
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             voting_vm_node(0, 1.0, VoteSink::Eat.index() as u8, &[1]),
             voting_vm_node(1, 4.0, VoteSink::Terminate.index() as u8, &[0]),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let one_pass = run(&genome, 1000.0, 1);
     assert_eq!(one_pass.votes[VoteSink::Eat.index()], 1.0);
 
@@ -222,13 +224,14 @@ fn a_revisit_replaces_that_node_s_contribution_rather_than_adding_one() {
 
 #[test]
 fn contributions_from_two_nodes_sum_with_their_signs() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             voting_vm_node(0, 2.5, VoteSink::Terminate.index() as u8, &[1]),
             voting_vm_node(1, -4.0, VoteSink::Terminate.index() as u8, &[]),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let output = run(&genome, 1000.0, 4);
     assert_eq!(output.votes[VoteSink::Terminate.index()], -1.5);
 }
@@ -259,9 +262,9 @@ fn a_non_finite_contribution_is_sanitized_at_commit_and_so_is_the_sum() {
 #[test]
 fn a_saturating_vm_vote_is_clamped_when_the_dispatch_commits() {
     // 1e30 * 1e30 overflows to +inf, which sanitizes to the clamp.
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -282,7 +285,8 @@ fn a_saturating_vm_vote_is_clamped_when_the_dispatch_commits() {
             }),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let output = run(&genome, 100.0, 4);
     assert_eq!(
         output.votes[VoteSink::Directed(DirectedVoteKind::Reproduce, 0).index()],
@@ -303,18 +307,21 @@ fn an_invalid_add_vote_sink_writes_nothing_and_still_costs() {
             VmInstruction::Halt,
         ]
     };
-    let make = |sink: u8| CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let make = |sink: u8| {
+        CreatureGenome::new(
             NodeId::new(0),
-            vec![],
-            BackendDef::Vm(VmBackendDef {
-                register_count: 1,
-                constants: vec![3.0],
-                program: program(sink),
-            }),
-            vec![],
-        )],
+            vec![NodeGenome::new(
+                NodeId::new(0),
+                vec![],
+                BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![3.0],
+                    program: program(sink),
+                }),
+                vec![],
+            )],
+            crate::creature::founder::default_founder_body(),
+        )
     };
     let valid = run(&make(VOTE_SINK_COUNT as u8 - 1), 100.0, 4);
     let invalid = run(&make(VOTE_SINK_COUNT as u8), 100.0, 4);
@@ -325,9 +332,9 @@ fn an_invalid_add_vote_sink_writes_nothing_and_still_costs() {
 
 #[test]
 fn an_exhausted_vm_dispatch_commits_nothing() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             voting_vm_node(0, 7.0, VoteSink::Eat.index() as u8, &[1]),
             // Node 1 votes, then runs out of energy before it can halt.
             NodeGenome::new(
@@ -351,7 +358,8 @@ fn an_exhausted_vm_dispatch_commits_nothing() {
                 vec![],
             ),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     // Node 0 spends 0.27; node 1 executes its vote and then exhausts on the
     // charge for its `Halt`, so it never reaches the commit boundary.
     let exhausted = run_with(&genome, 0.52, costly_config());
@@ -365,9 +373,9 @@ fn an_exhausted_vm_dispatch_commits_nothing() {
 
 #[test]
 fn a_graph_visit_commits_its_wired_sinks_and_writes_the_parameter_surface() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![voting_graph_node(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![voting_graph_node(
             0,
             2.0,
             &[
@@ -376,7 +384,8 @@ fn a_graph_visit_commits_its_wired_sinks_and_writes_the_parameter_surface() {
             ],
             &[],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let output = run(&genome, 100.0, 4);
     assert_eq!(
         output.votes[VoteSink::Directed(DirectedVoteKind::StealEnergy, 5).index()],
@@ -432,9 +441,9 @@ fn the_parameter_surface_takes_the_last_visit_s_value_and_an_unwired_sink_leaves
 
 #[test]
 fn an_exhausted_graph_visit_leaves_the_vote_vector_untouched() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             voting_vm_node(0, 6.0, VoteSink::Eat.index() as u8, &[1]),
             voting_graph_node(
                 1,
@@ -446,7 +455,8 @@ fn an_exhausted_graph_visit_leaves_the_vote_vector_untouched() {
                 &[],
             ),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let affordable = run(&genome, 100.0, 4);
     assert_eq!(
         affordable.votes[VoteSink::Directed(DirectedVoteKind::Move, 0).index()],
@@ -469,9 +479,9 @@ fn an_exhausted_graph_visit_leaves_the_vote_vector_untouched() {
 
 #[test]
 fn the_three_execution_modes_agree_on_a_voting_genome() {
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             voting_vm_node(0, 1.25, VoteSink::Eat.index() as u8, &[1]),
             voting_graph_node(
                 1,
@@ -483,7 +493,8 @@ fn the_three_execution_modes_agree_on_a_voting_genome() {
                 &[0],
             ),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     for cap in [1, 2, 3] {
         for start in [0.2, 5.0, 100.0] {
             let config = RuntimeConfig {

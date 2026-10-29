@@ -97,7 +97,7 @@ impl CladeMemberReading {
     #[must_use]
     pub fn observe(creature: &CreatureState) -> Self {
         Self {
-            lineage_id: creature.body.identity.lineage_id,
+            lineage_id: creature.lineage_id,
             energy: creature.energy,
             age: creature.age,
             generation: creature.generation,

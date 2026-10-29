@@ -11,9 +11,7 @@ use crate::contracts::votes::VoteSink;
 use crate::contracts::ActionOutcome;
 use crate::contracts::{CreatureId, InputReference, NodeId, Position, WorldInputKey};
 use crate::creature::action_log::{ActionLog, ActionType};
-use crate::creature::body::HeritableBody;
 use crate::creature::founder::{v3alpha1_founder_genome, vm_decision_founder_genome};
-use crate::creature::phenotype::Phenotype;
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use crate::ledger::DeathCause;
 use crate::runtime::traced_mesh::TruncationReason;
@@ -42,14 +40,8 @@ fn with_vm_founders(mut sim: Simulation) -> Simulation {
         let old = &sim.creatures[id];
         let rebuilt = {
             let mut born = crate::creature::birth::Zygote::founder(
-                vm_decision_founder_genome(),
-                HeritableBody {
-                    phenotype: Phenotype::FOUNDER,
-                    identity: old.body.identity,
-                    capacity: 200.0,
-                    steal_share: 0.2,
-                    give_share: 0.2,
-                },
+                vm_decision_founder_genome().with_body(*old.genome().body()),
+                old.lineage_id,
             )
             .with_payload(crate::creature::birth::BirthPayload::new(
                 crate::genome::learning::Seeds::default(),
@@ -571,9 +563,9 @@ fn charge_and_reward_match_the_energy_flow_deltas() {
 
 /// Steals ten energy from the north neighbor.
 fn steal_north_genome() -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -599,7 +591,8 @@ fn steal_north_genome() -> CreatureGenome {
             }),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 /// Gives to the north neighbour at the unwired effort modifier 1 (T27.F03).
@@ -650,7 +643,10 @@ fn a_giver_exhausted_by_its_gift_inside_its_window_matches_the_untraced_run() {
             vm_program_genome(vec![VmInstruction::Halt]),
         );
         sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
-        sim.creatures[giver].body.give_share = 1.0;
+        sim.creatures[giver] =
+            crate::creature::birth::Zygote::reborn(&sim.creatures[giver], |body| {
+                body.with_give_share(1.0)
+            });
         (sim, giver)
     };
     for budget in [Some(WINDOW_BUDGET), None] {
@@ -733,7 +729,10 @@ fn a_victim_killed_before_or_after_its_turn_records_predation() {
         sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
         sim.config.exchange.effort_rate = 0.0;
         // Share 1 at modifier 4: intensity 1, a steal that kills (T27.F03).
-        sim.creatures[attacker].body.steal_share = 1.0;
+        sim.creatures[attacker] =
+            crate::creature::birth::Zygote::reborn(&sim.creatures[attacker], |body| {
+                body.with_steal_share(1.0)
+            });
         let mut trace = Some(ActiveTrace::new(victim, 3));
         run_tick(&mut sim, &mut trace);
         assert!(
@@ -812,7 +811,10 @@ fn decisions_discarded_by_a_death_match_the_untraced_run() {
         );
         sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
         sim.config.exchange.effort_rate = 0.0;
-        sim.creatures[attacker].body.steal_share = 1.0;
+        sim.creatures[attacker] =
+            crate::creature::birth::Zygote::reborn(&sim.creatures[attacker], |body| {
+                body.with_steal_share(1.0)
+            });
         (sim, victim)
     }
     for fixture in [dying, preyed] {
@@ -886,9 +888,9 @@ fn a_removal_between_ticks_ends_the_window_with_its_cause() {
 fn typed_food_reader_genome() -> CreatureGenome {
     let fruit = OrdinaryFoodTypeId::new(1);
     let grass = OrdinaryFoodTypeId::new(0);
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![
                 InputReference::World(WorldInputKey::food_here(grass)),
@@ -902,7 +904,8 @@ fn typed_food_reader_genome() -> CreatureGenome {
             }),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 #[test]

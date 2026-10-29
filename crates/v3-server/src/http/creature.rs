@@ -322,7 +322,7 @@ pub async fn get_creature(
         .get(creature_id)
         .ok_or_else(|| AppError::NotFound(format!("creature {id} not found")))?;
 
-    let rgb = channels_to_rgb(creature.body.phenotype.channels);
+    let rgb = channels_to_rgb(creature.genome().body().colour().channels());
     let exclude: std::collections::HashSet<&str> = query
         .exclude
         .as_deref()
@@ -378,17 +378,17 @@ pub async fn get_creature(
         },
         energy: creature.energy,
         max_energy: creature.energy_cap(),
-        steal_share: creature.body.steal_share,
-        give_share: creature.body.give_share,
+        steal_share: creature.genome().body().steal_share(),
+        give_share: creature.genome().body().give_share(),
         age: creature.age,
         generation: creature.generation,
         heading: creature.heading,
         complexity: creature.complexity(),
         genome_size: creature.genome().genome_size(),
         phenotype: CreaturePhenotypeResponse {
-            channels: creature.body.phenotype.channels,
-            active_channel: creature.body.phenotype.active_channel,
-            polarity: creature.body.phenotype.polarity,
+            channels: creature.genome().body().colour().channels(),
+            active_channel: creature.genome().body().colour().active_channel(),
+            polarity: creature.genome().body().colour().polarity(),
             rgb,
         },
         latest_tick,

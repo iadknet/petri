@@ -14,9 +14,9 @@ use rand::SeedableRng;
 use std::collections::HashSet;
 
 fn move_north_with_barrier_reader_genome() -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
             BackendDef::Vm(VmBackendDef {
@@ -39,13 +39,14 @@ fn move_north_with_barrier_reader_genome() -> CreatureGenome {
             }),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 fn reproduce_north_with_barrier_reader_genome() -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
             BackendDef::Vm(VmBackendDef {
@@ -68,7 +69,8 @@ fn reproduce_north_with_barrier_reader_genome() -> CreatureGenome {
             }),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 #[test]
@@ -136,9 +138,9 @@ fn zero_transfer_reproduction_records_a_too_small_litter_in_action_log() {
 #[test]
 fn tick_action_log_records_applied_food_type_amount_and_result() {
     // Arrange
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -159,7 +161,8 @@ fn tick_action_log_records_applied_food_type_amount_and_result() {
             }),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let (mut sim, id) = make_sim_with_custom_genome(10.0, genome);
     sim.config
         .world
@@ -623,15 +626,16 @@ fn reproduction_resets_child_reward_credit_and_keeps_parent_trace() {
                 retention: 1.0,
             }),
         ));
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![],
                 BackendDef::Graph(def),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         let (mut sim, parent) = make_sim_with_custom_genome(1000.0, genome);
         sim.config.mutation.per_unit_rate = 0.0;
         sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
@@ -781,9 +785,9 @@ fn founder_reproduce_charge_is_bit_identical_with_and_without_the_replication_ra
 /// A one-node VM genome that eats the named food type: write the type index
 /// to the `EatFoodType` field the commit decodes, then vote one `Eat`.
 fn eat_type_genome(type_idx: u16) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -808,7 +812,8 @@ fn eat_type_genome(type_idx: u16) -> CreatureGenome {
             }),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 /// Give an existing simulation a second food type, keeping the world's food
@@ -918,9 +923,9 @@ fn failed_typed_eat_counters_rise_only_for_the_type_the_action_named() {
 /// the cell (T02.F08): write `EatLeaveShare`, then vote one `Eat`.
 fn eat_leave_genome(leave: f32) -> CreatureGenome {
     use crate::contracts::votes::{ActionParamField, VoteSink};
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -948,7 +953,8 @@ fn eat_leave_genome(leave: f32) -> CreatureGenome {
             }),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 /// T02.F08: an applied partial eat through `execute_eat` keeps

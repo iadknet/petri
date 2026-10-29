@@ -1,7 +1,7 @@
-//! T25.F02 unit rule: `genome_size()` charges one unit per edge on both graph
+//! T25.F02 unit rule: `brain_units()` charges one unit per edge on both graph
 //! surfaces, nothing for a wired sink itself, and (T25.F03, T25.F10) one unit
 //! per edge-bundle record and nothing for its members, so a gene of either
-//! shape costs one unit.
+//! shape costs one unit; `genome_size()` adds the five body genes (T29.F02).
 use proptest::prelude::*;
 
 use crate::config::OrdinaryFoodTypeId;
@@ -21,9 +21,9 @@ fn leaf(ref_idx: u16) -> GraphSource {
 }
 
 fn graph_genome(def: CgpGraphBackendDef, refs: usize, targets: u8) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![
                 InputReference::World(WorldInputKey::FoodHere {
@@ -40,7 +40,8 @@ fn graph_genome(def: CgpGraphBackendDef, refs: usize, targets: u8) -> CreatureGe
                 })
                 .collect(),
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 /// A sink with two edges costs its two edges (3 units under the old rule, 2
@@ -49,7 +50,7 @@ fn graph_genome(def: CgpGraphBackendDef, refs: usize, targets: u8) -> CreatureGe
 fn genome_size_charges_no_wired_sink_unit() {
     let unwired = graph_genome(CgpGraphBackendDef::new_with_fixed_outputs(), 1, 0);
     // 1 mesh node + 1 input reference; the fixed outputs are unwired.
-    assert_eq!(unwired.genome_size(), 2);
+    assert_eq!(unwired.brain_units(), 2);
 
     let wired = graph_genome(
         CgpGraphBackendDef::new_with_fixed_outputs().with_sink_inputs(
@@ -59,7 +60,7 @@ fn genome_size_charges_no_wired_sink_unit() {
         1,
         0,
     );
-    assert_eq!(wired.genome_size(), 2 + 2);
+    assert_eq!(wired.brain_units(), 2 + 2);
 }
 
 /// T25.F10 invariant 1: a `Ring` gene costs one unit, a pair gene with its
@@ -76,7 +77,7 @@ fn a_gene_costs_one_unit_and_its_members_nothing() {
     let size = |def: &CgpGraphBackendDef| {
         let mut genome = graph_genome(def.clone(), 0, 0);
         genome.nodes[0].input_refs = refs.to_vec();
-        genome.genome_size()
+        genome.brain_units()
     };
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     let base = size(&def);
@@ -166,9 +167,10 @@ fn def_strategy() -> impl Strategy<Value = CgpGraphBackendDef> {
 }
 
 proptest! {
-    /// `genome_size` is the unit rule's sum: mesh node + input references +
+    /// `brain_units` is the unit rule's sum: mesh node + input references +
     /// route targets + compute nodes + compute edges + sink edges with no
-    /// membership + 1 per bundle record (T25.F10), whatever the generated def.
+    /// membership + 1 per bundle record (T25.F10), whatever the generated
+    /// def, and `genome_size` adds one unit per body gene (T29.F02).
     #[test]
     fn genome_size_is_the_unit_rule_sum(
         def in def_strategy(),
@@ -187,6 +189,7 @@ proptest! {
         let expected = 1 + refs + usize::from(targets) + compute_nodes + compute_edges + sink_edges
             + bundles;
         let genome = graph_genome(def, refs, targets);
-        prop_assert_eq!(genome.genome_size() as usize, expected);
+        prop_assert_eq!(genome.brain_units() as usize, expected);
+        prop_assert_eq!(genome.genome_size() as usize, expected + 5);
     }
 }

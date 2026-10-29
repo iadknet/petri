@@ -40,9 +40,9 @@ fn constants() -> Vec<f32> {
 }
 
 fn vm_genome(program: Vec<VmInstruction>) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             Vec::new(),
             BackendDef::Vm(VmBackendDef {
@@ -52,7 +52,8 @@ fn vm_genome(program: Vec<VmInstruction>) -> CreatureGenome {
             }),
             Vec::new(),
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 fn program_of(genome: &CreatureGenome) -> Vec<VmInstruction> {

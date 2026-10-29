@@ -247,9 +247,12 @@ fn the_catalog_places_the_bundle_operators_at_their_tiers() {
 /// one (T25.F11 invariant 7).
 #[test]
 fn applicability_follows_sources_bundles_and_wirings() {
-    let genome = |refs, def| CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![graph_node(refs, def)],
+    let genome = |refs, def| {
+        CreatureGenome::new(
+            NodeId::new(0),
+            vec![graph_node(refs, def)],
+            crate::creature::founder::default_founder_body(),
+        )
     };
     let full = CgpGraphBackendDef::new_with_fixed_outputs;
     let bare = genome(vec![], full());
@@ -275,9 +278,9 @@ fn applicability_follows_sources_bundles_and_wirings() {
         let geometric_only = op == GraphOperator::ShiftBundleOffset;
         assert_eq!(applies(&plain_only, op), !geometric_only, "{op:?}");
     }
-    let vm = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let vm = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![barrier()],
             BackendDef::Vm(VmBackendDef {
@@ -287,7 +290,8 @@ fn applicability_follows_sources_bundles_and_wirings() {
             }),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     for op in BUNDLE_OPERATORS {
         assert!(!applies(&vm, op), "{op:?}");
     }
@@ -331,13 +335,14 @@ fn creation_sources() -> Vec<(BundleSource, FieldSet)> {
 /// graph declaring [`creation_refs`]; returns the node and the event's RNG
 /// after it.
 fn create(op: GraphOperator, seed: u64) -> (NodeGenome, SmallRng) {
-    let mut genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![graph_node(
+    let mut genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![graph_node(
             creation_refs(),
             CgpGraphBackendDef::new_with_fixed_outputs(),
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let mut rng = SmallRng::seed_from_u64(seed);
     GraphMutator::apply_to_node(
         &mut genome,
@@ -706,10 +711,11 @@ fn the_mutator_dispatches_each_unit_operator_to_its_bundle_edit() {
     for (op, edit) in cases {
         for seed in 0..16 {
             // Arrange
-            let mut genome = CreatureGenome {
-                entry_node_id: NodeId::new(0),
-                nodes: vec![graph_node(refs(), three())],
-            };
+            let mut genome = CreatureGenome::new(
+                NodeId::new(0),
+                vec![graph_node(refs(), three())],
+                crate::creature::founder::default_founder_body(),
+            );
             let mut direct = graph_node(refs(), three());
 
             // Act
@@ -892,9 +898,12 @@ proptest::proptest! {
 /// it skips without a draw where none is.
 #[test]
 fn applicability_follows_members_for_detach() {
-    let genome = |def| CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![graph_node(refs(), def)],
+    let genome = |def| {
+        CreatureGenome::new(
+            NodeId::new(0),
+            vec![graph_node(refs(), def)],
+            crate::creature::founder::default_founder_body(),
+        )
     };
     let op = GraphOperator::DetachGraphEdge;
     let plain = genome(CgpGraphBackendDef::new_with_fixed_outputs());
@@ -937,10 +946,11 @@ fn applicability_follows_members_for_detach() {
 fn add_graph_edge_never_joins_a_bundle() {
     let mut onto_a_bundle_sink = false;
     for seed in 0..256 {
-        let mut genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![graph_node(refs(), three())],
-        };
+        let mut genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![graph_node(refs(), three())],
+            crate::creature::founder::default_founder_body(),
+        );
         let before = graph(&genome.nodes[0]).clone();
         let mut rng = SmallRng::seed_from_u64(seed);
         let config = MutationConfig::default();

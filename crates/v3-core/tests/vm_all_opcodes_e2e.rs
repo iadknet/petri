@@ -13,9 +13,6 @@ use v3_core::config::SimulationConfig;
 use v3_core::contracts::{
     CreatureId, InputReference, NodeId, Position, WorldAction, WorldInputKey,
 };
-use v3_core::creature::body::HeritableBody;
-use v3_core::creature::identity::CreatureIdentityState;
-use v3_core::creature::phenotype::Phenotype;
 use v3_core::creature::state::CreatureState;
 use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use v3_core::kernel::WorldState;
@@ -159,9 +156,9 @@ fn sample_vm_program() -> Vec<VmInstruction> {
 }
 
 fn sample_vm_genome() -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![InputReference::World(WorldInputKey::FoodHere {
                 type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
@@ -173,7 +170,8 @@ fn sample_vm_genome() -> CreatureGenome {
             }),
             vec![],
         )],
-    }
+        v3_core::creature::founder::default_founder_body(),
+    )
 }
 
 fn expected_all_opcode_discriminants() -> HashSet<Discriminant<VmInstruction>> {
@@ -286,25 +284,16 @@ fn build_simulation(food_here: f32) -> (Simulation, CreatureId, Position) {
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let genome = sample_vm_genome();
     let id = creatures.insert_with_key(|cid| {
-        v3_core::creature::birth::Zygote::founder(
-            genome.clone(),
-            HeritableBody {
-                phenotype: Phenotype::FOUNDER,
-                identity: CreatureIdentityState::default(),
-                capacity: 200.0,
-                steal_share: 0.2,
-                give_share: 0.2,
-            },
-        )
-        .finalize(
-            cid,
-            v3_core::creature::birth::BirthPlace {
-                position: pos,
-                heading: v3_core::contracts::Direction::N,
-                energy: 100.0,
-            },
-        )
-        .creature
+        v3_core::creature::birth::Zygote::founder(genome.clone(), 0)
+            .finalize(
+                cid,
+                v3_core::creature::birth::BirthPlace {
+                    position: pos,
+                    heading: v3_core::contracts::Direction::N,
+                    energy: 100.0,
+                },
+            )
+            .creature
     });
     world.place_creature(pos, id);
 

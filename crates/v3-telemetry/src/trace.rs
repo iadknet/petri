@@ -423,26 +423,24 @@ pub(crate) fn actions(a: &mut Attributes, config: &SimulationConfig) {
         mutation.mesh_layer_probability,
     );
     a.double(config_key("mutation.executed_bias"), mutation.executed_bias);
-    // The move factor and the birth's capacity draw and cap (T26.F02).
+    // The move factor and the capacity gene's step and cap (T26.F02, T29.F02).
     let capacity = &config.energy.capacity;
     for (key, value) in [
         ("energy.capacity.reference", capacity.reference),
         ("energy.capacity.min", capacity.min),
         ("energy.capacity.move_cost_slope", capacity.move_cost_slope),
         ("energy.lifecycle.max_energy", lifecycle.max_energy),
-        ("mutation.capacity.chance", mutation.capacity.chance),
         ("mutation.capacity.log_step", mutation.capacity.log_step),
     ] {
         a.double(config_key(key), value);
     }
-    // The exchange acts' effort rate, the share range and the birth's share
-    // draw (T27.F03).
+    // The exchange acts' effort rate, the share range and the share genes'
+    // step (T27.F03, T29.F02).
     let exchange = &config.exchange;
     for (key, value) in [
         ("exchange.effort_rate", exchange.effort_rate),
         ("exchange.share_min", exchange.share_min),
         ("exchange.founder_share", exchange.founder_share),
-        ("mutation.share.chance", mutation.share.chance),
         ("mutation.share.log_step", mutation.share.log_step),
     ] {
         a.double(config_key(key), value);

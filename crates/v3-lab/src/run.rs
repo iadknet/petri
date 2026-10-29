@@ -364,6 +364,7 @@ fn load_genomes(params: &RunParams, reference: &SimulationConfig) -> Result<Geno
     let production_founder = founder_genome_with_age_gate(
         reference.population.founder_profile,
         &reference.energy.lifecycle,
+        v3_core::creature::founder::default_founder_body(),
     );
     let start = match &params.genome {
         Some(path) => GenomeFile::load(path)?,

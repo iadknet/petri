@@ -47,15 +47,19 @@ fn bundle(
 }
 
 fn single(def: CgpGraphBackendDef, refs: Vec<InputReference>) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![node(0, refs, def)],
-    }
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![node(0, refs, def)],
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 #[test]
 fn the_founder_carries_one_food_rule_covering_its_four_cardinals() {
-    let census = census_of(&[founder_genome(FounderProfile::default())]);
+    let census = census_of(&[founder_genome(
+        FounderProfile::default(),
+        crate::creature::founder::default_founder_body(),
+    )]);
     assert_eq!(census.creatures, 1);
     assert_eq!(
         census.rule_rows(),
@@ -123,10 +127,11 @@ fn bus_hop_read(sender_channel: u16, reader: InputReference, sub_idx: u16) -> Cr
         slot: 0,
         gate_bias: 1.0,
     });
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![entry, node(1, vec![reader], receiver)],
-    }
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![entry, node(1, vec![reader], receiver)],
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 #[test]
@@ -300,13 +305,14 @@ fn a_ring_bundle_covers_every_direction_once_it_carries_weight() {
 fn a_ring_bundle_on_an_unreachable_node_is_counted_apart() {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
     bundle(&mut def, DirectedVoteKind::Move, 0, 1.0);
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             node(0, vec![], CgpGraphBackendDef::new_with_fixed_outputs()),
             node(1, vec![barrier()], def),
         ],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let census = census_of(&[genome]);
     assert_eq!(census.ring_bundles, 0);
     assert_eq!(census.ring_bundle_carriers, 0);

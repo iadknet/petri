@@ -15,8 +15,9 @@ pub(crate) use transaction::{resolve, ActionInputs, Applied, Conception};
 
 use crate::config::{EnergyConfig, OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{ActionOutcome, ActionResult, CreatureId, Direction};
-use crate::creature::body::HeritableBody;
+use crate::creature::body::move_factor;
 use crate::creature::state::CreatureState;
+use crate::genome::body::BodyGenome;
 use crate::kernel::WorldState;
 use crate::ledger::{applied_debit, DeathCause, EnergyFlows};
 
@@ -202,13 +203,13 @@ pub fn apply_typed_eat(
 }
 
 /// The effort one move charges, successful or blocked (T26.F02): the move
-/// base scaled by the body's [`HeritableBody::move_factor`], through
+/// base scaled by the body's [`move_factor`], through
 /// [`EnergyConfig::action_effort`] at the actor's `complexity` and `age`, so
 /// the noop floor still holds.
 #[must_use]
-pub fn move_effort(body: &HeritableBody, energy: &EnergyConfig, complexity: u32, age: u64) -> f32 {
+pub fn move_effort(body: &BodyGenome, energy: &EnergyConfig, complexity: u32, age: u64) -> f32 {
     energy.action_effort(
-        energy.costs.move_cost * body.move_factor(&energy.capacity),
+        energy.costs.move_cost * move_factor(body, &energy.capacity),
         complexity,
         age,
     )
@@ -242,7 +243,7 @@ pub fn apply_move(
     };
 
     let move_effort = move_effort(
-        &creature.body,
+        creature.genome().body(),
         &config.energy,
         creature.complexity(),
         creature.age,
@@ -266,12 +267,11 @@ mod tests {
     use crate::config::{FounderProfile, SimulationConfig};
     use crate::contracts::Position;
     use crate::creature::action_log::ActionType;
-    use crate::creature::body::HeritableBody;
     use crate::creature::founder::{
         founder_genome, founder_reproduce_policy, v3alpha1_founder_genome,
     };
-    use crate::creature::identity::CreatureIdentityState;
-    use crate::creature::phenotype::Phenotype;
+    use crate::genome::body::BodyGenome;
+    use crate::genome::body::Phenotype;
     use crate::kernel::WorldState;
     use crate::simulation::seeding::seed_simulation;
     use crate::simulation::simulation::Simulation;
@@ -280,14 +280,8 @@ mod tests {
     use slotmap::SlotMap;
 
     /// A founder-phenotype body with the default identity.
-    fn founder_body() -> HeritableBody {
-        HeritableBody {
-            phenotype: Phenotype::FOUNDER,
-            identity: CreatureIdentityState::default(),
-            capacity: 200.0,
-            steal_share: 0.2,
-            give_share: 0.2,
-        }
+    fn founder_body() -> BodyGenome {
+        BodyGenome::new(Phenotype::FOUNDER, 0, 200.0, 0.2, 0.2)
     }
 
     fn small_config() -> SimulationConfig {
@@ -318,7 +312,8 @@ mod tests {
         world.reconfigure_food(cfg.world.food.clone());
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
         let id = creatures.insert_with_key(|id| {
-            crate::creature::birth::Zygote::founder(genome, founder_body()).born_at(id, pos, energy)
+            crate::creature::birth::Zygote::founder(genome.with_body(founder_body()), 0)
+                .born_at(id, pos, energy)
         });
         world.place_creature(pos, id);
         let sim = Simulation {
@@ -510,12 +505,18 @@ mod tests {
         let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
         let id1 = creatures.insert_with_key(|id| {
-            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
-                .born_at(id, pos1, 50.0)
+            crate::creature::birth::Zygote::founder(
+                v3alpha1_founder_genome().with_body(founder_body()),
+                0,
+            )
+            .born_at(id, pos1, 50.0)
         });
         let id2 = creatures.insert_with_key(|id| {
-            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
-                .born_at(id, pos2, 50.0)
+            crate::creature::birth::Zygote::founder(
+                v3alpha1_founder_genome().with_body(founder_body()),
+                0,
+            )
+            .born_at(id, pos2, 50.0)
         });
         world.place_creature(pos1, id1);
         world.place_creature(pos2, id2);
@@ -674,12 +675,18 @@ mod tests {
         let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
         let parent = creatures.insert_with_key(|id| {
-            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
-                .born_at(id, pos, 80.0)
+            crate::creature::birth::Zygote::founder(
+                v3alpha1_founder_genome().with_body(founder_body()),
+                0,
+            )
+            .born_at(id, pos, 80.0)
         });
         let blocker = creatures.insert_with_key(|id| {
-            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
-                .born_at(id, north, 80.0)
+            crate::creature::birth::Zygote::founder(
+                v3alpha1_founder_genome().with_body(founder_body()),
+                0,
+            )
+            .born_at(id, north, 80.0)
         });
         world.place_creature(pos, parent);
         world.place_creature(north, blocker);
@@ -1010,7 +1017,7 @@ mod tests {
             sim.config.mutation.genome_size_pressure_enabled = true;
             sim.config.mutation.genome_size_cap = 1;
 
-            let parent_channels = sim.creatures[parent_id].body.phenotype.channels;
+            let parent_channels = sim.creatures[parent_id].genome().body().colour().channels();
             let parent_generation = sim.creatures[parent_id].generation;
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
             let result = reproduce_now(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
@@ -1024,7 +1031,8 @@ mod tests {
                     .find(|c| c.generation == parent_generation + 1)
                     .expect("child must exist when reproduction spawned");
                 assert_ne!(
-                    child.body.phenotype.channels, parent_channels,
+                    child.genome().body().colour().channels(),
+                    parent_channels,
                     "applied event must still trigger phenotype mutation"
                 );
                 observed = true;
@@ -1038,8 +1046,11 @@ mod tests {
         );
     }
 
+    /// A birth whose brain events were all skipped still draws the body's
+    /// own supply (T29.F02 invariant 3): at rate 1.0 its five body events
+    /// apply and the child's body is the parent's after them.
     #[test]
-    fn skipped_only_mutation_event_does_not_trigger_phenotype_mutation() {
+    fn a_birth_with_only_skipped_brain_events_still_applies_its_body_supply() {
         use crate::contracts::NodeId;
         use crate::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
 
@@ -1048,9 +1059,9 @@ mod tests {
 
         for seed in 0u64..10_000 {
             // Bias toward skipped mutations: no Graph nodes, no input refs, no route targets.
-            let genome = crate::genome::CreatureGenome {
-                entry_node_id: NodeId::new(0),
-                nodes: vec![NodeGenome::new(
+            let genome = crate::genome::CreatureGenome::new(
+                NodeId::new(0),
+                vec![NodeGenome::new(
                     NodeId::new(0),
                     vec![],
                     BackendDef::Vm(VmBackendDef {
@@ -1060,7 +1071,8 @@ mod tests {
                     }),
                     vec![],
                 )],
-            };
+                crate::creature::founder::default_founder_body(),
+            );
             let (mut sim, parent_id) = make_sim_one_founder(genome, pos, 80.0);
             sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
             // Rate 1.0: every genome unit requests one event.
@@ -1069,12 +1081,13 @@ mod tests {
             sim.config.mutation.phenotype.polarity_flip_chance = 0.0;
             sim.config.mutation.phenotype.channel_step = 1;
 
-            let parent_channels = sim.creatures[parent_id].body.phenotype.channels;
+            let parent_body = *sim.creatures[parent_id].genome().body();
             let parent_generation = sim.creatures[parent_id].generation;
             let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
             let result = reproduce_now(parent_id, &mut sim, Direction::N, 0.5, &mut rng);
+            let body_events = u64::from(crate::genome::body::BodyGenome::UNITS);
             if result == ReproductionActionResult::Conceived
-                && sim.stats.mutation_events_applied_total == 0
+                && sim.stats.mutation_events_applied_total == body_events
                 && sim.stats.mutation_events_skipped_total > 0
             {
                 let child = sim
@@ -1082,9 +1095,10 @@ mod tests {
                     .values()
                     .find(|c| c.generation == parent_generation + 1)
                     .expect("child must exist when reproduction spawned");
-                assert_eq!(
-                    child.body.phenotype.channels, parent_channels,
-                    "skipped-only mutation event must not trigger phenotype mutation"
+                assert_ne!(
+                    child.genome().body(),
+                    &parent_body,
+                    "the body's own events apply whatever the brain's did"
                 );
                 observed = true;
                 break;
@@ -1093,7 +1107,7 @@ mod tests {
 
         assert!(
             observed,
-            "expected at least one spawned child with skipped-only mutation event"
+            "expected at least one spawned child whose brain events all skipped"
         );
     }
 
@@ -1200,10 +1214,14 @@ mod tests {
             ReproductionActionResult::Conceived
         );
 
-        // Assert: the rejected events are counted, and nothing applied.
+        // Assert: the rejected events are counted, and only the five body
+        // events, which no gate reads, applied.
         let skipped = skipped_funnel_total(&sim);
         assert!(skipped > 0, "a rejected operator is a skipped funnel event");
-        assert_eq!(applied_funnel_total(&sim), 0);
+        assert_eq!(
+            applied_funnel_total(&sim),
+            u64::from(crate::genome::body::BodyGenome::UNITS)
+        );
         assert!(skipped <= sim.stats.mutation_events_skipped_total);
 
         // Act: a second birth from the same parent.
@@ -1335,12 +1353,18 @@ mod tests {
         let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
         let id1 = creatures.insert_with_key(|id| {
-            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
-                .born_at(id, pos1, 50.0)
+            crate::creature::birth::Zygote::founder(
+                v3alpha1_founder_genome().with_body(founder_body()),
+                0,
+            )
+            .born_at(id, pos1, 50.0)
         });
         let _id2 = creatures.insert_with_key(|id| {
-            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
-                .born_at(id, pos2, 50.0)
+            crate::creature::birth::Zygote::founder(
+                v3alpha1_founder_genome().with_body(founder_body()),
+                0,
+            )
+            .born_at(id, pos2, 50.0)
         });
         world.place_creature(pos1, id1);
         world.place_creature(pos2, _id2);
@@ -1445,9 +1469,9 @@ mod tests {
         // `Terminate`, which commits nothing.
         let instruction_count = (min_complexity.saturating_sub(1)) as usize;
         let program = vec![VmInstruction::AddVote { sink: 25, src: 0 }; instruction_count];
-        CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![],
                 BackendDef::Vm(VmBackendDef {
@@ -1457,7 +1481,8 @@ mod tests {
                 }),
                 vec![],
             )],
-        }
+            crate::creature::founder::default_founder_body(),
+        )
     }
 
     /// Create a sim with one creature that has the given genome.
@@ -1471,7 +1496,8 @@ mod tests {
         let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
         let id = creatures.insert_with_key(|id| {
-            crate::creature::birth::Zygote::founder(genome, founder_body()).born_at(id, pos, energy)
+            crate::creature::birth::Zygote::founder(genome.with_body(founder_body()), 0)
+                .born_at(id, pos, energy)
         });
         world.place_creature(pos, id);
         let sim = Simulation {
@@ -1650,8 +1676,11 @@ mod tests {
         // Add a victim to the north
         let victim_pos = Position::new(5, 4);
         let victim_id_low = sim_low.creatures.insert_with_key(|id| {
-            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
-                .born_at(id, victim_pos, 50.0)
+            crate::creature::birth::Zygote::founder(
+                v3alpha1_founder_genome().with_body(founder_body()),
+                0,
+            )
+            .born_at(id, victim_pos, 50.0)
         });
         sim_low.world.place_creature(victim_pos, victim_id_low);
         let energy_before_low = sim_low.creatures[attacker_low].energy;
@@ -1662,8 +1691,11 @@ mod tests {
         let (mut sim_high, attacker_high) =
             make_sim_with_genome(Position::new(5, 5), 100.0, high_genome);
         let victim_id_high = sim_high.creatures.insert_with_key(|id| {
-            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
-                .born_at(id, victim_pos, 50.0)
+            crate::creature::birth::Zygote::founder(
+                v3alpha1_founder_genome().with_body(founder_body()),
+                0,
+            )
+            .born_at(id, victim_pos, 50.0)
         });
         sim_high.world.place_creature(victim_pos, victim_id_high);
         let energy_before_high = sim_high.creatures[attacker_high].energy;
@@ -1830,8 +1862,11 @@ mod tests {
         // Young attacker
         let (mut sim_young, attacker_young) = make_sim_one_creature(Position::new(5, 5), 100.0);
         let victim_young = sim_young.creatures.insert_with_key(|id| {
-            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
-                .born_at(id, victim_pos, 50.0)
+            crate::creature::birth::Zygote::founder(
+                v3alpha1_founder_genome().with_body(founder_body()),
+                0,
+            )
+            .born_at(id, victim_pos, 50.0)
         });
         sim_young.world.place_creature(victim_pos, victim_young);
         let energy_before_young = sim_young.creatures[attacker_young].energy;
@@ -1842,8 +1877,11 @@ mod tests {
         let (mut sim_old, attacker_old) = make_sim_one_creature(Position::new(5, 5), 100.0);
         sim_old.creatures[attacker_old].age = 400;
         let victim_old = sim_old.creatures.insert_with_key(|id| {
-            crate::creature::birth::Zygote::founder(v3alpha1_founder_genome(), founder_body())
-                .born_at(id, victim_pos, 50.0)
+            crate::creature::birth::Zygote::founder(
+                v3alpha1_founder_genome().with_body(founder_body()),
+                0,
+            )
+            .born_at(id, victim_pos, 50.0)
         });
         sim_old.world.place_creature(victim_pos, victim_old);
         let energy_before_old = sim_old.creatures[attacker_old].energy;
@@ -1873,8 +1911,11 @@ mod tests {
         let policy = founder_reproduce_policy(profile);
         let scale = SimulationConfig::default().energy.capacity.reference;
         let energy = (policy.energy_threshold * scale).next_up();
-        let (mut sim, id) =
-            make_sim_one_founder(founder_genome(profile), Position::new(5, 5), energy);
+        let (mut sim, id) = make_sim_one_founder(
+            founder_genome(profile, crate::creature::founder::default_founder_body()),
+            Position::new(5, 5),
+            energy,
+        );
         sim.creatures[id].age = FOUNDER_MARGIN_MAX_AGE + 1;
         let result = reproduce_now(
             id,
@@ -1913,7 +1954,7 @@ mod tests {
             // draws 0.0, the capacity when it draws 1.0.
             let threshold = policy.energy_threshold * max_energy;
             let energy = (threshold + unit * (max_energy - threshold)).max(threshold.next_up());
-            let (mut sim, id) = make_sim_one_founder(founder_genome(profile), Position::new(5, 5), energy);
+            let (mut sim, id) = make_sim_one_founder(founder_genome(profile, crate::creature::founder::default_founder_body()), Position::new(5, 5), energy);
             proptest::prop_assert!(age >= sim.config.energy.lifecycle.min_reproduce_age);
             sim.creatures[id].age = age;
             let result = reproduce_now(id, &mut sim, Direction::N, policy.transfer_fraction, &mut rand::rngs::SmallRng::seed_from_u64(7));
@@ -2048,7 +2089,9 @@ mod tests {
     #[test]
     fn empty_eat_does_not_clamp_energy_after_live_maximum_is_lowered() {
         let (mut sim, id) = make_sim_one_creature(Position::new(3, 3), 50.0);
-        sim.creatures[id].body.capacity = 20.0;
+        sim.creatures[id] = crate::creature::birth::Zygote::reborn(&sim.creatures[id], |body| {
+            body.with_capacity(20.0)
+        });
         sim.config.energy.costs.eat_cost = 2.0;
         assert_eq!(
             apply_typed_eat(

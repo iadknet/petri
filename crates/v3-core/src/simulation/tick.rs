@@ -185,7 +185,7 @@ fn run_phase_0_creatures(sim: &mut Simulation) {
             lifecycle.energy_decay_per_tick,
             lifecycle.genome_carry_cost_per_unit,
             creature.genome_size(),
-            creature.body.upkeep(capacity),
+            crate::creature::body::upkeep(creature.genome().body(), capacity),
         )
         .settle(energy_before);
         creature.energy = settled.after;
@@ -954,9 +954,9 @@ mod final_action_observation_tests {
     use rand::RngCore;
 
     fn memory_direction_genome() -> CreatureGenome {
-        CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![],
                 BackendDef::Vm(VmBackendDef {
@@ -992,14 +992,15 @@ mod final_action_observation_tests {
                 }),
                 vec![],
             )],
-        }
+            crate::creature::founder::default_founder_body(),
+        )
     }
 
     fn runtime_state_action_genome() -> CreatureGenome {
         let runtime_output = GraphEdge::new(GraphSource::ComputeNode(0), 1.0);
-        CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![],
                 BackendDef::Graph(
@@ -1017,7 +1018,8 @@ mod final_action_observation_tests {
                 ),
                 vec![],
             )],
-        }
+            crate::creature::founder::default_founder_body(),
+        )
     }
 
     fn expected_memory_action(value: f32) -> Vec<WorldAction> {

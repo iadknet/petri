@@ -13,10 +13,11 @@ use crate::sensors::typed_food::TypedFoodLocalSnapshot;
 use proptest::prelude::*;
 
 fn genome(backend_def: BackendDef) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(NodeId::new(0), vec![], backend_def, vec![])],
-    }
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(NodeId::new(0), vec![], backend_def, vec![])],
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 fn sensors() -> SensorSnapshot {

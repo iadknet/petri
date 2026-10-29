@@ -1088,9 +1088,9 @@ mod tests {
             "petri-sweep-capacity-recipe-{}.json",
             std::process::id()
         ));
-        for (founder, scale, slope, upkeep, chance, rate) in [
+        for (founder, scale, slope, upkeep, log_step, rate) in [
             (50.0, "own", 0.0, 0.0, 0.0, 0.0),
-            (800.0, "reference", 1.0, 0.002, 0.1, 0.0060625),
+            (800.0, "reference", 1.0, 0.002, 0.25, 0.005),
         ] {
             let recipe = serde_json::json!({
                 "world": {"width": 12, "height": 9},
@@ -1101,7 +1101,7 @@ mod tests {
                     "move_cost_slope": slope,
                     "upkeep_per_unit": upkeep
                 }},
-                "mutation": {"per_unit_rate": rate, "capacity": {"chance": chance}}
+                "mutation": {"per_unit_rate": rate, "capacity": {"log_step": log_step}}
             });
             std::fs::write(&path, recipe.to_string()).unwrap();
             let args = BenchArgs {
@@ -1121,7 +1121,7 @@ mod tests {
             assert_eq!(capacity.sensor_scale, expected_scale);
             assert_eq!(capacity.move_cost_slope, slope);
             assert_eq!(capacity.upkeep_per_unit, upkeep);
-            assert_eq!(config.mutation.capacity.chance, chance);
+            assert_eq!(config.mutation.capacity.log_step, log_step);
             assert_eq!(config.mutation.per_unit_rate, rate);
         }
         std::fs::remove_file(&path).unwrap();

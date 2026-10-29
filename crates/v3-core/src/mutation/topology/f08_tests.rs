@@ -56,10 +56,11 @@ fn worker_node() -> NodeGenome {
 }
 
 fn chain_genome() -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![entry_node(1), worker_node()],
-    }
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![entry_node(1), worker_node()],
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 fn apply(

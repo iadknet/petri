@@ -88,9 +88,9 @@ fn seed_simulation_default() -> crate::simulation::Simulation {
 #[test]
 fn run_tick_accumulates_reward_modulated_plasticity_update_in_phase_2_5() {
     let node_id = NodeId::new(0);
-    let genome = CreatureGenome {
-        entry_node_id: node_id,
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        node_id,
+        vec![NodeGenome::new(
             node_id,
             vec![],
             BackendDef::Graph(
@@ -120,7 +120,8 @@ fn run_tick_accumulates_reward_modulated_plasticity_update_in_phase_2_5() {
             ),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
 
     let (mut sim, _id) = make_sim_with_custom_genome(100.0, genome);
 
@@ -227,9 +228,9 @@ fn mixed_learning_genome(hebbian_edges: usize, reward_edges: usize) -> CreatureG
             }),
         )
     };
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Graph(
@@ -244,7 +245,8 @@ fn mixed_learning_genome(hebbian_edges: usize, reward_edges: usize) -> CreatureG
             ),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 #[test]

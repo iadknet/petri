@@ -614,10 +614,11 @@ mod tests {
     #[test]
     fn compact_observation_records_only_applied_routes_and_real_cap_termination() {
         let id = NodeId::new(0);
-        let mut genome = CreatureGenome {
-            entry_node_id: id,
-            nodes: vec![vm_halt_with_route(id, 1.0, vec![id])],
-        };
+        let mut genome = CreatureGenome::new(
+            id,
+            vec![vm_halt_with_route(id, 1.0, vec![id])],
+            crate::creature::founder::default_founder_body(),
+        );
         let config = RuntimeConfig {
             max_mesh_hops: 2,
             ..default_config()
@@ -716,10 +717,8 @@ mod tests {
             ),
         ];
         for (nodes, start, expected) in cases {
-            let genome = CreatureGenome {
-                entry_node_id: id,
-                nodes,
-            };
+            let genome =
+                CreatureGenome::new(id, nodes, crate::creature::founder::default_founder_body());
             let mut energy = start;
             let plain = execute_creature_mesh(
                 &genome,
@@ -813,9 +812,9 @@ mod tests {
                 ],
             );
         }
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![
                 vm,
                 NodeGenome::new(
                     NodeId::new(1),
@@ -824,7 +823,8 @@ mod tests {
                     wrap_targets(vec![NodeId::new(1)]),
                 ),
             ],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         for starting_energy in [0.0, 0.01, 2.0, 100.0] {
             let mut energy = starting_energy;
             let mut observed_energy = energy;
@@ -1022,10 +1022,11 @@ mod tests {
     /// A genome with no nodes — entry_node_id is not in the node set.
     #[test]
     fn missing_entry_node_returns_noop() {
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(99),
-            nodes: vec![],
-        };
+        let genome = CreatureGenome::new(
+            NodeId::new(99),
+            vec![],
+            crate::creature::founder::default_founder_body(),
+        );
         let ss = empty_sensor_snapshot();
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
@@ -1112,9 +1113,9 @@ mod tests {
     #[test]
     fn empty_targets_returns_noop() {
         let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            id0,
+            vec![NodeGenome::new(
                 id0,
                 vec![],
                 BackendDef::Vm(VmBackendDef {
@@ -1125,7 +1126,8 @@ mod tests {
                 // no targets
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         let ss = empty_sensor_snapshot();
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
@@ -1154,9 +1156,9 @@ mod tests {
     fn energy_exhaustion_returns_noop() {
         let id0 = NodeId::new(0);
         // Noop costs 0.05; with energy=0.01 the first opcode exhausts energy.
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            id0,
+            vec![NodeGenome::new(
                 id0,
                 vec![],
                 BackendDef::Vm(VmBackendDef {
@@ -1166,7 +1168,8 @@ mod tests {
                 }),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         let ss = empty_sensor_snapshot();
         let mut energy = 0.01f32; // way below the Noop cost of 0.05
         let mut shared_mem = [0.0f32; 16];
@@ -1194,10 +1197,11 @@ mod tests {
     #[test]
     fn vm_node_emits_eat_action() {
         let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![vm_emit_node(id0, 1, vec![])],
-        };
+        let genome = CreatureGenome::new(
+            id0,
+            vec![vm_emit_node(id0, 1, vec![])],
+            crate::creature::founder::default_founder_body(),
+        );
         let ss = empty_sensor_snapshot();
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
@@ -1245,10 +1249,11 @@ mod tests {
         let node_b = vm_emit_node(id_b, 0, vec![]); // NoOp
         let node_c = vm_emit_node(id_c, 0, vec![]); // NoOp
 
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![entry, node_a, node_b, node_c],
-        };
+        let genome = CreatureGenome::new(
+            id0,
+            vec![entry, node_a, node_b, node_c],
+            crate::creature::founder::default_founder_body(),
+        );
         let ss = empty_sensor_snapshot();
         let mut energy = 1000.0f32;
         let mut shared_mem = [0.0f32; 16];
@@ -1293,10 +1298,11 @@ mod tests {
         let node_noop = vm_emit_node(id_noop, 0, vec![]); // NoOp
         let node_eat = vm_emit_node(id_eat, 1, vec![]); // Eat
 
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![entry, node_noop, node_eat],
-        };
+        let genome = CreatureGenome::new(
+            id0,
+            vec![entry, node_noop, node_eat],
+            crate::creature::founder::default_founder_body(),
+        );
         let ss = empty_sensor_snapshot();
         let mut energy = 1000.0f32;
         let mut shared_mem = [0.0f32; 16];
@@ -1330,10 +1336,11 @@ mod tests {
     fn default_priority_bid_is_zero() {
         // A genome with no SetPriorityBid instruction should return priority_bid == 0.0.
         let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![vm_emit_node(id0, 1, vec![])],
-        };
+        let genome = CreatureGenome::new(
+            id0,
+            vec![vm_emit_node(id0, 1, vec![])],
+            crate::creature::founder::default_founder_body(),
+        );
         let ss = empty_sensor_snapshot();
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
@@ -1359,9 +1366,9 @@ mod tests {
     fn priority_bid_propagates_to_mesh_output() {
         // A VM node loads 3.0 into r0, calls SetPriorityBid, then emits Eat.
         let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            id0,
+            vec![NodeGenome::new(
                 id0,
                 vec![],
                 BackendDef::Vm(VmBackendDef {
@@ -1386,7 +1393,8 @@ mod tests {
                 }),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         let ss = empty_sensor_snapshot();
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
@@ -1469,10 +1477,11 @@ mod tests {
     #[test]
     fn priority_bid_all_in_exhausts_at_settlement_and_keeps_the_queue() {
         let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![bidding_node(id0, 5.0, vote_eat_tail(), vec![])],
-        };
+        let genome = CreatureGenome::new(
+            id0,
+            vec![bidding_node(id0, 5.0, vote_eat_tail(), vec![])],
+            crate::creature::founder::default_founder_body(),
+        );
         let mut energy = 2.0f32;
         let output = run(&genome, &default_config(), &mut energy);
         assert_eq!(energy, 0.0);
@@ -1499,15 +1508,16 @@ mod tests {
     #[test]
     fn priority_bid_is_unpaid_when_compute_exhausts_the_creature() {
         let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![bidding_node(
+        let genome = CreatureGenome::new(
+            id0,
+            vec![bidding_node(
                 id0,
                 0.5,
                 vec![VmInstruction::Noop; 10_000],
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         let config = RuntimeConfig {
             vm: crate::config::VmRuntimeConfig {
                 opcode_cost_multiplier: 1.0,
@@ -1535,10 +1545,11 @@ mod tests {
     #[test]
     fn priority_bid_last_write_wins_across_revisits_and_settles_once() {
         let exit = NodeId::new(1);
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![counted_cycle_node(3.0, exit), vm_emit_node(exit, 1, vec![])],
-        };
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![counted_cycle_node(3.0, exit), vm_emit_node(exit, 1, vec![])],
+            crate::creature::founder::default_founder_body(),
+        );
         let mut energy = 10.0f32;
         let output = run(&genome, &default_config(), &mut energy);
         assert_eq!(output.termination_reason, TerminationReason::NoDecision);
@@ -1551,10 +1562,11 @@ mod tests {
     fn priority_bid_ignores_negative_and_non_finite_reads() {
         for raw in [-1.0, f32::NAN, f32::NEG_INFINITY] {
             let id0 = NodeId::new(0);
-            let genome = CreatureGenome {
-                entry_node_id: id0,
-                nodes: vec![bidding_node(id0, raw, vote_eat_tail(), vec![])],
-            };
+            let genome = CreatureGenome::new(
+                id0,
+                vec![bidding_node(id0, raw, vote_eat_tail(), vec![])],
+                crate::creature::founder::default_founder_body(),
+            );
             let mut energy = 10.0f32;
             let output = run(&genome, &default_config(), &mut energy);
             assert_eq!(output.priority_bid, 0.0);
@@ -1611,10 +1623,11 @@ mod tests {
             vec![],
         );
 
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![node0, node1],
-        };
+        let genome = CreatureGenome::new(
+            id0,
+            vec![node0, node1],
+            crate::creature::founder::default_founder_body(),
+        );
         let ss = empty_sensor_snapshot();
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
@@ -1646,10 +1659,11 @@ mod tests {
         // A single VM node (LoadConst, AddVote, Halt = 3 opcodes) with no
         // routing, run for two passes: two mesh hops and six VM steps.
         let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![vm_emit_node(id0, 1, vec![])],
-        };
+        let genome = CreatureGenome::new(
+            id0,
+            vec![vm_emit_node(id0, 1, vec![])],
+            crate::creature::founder::default_founder_body(),
+        );
         let ss = empty_sensor_snapshot();
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
@@ -1719,10 +1733,11 @@ mod tests {
             vec![],
         );
 
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![node0, node1],
-        };
+        let genome = CreatureGenome::new(
+            id0,
+            vec![node0, node1],
+            crate::creature::founder::default_founder_body(),
+        );
         let ss = empty_sensor_snapshot();
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
@@ -1749,10 +1764,11 @@ mod tests {
     fn missing_entry_node_reports_zero_work() {
         // A genome with no reachable entry node runs one empty pass and
         // performs no mesh, VM, or graph work.
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(99),
-            nodes: vec![],
-        };
+        let genome = CreatureGenome::new(
+            NodeId::new(99),
+            vec![],
+            crate::creature::founder::default_founder_body(),
+        );
         let ss = empty_sensor_snapshot();
         let mut energy = 100.0f32;
         let mut shared_mem = [0.0f32; 16];
@@ -1795,10 +1811,11 @@ mod tests {
                 vm_halt_with_route(NodeId::new(i as u32), 1.0, targets)
             })
             .collect();
-        CreatureGenome {
-            entry_node_id: NodeId::new(0),
+        CreatureGenome::new(
+            NodeId::new(0),
             nodes,
-        }
+            crate::creature::founder::default_founder_body(),
+        )
     }
 
     fn run_chain(genome: &CreatureGenome, config: &RuntimeConfig, energy: &mut f32) -> MeshOutput {
@@ -1914,9 +1931,9 @@ mod tests {
     #[test]
     fn a_node_reads_its_own_hop_ramp_charge_as_consumed_this_tick() {
         fn consumption_read(hop_ramp_cost: f32) -> f32 {
-            let genome = CreatureGenome {
-                entry_node_id: NodeId::new(0),
-                nodes: vec![
+            let genome = CreatureGenome::new(
+                NodeId::new(0),
+                vec![
                     vm_halt_with_route(NodeId::new(0), 1.0, vec![NodeId::new(1)]),
                     NodeGenome::new(
                         NodeId::new(1),
@@ -1942,7 +1959,8 @@ mod tests {
                         wrap_targets(vec![]),
                     ),
                 ],
-            };
+                crate::creature::founder::default_founder_body(),
+            );
             let config = RuntimeConfig {
                 hop_ramp_allowance: 0,
                 hop_ramp_cost,
@@ -2125,9 +2143,9 @@ mod tests {
 
     #[test]
     fn an_executed_vm_read_is_recorded_and_one_past_halt_is_not() {
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![
                     InputReference::World(WorldInputKey::NearbyCreature),
@@ -2152,7 +2170,8 @@ mod tests {
                 }),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
 
         let reads = reads_after_run(&genome);
 
@@ -2163,22 +2182,24 @@ mod tests {
     #[test]
     fn a_graph_node_is_recorded_only_when_the_mesh_visits_it() {
         let key = WorldInputKey::AreaOccupancySummary;
-        let unvisited = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![
+        let unvisited = CreatureGenome::new(
+            NodeId::new(0),
+            vec![
                 vm_emit_node(NodeId::new(0), 0, vec![]),
                 graph_reading(NodeId::new(1), key),
             ],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         assert!(reads_after_run(&unvisited).is_empty());
 
-        let visited = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![
+        let visited = CreatureGenome::new(
+            NodeId::new(0),
+            vec![
                 vm_halt_with_route(NodeId::new(0), 1.0, vec![NodeId::new(1)]),
                 graph_reading(NodeId::new(1), key),
             ],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         assert!(reads_after_run(&visited).contains(key));
     }
 
@@ -2189,15 +2210,16 @@ mod tests {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         let id = def.add_ring_bundle(0, DirectedVoteKind::StealEnergy, 0);
         def.bundle_mut(id).set_scale(0.5);
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![InputReference::World(WorldInputKey::NeighborOccupiedRing)],
                 BackendDef::Graph(def),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
 
         let reads = reads_after_run(&genome);
 
@@ -2215,9 +2237,9 @@ mod tests {
         };
         use crate::genome::sensor_analysis::sensor_census;
         let key = WorldInputKey::NearbyCreature;
-        let vm = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        let vm = CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![InputReference::World(key)],
                 BackendDef::Vm(VmBackendDef {
@@ -2234,10 +2256,11 @@ mod tests {
                 }),
                 vec![],
             )],
-        };
-        let graph = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+            crate::creature::founder::default_founder_body(),
+        );
+        let graph = CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![InputReference::World(key)],
                 BackendDef::Graph(
@@ -2256,7 +2279,8 @@ mod tests {
                 ),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         for genome in [vm, graph] {
             let reachable = mesh_reachable_nodes(&genome);
             assert!(!sensor_census(&genome, &reachable)

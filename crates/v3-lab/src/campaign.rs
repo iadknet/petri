@@ -895,6 +895,7 @@ fn breed(arm: &Arm, lineage: &mut Lineage, members: &[Scored], order: &[usize], 
             let summary = MutationEngine::apply_mutations_in(
                 &mut child,
                 &config.mutation,
+                &v3_core::creature::body::body_ranges(config),
                 &reachable[pick],
                 ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                 &mut rng,
@@ -958,6 +959,7 @@ mod tests {
         let founder = founder_genome_with_age_gate(
             setup.config.population.founder_profile,
             &setup.config.energy.lifecycle,
+            v3_core::creature::founder::default_founder_body(),
         );
         Arm {
             name: "native".into(),
@@ -1299,6 +1301,7 @@ mod tests {
             let summary = MutationEngine::apply_mutations_in(
                 &mut genome,
                 &arm.setup.config.mutation,
+                &v3_core::creature::body::body_ranges(&arm.setup.config),
                 &reachable,
                 ParentExecuted::Query(&|window| frozen.executed_indices(window)),
                 &mut rng,

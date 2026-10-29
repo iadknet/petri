@@ -195,6 +195,18 @@ fn empty_blocks() -> SampleBlocks {
         plasticity_census: Some(plasticity_for(0)),
         capacity: None,
         shares: None,
+        body: None,
+    }
+}
+
+/// A body block of three founder-coloured creatures of distinct tags.
+fn body_block() -> crate::bench::body::BodyBlock {
+    crate::bench::body::BodyBlock {
+        distinct_colours: 1,
+        founder_colour_fraction: six(1.0),
+        distinct_kin_tags: 3,
+        kin_hamming_within_clade: None,
+        kin_hamming_across_clades: Some(six(16.0)),
     }
 }
 
@@ -242,6 +254,7 @@ fn blocks_for(tick: u64, population: u64, energy: f64) -> SampleBlocks {
         plasticity_census: Some(plasticity_for(population)),
         capacity: Some(capacity_block(tick as f64)),
         shares: Some(shares_block(tick as f64 / 1000.0)),
+        body: Some(body_block()),
     }
 }
 
@@ -363,15 +376,16 @@ fn each_stateful_split_counts_the_creatures_that_qualify_for_it() {
     // Arrange: three creatures — one reads a shared-memory slot, one holds
     // a live stateful compute node, one reads neither.
     fn graph_genome(graph: CgpGraphBackendDef) -> CreatureGenome {
-        CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![],
                 BackendDef::Graph(graph),
                 vec![],
             )],
-        }
+            v3_core::creature::founder::default_founder_body(),
+        )
     }
     fn sink(source: GraphSource) -> Vec<GraphEdge> {
         vec![GraphEdge::new(source, 1.0)]
@@ -490,7 +504,7 @@ fn the_observed_grid_separates_clades_by_where_they_stand() {
         (Position::new(19, 19), 2),
     ]) {
         sim.creatures[*id].position = position;
-        sim.creatures[*id].body.identity.lineage_id = lineage_id;
+        sim.creatures[*id].lineage_id = lineage_id;
     }
 
     let grid = OccupancyGrid::observe(&sim);
@@ -528,11 +542,8 @@ fn sample_blocks_average_the_living_population_and_count_its_clades() {
     assert_eq!(
         blocks.shannon_entropy_nats,
         Some(
-            lineage_diversity(
-                42,
-                sim.creatures.values().map(|c| c.body.identity.lineage_id)
-            )
-            .shannon_entropy_nats
+            lineage_diversity(42, sim.creatures.values().map(|c| c.lineage_id))
+                .shannon_entropy_nats
         ),
         "the checkpoint reading and the terminal reading share one computation"
     );
@@ -570,6 +581,7 @@ proptest! {
                 plasticity_census: Some(plasticity_for(population)),
                 capacity: (population > 0).then(|| capacity_block(population as f64)),
                 shares: (population > 0).then(|| shares_block(population as f64 / 1000.0)),
+                body: (population > 0).then(body_block),
             },
             tracking: WorldTracking::default(),
         };
@@ -597,6 +609,7 @@ proptest! {
             "plasticity_census",
             "capacity",
             "shares",
+            "body",
         ] {
             object.remove(key);
         }
@@ -618,6 +631,7 @@ proptest! {
                 plasticity_census: None,
                 capacity: None,
                 shares: None,
+                body: None,
             }
         );
     }
@@ -1428,6 +1442,7 @@ fn tracking_fields_survive_a_round_trip() {
             plasticity_census: Some(plasticity_for(5)),
             capacity: Some(capacity_block(200.0)),
             shares: Some(shares_block(0.2)),
+            body: Some(body_block()),
         },
         tracking: WorldTracking {
             typed_eats_total: vec![7],
@@ -1741,7 +1756,7 @@ fn the_terminal_block_profiles_each_surviving_clade_in_lineage_order() {
     let food_type_count = sim.config.world.food.types.len();
     // Two clades: founder 3 keeps its lineage, everyone else joins lineage 1.
     for (index, creature) in sim.creatures.values_mut().enumerate() {
-        creature.body.identity.lineage_id = if index == 3 { 3 } else { 1 };
+        creature.lineage_id = if index == 3 { 3 } else { 1 };
         creature.energy = index as f32;
         creature.lifetime_action_attempted_count = 1;
         creature.lifetime_actions_attempted_by_type = [0, 0, 1, 0, 0, 0];
@@ -1761,7 +1776,7 @@ fn the_terminal_block_profiles_each_surviving_clade_in_lineage_order() {
     assert_eq!(profiles.definition, "surviving-clade-profile-v1");
     assert_eq!(
         profiles.rows.len() as u64,
-        clade_diversity(sim.creatures.values().map(|c| c.body.identity.lineage_id)).0
+        clade_diversity(sim.creatures.values().map(|c| c.lineage_id)).0
     );
     assert_eq!(
         profiles
@@ -1848,9 +1863,9 @@ fn decision_input_rows_count_each_referencing_creature_once() {
             });
         }
         program.push(VmInstruction::Halt);
-        CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 refs,
                 BackendDef::Vm(VmBackendDef {
@@ -1860,7 +1875,8 @@ fn decision_input_rows_count_each_referencing_creature_once() {
                 }),
                 vec![],
             )],
-        }
+            v3_core::creature::founder::default_founder_body(),
+        )
     }
 
     let mut config = SimulationConfig::default();

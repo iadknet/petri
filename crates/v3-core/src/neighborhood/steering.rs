@@ -220,7 +220,10 @@ mod tests {
     }
 
     fn founder() -> CreatureGenome {
-        founder_genome(config().population.founder_profile)
+        founder_genome(
+            config().population.founder_profile,
+            crate::creature::founder::default_founder_body(),
+        )
     }
 
     fn executed(genome: &CreatureGenome, config: &SimulationConfig) -> BTreeSet<NodeId> {
@@ -237,15 +240,16 @@ mod tests {
         let genome_with = |kind| {
             let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
             def.add_ring_bundle(0, kind, 0);
-            CreatureGenome {
-                entry_node_id: NodeId::new(0),
-                nodes: vec![NodeGenome::new(
+            CreatureGenome::new(
+                NodeId::new(0),
+                vec![NodeGenome::new(
                     NodeId::new(0),
                     vec![ring.clone()],
                     BackendDef::Graph(def),
                     vec![],
                 )],
-            }
+                crate::creature::founder::default_founder_body(),
+            )
         };
         let executed = BTreeSet::from([NodeId::new(0)]);
         assert!(votes_move(&genome_with(DirectedVoteKind::Move), &executed));
@@ -268,15 +272,16 @@ mod tests {
         let genome_with = |kind| {
             let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
             def.add_pair_bundle(0, 0, crate::contracts::pair_layout(&area, 0), kind, 2);
-            CreatureGenome {
-                entry_node_id: NodeId::new(0),
-                nodes: vec![NodeGenome::new(
+            CreatureGenome::new(
+                NodeId::new(0),
+                vec![NodeGenome::new(
                     NodeId::new(0),
                     vec![area.clone()],
                     BackendDef::Graph(def),
                     vec![],
                 )],
-            }
+                crate::creature::founder::default_founder_body(),
+            )
         };
         let executed = BTreeSet::from([NodeId::new(0)]);
         assert!(votes_move(&genome_with(DirectedVoteKind::Move), &executed));
@@ -290,9 +295,12 @@ mod tests {
     fn an_edge_or_add_vote_into_the_move_drive_votes_move() {
         use crate::genome::cgp::{GraphEdge, GraphSource};
         use crate::genome::{VmBackendDef, VmInstruction};
-        let node = |backend_def| CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(NodeId::new(0), vec![], backend_def, vec![])],
+        let node = |backend_def| {
+            CreatureGenome::new(
+                NodeId::new(0),
+                vec![NodeGenome::new(NodeId::new(0), vec![], backend_def, vec![])],
+                crate::creature::founder::default_founder_body(),
+            )
         };
         let graph_into = |kind: DirectedVoteKind| {
             let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
@@ -437,15 +445,16 @@ mod tests {
             VoteSink::Directed(DirectedVoteKind::Move, scalar),
             vote_edge(GraphSource::ComputeNode(0), 0.5),
         );
-        CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![FOOD_RING, BARRIER_RING],
                 BackendDef::Graph(graph),
                 Vec::new(),
             )],
-        }
+            crate::creature::founder::default_founder_body(),
+        )
     }
 
     fn wire(graph: &mut CgpGraphBackendDef, sink: VoteSink, edge: GraphEdge) {
@@ -584,18 +593,21 @@ mod tests {
         assert!(!votes_move(&eater, &node0));
         // A VM `AddVote` on a `Move` sink does; one on `Eat` or past the
         // catalog does not.
-        let vm = |sink: u8| CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        let vm = |sink: u8| {
+            CreatureGenome::new(
                 NodeId::new(0),
-                vec![],
-                BackendDef::Vm(crate::genome::VmBackendDef {
-                    register_count: 1,
-                    constants: vec![],
-                    program: vec![VmInstruction::AddVote { sink, src: 0 }],
-                }),
-                vec![],
-            )],
+                vec![NodeGenome::new(
+                    NodeId::new(0),
+                    vec![],
+                    BackendDef::Vm(crate::genome::VmBackendDef {
+                        register_count: 1,
+                        constants: vec![],
+                        program: vec![VmInstruction::AddVote { sink, src: 0 }],
+                    }),
+                    vec![],
+                )],
+                crate::creature::founder::default_founder_body(),
+            )
         };
         assert!(votes_move(
             &vm(VoteSink::Directed(DirectedVoteKind::Move, 7).index() as u8),

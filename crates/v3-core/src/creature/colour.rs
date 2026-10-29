@@ -111,7 +111,7 @@ mod tests {
     #[test]
     fn channels_to_rgb_founder_values() {
         // Founder channels [0, 0, 92, 92, 138, 138] should map to founder RGB [204, 61, 61].
-        let rgb = channels_to_rgb(crate::creature::phenotype::Phenotype::FOUNDER.channels);
+        let rgb = channels_to_rgb(crate::genome::body::Phenotype::FOUNDER.channels());
         assert_eq!(rgb, [204, 61, 61]);
     }
 

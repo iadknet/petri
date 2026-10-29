@@ -7,7 +7,7 @@ use crate::contracts::{
     SHARED_MEMORY_SLOTS,
 };
 use crate::creature::action_log::{ActionType, ACTION_TYPE_COUNT};
-use crate::creature::body::HeritableBody;
+use crate::creature::body::energy_scale;
 use crate::creature::colour::unit_rgb;
 use crate::genome::analysis::mesh_reachable_nodes;
 use crate::genome::learning::Seeds;
@@ -57,6 +57,9 @@ pub struct CreatureState {
     /// Observation only: first exhausting sink since the last positive recovery.
     pub(crate) pending_death_cause: Option<crate::ledger::DeathCause>,
     pub age: u64,
+    /// The founder this creature descends from (T29.F02 invariant 6):
+    /// provenance, written by finalization; no rule, sensor or draw reads it.
+    pub lineage_id: u32,
     pub generation: u64,
     /// Shared f32 memory slots, accessible by both VM and Graph backends.
     /// Copied from parent to child on reproduction.
@@ -67,8 +70,6 @@ pub struct CreatureState {
     /// plasticity weights), built from the genome; read through
     /// [`Self::graph_runtime`] and run through the brain operations.
     graph_runtime: GraphRuntimeState,
-    /// The heritable body: colour phenotype and kin identity (T26.F01).
-    pub body: HeritableBody,
     /// What the record derives from `genome` at birth.
     derived: GenomeDerived,
     /// Mutation operators applied when this creature was born.
@@ -119,17 +120,17 @@ pub struct CreatureState {
 
 impl CreatureState {
     /// What sensors read of this body this tick, every body rule applied:
-    /// the energy sensor denominator ([`HeritableBody::energy_scale`]) and
-    /// the seen colour ([`unit_rgb`]).
+    /// the energy sensor denominator ([`energy_scale`]) and the seen colour
+    /// ([`unit_rgb`]).
     #[must_use]
     pub fn sensed_body(&self, capacity: &EnergyCapacityConfig) -> BodyView {
         BodyView {
             position: self.position,
             age: self.age,
             energy: self.energy,
-            energy_scale: self.body.energy_scale(capacity),
-            colour: unit_rgb(self.body.phenotype.channels),
-            kin_tag: self.body.identity.kin_tag,
+            energy_scale: energy_scale(self.genome.body(), capacity),
+            colour: unit_rgb(self.genome.body().colour().channels()),
+            kin_tag: self.genome.body().kin_tag(),
             previous_outcome: self.previous_outcome,
         }
     }
@@ -156,7 +157,7 @@ impl CreatureState {
     /// creature detail response.
     #[must_use]
     pub fn energy_cap(&self) -> f32 {
-        self.body.capacity
+        self.genome.body().capacity()
     }
 
     /// Cap the energy at [`Self::energy_cap`] and return the applied excess
@@ -196,7 +197,6 @@ impl CreatureState {
         genome: CreatureGenome,
         position: Position,
         energy: f32,
-        body: HeritableBody,
         shared_memory: [f32; SHARED_MEMORY_SLOTS],
         seeds: &Seeds,
     ) -> Self {
@@ -209,11 +209,11 @@ impl CreatureState {
             energy,
             pending_death_cause: None,
             age: 0,
+            lineage_id: 0,
             generation: 0,
             shared_memory,
             prev_shared_memory: [0.0; SHARED_MEMORY_SLOTS],
             graph_runtime,
-            body,
             derived,
             last_mesh_world_reads: WorldKeySet::default(),
             birth_mutation_operators: Vec::new().into_boxed_slice(),
@@ -429,31 +429,22 @@ const _: () = assert!(size_of::<[f32; SHARED_MEMORY_SLOTS]>() == 64);
 mod tests {
     use super::*;
     use crate::contracts::{DynamicIntrospectionKey, InputReference, NodeId, WorldInputKey};
-    use crate::creature::identity::CreatureIdentityState;
-    use crate::creature::phenotype::Phenotype;
+    use crate::genome::body::{BodyGenome, Phenotype};
     use crate::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
     use proptest::prelude::*;
     use slotmap::SlotMap;
 
-    /// A body with `channels`, the founder's active channel and polarity, and
-    /// the default identity.
-    fn body(channels: [u8; 6]) -> HeritableBody {
-        HeritableBody {
-            phenotype: Phenotype {
-                channels,
-                ..Phenotype::FOUNDER
-            },
-            identity: CreatureIdentityState::default(),
-            capacity: 200.0,
-            steal_share: 0.2,
-            give_share: 0.2,
-        }
+    /// A body with `channels`, the founder's active channel and polarity,
+    /// kin tag 0 and the default capacity and shares.
+    fn body(channels: [u8; 6]) -> BodyGenome {
+        let colour = Phenotype::new(channels, 0, [true; 6]).expect("channel 0 is in range");
+        BodyGenome::new(colour, 0, 200.0, 0.2, 0.2)
     }
 
     fn minimal_genome() -> CreatureGenome {
-        CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![],
                 BackendDef::Vm(VmBackendDef {
@@ -463,7 +454,8 @@ mod tests {
                 }),
                 vec![],
             )],
-        }
+            crate::creature::founder::default_founder_body(),
+        )
     }
 
     #[test]
@@ -471,8 +463,8 @@ mod tests {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let id = sm.insert(());
         let state = crate::creature::birth::Zygote::founder(
-            minimal_genome(),
-            body([128, 64, 32, 10, 20, 30]),
+            minimal_genome().with_body(body([128, 64, 32, 10, 20, 30])),
+            0,
         )
         .born_at(id, Position::new(5, 5), 20.0);
         assert_eq!(state.age, 0);
@@ -483,9 +475,12 @@ mod tests {
         assert!(!state.graph_runtime().learned().has_learning());
         assert_eq!(state.generation, 0);
         assert!((state.energy - 20.0).abs() < f32::EPSILON);
-        assert_eq!(state.body.phenotype.channels, [128, 64, 32, 10, 20, 30]);
-        assert_eq!(state.body.phenotype.active_channel, 0);
-        assert_eq!(state.body.phenotype.polarity, [true; 6]);
+        assert_eq!(
+            state.genome().body().colour().channels(),
+            [128, 64, 32, 10, 20, 30]
+        );
+        assert_eq!(state.genome().body().colour().active_channel(), 0);
+        assert_eq!(state.genome().body().colour().polarity(), [true; 6]);
     }
 
     #[test]
@@ -495,12 +490,13 @@ mod tests {
         let mut mem = [0.0f32; SHARED_MEMORY_SLOTS];
         mem[3] = 1.5;
         mem[7] = -2.0;
-        let state = crate::creature::birth::Zygote::founder(minimal_genome(), body([0; 6]))
-            .with_payload(crate::creature::birth::BirthPayload::new(
-                crate::genome::learning::Seeds::default(),
-                mem,
-            ))
-            .born_at(id, Position::new(5, 5), 20.0);
+        let state =
+            crate::creature::birth::Zygote::founder(minimal_genome().with_body(body([0; 6])), 0)
+                .with_payload(crate::creature::birth::BirthPayload::new(
+                    crate::genome::learning::Seeds::default(),
+                    mem,
+                ))
+                .born_at(id, Position::new(5, 5), 20.0);
         assert!((state.shared_memory[3] - 1.5).abs() < f32::EPSILON);
         assert!((state.shared_memory[7] - -2.0).abs() < f32::EPSILON);
         // prev is always zeroed for new creatures
@@ -511,8 +507,9 @@ mod tests {
     fn new_creature_starts_with_an_empty_dispatch_record() {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let id = sm.insert(());
-        let state = crate::creature::birth::Zygote::founder(minimal_genome(), body([0; 6]))
-            .born_at(id, Position::new(0, 0), 20.0);
+        let state =
+            crate::creature::birth::Zygote::founder(minimal_genome().with_body(body([0; 6])), 0)
+                .born_at(id, Position::new(0, 0), 20.0);
         assert!(state.graph_runtime().dispatch_record.is_empty());
         assert!(state
             .graph_runtime()
@@ -526,8 +523,9 @@ mod tests {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let id = sm.insert(());
         // minimal_genome has 1 node (the entry), which is reachable
-        let state = crate::creature::birth::Zygote::founder(minimal_genome(), body([0; 6]))
-            .born_at(id, Position::new(0, 0), 20.0);
+        let state =
+            crate::creature::birth::Zygote::founder(minimal_genome().with_body(body([0; 6])), 0)
+                .born_at(id, Position::new(0, 0), 20.0);
         assert_eq!(state.reachable_nodes(), &[0]);
     }
 
@@ -536,9 +534,9 @@ mod tests {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let id = sm.insert(());
         // Genome with 2 nodes: entry at index 0, disconnected at index 1
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![
                 NodeGenome::new(
                     NodeId::new(0),
                     vec![],
@@ -561,12 +559,10 @@ mod tests {
                     vec![],
                 ),
             ],
-        };
-        let state = crate::creature::birth::Zygote::founder(genome, body([0; 6])).born_at(
-            id,
-            Position::new(0, 0),
-            20.0,
+            crate::creature::founder::default_founder_body(),
         );
+        let state = crate::creature::birth::Zygote::founder(genome.with_body(body([0; 6])), 0)
+            .born_at(id, Position::new(0, 0), 20.0);
         // Only node 0 should be reachable
         assert_eq!(state.reachable_nodes(), &[0]);
     }
@@ -593,12 +589,16 @@ mod tests {
                 ..MutationConfig::default()
             };
             let mut rng = SmallRng::seed_from_u64(seed);
-            let mut genome = founder_genome(profiles[profile]);
+            let mut genome = founder_genome(
+                profiles[profile],
+                crate::creature::founder::default_founder_body(),
+            );
             for _ in 0..rounds {
                 let reachable = mesh_reachable_nodes(&genome);
                 MutationEngine::apply_mutations_in(
                     &mut genome,
                     &config,
+                    &crate::creature::body::default_body_ranges(),
                     &reachable,
                     ParentExecuted::Indices(&reachable),
                     &mut rng,
@@ -619,7 +619,7 @@ mod tests {
             genome in mutated_genome(),
         ) {
             let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
-            let state = crate::creature::birth::Zygote::founder(genome, body([0; 6])).born_at(sm.insert(()), Position::new(0, 0), 20.0);
+            let state = crate::creature::birth::Zygote::founder(genome.with_body(body([0; 6])), 0).born_at(sm.insert(()), Position::new(0, 0), 20.0);
             let genome = state.genome();
             let reachable = mesh_reachable_nodes(genome);
             prop_assert_eq!(state.complexity(), genome.complexity());
@@ -656,8 +656,9 @@ mod tests {
     fn typed_attempts_and_eats_grow_their_own_slots() {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let id = sm.insert(());
-        let mut state = crate::creature::birth::Zygote::founder(minimal_genome(), body([0; 6]))
-            .born_at(id, Position::new(0, 0), 20.0);
+        let mut state =
+            crate::creature::birth::Zygote::founder(minimal_genome().with_body(body([0; 6])), 0)
+                .born_at(id, Position::new(0, 0), 20.0);
         state.record_action_attempt(ActionType::StealEnergy);
         state.record_action_attempt(ActionType::Eat);
         state.record_action_attempt(ActionType::Eat);
@@ -677,21 +678,33 @@ mod tests {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let genomes = [
             minimal_genome(),
-            founder_genome(FounderProfile::V3Alpha1),
-            founder_genome(FounderProfile::ForageFirstSparse),
-            founder_genome(FounderProfile::ForageFirstSparseConservative),
-            founder_genome(FounderProfile::ForageFirstSparseRichOffspring),
-            founder_genome(FounderProfile::ForageFirstSparseBalanced),
+            founder_genome(
+                FounderProfile::V3Alpha1,
+                crate::creature::founder::default_founder_body(),
+            ),
+            founder_genome(
+                FounderProfile::ForageFirstSparse,
+                crate::creature::founder::default_founder_body(),
+            ),
+            founder_genome(
+                FounderProfile::ForageFirstSparseConservative,
+                crate::creature::founder::default_founder_body(),
+            ),
+            founder_genome(
+                FounderProfile::ForageFirstSparseRichOffspring,
+                crate::creature::founder::default_founder_body(),
+            ),
+            founder_genome(
+                FounderProfile::ForageFirstSparseBalanced,
+                crate::creature::founder::default_founder_body(),
+            ),
         ];
         for genome in genomes {
             let id = sm.insert(());
             let expected = genome.genome_size();
             assert!(expected > 0, "every fixture genome has a nonzero size");
-            let state = crate::creature::birth::Zygote::founder(genome, body([0; 6])).born_at(
-                id,
-                Position::new(0, 0),
-                20.0,
-            );
+            let state = crate::creature::birth::Zygote::founder(genome.with_body(body([0; 6])), 0)
+                .born_at(id, Position::new(0, 0), 20.0);
             assert_eq!(state.genome_size(), expected);
             assert_eq!(state.genome_size(), state.genome().genome_size());
         }
@@ -702,15 +715,16 @@ mod tests {
     /// canonical founder is node 0 = 1 mesh node + 5 input references + 1 route
     /// target + 3 compute nodes + 4 compute edges + 6 sink edges = 20 and
     /// node 1 = 1 + 7 references + 10 compute nodes + 13 compute edges + 29
-    /// sink edges = 60, so it pays `80 * genome_carry_cost_per_unit` per tick.
-    /// The replication cost's anchor `FOUNDER_GENOME_SIZE_UNITS` is pinned to
-    /// the same measurement, so the founder's multiplier is exactly 1.0. The
-    /// ForageFirst profiles carry one more 2-input compute node: 83. No
+    /// sink edges = 60: 80 brain units. With the five body genes (T29.F02) it
+    /// pays `85 * genome_carry_cost_per_unit` per tick. The replication and
+    /// gestation anchor `FOUNDER_GENOME_SIZE_UNITS` is pinned to the same
+    /// measurement, so the founder's multiplier is exactly 1.0. The
+    /// ForageFirst profiles carry one more 2-input compute node: 88. No
     /// founder carries an edge bundle, so the T25.F10 unit rule (a gene one
     /// unit, its members nothing) leaves every founder size and the anchor
     /// unchanged: remeasured, not recalibrated.
     #[test]
-    fn founder_is_eighty_units() {
+    fn founder_is_eighty_five_units() {
         use crate::config::FounderProfile;
         use crate::creature::founder::{founder_genome, FOUNDER_GENOME_SIZE_UNITS};
 
@@ -720,9 +734,13 @@ mod tests {
                 BackendDef::Vm(_) => true,
             })
         };
-        let genome = founder_genome(FounderProfile::V3Alpha1);
+        let genome = founder_genome(
+            FounderProfile::V3Alpha1,
+            crate::creature::founder::default_founder_body(),
+        );
         assert!(no_bundle(&genome), "the founder carries no edge bundle");
-        assert_eq!(genome.genome_size(), 80);
+        assert_eq!(genome.brain_units(), 80);
+        assert_eq!(genome.genome_size(), 85);
         assert_eq!(genome.genome_size(), FOUNDER_GENOME_SIZE_UNITS);
         for profile in [
             FounderProfile::ForageFirstSparse,
@@ -730,9 +748,9 @@ mod tests {
             FounderProfile::ForageFirstSparseRichOffspring,
             FounderProfile::ForageFirstSparseBalanced,
         ] {
-            let genome = founder_genome(profile);
+            let genome = founder_genome(profile, crate::creature::founder::default_founder_body());
             assert!(no_bundle(&genome), "{profile:?}");
-            assert_eq!(genome.genome_size(), 83, "{profile:?}");
+            assert_eq!(genome.genome_size(), 88, "{profile:?}");
         }
     }
 
@@ -741,8 +759,11 @@ mod tests {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let id = sm.insert(());
         let state = {
-            let mut born = crate::creature::birth::Zygote::founder(minimal_genome(), body([0; 6]))
-                .born_at(id, Position::new(3, 7), 50.0);
+            let mut born = crate::creature::birth::Zygote::founder(
+                minimal_genome().with_body(body([0; 6])),
+                0,
+            )
+            .born_at(id, Position::new(3, 7), 50.0);
             born.generation = 2;
             born
         };
@@ -758,14 +779,14 @@ mod tests {
     fn the_sensed_body_resolves_colour_and_energy_scale() {
         use crate::config::SensorScale;
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
+        let colour = *body([150, 0, 200, 200, 60, 60]).colour();
+        let body = BodyGenome::new(colour, 0xABCD, 50.0, 0.2, 0.2);
         let mut state = crate::creature::birth::Zygote::founder(
-            minimal_genome(),
-            body([150, 0, 200, 200, 60, 60]),
+            minimal_genome().with_body(body),
+            0,
         )
         .born_at(sm.insert(()), Position::new(3, 7), 50.0);
         state.age = 9;
-        state.body.capacity = 50.0;
-        state.body.identity.kin_tag = 0xABCD;
         state.previous_outcome = [1.0, 0.0, -2.0, 1.0];
         let mut capacity = EnergyCapacityConfig {
             reference: 150.0,
@@ -793,9 +814,9 @@ mod tests {
     fn new_creature_caches_live_vm_world_inputs() {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let id = sm.insert(());
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![
                 NodeGenome::new(
                     NodeId::new(0),
                     vec![
@@ -863,13 +884,11 @@ mod tests {
                     vec![],
                 ),
             ],
-        };
-
-        let state = crate::creature::birth::Zygote::founder(genome, body([0; 6])).born_at(
-            id,
-            Position::new(0, 0),
-            10.0,
+            crate::creature::founder::default_founder_body(),
         );
+
+        let state = crate::creature::birth::Zygote::founder(genome.with_body(body([0; 6])), 0)
+            .born_at(id, Position::new(0, 0), 10.0);
 
         let counts: std::collections::HashMap<_, _> =
             state.live_vm_world_inputs().iter().cloned().collect();

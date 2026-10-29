@@ -357,9 +357,9 @@ mod work_counter_tests {
     #[test]
     fn single_node_graph_reports_known_relax_iters_and_no_plasticity() {
         let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            id0,
+            vec![NodeGenome::new(
                 id0,
                 vec![],
                 BackendDef::Graph(
@@ -369,7 +369,8 @@ mod work_counter_tests {
                 ),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
 
         let ss = empty_ss();
         let config = RuntimeConfig::default();
@@ -401,9 +402,9 @@ mod work_counter_tests {
     #[test]
     fn hebbian_plastic_node_reports_one_plasticity_update() {
         let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            id0,
+            vec![NodeGenome::new(
                 id0,
                 vec![],
                 BackendDef::Graph(
@@ -435,7 +436,8 @@ mod work_counter_tests {
                 ),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
 
         let ss = empty_ss();
         let config = RuntimeConfig {

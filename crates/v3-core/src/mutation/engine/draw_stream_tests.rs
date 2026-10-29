@@ -22,6 +22,7 @@ fn the_default_draw_stream_is_pinned() {
         let summary = MutationEngine::apply_mutations_in(
             &mut genome,
             &config,
+            &crate::creature::body::default_body_ranges(),
             &[0, 1, 2],
             ParentExecuted::NONE,
             &mut rng,
@@ -45,6 +46,8 @@ fn the_default_draw_stream_is_pinned() {
     );
     // Pinned by T25.F11 commit 3 after two agreeing runs; re-pinned by
     // T25.F12 commit 2 (the learning catalog, the target draw over edges and
-    // slots, the bundle birth draws and the genome JSON key `learning`).
-    assert_eq!(hash, 13_590_202_118_071_790_475, "the default draw stream");
+    // slots, the bundle birth draws and the genome JSON key `learning`);
+    // re-pinned by T29.F02 (the 0.485 / 85 rate, the body supply after the
+    // brain events and the body in the genome JSON).
+    assert_eq!(hash, 11_864_597_453_733_620_729, "the default draw stream");
 }

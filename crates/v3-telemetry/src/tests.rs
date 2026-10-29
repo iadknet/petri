@@ -1483,7 +1483,7 @@ fn a_snapshot_counts_plastic_carriers_edges_drift_and_clamped_edges_per_kind() {
         heading: founder.heading,
         energy: founder.energy,
     };
-    let rebuilt = Zygote::founder(founder.genome().clone(), founder.body)
+    let rebuilt = Zygote::founder(founder.genome().clone(), founder.lineage_id)
         .with_payload(BirthPayload::new(seeds, founder.shared_memory))
         .finalize(id, place)
         .creature;

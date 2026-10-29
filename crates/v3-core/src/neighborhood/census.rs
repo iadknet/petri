@@ -124,7 +124,10 @@ mod tests {
         let context = EvalContext::from_config(&config);
         let battery = Battery::generate(context.sensors.food_type_count);
         one_edge_census(
-            &founder_genome(FounderProfile::V3Alpha1),
+            &founder_genome(
+                FounderProfile::V3Alpha1,
+                crate::creature::founder::default_founder_body(),
+            ),
             1,
             &battery,
             &context,

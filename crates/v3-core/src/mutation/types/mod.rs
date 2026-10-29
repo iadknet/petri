@@ -3,6 +3,7 @@ use std::fmt;
 
 use crate::config::{MutationConfig, ReachableBiasConfig};
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
+use crate::mutation::body::BodyOperator;
 use crate::mutation::graph::GraphOperator;
 use crate::mutation::input_ref::InputRefOperator;
 use crate::mutation::topology::TopologyOperator;
@@ -13,7 +14,8 @@ pub use crate::mutation::event::{
     MutationSkipReason, TargetReachability, FORM_KEYS, WIRING_KEYS,
 };
 
-/// Domain selected for a mutation event.
+/// Domain of a mutation event: the four brain domains and the body
+/// chromosome (T29.F02).
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
@@ -22,6 +24,51 @@ pub enum MutationDomain {
     Vm,
     Graph,
     InputRef,
+    Body,
+}
+
+/// A brain domain: what the two-layer dispatch draws for a brain event and
+/// what carries the facts only the brain has (a target selector's reachable
+/// bias, operator weights).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum BrainDomain {
+    Topology,
+    Vm,
+    Graph,
+    InputRef,
+}
+
+impl BrainDomain {
+    /// The four brain domains, in domain order.
+    pub const ALL: [Self; 4] = [Self::Topology, Self::Vm, Self::Graph, Self::InputRef];
+
+    /// This domain's operators: its slice of [`MutationOperator::ALL`].
+    #[must_use]
+    pub fn catalog(self) -> &'static [MutationOperator] {
+        MutationDomain::from(self).catalog()
+    }
+
+    /// The domain's production reachable bias.
+    #[must_use]
+    pub const fn reachable_bias(self, config: &ReachableBiasConfig) -> f64 {
+        match self {
+            Self::Topology => config.topology,
+            Self::Vm => config.vm,
+            Self::Graph => config.graph,
+            Self::InputRef => config.input_ref,
+        }
+    }
+}
+
+impl From<BrainDomain> for MutationDomain {
+    fn from(domain: BrainDomain) -> Self {
+        match domain {
+            BrainDomain::Topology => Self::Topology,
+            BrainDomain::Vm => Self::Vm,
+            BrainDomain::Graph => Self::Graph,
+            BrainDomain::InputRef => Self::InputRef,
+        }
+    }
 }
 
 /// Input class attached or wired when a mutation adds a new node.
@@ -93,12 +140,31 @@ impl MutationDomain {
             Self::Vm => "Vm",
             Self::Graph => "Graph",
             Self::InputRef => "InputRef",
+            Self::Body => "Body",
         }
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 4] {
-        [Self::Topology, Self::Vm, Self::Graph, Self::InputRef]
+    pub const fn all() -> [Self; 5] {
+        [
+            Self::Topology,
+            Self::Vm,
+            Self::Graph,
+            Self::InputRef,
+            Self::Body,
+        ]
+    }
+
+    /// The brain domain this is, `None` for the body.
+    #[must_use]
+    pub const fn brain(self) -> Option<BrainDomain> {
+        match self {
+            Self::Topology => Some(BrainDomain::Topology),
+            Self::Vm => Some(BrainDomain::Vm),
+            Self::Graph => Some(BrainDomain::Graph),
+            Self::InputRef => Some(BrainDomain::InputRef),
+            Self::Body => None,
+        }
     }
 
     /// This domain's operators: its slice of [`MutationOperator::ALL`], in
@@ -108,29 +174,20 @@ impl MutationDomain {
         const TOPOLOGY: usize = TopologyOperator::ALL.len();
         const VM: usize = TOPOLOGY + VmOperator::ALL.len();
         const GRAPH: usize = VM + GraphOperator::ALL.len();
+        const INPUT_REF: usize = GRAPH + InputRefOperator::ALL.len();
         let all = &MutationOperator::ALL;
         match self {
             Self::Topology => &all[..TOPOLOGY],
             Self::Vm => &all[TOPOLOGY..VM],
             Self::Graph => &all[VM..GRAPH],
-            Self::InputRef => &all[GRAPH..],
-        }
-    }
-
-    /// The domain's production reachable bias.
-    #[must_use]
-    pub const fn reachable_bias(self, config: &ReachableBiasConfig) -> f64 {
-        match self {
-            Self::Topology => config.topology,
-            Self::Vm => config.vm,
-            Self::Graph => config.graph,
-            Self::InputRef => config.input_ref,
+            Self::InputRef => &all[GRAPH..INPUT_REF],
+            Self::Body => &all[INPUT_REF..],
         }
     }
 }
 
 /// Mutation operator selected for one attempted mutation event: one of the
-/// four domain enums' operators (T30.F10). The domain enum owns every fact
+/// four brain domain enums' operators (T30.F10) or a body gene's (T29.F02). The domain enum owns every fact
 /// about its operators (key, weight, complexity effect); this enum derives
 /// them from the variant. Its derived order is today's flat order: the
 /// domains in variant order, then each domain enum's declaration order.
@@ -143,9 +200,10 @@ pub enum MutationOperator {
     Vm(VmOperator),
     Graph(GraphOperator),
     InputRef(InputRefOperator),
+    Body(BodyOperator),
 }
 
-/// Concatenates the four domain `ALL` lists in domain order.
+/// Concatenates the five domain `ALL` lists in domain order.
 const fn catalog_of() -> [MutationOperator; MutationOperator::COUNT] {
     let mut all = [MutationOperator::Topology(TopologyOperator::AddNode); MutationOperator::COUNT];
     let mut i = 0;
@@ -173,6 +231,12 @@ const fn catalog_of() -> [MutationOperator; MutationOperator::COUNT] {
         i += 1;
         j += 1;
     }
+    j = 0;
+    while j < BodyOperator::ALL.len() {
+        all[i] = MutationOperator::Body(BodyOperator::ALL[j]);
+        i += 1;
+        j += 1;
+    }
     assert!(
         i == MutationOperator::COUNT,
         "ALL holds every domain operator once"
@@ -181,13 +245,14 @@ const fn catalog_of() -> [MutationOperator; MutationOperator::COUNT] {
 }
 
 impl MutationOperator {
-    /// How many operators the four domain enums declare together.
+    /// How many operators the five domain enums declare together.
     pub const COUNT: usize = TopologyOperator::ALL.len()
         + VmOperator::ALL.len()
         + GraphOperator::ALL.len()
-        + InputRefOperator::ALL.len();
+        + InputRefOperator::ALL.len()
+        + BodyOperator::ALL.len();
 
-    /// Every operator, the four domain `ALL` lists in domain order.
+    /// Every operator, the five domain `ALL` lists in domain order.
     pub const ALL: [Self; Self::COUNT] = catalog_of();
 
     /// The domain's own operator, as its `Debug` names it.
@@ -197,6 +262,7 @@ impl MutationOperator {
             Self::Vm(op) => op,
             Self::Graph(op) => op,
             Self::InputRef(op) => op,
+            Self::Body(op) => op,
         }
     }
 
@@ -213,6 +279,7 @@ impl MutationOperator {
             Self::Vm(op) => op.as_key(),
             Self::Graph(op) => op.as_key(),
             Self::InputRef(op) => op.as_key(),
+            Self::Body(op) => op.as_key(),
         }
     }
 
@@ -223,6 +290,7 @@ impl MutationOperator {
             Self::Vm(_) => MutationDomain::Vm,
             Self::Graph(_) => MutationDomain::Graph,
             Self::InputRef(_) => MutationDomain::InputRef,
+            Self::Body(_) => MutationDomain::Body,
         }
     }
 
@@ -233,19 +301,22 @@ impl MutationOperator {
             Self::Vm(op) => op.complexity_effect(),
             Self::Graph(op) => op.complexity_effect(),
             Self::InputRef(op) => op.complexity_effect(),
+            Self::Body(op) => op.complexity_effect(),
         }
     }
 
-    /// The operator's selection weight within its domain: Topology's in
-    /// hundredths through the large-copy tuning, the other three their
-    /// own tier weights, so each domain's total keeps its units.
+    /// The operator's selection weight within its brain domain: Topology's
+    /// in hundredths through the large-copy tuning, the other three their
+    /// own tier weights, so each domain's total keeps its units. `None` for
+    /// a body operator: a body event draws its gene uniformly, by no weight.
     #[must_use]
-    pub fn weight(self, config: &MutationConfig) -> u16 {
+    pub fn weight(self, config: &MutationConfig) -> Option<u16> {
         match self {
-            Self::Topology(op) => op.tuned_weight(config.large_copy_weight_percent),
-            Self::Vm(op) => u16::from(op.weight()),
-            Self::Graph(op) => u16::from(op.weight()),
-            Self::InputRef(op) => u16::from(op.weight()),
+            Self::Topology(op) => Some(op.tuned_weight(config.large_copy_weight_percent)),
+            Self::Vm(op) => Some(u16::from(op.weight())),
+            Self::Graph(op) => Some(u16::from(op.weight())),
+            Self::InputRef(op) => Some(u16::from(op.weight())),
+            Self::Body(_) => None,
         }
     }
 }
@@ -303,6 +374,12 @@ impl From<GraphOperator> for MutationOperator {
 impl From<InputRefOperator> for MutationOperator {
     fn from(op: InputRefOperator) -> Self {
         Self::InputRef(op)
+    }
+}
+
+impl From<BodyOperator> for MutationOperator {
+    fn from(op: BodyOperator) -> Self {
+        Self::Body(op)
     }
 }
 
@@ -565,6 +642,23 @@ impl MutationSummary {
         for key in keys {
             *entry.entry(*key).or_insert(0) += 1;
         }
+    }
+
+    /// Record one body event of `operator` (T29.F02 invariant 4): attempted
+    /// and applied, with no target, no discards and
+    /// [`TargetReachability::NotApplicable`].
+    pub fn record_body_event(&mut self, operator: crate::mutation::body::BodyOperator) {
+        let operator = MutationOperator::Body(operator);
+        self.record_attempt(MutationDomain::Body, operator);
+        self.record_event(MutationEventRecord {
+            domain: MutationDomain::Body,
+            operator: Some(operator),
+            target: None,
+            outcome: MutationEventOutcome::Applied(TargetReachability::NotApplicable),
+            discarded: Vec::new(),
+        });
+        self.record_applied(MutationDomain::Body, operator);
+        self.record_reachability(TargetReachability::NotApplicable);
     }
 
     /// Record a skip where no operator could be selected for a domain.

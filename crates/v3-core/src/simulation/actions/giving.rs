@@ -71,7 +71,7 @@ pub(crate) fn apply_give_energy(
     effort: f32,
 ) -> (ActionResult, Option<CreatureId>) {
     let giver = &mut inputs.creatures[giver_id];
-    let intensity = super::exchange_intensity(giver.body.give_share, effort);
+    let intensity = super::exchange_intensity(giver.genome().body().give_share(), effort);
     let effort = super::pay_exchange_effort(
         giver,
         inputs.config,

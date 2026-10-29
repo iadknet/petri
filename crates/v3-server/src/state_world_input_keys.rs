@@ -7,7 +7,6 @@ use super::*;
 use v3_core::config::OrdinaryFoodTypeId;
 use v3_core::contracts::{CreatureId, Direction, InputReference, NodeId, Position, WorldInputKey};
 use v3_core::creature::birth::{BirthPlace, Zygote};
-use v3_core::creature::body::HeritableBody;
 use v3_core::creature::state::CreatureState;
 use v3_core::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 use v3_core::mutation::topology::TopologyOperator;
@@ -33,9 +32,9 @@ fn two_food_reader(id: CreatureId, config: &SimulationConfig) -> CreatureState {
         ref_idx,
         sub_idx: 0,
     };
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![InputReference::World(FOOD_0), InputReference::World(FOOD_1)],
             BackendDef::Vm(VmBackendDef {
@@ -61,19 +60,14 @@ fn two_food_reader(id: CreatureId, config: &SimulationConfig) -> CreatureState {
             }),
             vec![],
         )],
-    };
-    let body = HeritableBody::founder(
-        0,
-        1,
-        config.energy.capacity.founder,
-        config.exchange.founder_share,
+        v3_core::creature::founder::founder_body(0, 1, config),
     );
     let place = BirthPlace {
         position: Position::new(0, 0),
         heading: Direction::N,
         energy: 10.0,
     };
-    Zygote::founder(genome, body).finalize(id, place).creature
+    Zygote::founder(genome, 0).finalize(id, place).creature
 }
 
 #[test]

@@ -14,6 +14,7 @@ use rayon::prelude::*;
 use crate::config::MutationConfig;
 use crate::genome::analysis::{mesh_cycle_nodes, mesh_reachable_nodes};
 use crate::genome::CreatureGenome;
+use crate::mutation::engine::ChromosomeUnits;
 use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
 use crate::neighborhood::battery::{Battery, Signature};
@@ -222,7 +223,7 @@ pub fn per_birth_result(
 ) -> BirthResult {
     per_birth_result_on_units(
         subject,
-        subject.genome_size(),
+        ChromosomeUnits::of(subject),
         base,
         battery,
         mutation_config,
@@ -245,7 +246,7 @@ pub fn per_birth_reading(
 ) -> (BirthResult, BirthExposure) {
     per_birth_reading_on_units(
         subject,
-        subject.genome_size(),
+        ChromosomeUnits::of(subject),
         base,
         battery,
         mutation_config,
@@ -256,8 +257,8 @@ pub fn per_birth_reading(
 }
 
 /// [`per_birth_result`] with every birth's supply drawn on `units` instead of
-/// the subject's own size: the drift walk's checkpoint births pass the
-/// instrument constant `FOUNDER_GENOME_SIZE_UNITS` (T11.F20).
+/// the subject's own: the drift walk's checkpoint births pass the
+/// instrument constant `drift::walk_units` (T11.F20, T29.F02).
 #[allow(
     clippy::too_many_arguments,
     reason = "per_birth_result's seven inputs plus the supply unit count"
@@ -265,7 +266,7 @@ pub fn per_birth_reading(
 #[must_use]
 pub fn per_birth_result_on_units(
     subject: &CreatureGenome,
-    units: u32,
+    units: ChromosomeUnits,
     base: &Signature,
     battery: &Battery,
     mutation_config: &MutationConfig,
@@ -296,7 +297,7 @@ pub fn per_birth_result_on_units(
 #[must_use]
 pub fn per_birth_reading_on_units(
     subject: &CreatureGenome,
-    units: u32,
+    units: ChromosomeUnits,
     base: &Signature,
     battery: &Battery,
     mutation_config: &MutationConfig,
@@ -321,6 +322,7 @@ pub fn per_birth_reading_on_units(
                 &mut genome,
                 units,
                 mutation_config,
+                &context.body_ranges,
                 &reachable,
                 ParentExecuted::Indices(&executed),
                 &mut rng,
@@ -454,7 +456,10 @@ mod tests {
         use crate::mutation::MutationEngine;
 
         let config = SimulationConfig::default();
-        let subject = founder_genome(crate::config::FounderProfile::V3Alpha1);
+        let subject = founder_genome(
+            crate::config::FounderProfile::V3Alpha1,
+            crate::creature::founder::default_founder_body(),
+        );
         let battery = Battery::generate(config.world.food.types.len());
         let context = EvalContext::from_config(&config);
         let base = battery.signature(&subject, context.runtime, context.shared_memory_decay_rate);
@@ -487,6 +492,7 @@ mod tests {
             let summary = MutationEngine::apply_mutations_in(
                 &mut genome,
                 &config.mutation,
+                &context.body_ranges,
                 &reachable,
                 ParentExecuted::Indices(&executed),
                 &mut rng,
@@ -530,7 +536,10 @@ mod tests {
         use crate::creature::founder::founder_genome;
 
         let config = SimulationConfig::default();
-        let subject = founder_genome(crate::config::FounderProfile::V3Alpha1);
+        let subject = founder_genome(
+            crate::config::FounderProfile::V3Alpha1,
+            crate::creature::founder::default_founder_body(),
+        );
         let battery = Battery::generate(config.world.food.types.len());
         let context = EvalContext::from_config(&config);
         let base = battery.signature(&subject, context.runtime, context.shared_memory_decay_rate);

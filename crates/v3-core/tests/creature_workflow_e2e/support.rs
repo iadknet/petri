@@ -6,9 +6,9 @@ use v3_core::runtime::trace::domain::{BackendTrace, TickTrace, VmTrace};
 pub(crate) use crate::common::{graph_hop, insert_creature, run_one_traced_tick, test_config};
 
 pub(crate) fn vm_emit_noop_genome() -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Vm(VmBackendDef {
@@ -22,7 +22,8 @@ pub(crate) fn vm_emit_noop_genome() -> CreatureGenome {
             }),
             vec![],
         )],
-    }
+        v3_core::creature::founder::default_founder_body(),
+    )
 }
 
 pub(crate) fn vm_hop(tick: &TickTrace, hop_idx: usize) -> &VmTrace {

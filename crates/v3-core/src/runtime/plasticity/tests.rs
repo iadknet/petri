@@ -109,15 +109,16 @@ fn edit_config(def: &mut CgpGraphBackendDef, node: usize, edit: impl Fn(&mut Lea
 }
 
 fn genome(def: &CgpGraphBackendDef) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Graph(def.clone()),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 fn begin(state: &mut GraphRuntimeState) {
@@ -848,7 +849,10 @@ fn a_non_learning_graph_allocates_no_learned_state() {
     assert!(!state.learned().has_learning());
     assert_eq!(state.learned().edges(0).count(), 0);
     assert!(state.learned().capture().is_empty());
-    let founder = crate::creature::founder::founder_genome(crate::config::FounderProfile::V3Alpha1);
+    let founder = crate::creature::founder::founder_genome(
+        crate::config::FounderProfile::V3Alpha1,
+        crate::creature::founder::default_founder_body(),
+    );
     assert!(
         !GraphRuntimeState::for_genome(&founder, &crate::genome::learning::Seeds::default())
             .learned()

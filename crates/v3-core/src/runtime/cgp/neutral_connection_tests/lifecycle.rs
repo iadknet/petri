@@ -93,7 +93,7 @@ proptest! {
         for weight in [0.0, 0.5] {
             wire(&mut def, OutputSinkKind::ActionVote(VoteSink::Directed(DirectedVoteKind::Reproduce, 7)), edge(leaf(unused as u16, channel), weight));
         }
-        let mut genome = CreatureGenome { entry_node_id: NodeId::new(0), nodes: vec![graph_node(def, refs)] };
+        let mut genome = CreatureGenome::new(NodeId::new(0), vec![graph_node(def, refs)], crate::creature::founder::default_founder_body());
         let before = effects(graph(&genome.nodes[0]), genome.nodes[0].input_refs(), 0.25).side.dispatch_effects();
         let mut rng = SmallRng::seed_from_u64(seed);
         InputRefMutator::apply_to_node(&mut genome, InputRefOperator::Prune, 0, &mut rng, &crate::config::test_sensor_context(2)).unwrap();
@@ -115,7 +115,7 @@ proptest! {
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs();
         let kind = OutputSinkKind::ActionVote(VoteSink::from_index(vote_index).unwrap());
         for _ in 0..incumbent_edges { wire(&mut def, kind, edge(memory(0, false), 0.5)); }
-        let mut genome = CreatureGenome { entry_node_id: NodeId::new(0), nodes: vec![graph_node(def, vec![])] };
+        let mut genome = CreatureGenome::new(NodeId::new(0), vec![graph_node(def, vec![])], crate::creature::founder::default_founder_body());
         let before = genome.genome_size();
         let source = if add_declaration {
             genome.nodes[0].input_refs_mut().push(InputReference::World(WorldInputKey::NearbyCreature));
@@ -133,10 +133,11 @@ proptest! {
 
 #[test]
 fn last_zero_consumer_removal_enables_pruning_and_never_recreates_the_edge() {
-    let mut genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![duplicate_node()],
-    };
+    let mut genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![duplicate_node()],
+        crate::creature::founder::default_founder_body(),
+    );
     let mut rng = SmallRng::seed_from_u64(17);
     for remaining in (1..=3).rev() {
         assert_eq!(graph(&genome.nodes[0]).edges().count(), remaining);
@@ -188,10 +189,11 @@ fn native_node_copy_and_genome_serde_retain_channels_sink_identity_and_independe
         );
     }
     let original_worker = worker.clone();
-    let mut genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![entry, worker],
-    };
+    let mut genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![entry, worker],
+        crate::creature::founder::default_founder_body(),
+    );
     TopologyMutator::apply(
         &mut genome,
         TopologyOperator::CopyNode,

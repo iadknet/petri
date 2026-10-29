@@ -85,10 +85,11 @@ fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
         vec![],
     );
 
-    let genome = CreatureGenome {
-        entry_node_id: id_entry,
-        nodes: vec![entry, noop, eat],
-    };
+    let genome = CreatureGenome::new(
+        id_entry,
+        vec![entry, noop, eat],
+        v3_core::creature::founder::default_founder_body(),
+    );
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let target = insert_creature(&mut creatures, &mut world, genome, pos, 80.0, 0);
     let mut sim = Simulation::new(world, creatures, 0, cfg, 19);
@@ -146,15 +147,16 @@ fn graph_state_persists_across_ticks_e2e() {
         def.push_edge(sink, GraphEdge::new(GraphSource::ComputeNode(1), 1.0));
         def
     };
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Graph(state_def),
             vec![],
         )],
-    };
+        v3_core::creature::founder::default_founder_body(),
+    );
 
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let target = insert_creature(&mut creatures, &mut world, genome, pos, 60.0, 0);

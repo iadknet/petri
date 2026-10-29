@@ -15,6 +15,7 @@ use super::*;
 use crate::config::{MutationConfig, SimulationConfig};
 use crate::contracts::{NodeId, OUTCOME_CHANNEL_COUNT};
 use crate::creature::founder::v3alpha1_founder_genome;
+use crate::genome::body::BodyGenome;
 use crate::genome::cgp::test_support::{plastic_node, set_surface_plasticity};
 use crate::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, EdgeOccurrence, EdgeSurface, GraphEdge,
@@ -27,8 +28,10 @@ use crate::mutation::reachability::TargetSets;
 use crate::mutation::{MutationOperator, MutationSkipReason};
 use crate::runtime::state::GraphRuntimeState;
 
-fn body(capacity: f32) -> HeritableBody {
-    HeritableBody::founder(0, 7, capacity, 0.2)
+fn body(capacity: f32) -> BodyGenome {
+    let mut config = SimulationConfig::default();
+    config.energy.capacity.founder = capacity;
+    crate::creature::founder::founder_body(0, 7, &config)
 }
 
 fn place(energy: f32) -> BirthPlace {
@@ -52,15 +55,16 @@ fn learning(lamarckian: bool, rule: HebbianRule) -> Learning {
 
 /// A one-node genome running `def`.
 fn genome_of(def: &CgpGraphBackendDef) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             Vec::new(),
             BackendDef::Graph(def.clone()),
             Vec::new(),
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 /// What every finalization guarantees (T29.F01 invariant 10): the stored
@@ -102,11 +106,12 @@ fn creature_of(zygote: Zygote, energy: f32) -> Newborn {
 
 #[test]
 fn a_founder_is_generation_zero_with_an_empty_record_and_its_energy_capped() {
-    let genome = v3alpha1_founder_genome();
+    let genome = v3alpha1_founder_genome().with_body(body(100.0));
     for given in [20.0, 100.0, 250.0] {
-        let born = creature_of(Zygote::founder(genome.clone(), body(100.0)), given);
+        let born = creature_of(Zygote::founder(genome.clone(), 5), given);
         assert_finalized(&born, &genome, given, [0.0; 16]);
         assert_eq!(born.creature.generation, 0);
+        assert_eq!(born.creature.lineage_id, 5);
         assert!(born.creature.birth_mutation_operators.is_empty());
         assert_eq!(born.creature.birth_edge_class, None);
         assert!(!born.creature.graph_runtime().learned().has_learning());
@@ -126,7 +131,7 @@ fn learned_parent(memory: [f32; 16]) -> CreatureState {
         )],
         Some(learning(true, HebbianRule::Classic)),
     )]);
-    let zygote = Zygote::founder(genome_of(&def), body(100.0))
+    let zygote = Zygote::founder(genome_of(&def).with_body(body(100.0)), 2)
         .with_payload(BirthPayload::new(Seeds::default(), memory));
     let mut parent = creature_of(zygote, 50.0).creature;
     parent.runtime_mut().learned.set_slot(0, 0, 0.9, 0.0);
@@ -146,11 +151,44 @@ fn an_unchanged_child_inherits_its_parents_learning_memory_and_body() {
     assert_finalized(&born, parent.genome(), 30.0, memory);
     let child = &born.creature;
     assert_eq!(child.generation, 5);
+    assert_eq!(child.lineage_id, 2, "a child carries its parent's lineage");
     assert!(child.birth_mutation_operators.is_empty());
     let edge = child.graph_runtime().learned().edges(0).next().unwrap();
     assert_eq!(edge.learned, Some(0.9));
-    assert_eq!(child.body.phenotype, parent.body.phenotype);
-    assert_eq!(child.body.identity, parent.body.identity);
+    assert_eq!(child.genome().body(), parent.genome().body());
+}
+
+/// An instrument's mutated genome equals conception's for the same draws
+/// (T29.F02 invariant 3, B11): the engine entry under the config's body
+/// ranges is conception's mutation, and conception's clamp is idempotent
+/// under unchanged bounds.
+#[test]
+fn an_instruments_mutated_genome_equals_conceptions_for_the_same_draws() {
+    let parent = learned_parent([0.0; 16]);
+    let mut config = SimulationConfig::default();
+    config.mutation.per_unit_rate = 0.3;
+    for seed in 0..64 {
+        let (zygote, summary) =
+            Zygote::conceive(&parent, &config, &mut SmallRng::seed_from_u64(seed));
+        let mut genome = parent.genome().clone();
+        let executed = |window| {
+            parent
+                .graph_runtime()
+                .dispatch_record
+                .executed_indices(parent.age, window)
+        };
+        let (reading, _) = MutationEngine::apply_mutations_in(
+            &mut genome,
+            &config.mutation,
+            &crate::creature::body::body_ranges(&config),
+            parent.reachable_nodes(),
+            ParentExecuted::Query(&executed),
+            &mut SmallRng::seed_from_u64(seed),
+            &config.sensor_context(config.world.food.types.len()),
+        );
+        assert_eq!(&genome, zygote.genome(), "seed {seed}");
+        assert_eq!(reading.events, summary.events);
+    }
 }
 
 proptest! {
@@ -194,8 +232,9 @@ fn grown(seed: u64, growth: u8) -> CreatureGenome {
     for _ in 0..growth {
         let _ = MutationEngine::apply_mutations_on_units(
             &mut genome,
-            4,
+            crate::mutation::engine::ChromosomeUnits { brain: 4, body: 0 },
             &config,
+            &crate::creature::body::default_body_ranges(),
             &[],
             ParentExecuted::NONE,
             &mut rng,
@@ -341,17 +380,14 @@ proptest! {
         prop_assert!(gated, "the gate rejected no applied event");
         let mut child = parent.clone();
         let birth = MutationConfig { per_unit_rate: 1.0, ..config };
-        let (summary, inheritance) = MutationEngine::apply_mutations_in(
-            &mut child,
-            &birth,
-            &reachable,
-            ParentExecuted::NONE,
-            &mut SmallRng::seed_from_u64(seed),
-            &context,
-        );
+        let (summary, inheritance) = MutationEngine::apply_mutations_in(&mut child, &birth, &crate::creature::body::default_body_ranges(), &reachable, ParentExecuted::NONE, &mut SmallRng::seed_from_u64(seed), &context);
+        // Every brain event is rejected; the body's five events, which no
+        // gate reads, all apply and leave the brain as it was.
         prop_assert!(summary.attempted_events > 0);
-        prop_assert_eq!(summary.applied_events, 0);
-        prop_assert_eq!(&child, &parent);
+        let body = summary.applied_by_domain.get(&crate::mutation::MutationDomain::Body);
+        prop_assert_eq!(summary.applied_events, 5);
+        prop_assert_eq!(body, Some(&5));
+        prop_assert_eq!(&child.clone().with_body(*parent.body()), &parent);
         prop_assert_eq!(inheritance.apply(&parent_seeds), parent_seeds);
     }
 

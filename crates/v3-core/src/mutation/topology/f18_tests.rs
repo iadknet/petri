@@ -279,7 +279,7 @@ fn both_detours_preserve_nonzero_bus_queue_local_metadata_and_temporal_state() {
                     }
                 }
                 assert_eq!(
-                    genome(vec![grown.nodes.last().unwrap().clone()]).genome_size(),
+                    genome(vec![grown.nodes.last().unwrap().clone()]).brain_units(),
                     if graph { 2 } else { 3 }
                 );
                 let mut paired = grown.clone();

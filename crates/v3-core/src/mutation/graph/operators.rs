@@ -1622,15 +1622,16 @@ mod tests {
 
         let def = minimal_def();
         let before = total_edge_count(&def);
-        let mut genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        let mut genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 sample_input_refs(),
                 BackendDef::Graph(def),
                 Vec::new(),
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         let mut rng = test_rng();
         add_graph_edge(&mut genome, 0, &TEST_CONTEXT, &mut rng).expect("edge add should succeed");
         let BackendDef::Graph(after_def) = genome.nodes[0].backend_def() else {

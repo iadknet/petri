@@ -156,10 +156,11 @@ pub(crate) fn leaf(ref_idx: u16, sub_idx: u16) -> GraphSource {
 }
 
 pub(crate) fn genome(nodes: Vec<NodeGenome>) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: nodes.first().map_or(NodeId::new(0), |node| node.node_id),
+    CreatureGenome::new(
+        nodes.first().map_or(NodeId::new(0), |node| node.node_id),
         nodes,
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 /// Unit-scale local sensors on one food type.

@@ -106,10 +106,11 @@ fn observe(g: &CreatureGenome, cap: u32) -> (MeshOutput, MeshObservation) {
 }
 #[test]
 fn top_choice_revisits_and_a_cycle_runs_to_the_pass_cap() {
-    let g = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![node(0, &[1]), node(1, &[0, 2]), node(2, &[1, 2])],
-    };
+    let g = CreatureGenome::new(
+        NodeId::new(0),
+        vec![node(0, &[1]), node(1, &[0, 2]), node(2, &[1, 2])],
+        crate::creature::founder::default_founder_body(),
+    );
     for _ in 0..2 {
         let (output, result) = observe(&g, 10);
         assert_eq!(result.hops.len(), 10);
@@ -126,10 +127,11 @@ fn top_choice_revisits_and_a_cycle_runs_to_the_pass_cap() {
 }
 #[test]
 fn cap_is_a_per_pass_limit_and_the_final_dispatch_can_complete() {
-    let g = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![node(0, &[1]), node(1, &[2]), node(2, &[])],
-    };
+    let g = CreatureGenome::new(
+        NodeId::new(0),
+        vec![node(0, &[1]), node(1, &[2]), node(2, &[])],
+        crate::creature::founder::default_founder_body(),
+    );
     let (capped, result) = observe(&g, 2);
     assert_eq!(result.termination_reason, TerminationReason::NoDecision);
     assert_eq!(result.hops.len(), 2);
@@ -172,14 +174,16 @@ fn backend_costs_accumulate_every_dispatch_and_close_the_energy_account() {
     let vm: (Build, Cost) = (node, |o| o.cost_report.vm_cost);
     let graph: (Build, Cost) = (graph_node, |o| o.cost_report.graph_cost);
     for (build, cost) in [vm, graph] {
-        let single = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![build(0, &[])],
-        };
-        let chain = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![build(0, &[1]), build(1, &[2]), build(2, &[])],
-        };
+        let single = CreatureGenome::new(
+            NodeId::new(0),
+            vec![build(0, &[])],
+            crate::creature::founder::default_founder_body(),
+        );
+        let chain = CreatureGenome::new(
+            NodeId::new(0),
+            vec![build(0, &[1]), build(1, &[2]), build(2, &[])],
+            crate::creature::founder::default_founder_body(),
+        );
         let (one, one_spent) = run(&single);
         let (three, three_spent) = run(&chain);
         assert!(cost(&one) > 0.0, "{:?}", one.cost_report);
@@ -202,10 +206,11 @@ fn backend_costs_accumulate_every_dispatch_and_close_the_energy_account() {
 }
 #[test]
 fn missing_winner_soft_terminates_without_fallback() {
-    let g = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![node(0, &[99, 1]), node(1, &[])],
-    };
+    let g = CreatureGenome::new(
+        NodeId::new(0),
+        vec![node(0, &[99, 1]), node(1, &[])],
+        crate::creature::founder::default_founder_body(),
+    );
     let (_, result) = observe(&g, 10);
     assert_eq!(
         result.hops,
@@ -215,10 +220,11 @@ fn missing_winner_soft_terminates_without_fallback() {
 }
 #[test]
 fn all_three_modes_match_on_a_revisiting_cycle_energy_memory_priority_and_cost() {
-    let g = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![node(0, &[1]), node(1, &[0, 2]), node(2, &[1])],
-    };
+    let g = CreatureGenome::new(
+        NodeId::new(0),
+        vec![node(0, &[1]), node(1, &[0, 2]), node(2, &[1])],
+        crate::creature::founder::default_founder_body(),
+    );
     for cap in [1, 2, 3, 10] {
         for start in [0.0, 0.1, 1.0, 1000.0] {
             let config = RuntimeConfig {
@@ -305,7 +311,7 @@ proptest! {
     /// counter records exactly that.
     #[test]
     fn dispatches_are_bounded_by_the_cap_and_the_cap_alone_counts_a_capped_pass(edges in prop::collection::vec(prop::collection::vec(0u32..20,0..8),1..20), cap in 1u32..25) {
-        let g=CreatureGenome { entry_node_id:NodeId::new(0),nodes:edges.iter().enumerate().map(|(i,e)|node(i as u32,e)).collect() };
+        let g=CreatureGenome::new(NodeId::new(0), edges.iter().enumerate().map(|(i,e)|node(i as u32,e)).collect(), crate::creature::founder::default_founder_body());
         let (output, result)=observe(&g,cap);
         prop_assert!(result.hops.len()<=cap as usize);
         prop_assert!(result.hops.iter().all(|(id,_)| g.nodes.iter().any(|n| n.node_id==*id)));

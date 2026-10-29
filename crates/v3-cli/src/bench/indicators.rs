@@ -287,7 +287,10 @@ fn compute_drift_depth(
     sizes: neighborhood::drift::DriftSizes,
 ) -> (DriftDepth, DriftCohortInputs) {
     use neighborhood::{battery as fixed_battery, drift, mesh_execution, recruitment};
-    let founder = founder_genome(v3_core::config::FounderProfile::V3Alpha1);
+    let founder = founder_genome(
+        v3_core::config::FounderProfile::V3Alpha1,
+        v3_core::creature::founder::default_founder_body(),
+    );
     let readings = drift::observe(
         &founder,
         battery,
@@ -598,7 +601,10 @@ pub(super) fn compute_founder_neighborhood(
     battery: &Battery,
     sizes: NeighborhoodSizes,
 ) -> NeighborhoodFounderHalf {
-    let subject = founder_genome(config.population.founder_profile);
+    let subject = founder_genome(
+        config.population.founder_profile,
+        v3_core::creature::founder::default_founder_body(),
+    );
     let context = EvalContext::from_config(config);
     let evaluation: GenomeEvaluation = evaluate_genome(
         &subject,

@@ -325,10 +325,11 @@ fn dormant_activation_changes_a_later_live_energy_read() {
         OutputSinkKind::WriteSlot(0),
         edge(leaf(0, 0), 1.0),
     );
-    let base = CreatureGenome {
-        entry_node_id: entry.node_id,
-        nodes: vec![entry, reader],
-    };
+    let base = CreatureGenome::new(
+        entry.node_id,
+        vec![entry, reader],
+        crate::creature::founder::default_founder_body(),
+    );
     let mut silent = base.clone();
     wire(
         graph_mut(&mut silent.nodes[0]),

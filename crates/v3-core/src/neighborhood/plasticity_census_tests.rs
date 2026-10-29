@@ -51,15 +51,16 @@ fn node(plasticity: Option<Learning>, weights: &[f32]) -> ComputeNode {
 }
 
 fn genome_of(def: CgpGraphBackendDef) -> CreatureGenome {
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Graph(def),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 fn graph_genome(compute_nodes: Vec<ComputeNode>) -> CreatureGenome {
@@ -107,7 +108,10 @@ fn every_attribute_key_is_distinct() {
 
 #[test]
 fn the_founder_carries_no_plasticity() {
-    let genome = founder_genome(FounderProfile::default());
+    let genome = founder_genome(
+        FounderProfile::default(),
+        crate::creature::founder::default_founder_body(),
+    );
     let reachable = mesh_reachable_nodes(&genome);
     let census = census_of(&genome, &reachable, None);
     assert_eq!(census.creatures, 1);
@@ -355,9 +359,9 @@ fn member_learners_and_learned_scales_are_censused_by_source_and_scale() {
     .into_iter()
     .map(|(key, value)| (LearnableId { node: 0, key }, value))
     .collect();
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![crate::contracts::InputReference::World(
                 WorldInputKey::NeighborBarrierRing,
@@ -365,7 +369,8 @@ fn member_learners_and_learned_scales_are_censused_by_source_and_scale() {
             BackendDef::Graph(def),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let state = GraphRuntimeState::for_genome(&genome, &seeds);
     let census = PlasticityCensus::observe([(&[0usize][..], state.learned())]);
 
@@ -400,15 +405,16 @@ fn a_scale_only_bundle_makes_a_carrier_without_edge_learners() {
         LearningSlot::Scale,
         Some(plastic(HebbianRule::Classic, false, false)),
     );
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
             BackendDef::Graph(def),
             vec![],
         )],
-    };
+        crate::creature::founder::default_founder_body(),
+    );
     let state = GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
     let census = PlasticityCensus::observe([(&[0usize][..], state.learned())]);
 
@@ -478,15 +484,16 @@ fn edges_and_scales_are_censused_by_retention_bin_with_birth_drift() {
         def.edge_mut(members[0])
             .set_policy(MemberPolicy::Own(config));
         def.edge_mut(members[1]).set_credits(true);
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
                 BackendDef::Graph(def),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         let unvisited =
             GraphRuntimeState::for_genome(&genome, &crate::genome::learning::Seeds::default());
         let census = PlasticityCensus::observe([(&[0usize][..], unvisited.learned())]);

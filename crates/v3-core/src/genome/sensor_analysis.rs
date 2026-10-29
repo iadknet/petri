@@ -269,21 +269,22 @@ mod tests {
     const FOOD_0: OrdinaryFoodTypeId = OrdinaryFoodTypeId::new(0);
 
     fn graph_node(graph: CgpGraphBackendDef, input_refs: Vec<InputReference>) -> CreatureGenome {
-        CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 input_refs,
                 BackendDef::Graph(graph),
                 vec![],
             )],
-        }
+            crate::creature::founder::default_founder_body(),
+        )
     }
 
     fn vm_node(program: Vec<VmInstruction>, input_refs: Vec<InputReference>) -> CreatureGenome {
-        CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 input_refs,
                 BackendDef::Vm(VmBackendDef {
@@ -293,7 +294,8 @@ mod tests {
                 }),
                 vec![],
             )],
-        }
+            crate::creature::founder::default_founder_body(),
+        )
     }
 
     fn empty_graph() -> CgpGraphBackendDef {
@@ -908,9 +910,7 @@ mod tests {
             ),
         ) {
             let template = vm_node(vec![VmInstruction::Halt], Vec::new()).nodes.remove(0);
-            let mut genome = CreatureGenome {
-                entry_node_id: NodeId::new(0),
-                nodes: refs
+            let mut genome = CreatureGenome::new(NodeId::new(0), refs
                     .iter()
                     .enumerate()
                     .map(|(i, input_refs)| NodeGenome {
@@ -918,8 +918,7 @@ mod tests {
                         input_refs: input_refs.clone(),
                         ..template.clone()
                     })
-                    .collect(),
-            };
+                    .collect(), crate::creature::founder::default_founder_body());
             let keys: Vec<PerceptionRequirements> = refs
                 .iter()
                 .flatten()

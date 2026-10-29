@@ -104,7 +104,8 @@ pub struct CopySource {
 
 /// Which part of a module a mutation event reached (T13.F07's target-local
 /// exposure): its route entries (`Split`), its `backend_def` (`Payload`), or
-/// neither (`Other`: input references, creation, deletion and copy sources).
+/// neither (`Other`: input references, creation, deletion, copy sources and
+/// body genes, which select no node).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EditSurface {
     Split,
@@ -134,7 +135,7 @@ impl EditSurface {
                 | TopologyOperator::CopyMeshForwardSlice => Self::Other,
             },
             MutationOperator::Vm(_) | MutationOperator::Graph(_) => Self::Payload,
-            MutationOperator::InputRef(_) => Self::Other,
+            MutationOperator::InputRef(_) | MutationOperator::Body(_) => Self::Other,
         }
     }
 }

@@ -16,7 +16,8 @@ pub const SUMMARY_KIND: &str = "petri-lab-summary";
 pub const SUMMARY_VERSION: u32 = 4;
 /// The oldest summary version `report` still renders.
 pub const SUMMARY_VERSION_MIN: u32 = 2;
-/// Genome-file format: 10 since T27.F03 commit 4 (the `GiveEnergy` kind
+/// Genome-file format: 12 since T29.F02 (the genome carries its body
+/// chromosome, `body`); 10 since T27.F03 commit 4 (the `GiveEnergy` kind
 /// moves the drive, `Terminate` and `Decide` sink indices and adds
 /// `GiveEffort`); 9 since T27.F03 commit 3 (parameter field 3 is
 /// `StealEffort`, an effort modifier, where `StealEnergyAmount` stood); 8
@@ -31,7 +32,7 @@ pub const SUMMARY_VERSION_MIN: u32 = 2;
 /// the three creature families); 2 since T25.F03
 /// (`own_weight`, edge membership and bundles replace `weight` and ring
 /// projections).
-pub const GENOME_FORMAT: u32 = 11;
+pub const GENOME_FORMAT: u32 = 12;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Summary {

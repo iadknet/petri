@@ -123,15 +123,16 @@ fn graph_reads_all_neighbor_sensor_directions_e2e() {
         def
     };
 
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             input_refs,
             BackendDef::Graph(graph_def),
             vec![],
         )],
-    };
+        v3_core::creature::founder::default_founder_body(),
+    );
 
     let target = insert_creature(&mut creatures, &mut world, genome, target_pos, 120.0, 0);
     let mut sim = Simulation::new(world, creatures, 0, cfg, 31);
@@ -256,15 +257,16 @@ fn graph_reads_inputs_and_writes_outputs_e2e() {
         def
     };
 
-    let target_genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    let target_genome = CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             input_refs,
             BackendDef::Graph(graph_def),
             vec![],
         )],
-    };
+        v3_core::creature::founder::default_founder_body(),
+    );
 
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     // West neighbor occupancy source.

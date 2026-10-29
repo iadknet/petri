@@ -446,15 +446,16 @@ mod tests {
         let mut def = crate::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs();
         def = def.with_compute_nodes(compute_nodes);
 
-        CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![],
                 BackendDef::Graph(def),
                 vec![],
             )],
-        }
+            crate::creature::founder::default_founder_body(),
+        )
     }
 
     /// Newborns on both reproduction paths carry a genome size equal to a
@@ -500,8 +501,8 @@ mod tests {
 
     #[test]
     fn replication_multiplier_is_exactly_one_below_the_founder_anchor() {
-        // T25.F02: the anchor is 80 (was 97); the old rule and 97 restore 96.
-        for size in [0, 1, 7, 79] {
+        // T29.F02: the anchor is 85 (T25.F02 80, was 97).
+        for size in [0, 1, 7, 79, 84] {
             assert_eq!(genome_replication_cost_multiplier(0.1, size), 1.0);
         }
     }
@@ -514,12 +515,12 @@ mod tests {
     }
 
     #[test]
-    fn replication_multiplier_charges_the_reference_genome_31_6_times() {
-        // The T03.F08 cost arm's 386-unit genome: 306 units above the 80-unit
-        // founder (T25.F02 unit rule; 289 above the 97-unit anchor gave 29.9,
-        // which the old rule and anchor 97 restore).
+    fn replication_multiplier_charges_the_reference_genome_31_1_times() {
+        // The T03.F08 cost arm's 386-unit genome: 301 units above the 85-unit
+        // founder (T29.F02 body genes; 306 above the 80-unit T25.F02 anchor
+        // gave 31.6, 289 above the 97-unit anchor 29.9).
         let factor = genome_replication_cost_multiplier(0.1, 386);
-        assert!((factor - 31.6).abs() < 1e-4, "factor {factor}");
+        assert!((factor - 31.1).abs() < 1e-4, "factor {factor}");
     }
 
     proptest::proptest! {
@@ -583,10 +584,10 @@ mod tests {
         assert_eq!(gestation_ticks(FOUNDER_GENOME_SIZE_UNITS, 1.0), 1);
         assert_eq!(gestation_ticks(1, 1.0), 1);
         assert_eq!(gestation_ticks(0, 1.0), 0);
-        // T25.F02 anchor 80 (97 restores 98 / 194 / 195).
-        assert_eq!(gestation_ticks(81, 1.0), 2);
-        assert_eq!(gestation_ticks(160, 1.0), 2);
-        assert_eq!(gestation_ticks(161, 1.0), 3);
+        // T29.F02 anchor 85 (T25.F02's 80 restores 81 / 160 / 161).
+        assert_eq!(gestation_ticks(86, 1.0), 2);
+        assert_eq!(gestation_ticks(170, 1.0), 2);
+        assert_eq!(gestation_ticks(171, 1.0), 3);
         assert_eq!(gestation_ticks(FOUNDER_GENOME_SIZE_UNITS, 2.0), 2);
         assert_eq!(gestation_ticks(FOUNDER_GENOME_SIZE_UNITS, 0.5), 1);
         assert_eq!(gestation_ticks(u32::MAX, f32::MAX), u64::MAX);
@@ -717,9 +718,9 @@ mod tests {
         use crate::contracts::NodeId;
         use crate::genome::{NodeGenome, VmBackendDef, VmInstruction};
 
-        let genome = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![NodeGenome::new(
+        let genome = CreatureGenome::new(
+            NodeId::new(0),
+            vec![NodeGenome::new(
                 NodeId::new(0),
                 vec![],
                 BackendDef::Vm(VmBackendDef {
@@ -729,7 +730,8 @@ mod tests {
                 }),
                 vec![],
             )],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
 
         // VM nodes carry no plastic edge.
         let child = build_child_learned(&genome, &[]);
@@ -758,9 +760,9 @@ mod tests {
                 targets,
             )
         };
-        let mut child = CreatureGenome {
-            entry_node_id: NodeId::new(0),
-            nodes: vec![
+        let mut child = CreatureGenome::new(
+            NodeId::new(0),
+            vec![
                 vm(
                     0,
                     vec![RouteTarget {
@@ -771,7 +773,8 @@ mod tests {
                 ),
                 vm(1, vec![]),
             ],
-        };
+            crate::creature::founder::default_founder_body(),
+        );
         let parent = crate::runtime::state::GraphRuntimeState::for_genome(
             &child,
             &crate::genome::learning::Seeds::default(),

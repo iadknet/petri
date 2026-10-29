@@ -38,7 +38,7 @@ export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 		step: 0.001,
 		defaultValue: 0.1,
 		tooltip:
-			"Raises the parent's reproduce charge for big genomes: the charge is multiplied by 1 + rate \u00d7 (genome units above the founder's 80)",
+			"Raises the parent's reproduce charge for big genomes: the charge is multiplied by 1 + rate \u00d7 (genome units above the founder's 85)",
 	},
 	{
 		path: "energy.lifecycle.gestation_ticks_per_founder_genome",
@@ -48,7 +48,7 @@ export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 		step: 0.1,
 		defaultValue: 1.0,
 		tooltip:
-			"Gestation ticks per founder-sized genome (80 units); bigger genomes gestate longer, rounded up. The parent cannot act until the birth, and its death loses the child. 0 delivers at once",
+			"Gestation ticks per founder-sized genome (85 units); bigger genomes gestate longer, rounded up. The parent cannot act until the birth, and its death loses the child. 0 delivers at once",
 	},
 	{
 		path: "energy.lifecycle.min_reproduce_energy",

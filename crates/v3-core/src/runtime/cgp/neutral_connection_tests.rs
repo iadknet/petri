@@ -437,9 +437,12 @@ fn active_native_visits_and_ticks_preserve_actions_temporal_plasticity_and_costs
             silent.add_bundle(source, birth, &context).unwrap();
         }
     }
-    let genomes = [original, silent].map(|node| CreatureGenome {
-        entry_node_id: node.node_id,
-        nodes: vec![node],
+    let genomes = [original, silent].map(|node| {
+        CreatureGenome::new(
+            node.node_id,
+            vec![node],
+            crate::creature::founder::default_founder_body(),
+        )
     });
     let config = RuntimeConfig {
         graph_node_base_cost: BASE_COST,

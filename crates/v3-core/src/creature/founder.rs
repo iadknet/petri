@@ -1,26 +1,62 @@
-use crate::config::{EnergyLifecycleConfig, FounderProfile, OrdinaryFoodTypeId};
+use std::sync::LazyLock;
+
+use crate::config::{EnergyLifecycleConfig, FounderProfile, OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{
-    DynamicIntrospectionKey, InputReference, NodeId, RouteTarget, StaticIntrospectionKey,
-    WorldInputKey,
+    splitmix64, DynamicIntrospectionKey, InputReference, NodeId, RouteTarget,
+    StaticIntrospectionKey, WorldInputKey,
 };
+use crate::genome::body::{BodyGenome, Phenotype};
 use crate::genome::{BackendDef, CreatureGenome, NodeGenome};
 
 use super::cgp_founder::{
     build_cgp_founder_decision_graph, build_cgp_founder_graph_with_thresholds,
 };
 
-/// `genome_size()` of the canonical V3Alpha1 founder. The genome replication
-/// cost (T03.F11) charges only the units above this anchor, so the founder's
-/// reproduce charge is unchanged; `creature::state` tests pin the founder's
-/// measured size to this constant (80 under the T25.F02 unit rule).
-pub const FOUNDER_GENOME_SIZE_UNITS: u32 = 80;
+/// `genome_size()` of the canonical V3Alpha1 founder: 80 brain units (the
+/// T25.F02 unit rule) and the 5 body genes (T29.F02). The replication cost
+/// (T03.F11) charges only the units above this anchor and gestation runs one
+/// tick at it, so the founder's charges are unchanged; `creature::state`
+/// tests pin the founder's measured size to this constant.
+pub const FOUNDER_GENOME_SIZE_UNITS: u32 = 85;
 
-/// Return the canonical v3alpha1 founder genome.
+/// The body of founder `founder_index` of a run seeded with `startup_seed`
+/// under `config` (T29.F02 invariant 7): the [`Phenotype::FOUNDER`] colour,
+/// the kin tag `splitmix64(startup_seed ^ founder_index) as u32`, the capacity
+/// `energy.capacity.founder` and both shares at `exchange.founder_share`.
+#[must_use]
+pub fn founder_body(
+    founder_index: usize,
+    startup_seed: u64,
+    config: &SimulationConfig,
+) -> BodyGenome {
+    let kin_tag = splitmix64(startup_seed ^ founder_index as u64) as u32;
+    let share = config.exchange.founder_share;
+    BodyGenome::new(
+        Phenotype::FOUNDER,
+        kin_tag,
+        config.energy.capacity.founder,
+        share,
+        share,
+    )
+}
+
+/// Founder 0's body at startup seed 0 under the default config: the body of
+/// the default-config founder genomes ([`v3alpha1_founder_genome`]) and of
+/// readers and fixtures that run the default config.
+#[must_use]
+pub fn default_founder_body() -> BodyGenome {
+    static BODY: LazyLock<BodyGenome> =
+        LazyLock::new(|| founder_body(0, 0, &SimulationConfig::default()));
+    *BODY
+}
+
+/// Return the canonical v3alpha1 founder genome under the default config,
+/// with [`default_founder_body`].
 ///
 /// 2-node mesh: Node 0 (Graph sensor aggregator) -> Node 1 (Graph vote decision).
 /// Spec: v3-startup-seeding-spec.md Section 5.1.
 pub fn v3alpha1_founder_genome() -> CreatureGenome {
-    founder_genome(FounderProfile::V3Alpha1)
+    founder_genome(FounderProfile::V3Alpha1, default_founder_body())
 }
 
 /// The energy gate and offspring investment a founder profile emits
@@ -61,26 +97,28 @@ pub const fn founder_reproduce_policy(profile: FounderProfile) -> FounderReprodu
     }
 }
 
-/// Return a founder genome variant selected by profile, with the age gate
-/// derived from the default lifecycle config.
+/// Return a founder genome variant selected by profile with `body`, with the
+/// age gate derived from the default lifecycle config.
 #[must_use]
-pub fn founder_genome(profile: FounderProfile) -> CreatureGenome {
-    founder_genome_with_age_gate(profile, &EnergyLifecycleConfig::default())
+pub fn founder_genome(profile: FounderProfile, body: BodyGenome) -> CreatureGenome {
+    founder_genome_with_age_gate(profile, &EnergyLifecycleConfig::default(), body)
 }
 
-/// Return a founder genome variant selected by profile with its age gate
-/// derived from `lifecycle`: `min_reproduce_age` on the `age_reference_ticks`
-/// scale the brain reads `AgeTicks` on (T17.F02 invariant 5).
+/// Return a founder genome variant selected by profile with `body` and its
+/// age gate derived from `lifecycle`: `min_reproduce_age` on the
+/// `age_reference_ticks` scale the brain reads `AgeTicks` on (T17.F02
+/// invariant 5).
 #[must_use]
 pub fn founder_genome_with_age_gate(
     profile: FounderProfile,
     lifecycle: &EnergyLifecycleConfig,
+    body: BodyGenome,
 ) -> CreatureGenome {
     let forage_first = profile != FounderProfile::V3Alpha1;
     let policy = founder_reproduce_policy(profile);
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![
             node0_graph_sensor(
                 policy.energy_threshold,
                 lifecycle.min_reproduce_age,
@@ -88,7 +126,8 @@ pub fn founder_genome_with_age_gate(
             ),
             node1_graph_decision(forage_first, policy.transfer_fraction),
         ],
-    }
+        body,
+    )
 }
 
 fn node0_graph_sensor(
@@ -262,6 +301,29 @@ mod tests {
     use crate::sensors::typed_food::TypedFoodLocalSnapshot;
     use proptest::prelude::*;
 
+    /// A founder's body (T29.F02 invariant 7): the founder colour, the kin
+    /// tag `splitmix64(seed ^ index)`, the config's founder capacity and both
+    /// shares at the founder share; tags differ by index and by seed.
+    #[test]
+    fn a_founder_body_is_the_configs_founder_values_and_its_kin_tag() {
+        let mut config = SimulationConfig::default();
+        config.energy.capacity.founder = 321.0;
+        config.exchange.founder_share = 0.3;
+        let body = founder_body(4, 99, &config);
+        assert_eq!(body.colour(), &Phenotype::FOUNDER);
+        assert_eq!(body.kin_tag(), splitmix64(99 ^ 4) as u32);
+        assert_eq!(body.capacity(), 321.0);
+        assert_eq!((body.steal_share(), body.give_share()), (0.3, 0.3));
+        assert_eq!(founder_body(4, 99, &config), body);
+        assert_ne!(founder_body(5, 99, &config).kin_tag(), body.kin_tag());
+        assert_ne!(founder_body(4, 98, &config).kin_tag(), body.kin_tag());
+        assert_eq!(
+            default_founder_body(),
+            founder_body(0, 0, &SimulationConfig::default())
+        );
+        assert_eq!(v3alpha1_founder_genome().body(), &default_founder_body());
+    }
+
     /// The T17.F01 profile table on the unit scale (T17.F02): (profile,
     /// strict energy threshold as a fraction of the energy scale, the T17.F01
     /// raw threshold it re-expresses at the default scale (200), transfer
@@ -371,7 +433,11 @@ mod tests {
             min_reproduce_age: min_age,
             ..EnergyLifecycleConfig::default()
         };
-        let genome = founder_genome_with_age_gate(profile, &lifecycle);
+        let genome = founder_genome_with_age_gate(
+            profile,
+            &lifecycle,
+            crate::creature::founder::default_founder_body(),
+        );
         run_founder(&genome, &lifecycle, food, energy, age, cardinal, limit)
     }
 
@@ -589,10 +655,13 @@ mod tests {
     fn founder_structure_is_a_sensor_graph_feeding_a_vote_graph() {
         assert_eq!(
             v3alpha1_founder_genome(),
-            founder_genome(FounderProfile::V3Alpha1)
+            founder_genome(
+                FounderProfile::V3Alpha1,
+                crate::creature::founder::default_founder_body()
+            )
         );
         for (profile, ..) in PROFILES {
-            let genome = founder_genome(profile);
+            let genome = founder_genome(profile, crate::creature::founder::default_founder_body());
             assert_eq!(genome.nodes.len(), 2);
             assert_eq!(genome.nodes[0].input_refs().len(), 5);
             assert_eq!(genome.nodes[1].input_refs().len(), 7);

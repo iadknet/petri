@@ -109,7 +109,7 @@ export const MOCK_CONFIG: SimulationConfig = {
 		perception: { vision_radius: 5 },
 	},
 	mutation: {
-		per_unit_rate: 0.0060625,
+		per_unit_rate: 0.485 / 85,
 		mesh_layer_probability: 0.2,
 		large_copy_weight_percent: 25,
 		genome_size_cap: 1200,
@@ -127,8 +127,8 @@ export const MOCK_CONFIG: SimulationConfig = {
 		},
 		executed_bias: 0.9,
 		executed_window_ticks: 100,
-		capacity: { chance: 0.1, log_step: 0.25 },
-		share: { chance: 0.1, log_step: 0.25 },
+		capacity: { log_step: 0.25 },
+		share: { log_step: 0.25 },
 	},
 	predation: {
 		kill_complexity_bonus_multiplier: 0.05,

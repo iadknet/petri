@@ -199,7 +199,10 @@ fn predation_caps_and_bonus_recovery_observe_separate_applied_flows() {
     sim.config.exchange.effort_rate = 0.0;
     sim.config.energy.costs.noop_cost = 0.0; // no T16.F02 effort floor
     sim.config.predation.kill_complexity_bonus_multiplier = 0.5;
-    sim.creatures[attacker].body.capacity = 10.0;
+    sim.creatures[attacker] =
+        crate::creature::birth::Zygote::reborn(&sim.creatures[attacker], |body| {
+            body.with_capacity(10.0)
+        });
     assert_eq!(sim.creatures[victim].complexity(), 4);
     steal_now(attacker, &mut sim, Direction::N, 10.0);
     let flows = &sim.stats.energy_flows;
@@ -353,7 +356,8 @@ fn food_credit_is_observed_before_cap_and_can_recover_an_exhausted_creature() {
     sim.config.energy.complexity_cost.enabled = false;
     sim.config.energy.costs.eat_cost = 1.0;
     sim.config.energy.costs.eat_reward_per_food = 10.0;
-    sim.creatures[id].body.capacity = 5.0;
+    sim.creatures[id] =
+        crate::creature::birth::Zygote::reborn(&sim.creatures[id], |body| body.with_capacity(5.0));
     sim.world.set_food_type(
         sim.creatures[id].position,
         OrdinaryFoodTypeId::default(),
@@ -380,9 +384,9 @@ fn learning_genome(reward: bool) -> crate::genome::CreatureGenome {
     use crate::genome::{
         BackendDef, CreatureGenome, HebbianRule, Learning, NodeGenome, RewardModulationConfig,
     };
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome::new(
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![NodeGenome::new(
             NodeId::new(0),
             vec![],
             BackendDef::Graph(
@@ -412,7 +416,8 @@ fn learning_genome(reward: bool) -> crate::genome::CreatureGenome {
             ),
             vec![],
         )],
-    }
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 /// Reward-modulated learning is free (T25.F02): a tick in which every other
@@ -536,10 +541,10 @@ fn phase_zero_assigns_each_creatures_decay_first_cause_at_the_zero_boundary() {
         (2.0, DeathCause::LifecycleDecay),
         (3.0, DeathCause::GenomeCarrying),
     ] {
-        let (mut sim, id) = make_sim_with_custom_genome(initial_energy, sized_genome(4));
+        let (mut sim, id) = make_sim_with_custom_genome(initial_energy, sized_genome(8));
         sim.config.energy.lifecycle.energy_decay_per_tick = 2.0;
-        sim.config.energy.lifecycle.genome_carry_cost_per_unit = 0.5;
-        assert_eq!(sim.creatures[id].genome_size(), 4);
+        sim.config.energy.lifecycle.genome_carry_cost_per_unit = 0.25;
+        assert_eq!(sim.creatures[id].genome_size(), 8);
 
         run_phase_0(&mut sim);
 
@@ -552,17 +557,17 @@ fn phase_zero_assigns_each_creatures_decay_first_cause_at_the_zero_boundary() {
 #[test]
 fn phase_zero_allocates_combined_debit_and_counts_even_dead_creature_exposure() {
     let (mut sim, decay, carrying) =
-        make_sim_two_with_genomes(1.0, 3.0, sized_genome(4), sized_genome(4));
+        make_sim_two_with_genomes(1.0, 3.0, sized_genome(8), sized_genome(8));
     sim.config.energy.lifecycle.energy_decay_per_tick = 2.0;
-    sim.config.energy.lifecycle.genome_carry_cost_per_unit = 0.5;
-    assert_eq!(sim.creatures[decay].genome_size(), 4);
-    assert_eq!(sim.creatures[carrying].genome_size(), 4);
+    sim.config.energy.lifecycle.genome_carry_cost_per_unit = 0.25;
+    assert_eq!(sim.creatures[decay].genome_size(), 8);
+    assert_eq!(sim.creatures[carrying].genome_size(), 8);
     run_phase_0(&mut sim);
     assert_eq!(sim.stats.mortality.count(DeathCause::LifecycleDecay), 1);
     assert_eq!(sim.stats.mortality.count(DeathCause::GenomeCarrying), 1);
     assert_eq!(sim.stats.energy_flows.lifecycle_decay, 4.0);
     assert_eq!(sim.stats.energy_flows.genome_carrying, 4.0);
-    assert_eq!(sim.stats.energy_flows.genome_size_creature_ticks, 8);
+    assert_eq!(sim.stats.energy_flows.genome_size_creature_ticks, 16);
 }
 
 #[test]

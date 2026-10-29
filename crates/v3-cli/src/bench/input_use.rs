@@ -336,8 +336,10 @@ pub(super) fn observe_world(
         observation.read_sample,
         observation.sizes,
     );
-    let founder =
-        v3_core::creature::founder::founder_genome(v3_core::config::FounderProfile::V3Alpha1);
+    let founder = v3_core::creature::founder::founder_genome(
+        v3_core::config::FounderProfile::V3Alpha1,
+        v3_core::creature::founder::default_founder_body(),
+    );
     let context = v3_core::neighborhood::EvalContext::from_config(observation.config);
     let reading = funnel::observe(
         effects::WorldInputs {

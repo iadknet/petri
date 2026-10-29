@@ -414,10 +414,9 @@ mod tests {
     use super::*;
     use crate::config::EnergyCapacityConfig;
     use crate::config::WorldEdgeMode;
-    use crate::creature::body::HeritableBody;
     use crate::creature::founder::v3alpha1_founder_genome;
-    use crate::creature::identity::CreatureIdentityState;
-    use crate::creature::phenotype::Phenotype;
+    use crate::genome::body::BodyGenome;
+    use crate::genome::body::Phenotype;
     use crate::sensors::visibility::{compute_visible_cells, get_visibility_table};
     use slotmap::SlotMap;
 
@@ -429,25 +428,14 @@ mod tests {
         id: CreatureId,
         pos: crate::contracts::Position,
         energy: f32,
-        identity: CreatureIdentityState,
+        kin_tag: u32,
         phenotype: [u8; 6],
     ) -> BodyView {
-        crate::creature::birth::Zygote::founder(
-            v3alpha1_founder_genome(),
-            HeritableBody {
-                phenotype: Phenotype {
-                    channels: phenotype,
-                    active_channel: 0,
-                    polarity: [true; 6],
-                },
-                identity,
-                capacity: 200.0,
-                steal_share: 0.2,
-                give_share: 0.2,
-            },
-        )
-        .born_at(id, pos, energy)
-        .sensed_body(&EnergyCapacityConfig::default())
+        let colour = Phenotype::new(phenotype, 0, [true; 6]).expect("channel 0 is in range");
+        let body = BodyGenome::new(colour, kin_tag, 200.0, 0.2, 0.2);
+        crate::creature::birth::Zygote::founder(v3alpha1_founder_genome().with_body(body), 0)
+            .born_at(id, pos, energy)
+            .sensed_body(&EnergyCapacityConfig::default())
     }
 
     /// The views the scheduler would collect over these creatures.
@@ -570,9 +558,8 @@ mod tests {
         let visible = compute_visible_cells(origin, &world, table);
 
         let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
-        let observer_id = creatures.insert_with_key(|id| {
-            make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
-        });
+        let observer_id =
+            creatures.insert_with_key(|id| make_creature(id, origin, 50.0, 0, [0; 6]));
 
         let occ = reduce_occupancy(
             visible.cells(),
@@ -591,21 +578,13 @@ mod tests {
         let origin = crate::contracts::Position::new(10, 10);
 
         let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
-        let observer_id = creatures.insert_with_key(|id| {
-            make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
-        });
+        let observer_id =
+            creatures.insert_with_key(|id| make_creature(id, origin, 50.0, 0, [0; 6]));
         world.place_creature(origin, observer_id);
 
         let neighbor_pos = crate::contracts::Position::new(11, 10);
-        let neighbor_id = creatures.insert_with_key(|id| {
-            make_creature(
-                id,
-                neighbor_pos,
-                30.0,
-                CreatureIdentityState::default(),
-                [0; 6],
-            )
-        });
+        let neighbor_id =
+            creatures.insert_with_key(|id| make_creature(id, neighbor_pos, 30.0, 0, [0; 6]));
         world.place_creature(neighbor_pos, neighbor_id);
 
         let table = get_visibility_table(2);
@@ -629,34 +608,21 @@ mod tests {
         let origin = crate::contracts::Position::new(10, 10);
 
         let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
-        let observer_id = creatures.insert_with_key(|id| {
-            make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
-        });
+        let observer_id =
+            creatures.insert_with_key(|id| make_creature(id, origin, 50.0, 0, [0; 6]));
         world.place_creature(origin, observer_id);
 
         // Near creature at distance 1
         let near_pos = crate::contracts::Position::new(11, 10);
         let near_id = creatures.insert_with_key(|id| {
-            make_creature(
-                id,
-                near_pos,
-                30.0,
-                CreatureIdentityState::default(),
-                [100, 100, 100, 100, 100, 100],
-            )
+            make_creature(id, near_pos, 30.0, 0, [100, 100, 100, 100, 100, 100])
         });
         world.place_creature(near_pos, near_id);
 
         // Far creature at distance 2
         let far_pos = crate::contracts::Position::new(12, 10);
         let far_id = creatures.insert_with_key(|id| {
-            make_creature(
-                id,
-                far_pos,
-                80.0,
-                CreatureIdentityState::default(),
-                [200, 200, 200, 200, 200, 200],
-            )
+            make_creature(id, far_pos, 80.0, 0, [200, 200, 200, 200, 200, 200])
         });
         world.place_creature(far_pos, far_id);
 
@@ -699,9 +665,8 @@ mod tests {
         let origin = crate::contracts::Position::new(10, 10);
 
         let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
-        let observer_id = creatures.insert_with_key(|id| {
-            make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
-        });
+        let observer_id =
+            creatures.insert_with_key(|id| make_creature(id, origin, 50.0, 0, [0; 6]));
         world.place_creature(origin, observer_id);
 
         let positions = [
@@ -713,9 +678,8 @@ mod tests {
         ];
 
         for position in positions {
-            let creature_id = creatures.insert_with_key(|id| {
-                make_creature(id, position, 30.0, CreatureIdentityState::default(), [0; 6])
-            });
+            let creature_id =
+                creatures.insert_with_key(|id| make_creature(id, position, 30.0, 0, [0; 6]));
             world.place_creature(position, creature_id);
         }
 
@@ -757,9 +721,8 @@ mod tests {
         world.set_food(origin, 0.5);
 
         let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
-        let observer_id = creatures.insert_with_key(|id| {
-            make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
-        });
+        let observer_id =
+            creatures.insert_with_key(|id| make_creature(id, origin, 50.0, 0, [0; 6]));
         world.place_creature(origin, observer_id);
 
         let table = get_visibility_table(5);
@@ -792,54 +755,32 @@ mod tests {
 
         let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
         let observer_id = creatures.insert_with_key(|id| {
-            make_creature(
-                id,
-                origin,
-                50.0,
-                CreatureIdentityState {
-                    lineage_id: 7,
-                    kin_tag: 0xAAAA_AAAA,
-                },
-                [10, 20, 30, 40, 50, 60],
-            )
+            make_creature(id, origin, 50.0, 0xAAAA_AAAA, [10, 20, 30, 40, 50, 60])
         });
         world.place_creature(origin, observer_id);
 
-        for (position, energy, lineage_id, kin_tag, phenotype) in [
+        for (position, energy, kin_tag, phenotype) in [
             (
                 crate::contracts::Position::new(11, 10),
                 30.0,
-                7,
                 0xAAAA_AAAA,
                 [10, 20, 30, 40, 50, 60],
             ),
             (
                 crate::contracts::Position::new(9, 10),
                 80.0,
-                9,
                 0x5555_5555,
                 [200, 180, 160, 140, 120, 100],
             ),
             (
                 crate::contracts::Position::new(10, 11),
                 120.0,
-                11,
                 0xAAAA_5555,
                 [30, 60, 90, 120, 150, 180],
             ),
         ] {
-            let creature_id = creatures.insert_with_key(|id| {
-                make_creature(
-                    id,
-                    position,
-                    energy,
-                    CreatureIdentityState {
-                        lineage_id,
-                        kin_tag,
-                    },
-                    phenotype,
-                )
-            });
+            let creature_id = creatures
+                .insert_with_key(|id| make_creature(id, position, energy, kin_tag, phenotype));
             world.place_creature(position, creature_id);
         }
 
@@ -920,34 +861,25 @@ mod tests {
         let mut world = make_world(20, 20);
         let origin = crate::contracts::Position::new(10, 10);
         let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
-        let observer_identity = CreatureIdentityState {
-            lineage_id: 42,
-            kin_tag: 0xAAAA_AAAA,
-        };
+        let observer_kin_tag = 0xAAAA_AAAA;
         let observer_id = creatures
-            .insert_with_key(|id| make_creature(id, origin, 50.0, observer_identity, [0; 6]));
+            .insert_with_key(|id| make_creature(id, origin, 50.0, observer_kin_tag, [0; 6]));
         world.place_creature(origin, observer_id);
         // Slot 0: one cell east, one kin bit apart, of age; the founder's
         // colour, RGB (204, 61, 61).
         let near = crate::contracts::Position::new(11, 10);
-        let near_identity = CreatureIdentityState {
-            lineage_id: 42,
-            kin_tag: 0xAAAA_AAAB,
-        };
+        let near_kin_tag = 0xAAAA_AAAB;
         let near_id = creatures.insert_with_key(|id| {
-            make_creature(id, near, 30.0, near_identity, [0, 0, 92, 92, 138, 138])
+            make_creature(id, near, 30.0, near_kin_tag, [0, 0, 92, 92, 138, 138])
         });
         creatures[near_id].age = 25;
         world.place_creature(near, near_id);
         // Slot 1: two west and one south, every kin bit apart, under age;
         // RGB (13, 89, 174).
         let far = crate::contracts::Position::new(8, 11);
-        let far_identity = CreatureIdentityState {
-            lineage_id: 7,
-            kin_tag: 0x5555_5555,
-        };
+        let far_kin_tag = 0x5555_5555;
         let far_id = creatures.insert_with_key(|id| {
-            make_creature(id, far, 160.0, far_identity, [150, 0, 200, 200, 60, 60])
+            make_creature(id, far, 160.0, far_kin_tag, [150, 0, 200, 200, 60, 60])
         });
         world.place_creature(far, far_id);
 
@@ -1015,18 +947,9 @@ mod tests {
         let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
         let a_pos = crate::contracts::Position::new(10, 10);
         let b_pos = crate::contracts::Position::new(12, 9);
-        let a_id = creatures.insert_with_key(|id| {
-            make_creature(id, a_pos, 50.0, CreatureIdentityState::default(), [0; 6])
-        });
-        let b_id = creatures.insert_with_key(|id| {
-            make_creature(
-                id,
-                b_pos,
-                50.0,
-                CreatureIdentityState::default(),
-                [150, 0, 200, 200, 60, 60],
-            )
-        });
+        let a_id = creatures.insert_with_key(|id| make_creature(id, a_pos, 50.0, 0, [0; 6]));
+        let b_id = creatures
+            .insert_with_key(|id| make_creature(id, b_pos, 50.0, 0, [150, 0, 200, 200, 60, 60]));
         world.place_creature(a_pos, a_id);
         world.place_creature(b_pos, b_id);
 
@@ -1061,21 +984,13 @@ mod tests {
         let origin = crate::contracts::Position::new(10, 10);
 
         let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
-        let observer_id = creatures.insert_with_key(|id| {
-            make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
-        });
+        let observer_id =
+            creatures.insert_with_key(|id| make_creature(id, origin, 50.0, 0, [0; 6]));
         world.place_creature(origin, observer_id);
 
         let neighbor_pos = crate::contracts::Position::new(11, 10);
-        let neighbor_id = creatures.insert_with_key(|id| {
-            make_creature(
-                id,
-                neighbor_pos,
-                100.0,
-                CreatureIdentityState::default(),
-                [0; 6],
-            )
-        });
+        let neighbor_id =
+            creatures.insert_with_key(|id| make_creature(id, neighbor_pos, 100.0, 0, [0; 6]));
         creatures[neighbor_id].age = 5;
         world.place_creature(neighbor_pos, neighbor_id);
 
@@ -1119,17 +1034,10 @@ mod tests {
     fn nearby_slot_reads_zero_for_a_non_positive_normalizer() {
         let origin = crate::contracts::Position::new(10, 10);
         let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
-        let observer_id = creatures.insert_with_key(|id| {
-            make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
-        });
+        let observer_id =
+            creatures.insert_with_key(|id| make_creature(id, origin, 50.0, 0, [0; 6]));
         let neighbor_id = creatures.insert_with_key(|id| {
-            make_creature(
-                id,
-                crate::contracts::Position::new(11, 11),
-                40.0,
-                CreatureIdentityState::default(),
-                [0; 6],
-            )
+            make_creature(id, crate::contracts::Position::new(11, 11), 40.0, 0, [0; 6])
         });
         let candidates = [NearbyCandidate {
             creature_id: neighbor_id,
@@ -1167,17 +1075,10 @@ mod tests {
     fn nearby_energy_ratio_divides_by_the_targets_energy_scale() {
         let origin = crate::contracts::Position::new(10, 10);
         let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
-        let observer_id = creatures.insert_with_key(|id| {
-            make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
-        });
+        let observer_id =
+            creatures.insert_with_key(|id| make_creature(id, origin, 50.0, 0, [0; 6]));
         let neighbor_id = creatures.insert_with_key(|id| {
-            make_creature(
-                id,
-                crate::contracts::Position::new(11, 11),
-                40.0,
-                CreatureIdentityState::default(),
-                [0; 6],
-            )
+            make_creature(id, crate::contracts::Position::new(11, 11), 40.0, 0, [0; 6])
         });
         let candidates = [NearbyCandidate {
             creature_id: neighbor_id,
@@ -1208,14 +1109,11 @@ mod tests {
         let mut world = make_world(20, 20);
         let origin = crate::contracts::Position::new(10, 10);
         let mut creatures: SlotMap<CreatureId, BodyView> = SlotMap::with_key();
-        let observer_id = creatures.insert_with_key(|id| {
-            make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
-        });
+        let observer_id =
+            creatures.insert_with_key(|id| make_creature(id, origin, 50.0, 0, [0; 6]));
         world.place_creature(origin, observer_id);
         let ghost = crate::contracts::Position::new(11, 10);
-        let ghost_id = creatures.insert_with_key(|id| {
-            make_creature(id, ghost, 50.0, CreatureIdentityState::default(), [0; 6])
-        });
+        let ghost_id = creatures.insert_with_key(|id| make_creature(id, ghost, 50.0, 0, [0; 6]));
         world.place_creature(ghost, ghost_id);
         let mut views = views(&creatures);
         views.remove(ghost_id);

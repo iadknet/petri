@@ -16,10 +16,11 @@ fn fixture() -> CreatureGenome {
             edge(leaf(0, i * 9), if i == 0 { 0.025 } else { 0.0 }),
         );
     }
-    CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![graph_node(def, vec![InputReference::World(key)])],
-    }
+    CreatureGenome::new(
+        NodeId::new(0),
+        vec![graph_node(def, vec![InputReference::World(key)])],
+        crate::creature::founder::default_founder_body(),
+    )
 }
 
 fn native_run(genome: &CreatureGenome) {
