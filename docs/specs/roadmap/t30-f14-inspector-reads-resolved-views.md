@@ -102,7 +102,7 @@ today's for a valid genome would show it wrong.
 - [x] Server: `cargo test -p v3-server` (wire-type test without `PETRI_WRITE_TS_TYPES`) -> pass.
 - [x] Frontend: `npm test`, `npm run lint` and `npx tsc -b` in `frontend/` -> pass (lint warnings only in files F14 does not touch).
 - [x] `cargo fmt --all -- --check` and `make rust-clippy` -> pass.
-- [x] `make check` -> exit 0 at tested commit `a0ce47056`, viability and baseline-world digests unchanged.
+- [x] `make check` -> exit 0 at tested commit `7ae37ad79` (rebased onto T30.F15; first run exit 0 at `a0ce47056`), viability and baseline-world digests unchanged.
 - [x] Benchmark profiles: `Not run: Verification Plan`.
 
 ## Performance and Goal Impact
