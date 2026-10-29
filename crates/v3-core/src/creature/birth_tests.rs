@@ -25,7 +25,7 @@ use crate::genome::learning::{GraphMapping, LearnableId, LearnableKey, NodeSeeds
 use crate::genome::{BackendDef, HebbianRule, Learning, NodeGenome};
 use crate::mutation::engine::apply_event;
 use crate::mutation::reachability::TargetSets;
-use crate::mutation::{MutationOperator, MutationSkipReason};
+use crate::mutation::{BrainOperator, MutationOperator, MutationSkipReason};
 use crate::runtime::state::GraphRuntimeState;
 
 fn body(capacity: f32) -> BodyGenome {
@@ -332,7 +332,7 @@ proptest! {
         let config = MutationConfig::default();
         let context = crate::config::test_sensor_context(2);
         let sets = TargetSets::new(&reachable, &[]);
-        for (index, &operator) in MutationOperator::ALL.iter().enumerate() {
+        for (index, &operator) in BrainOperator::ALL.iter().enumerate() {
             let mut child = parent.clone();
             let mut rng = SmallRng::seed_from_u64(seed ^ index as u64);
             let mut targets = sets.selector(0.5, 0.0);
@@ -340,7 +340,7 @@ proptest! {
                 Ok((_, report)) => {
                     let carried = report.inheritance.apply(&parent_seeds);
                     let fresh = assert_carried(&child, &carried, operator)?;
-                    if let Some(bound) = fresh_bound(operator) {
+                    if let Some(bound) = fresh_bound(operator.into()) {
                         prop_assert!(bound.contains(&fresh), "{:?} left {} fresh", operator, fresh);
                     }
                 }
@@ -368,7 +368,7 @@ proptest! {
         let context = crate::config::test_sensor_context(2);
         let sets = TargetSets::new(&reachable, &[]);
         let mut gated = false;
-        for (index, &operator) in MutationOperator::ALL.iter().enumerate() {
+        for (index, &operator) in BrainOperator::ALL.iter().enumerate() {
             let mut child = parent.clone();
             let mut rng = SmallRng::seed_from_u64(seed ^ index as u64);
             let mut targets = sets.selector(0.5, 0.0);
@@ -410,7 +410,7 @@ proptest! {
         let mut stepped = parent_seeds.clone();
         let mut fresh_free = true;
         for event in 0..events {
-            let operator = MutationOperator::ALL[(seed as usize + event * 7) % MutationOperator::ALL.len()];
+            let operator = BrainOperator::ALL[(seed as usize + event * 7) % BrainOperator::ALL.len()];
             let reachable: Vec<usize> = (0..child.nodes.len()).collect();
             let sets = TargetSets::new(&reachable, &[]);
             let mut targets = sets.selector(0.5, 0.0);
@@ -419,7 +419,7 @@ proptest! {
             {
                 stepped = report.inheritance.apply(&stepped);
                 composed = report.inheritance.after(&composed);
-                fresh_free &= fresh_bound(operator) == Some(0..=0);
+                fresh_free &= fresh_bound(operator.into()) == Some(0..=0);
             }
         }
         let carried = composed.apply(&parent_seeds);

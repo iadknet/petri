@@ -42,10 +42,19 @@ impl BrainDomain {
     /// The four brain domains, in domain order.
     pub const ALL: [Self; 4] = [Self::Topology, Self::Vm, Self::Graph, Self::InputRef];
 
-    /// This domain's operators: its slice of [`MutationOperator::ALL`].
+    /// This domain's operators: its slice of [`BrainOperator::ALL`].
     #[must_use]
-    pub fn catalog(self) -> &'static [MutationOperator] {
-        MutationDomain::from(self).catalog()
+    pub fn catalog(self) -> &'static [BrainOperator] {
+        const TOPOLOGY: usize = TopologyOperator::ALL.len();
+        const VM: usize = TOPOLOGY + VmOperator::ALL.len();
+        const GRAPH: usize = VM + GraphOperator::ALL.len();
+        let all = &BrainOperator::ALL;
+        match self {
+            Self::Topology => &all[..TOPOLOGY],
+            Self::Vm => &all[TOPOLOGY..VM],
+            Self::Graph => &all[VM..GRAPH],
+            Self::InputRef => &all[GRAPH..],
+        }
     }
 
     /// The domain's production reachable bias.
@@ -68,6 +77,123 @@ impl From<BrainDomain> for MutationDomain {
             BrainDomain::Graph => Self::Graph,
             BrainDomain::InputRef => Self::InputRef,
         }
+    }
+}
+
+/// A brain operator: what a birth's brain events select by weight and
+/// dispatch to a target (T29.F02 invariant 4). A body event draws its gene by
+/// no weight and never dispatches, so the brain path holds this type and
+/// widens it into a [`MutationOperator`] only to report.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum BrainOperator {
+    Topology(TopologyOperator),
+    Vm(VmOperator),
+    Graph(GraphOperator),
+    InputRef(InputRefOperator),
+}
+
+impl BrainOperator {
+    /// How many operators the four brain domain enums declare together.
+    pub const COUNT: usize = TopologyOperator::ALL.len()
+        + VmOperator::ALL.len()
+        + GraphOperator::ALL.len()
+        + InputRefOperator::ALL.len();
+
+    /// Every brain operator, the four brain domain `ALL` lists in domain order.
+    pub const ALL: [Self; Self::COUNT] = brain_catalog();
+
+    /// This operator as a [`MutationOperator`]; `From` in const context.
+    #[must_use]
+    pub const fn widen(self) -> MutationOperator {
+        match self {
+            Self::Topology(op) => MutationOperator::Topology(op),
+            Self::Vm(op) => MutationOperator::Vm(op),
+            Self::Graph(op) => MutationOperator::Graph(op),
+            Self::InputRef(op) => MutationOperator::InputRef(op),
+        }
+    }
+
+    /// The operator's selection weight within its brain domain: Topology's
+    /// in hundredths through the large-copy tuning, the other three their
+    /// own tier weights, so each domain's total keeps its units.
+    #[must_use]
+    pub fn weight(self, config: &MutationConfig) -> u16 {
+        match self {
+            Self::Topology(op) => op.tuned_weight(config.large_copy_weight_percent),
+            Self::Vm(op) => u16::from(op.weight()),
+            Self::Graph(op) => u16::from(op.weight()),
+            Self::InputRef(op) => u16::from(op.weight()),
+        }
+    }
+
+    #[must_use]
+    pub const fn complexity_effect(self) -> ComplexityEffect {
+        self.widen().complexity_effect()
+    }
+}
+
+/// Concatenates the four brain domain `ALL` lists in domain order.
+const fn brain_catalog() -> [BrainOperator; BrainOperator::COUNT] {
+    let mut all = [BrainOperator::Topology(TopologyOperator::AddNode); BrainOperator::COUNT];
+    let mut i = 0;
+    let mut j = 0;
+    while j < TopologyOperator::ALL.len() {
+        all[i] = BrainOperator::Topology(TopologyOperator::ALL[j]);
+        i += 1;
+        j += 1;
+    }
+    j = 0;
+    while j < VmOperator::ALL.len() {
+        all[i] = BrainOperator::Vm(VmOperator::ALL[j]);
+        i += 1;
+        j += 1;
+    }
+    j = 0;
+    while j < GraphOperator::ALL.len() {
+        all[i] = BrainOperator::Graph(GraphOperator::ALL[j]);
+        i += 1;
+        j += 1;
+    }
+    j = 0;
+    while j < InputRefOperator::ALL.len() {
+        all[i] = BrainOperator::InputRef(InputRefOperator::ALL[j]);
+        i += 1;
+        j += 1;
+    }
+    assert!(
+        i == BrainOperator::COUNT,
+        "ALL holds every brain operator once"
+    );
+    all
+}
+
+impl From<BrainOperator> for MutationOperator {
+    fn from(op: BrainOperator) -> Self {
+        op.widen()
+    }
+}
+
+impl From<TopologyOperator> for BrainOperator {
+    fn from(op: TopologyOperator) -> Self {
+        Self::Topology(op)
+    }
+}
+
+impl From<VmOperator> for BrainOperator {
+    fn from(op: VmOperator) -> Self {
+        Self::Vm(op)
+    }
+}
+
+impl From<GraphOperator> for BrainOperator {
+    fn from(op: GraphOperator) -> Self {
+        Self::Graph(op)
+    }
+}
+
+impl From<InputRefOperator> for BrainOperator {
+    fn from(op: InputRefOperator) -> Self {
+        Self::InputRef(op)
     }
 }
 
@@ -203,56 +329,29 @@ pub enum MutationOperator {
     Body(BodyOperator),
 }
 
-/// Concatenates the five domain `ALL` lists in domain order.
+/// [`BrainOperator::ALL`], then the body's operators.
 const fn catalog_of() -> [MutationOperator; MutationOperator::COUNT] {
     let mut all = [MutationOperator::Topology(TopologyOperator::AddNode); MutationOperator::COUNT];
     let mut i = 0;
+    while i < BrainOperator::COUNT {
+        all[i] = BrainOperator::ALL[i].widen();
+        i += 1;
+    }
     let mut j = 0;
-    while j < TopologyOperator::ALL.len() {
-        all[i] = MutationOperator::Topology(TopologyOperator::ALL[j]);
-        i += 1;
-        j += 1;
-    }
-    j = 0;
-    while j < VmOperator::ALL.len() {
-        all[i] = MutationOperator::Vm(VmOperator::ALL[j]);
-        i += 1;
-        j += 1;
-    }
-    j = 0;
-    while j < GraphOperator::ALL.len() {
-        all[i] = MutationOperator::Graph(GraphOperator::ALL[j]);
-        i += 1;
-        j += 1;
-    }
-    j = 0;
-    while j < InputRefOperator::ALL.len() {
-        all[i] = MutationOperator::InputRef(InputRefOperator::ALL[j]);
-        i += 1;
-        j += 1;
-    }
-    j = 0;
     while j < BodyOperator::ALL.len() {
         all[i] = MutationOperator::Body(BodyOperator::ALL[j]);
         i += 1;
         j += 1;
     }
-    assert!(
-        i == MutationOperator::COUNT,
-        "ALL holds every domain operator once"
-    );
     all
 }
 
 impl MutationOperator {
     /// How many operators the five domain enums declare together.
-    pub const COUNT: usize = TopologyOperator::ALL.len()
-        + VmOperator::ALL.len()
-        + GraphOperator::ALL.len()
-        + InputRefOperator::ALL.len()
-        + BodyOperator::ALL.len();
+    pub const COUNT: usize = BrainOperator::COUNT + BodyOperator::ALL.len();
 
-    /// Every operator, the five domain `ALL` lists in domain order.
+    /// Every operator, the five domain `ALL` lists in domain order: the
+    /// brain's [`BrainOperator::ALL`], then the body's.
     pub const ALL: [Self; Self::COUNT] = catalog_of();
 
     /// The domain's own operator, as its `Debug` names it.
@@ -304,21 +403,6 @@ impl MutationOperator {
             Self::Body(op) => op.complexity_effect(),
         }
     }
-
-    /// The operator's selection weight within its brain domain: Topology's
-    /// in hundredths through the large-copy tuning, the other three their
-    /// own tier weights, so each domain's total keeps its units. `None` for
-    /// a body operator: a body event draws its gene uniformly, by no weight.
-    #[must_use]
-    pub fn weight(self, config: &MutationConfig) -> Option<u16> {
-        match self {
-            Self::Topology(op) => Some(op.tuned_weight(config.large_copy_weight_percent)),
-            Self::Vm(op) => Some(u16::from(op.weight())),
-            Self::Graph(op) => Some(u16::from(op.weight())),
-            Self::InputRef(op) => Some(u16::from(op.weight())),
-            Self::Body(_) => None,
-        }
-    }
 }
 
 /// Today's flat name: the domain, then the inner variant's name, the domain
@@ -333,6 +417,13 @@ impl fmt::Debug for MutationOperator {
             f.write_str(domain)?;
         }
         f.write_str(&inner)
+    }
+}
+
+/// The flat name of the [`MutationOperator`] it widens to.
+impl fmt::Debug for BrainOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(&self.widen(), f)
     }
 }
 

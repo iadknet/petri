@@ -535,15 +535,50 @@ fn the_nested_catalog_derives_every_operator_fact() {
         }
     }
     for &op in &MutationOperator::ALL {
-        let (effect, weight) = match op {
-            MutationOperator::Topology(o) => (o.complexity_effect(), Some(o.tuned_weight(30))),
-            MutationOperator::Vm(o) => (o.complexity_effect(), Some(u16::from(o.weight()))),
-            MutationOperator::Graph(o) => (o.complexity_effect(), Some(u16::from(o.weight()))),
-            MutationOperator::InputRef(o) => (o.complexity_effect(), Some(u16::from(o.weight()))),
-            MutationOperator::Body(o) => (o.complexity_effect(), None),
+        let effect = match op {
+            MutationOperator::Topology(o) => o.complexity_effect(),
+            MutationOperator::Vm(o) => o.complexity_effect(),
+            MutationOperator::Graph(o) => o.complexity_effect(),
+            MutationOperator::InputRef(o) => o.complexity_effect(),
+            MutationOperator::Body(o) => o.complexity_effect(),
         };
         assert_eq!(op.complexity_effect(), effect, "{op:?}");
-        assert_eq!(op.weight(&config), weight, "{op:?}");
+    }
+
+    // The brain operators are the catalog's leading run, each brain domain's
+    // catalog its slice of them, and only they carry a weight.
+    let brain: Vec<MutationOperator> = BrainOperator::ALL
+        .into_iter()
+        .map(MutationOperator::from)
+        .collect();
+    assert_eq!(brain, MutationOperator::ALL[..BrainOperator::COUNT]);
+    let brain_catalogs: Vec<BrainOperator> = BrainDomain::ALL
+        .into_iter()
+        .flat_map(|domain| domain.catalog().iter().copied())
+        .collect();
+    assert_eq!(brain_catalogs, BrainOperator::ALL);
+    for domain in BrainDomain::ALL {
+        for &op in domain.catalog() {
+            assert_eq!(MutationOperator::from(op).domain(), domain.into());
+        }
+    }
+    for op in BrainOperator::ALL {
+        let weight = match op {
+            BrainOperator::Topology(o) => o.tuned_weight(30),
+            BrainOperator::Vm(o) => u16::from(o.weight()),
+            BrainOperator::Graph(o) => u16::from(o.weight()),
+            BrainOperator::InputRef(o) => u16::from(o.weight()),
+        };
+        assert_eq!(
+            op.weight(&config),
+            weight,
+            "{:?}",
+            MutationOperator::from(op)
+        );
+        assert_eq!(
+            op.complexity_effect(),
+            MutationOperator::from(op).complexity_effect()
+        );
     }
     assert!(serde_json::from_str::<MutationOperator>("\"GraphAddGraphEdge\"").is_err());
 

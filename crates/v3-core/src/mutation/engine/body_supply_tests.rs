@@ -157,14 +157,16 @@ fn a_genomes_own_units_are_its_brain_units_and_the_five_body_genes() {
     );
 }
 
-/// Every body operator is complexity-neutral and has no brain weight.
+/// Every body operator is complexity-neutral and outside the brain catalog,
+/// the only operators that carry a weight and dispatch.
 #[test]
-fn a_body_operator_is_neutral_and_unweighted() {
-    let config = MutationConfig::default();
+fn a_body_operator_is_neutral_and_outside_the_brain_catalog() {
     for operator in BodyOperator::ALL {
         let operator = MutationOperator::Body(operator);
         assert_eq!(operator.domain(), MutationDomain::Body);
-        assert_eq!(operator.weight(&config), None);
+        assert!(!BrainOperator::ALL
+            .map(MutationOperator::from)
+            .contains(&operator));
         assert!(!operator.complexity_effect().is_decreasing());
         assert!(operator.as_key().starts_with("Body."));
         assert_eq!(MutationDomain::Body.brain(), None);

@@ -16,8 +16,9 @@ use crate::mutation::pressure;
 use crate::mutation::reachability::{BirthMembership, ParentExecuted, TargetSelector, TargetSets};
 use crate::mutation::topology::{TopologyMutator, TopologyOperator};
 use crate::mutation::types::{
-    BrainDomain, EventReport, MutationAddedNodeInputClass, MutationDomain, MutationEventOutcome,
-    MutationEventRecord, MutationOperator, MutationSkipReason, MutationSummary, TargetReachability,
+    BrainDomain, BrainOperator, EventReport, MutationAddedNodeInputClass, MutationDomain,
+    MutationEventOutcome, MutationEventRecord, MutationOperator, MutationSkipReason,
+    MutationSummary, TargetReachability,
 };
 use crate::mutation::vm::VmMutator;
 
@@ -95,12 +96,13 @@ impl BirthDraw<'_> {
         rng: &mut impl Rng,
     ) -> Option<SelectedEvent> {
         let config = self.config;
-        let mut available: Vec<(MutationOperator, u16)> = domain
+        let mut available: Vec<(BrainOperator, u16)> = domain
             .catalog()
             .iter()
             .copied()
             .filter(|op| !self.restricted || op.complexity_effect().is_decreasing())
-            .filter_map(|op| Some((op, op.weight(config).filter(|&weight| weight > 0)?)))
+            .map(|op| (op, op.weight(config)))
+            .filter(|&(_, weight)| weight > 0)
             .collect();
         let bias = pressure_adjusted_bias(
             domain.reachable_bias(&config.reachable_bias),
@@ -108,11 +110,19 @@ impl BirthDraw<'_> {
         );
         while !available.is_empty() {
             let idx = select_weighted_index(&available, |(_, weight)| weight, rng);
-            let (operator, _) = available[idx];
+            let (brain_operator, _) = available[idx];
+            let operator = MutationOperator::from(brain_operator);
             let tracked_before =
                 operator_requires_added_node_input_tracking(operator).then(|| genome.clone());
             let mut targets = sets.selector(bias, self.executed_bias);
-            let result = apply_event(genome, operator, &mut targets, rng, config, self.context);
+            let result = apply_event(
+                genome,
+                brain_operator,
+                &mut targets,
+                rng,
+                config,
+                self.context,
+            );
             if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
                 discarded.push((
                     operator,
@@ -534,41 +544,38 @@ fn apply_gated<T>(
 }
 
 /// Apply `operator` through its domain's production entry, ungated: the one
-/// dispatch from the catalog to the four domain mutators. The engine gates
-/// it ([`apply_event`]); the per-operator battery and the recruitment-path
-/// replay call it directly.
+/// dispatch from the brain catalog to the four domain mutators. The engine
+/// gates it ([`apply_event`]); the per-operator battery and the
+/// recruitment-path replay call it directly. Body events never come here:
+/// `MutationEngine::apply_mutations_on_units` draws and applies them by gene.
 pub(crate) fn dispatch(
     genome: &mut CreatureGenome,
-    operator: MutationOperator,
+    operator: BrainOperator,
     targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     config: &MutationConfig,
     context: &SensorContext,
 ) -> Result<(TargetReachability, EventReport), MutationSkipReason> {
     match operator {
-        MutationOperator::Topology(op) => {
+        BrainOperator::Topology(op) => {
             TopologyMutator::apply_in(genome, op, targets, rng, config, context)
         }
-        MutationOperator::Vm(op) => VmMutator::apply(genome, op, targets, rng, config),
-        MutationOperator::Graph(op) => {
+        BrainOperator::Vm(op) => VmMutator::apply(genome, op, targets, rng, config),
+        BrainOperator::Graph(op) => {
             GraphMutator::apply_classified(genome, op, targets, rng, config, context)
         }
-        MutationOperator::InputRef(op) => {
+        BrainOperator::InputRef(op) => {
             InputRefMutator::apply_classified(genome, op, targets, rng, config, context)
         }
-        // A body gene is no brain site: body events are drawn by gene and
-        // applied by `MutationEngine::apply_mutations_on_units`, never
-        // dispatched to a target.
-        MutationOperator::Body(_) => Err(MutationSkipReason::NoApplicableTarget),
     }
 }
 
 /// Apply one mutation event through the gate: what it reports counts only
 /// when it commits, so a rolled-back event reports no bundle edits, broadcast
-/// or /// class (T25.F03, T25.F08).
+/// or class (T25.F03, T25.F08).
 pub(crate) fn apply_event(
     genome: &mut CreatureGenome,
-    operator: MutationOperator,
+    operator: BrainOperator,
     targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     config: &MutationConfig,

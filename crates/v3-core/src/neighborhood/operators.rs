@@ -12,7 +12,7 @@ use crate::genome::analysis::mesh_reachable_nodes;
 use crate::genome::CreatureGenome;
 use crate::mutation::engine::dispatch;
 use crate::mutation::reachability::TargetSets;
-use crate::mutation::types::{BrainDomain, MutationOperator};
+use crate::mutation::types::{BrainDomain, BrainOperator, MutationOperator};
 use crate::neighborhood::battery::{Battery, Signature};
 use crate::neighborhood::classify::{classify, Tally};
 use crate::neighborhood::EvalContext;
@@ -45,7 +45,7 @@ const ROW_DOMAINS: [BrainDomain; 4] = [
 ];
 
 /// Every brain operator in row order, beside its domain.
-fn row_operators() -> Vec<(BrainDomain, MutationOperator)> {
+fn row_operators() -> Vec<(BrainDomain, BrainOperator)> {
     ROW_DOMAINS
         .into_iter()
         .flat_map(|domain| domain.catalog().iter().map(move |&op| (domain, op)))
@@ -80,7 +80,7 @@ const fn seed_base(domain: BrainDomain) -> u64 {
 pub fn operator_catalog() -> Vec<(&'static str, String)> {
     row_operators()
         .into_iter()
-        .map(|(domain, op)| (family(domain), op.inner_name()))
+        .map(|(domain, op)| (family(domain), MutationOperator::from(op).inner_name()))
         .collect()
 }
 
@@ -166,7 +166,7 @@ pub fn per_operator_rows(
         .zip(tallies)
         .map(|((domain, op), tally)| OperatorRow {
             family: family(domain),
-            operator: op.inner_name(),
+            operator: MutationOperator::from(op).inner_name(),
             tally,
         })
         .collect()
