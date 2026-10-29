@@ -72,20 +72,29 @@ Invariants:
    derive from or are compile-time checked against it. The index of a kind
    outside the catalog panics and never aliases another sink.
 4. Total lookups: the sink of a kind and its surface are returned without
-   `Option`, by index; `insert_member` finds its sink without `expect`;
-   `site_sink` is absent only where `Site::sink` is (a site the wiring has
-   no sink for).
+   `Option`, by index; `site_sink` is absent only where `Site::sink` is (a
+   site the wiring has no sink for), and `insert_member`'s one `expect`
+   states that caller precondition, never a missing catalog sink.
 5. `hosts` and `hosts_kind` are gone; `plans` takes only the field set and
    returns, in the same order, what `plans` returns today on a full
    catalog (Plain: one `Plain` per vote sink in catalog order; Ring and
    Pair: every kind of `DirectedVoteKind::ALL`, offsets `0..8`).
 6. Skips that only a partial catalog took are deleted and every draw that
-   runs keeps its range and order: `draw_births`' empty-plans error and
-   `bundle_sources`' filter (`mutation/graph/bundle.rs`), `RetargetBundle`'s
+   runs keeps its range and order: `draw_births`' empty-plans error,
+   `bundle_sources`' filter and `add_bundle_by_law`'s empty-sources skip
+   (`mutation/graph/bundle.rs`), `RetargetBundle`'s
    Plain no-other-sink skip and post-draw `hosts` skip, `pick_random_surface`'s
    `None` and `can_add_edge` (`AddGraphEdge` applies to every Graph node), and
    `gate_sink`'s `Option` with its `ok_or` and `feedback_slot`'s Graph test
-   (`mutation/topology/routing.rs`).
+   (`mutation/topology/routing.rs`). The Graph effect pass applies every
+   wired sink with no slot-range or vote-index guard
+   (`runtime/cgp/effects.rs`, the `CustomOutput`, `RouterGate`,
+   `WriteSlot`, `ClearSlot` and `ActionVote` arms), since an out-of-catalog
+   kind can no longer exist. The sink trace's `applied` flag, which only
+   such a guard set apart from `wired`, is deleted from
+   `GraphOutputSinkTrace` (`runtime/trace/domain.rs`), the tracer's sink
+   callback, and the server's `GraphOutputSinkTracePayload` with its
+   generated frontend type; `applied_value` stays.
 7. After the change `grep -rnE "with_output_sinks|hosts_kind|cgp::hosts|fn hosts|can_add_edge" crates`
    matches nothing.
 8. No test is deleted other than tests of deleted behavior (a catalog
@@ -95,9 +104,11 @@ Invariants:
 ## Architecture
 
 The feature touches the genome (`genome/cgp`), `mutation` (`mutation/graph`,
-`mutation/topology/routing.rs`), readers (`neighborhood/drives.rs`,
-`census.rs`), `creature/cgp_founder.rs` and two outer callers
-(`v3-cli/src/bench/census_pins.rs`, `v3-lab/src/controllers.rs`). The shared
+`mutation/topology/routing.rs`), `runtime` (`runtime/cgp/effects.rs`), readers (`neighborhood/drives.rs`,
+`census.rs`), `creature/cgp_founder.rs`, two outer callers
+(`v3-cli/src/bench/census_pins.rs`, `v3-lab/src/controllers.rs`) and the
+server's sample payload, a wire type it owns
+(`v3-server/src/transport/sample_protocol.rs`). The shared
 rule it changes is which sinks a Graph carries and where each sits. Section
 3 makes the genome its owner ("genome structure") and rule 1 gives the owner
 building and validating; `contracts` keeps the vote-sink and parameter
@@ -106,7 +117,8 @@ vocabulary the catalog is made of. Today the rule is applied by
 `mod.rs:132-148`) and interpreted by scans and presence tests in
 `bundle.rs:448-492` (`hosts`, `plans`), `container.rs:488-500,1111,1404`,
 `mutation/graph/bundle.rs:103,194,376-395`, `mutation/graph/operators.rs:310-320,941`,
-`routing.rs:46-52,83,250` and `drives.rs:109`. After the change every path
+`routing.rs:46-52,83,250`, `drives.rs:109` and the slot guards in
+`runtime/cgp/effects.rs:129-172`. After the change every path
 reuses the owner's index map and total lookups; no separate policy remains.
 No section 5 debt names this deficiency, so none is deleted. `routing.rs`
 carries G2 and G23 (T30.F05); this feature changes only its sink lookup and
@@ -117,7 +129,9 @@ neither moves nor extends that debt. No boundary changes;
 
 Not applicable: no signal, attribute or configuration is added or changed,
 and every deleted branch is one no production genome takes, so every
-counter, skip tally and span a run emits is unchanged.
+counter, skip tally and span a run emits is unchanged. The server's sample
+payload, transport rather than telemetry, loses its redundant `applied`
+flag (invariant 6).
 
 ## Verification Plan
 
@@ -167,6 +181,9 @@ regression past its threshold would show it wrong.
       empty-def and generated-sink-list cases of
       `pick_random_surface_matches_the_reference`) are deleted or reduced
       to the full catalog.
+- [ ] Runtime guards and trace flag (rows 9, 10): invariant 6's last two
+      sentences; the trace and sample-assembler tests read `wired` where
+      they read `applied`; the generated frontend type is regenerated.
 
 ## Verification
 
@@ -219,4 +236,10 @@ acceptance. No indicator can move; the goal profile is not run
 - Decision: in-feature refactors from the preparatory audit, rows 1–8:
   `with_output_sinks` deleted, validating deserialization, `plans(set)`
   without `hosts`, total index lookups, the partial-catalog skips deleted,
-  `gate_sink` by index, `edit_sinks` inputs only, one catalog order.
+  `gate_sink` by index, `edit_sinks` inputs only, one catalog order; rows
+  9–10, found during the build: the effect pass's slot guards and the sink
+  trace's `applied` flag deleted.
+- Decision: fixtures set a catalog sink's inputs through the public
+  `with_sink_inputs(kind, inputs)` builder (audit row 1's one fixture
+  builder), unchecked like `with_compute_nodes`; it never adds, removes or
+  reorders a sink.
