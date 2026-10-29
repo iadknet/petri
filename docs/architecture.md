@@ -161,7 +161,6 @@ field access through another type. Design notes:
 | Debt | Today | Paid by |
 | --- | --- | --- |
 | G2 | Route resolution and jump targets imported from runtime (`mutation::topology::routing`, `mutation::vm::operators`) | T30.F05 |
-| G3 | Learning configured on edges only (the genome's edge type), group flags beside it (`genome::cgp::group`), `Scope::Group` branches in `runtime::plasticity::learned`, learners found from plastic edges (`genome::companions`) | T25.F12 |
 | G4 | No birth constructor: `spawn_child` (`simulation::actions::reproduction`) and `simulation::seeding` build creatures separately; learned seeds ride in the genome (`genome::cgp::container`); `cap_energy` runs after construction; traits draw their own RNG (`creature::identity`, `creature::body`); mesh copy and slice cloning are assembled by mutation callers (`mutation::topology::structural`) rather than genome operations that return their inherited-value effects | T29.F01 |
 | G5 | Body outside the genome (`creature::body`), per-birth trait chances, colour and kin tag gated on brain mutation (`simulation::actions::reproduction`), `lineage_id` in the body (`creature::identity`), mutation importing creature's `Phenotype` (`mutation::phenotype`) | T29.F02 |
 | G6 | Every memory slot passes to the child (`simulation::actions::reproduction`) | T29.F03 |

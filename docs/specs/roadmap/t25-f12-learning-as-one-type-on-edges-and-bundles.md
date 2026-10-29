@@ -1,6 +1,6 @@
 # T25.F12 — Learning as One Type on Edges and Bundles
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-28
 **Feature**: T25.F12
 **Track**: [T25 — Edge Groups and Per-Edge Learning](../../roadmaps/t25-edge-groups-and-learning.md)
@@ -140,7 +140,7 @@ compute cost outside the predeclaration.
 
 - [x] Viability first (`cargo test -p v3-core --test viability`) before and after each commit.
 - [x] Commit 1: the genome learning module and layout, `clear_learning`, the runtime's one update-law owner over today's semantics, every "carries learning" site reading the layout (audit R1, R2); preservation cases first: a randomized bundle whose contributors differ in rule, rate, source and trace; mixed reward sources on one scale; group-scope members with nonzero corrections. Pins hold.
-- [ ] Commit 2: invariants 1–11: `Learning`, storage, slots, policies and `credits`; `Scope`, `inherit_scale`, bundle retention and their setters deleted (R4); `Broadcast` (R3); the catalog table; birth draws (R5); detach table; the update law without commit 1's semantics; readers, view, wire, inspector, telemetry, bench, lab (R6); reference specs; predeclared re-pins.
+- [x] Commit 2: invariants 1–11: `Learning`, storage, slots, policies and `credits`; `Scope`, `inherit_scale`, bundle retention and their setters deleted (R4); `Broadcast` (R3); the catalog table; birth draws (R5); detach table; the update law without commit 1's semantics; readers, view, wire, inspector, telemetry, bench, lab (R6); reference specs; predeclared re-pins.
 - [x] Acceptance cases written first (Verification).
 - [x] Write `WORKAROUND(T30.F11): source changes and splits detach inside the container's owner operations` at `detached` (`mutation/graph/operators.rs:366`).
 
@@ -149,7 +149,7 @@ compute cost outside the predeclaration.
 - [x] Track guard: each learning-edit operator applied on its lone-edge, member and both slot targets, checking the broadcast (one, members) and that unaffected settings, siblings and the other slot do not change; runtime construction, census and structural classification agree with the layout, including bundle-only learners and scales without contributors.
 - [x] Note's cases: a bundle-only learner learns; an `Inherit` member under a learning scale moves only through it; `member_default` serves `Inherit` and leaves `Own` and `Static`; the slots evolve independently; a member that learns and credits updates both from one visit; disabling one member leaves siblings and the scale's credit; a child whose last contributor was switched off keeps, decays and passes on the scale; each detach row; Lamarckian seeding of a scale and a modifier; the layout built once per birth, with `Inherit` never resolved during a visit (invariant 5: `runtime::plasticity` names no `MemberPolicy`, `credits` or slot).
 - [x] Proptests (v3-core): detach preserves the composed weight bitwise and yields the table's `Learning` for any policy and slots; the layout's effective `Learning` is the override when `Own`, `member_default` or none when `Inherit`, none when `Static`.
-- [ ] `make check`; `make rust-test-slow`.
+- [x] `make check`; `make rust-test-slow`.
 - [x] Gate and goal summaries at `docs/progress/features/t25-f12.json` and `t25-f12-goal.json`, raw hash, byte count and time checked, series entries, no full report staged. (The gate ran three times after host contention; see the verdict.)
 
 Each checked clause's tests and the commands run with their results are in [readings](../../progress/readings/t25-f12.md#verification-2026-10-28).
@@ -204,9 +204,9 @@ threshold crossed; both epochs re-pinned to this feature's summaries
 
 ## Success Criteria
 
-- [ ] The track's "Learning is one type" criterion holds in the code: one `Learning` on edges and both bundle slots, `scale × pattern + modifier` for every member, policies and `credits`, a contributor-independent scale, one layout read by runtime, structure checks and the census, one update path.
-- [ ] G3 is deleted from `docs/architecture.md`.
-- [ ] The acceptance cases, `make check`, the slow tier, gate and goal pass the Verification section.
+- [x] The track's "Learning is one type" criterion holds in the code: one `Learning` on edges and both bundle slots, `scale × pattern + modifier` for every member, policies and `credits`, a contributor-independent scale, one layout read by runtime, structure checks and the census, one update path.
+- [x] G3 is deleted from `docs/architecture.md`.
+- [x] The acceptance cases, `make check`, the slow tier, gate and goal pass the Verification section.
 
 ## Notes for AI Agents
 
@@ -215,3 +215,4 @@ threshold crossed; both epochs re-pinned to this feature's summaries
 - Deferred: the long-run selection of learning policies, slots and `credits` is read by T27.F02's goal-long run, naming every feature closed in between.
 - Deferred: review P2 (code health), crates/v3-core/src/simulation/tick/tests/gestation.rs:301 — the gestation fixture searches for a seed meeting incidental population conditions (re-chosen 3485→4274 here); arranging the gestation and overflow conditions explicitly with the fixture helpers belongs to T29.F01, which extends this birth path.
 - Decision: final review raised no P1; lens1 P2×2 and P3×2 and lens3 P3 were remediated in-feature; lens2 raised none.
+- Cost: `/usage` totals at closure not yet provided by the user; implementer passes 4 (build, self-review, review remediation, fingerprint re-pin) with advisor consults 2, 2, 2, 1; spec-owner resumes after Plan 4; Codex challenge rounds 2, final verdict ready; final review lens1 P2×2 P3×2, lens2 none, lens3 P2×1 P3×1, no P1; Codex lenses retried once after a usage limit; run used Opus at effort high for the spec owner in place of Fable (user override).
