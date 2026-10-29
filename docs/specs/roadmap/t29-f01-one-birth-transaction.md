@@ -134,7 +134,7 @@ gate wall-clock flag shows the mapping or capture costs more than predeclared.
 ## Verification
 
 - [x] Focused tests: `cargo test -p v3-core --test viability` -> pass (30/30), digests unchanged before and after; acceptance-guard tests (`cargo test -p v3-core --lib -- creature::birth`) -> pass (18/18).
-- [x] `cargo test --workspace` -> pass, every pin in invariant 11 unchanged; `cargo check --workspace --all-targets` and `cargo clippy --workspace --all-targets` -> clean.
+- [x] `cargo test --workspace` -> pass (3,106 tests, 0 failed), every pin in invariant 11 unchanged; `cargo check --workspace --all-targets`, `cargo clippy --workspace --all-targets` and `cargo fmt --all --check` -> clean.
 - [ ] `make rust-test-slow` -> pass, readings unchanged.
 - [ ] Gate profile: summary at `docs/progress/features/t29-f01.json`, deterministic blocks identical to the epoch, raw hash and byte count checked, series entry points to the summary, no full report staged.
 
