@@ -186,3 +186,7 @@ closed in between; its epoch is not re-pinned.
 
 - Decision: audit rows B1–B11 are in-feature refactors of this feature ([readings](../../progress/readings/t29-f02.md)).
 - Decision: body traits are genes under the one per-unit law, accepting that capacity and the shares mutate about 16 to 18 times less often than 0.1 per birth (user, 2026-10-22, track Notes).
+- Deferred: unpaid accept, `CreatureGenome.nodes` (`crates/v3-core/src/genome/mod.rs:247`, `WORKAROUND(T29.F01)`); payer proposed to the user at closure.
+- Deferred: the engine's whole-genome clone taken before an event and diffed after it (`crates/v3-core/src/mutation/engine/mod.rs:62`, `WORKAROUND(T30.F11)`) is paid by T30.F11 (Operators Report Their Own Edits).
+- Deferred: review P3, `undo_t29_f02` in `crates/v3-cli/tests/bench_artifacts.rs:216` extends the historical schema replay by restoring the retired `chance` fields and the old rate; removing the reverse-schema chain while keeping the current-digest and repeated-resolution assertions is left as advisory test cruft.
+- Decision: the frontend Vite upgrade in `frontend/package-lock.json` (vite 6.4.4, GHSA-8g5g-mxqh-grgj) lands with this feature as its own `chore(deps)` commit `35de44eb5` (lockfile only): the pre-commit OSV hook blocks every commit while main carries 6.4.4; reported to the user at closure.
