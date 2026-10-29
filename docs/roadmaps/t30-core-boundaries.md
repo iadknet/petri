@@ -258,17 +258,9 @@ behavior.
   in `mutation/engine/mod.rs:198-575`) for TopologyAddNode,
   TopologySpliceNode and GraphAddInternalGraphNode, on top of
   `apply_gated`'s own snapshot; T25.F11 removed the same pattern for
-  bundles. Each operator returns the node it added. Also in F11: the five
-  wrappers built on `graph_def_mut_with_input_refs`
-  (`mutation/graph/operators.rs:36-47`), which clone `input_refs` per event
-  to avoid a borrow, use the split borrow `mutation/graph/bundle.rs` already
-  has; `EdgeMut::set_source` (`genome/cgp/container.rs:292-303`), which
-  relies on three callers detaching a member first, gains one container
-  retarget operation that detaches itself, and `split_edge`
-  (`genome/cgp/container.rs:1031`), whose caller `split_existing_edge`
-  detaches first and which writes the source directly, becomes an
-  owner-complete split that detaches and returns its effects, with split's
-  weight, seed and draw behavior unchanged; and `insert_member`'s per-member
+  bundles. Each operator returns the node it added. (T29.F01 paid the split
+  borrow, the self-detaching container retarget and the owner-complete
+  split this note listed.) Also in F11: `insert_member`'s per-member
   position scan, which makes building a wide bundle quadratic, becomes
   linear, so the widest-queue fixture in `container_tests.rs` builds
   through `add_bundle` (its `WORKAROUND(T30.F11)` marker). The bundle

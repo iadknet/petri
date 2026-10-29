@@ -21,7 +21,7 @@ user decisions and review:
 
 ## Executable Features
 
-- [ ] **T29.F01 — One Birth Transaction** — Depends on: T25.F12
+- [x] **T29.F01 — One Birth Transaction** — Depends on: T25.F12
   - Goal: An egg is a nucleus and its cytoplasm, assembled once: every creature, founder or child, is built by one birth transaction from its genome, a payload of what the parent passes on, and its provenance, with no behavior change.
 - [ ] **T29.F02 — Body Genes** — Depends on: T29.F01
   - Goal: One genome encodes both the body plan and the nervous system: colour, kin markings, fat reserves and how much a creature gives or takes are genes that cost what any gene costs and mutate as often.

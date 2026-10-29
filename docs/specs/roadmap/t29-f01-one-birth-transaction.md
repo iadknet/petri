@@ -1,6 +1,6 @@
 # T29.F01 — One Birth Transaction
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-10-28
 **Feature**: T29.F01
 **Track**: [T29 — Heredity](../../roadmaps/t29-heredity.md)
@@ -121,21 +121,21 @@ gate wall-clock flag shows the mapping or capture costs more than predeclared.
 
 - [x] Viability first: `cargo test -p v3-core --test viability` before and after (founder construction changes).
 - [x] Decisions A6, A8, A9: private node fields, `NodeGenome::new`, accessors, the split-borrow accessor at both mutation sites (the `WORKAROUND(T30.F11)` at `graph/operators.rs:36` goes), routing in place, the bench injection.
-- [ ] Decision A12: one container retarget operation that detaches a member before a source change (a same-source draw stays a no-op) and an owner-complete `split_edge` that detaches first, each returning its bundle effects and mapping, with split's weight, seed and draw behavior unchanged; `detached` and its `WORKAROUND(T30.F11)` go; at closure the T30.F11 note drops the split borrow, retarget and split items F01 paid.
+- [x] Decision A12: one container retarget operation that detaches a member before a source change (a same-source draw stays a no-op) and an owner-complete `split_edge` that detaches first, each returning its bundle effects and mapping, with split's weight, seed and draw behavior unchanged; `detached` and its `WORKAROUND(T30.F11)` go; at closure the T30.F11 note drops the split borrow, retarget and split items F01 paid.
 - [x] Decision A7: the genome mesh operations; `structural.rs` keeps only draws and eligibility.
 - [x] Decision A1, step 1: mappings and learnable keys beside today's seed rows, with a property test over the Graph, InputRef and Topology catalogs that applying an event's mapping to the parent's seeds equals the rows the container kept; then the payload, the zygote and finalization (A2, A4).
 - [x] Decision A1, step 2: delete `BirthSeeds`, the `birth_seeds` field, `take_birth_seeds`, `capture_birth_seeds` and the step-1 equivalence test; seeds reach the runtime only through finalization.
 - [x] Decision A3: one `SimStats` operation folds a `MutationSummary`; `spawn_child`'s `too_many_lines` allow goes.
 - [x] Decision A5: the mutation body policy and `HeritableBody`'s deterministic application; `WORKAROUND(G5)` at the gate (A10).
 - [x] Deferred A11: `WORKAROUND(T29.F01): CreatureGenome.nodes private behind owner operations` at the field.
-- [ ] Remove the three `WORKAROUND(G4)` markers; update the three reference specs; delete the G5 import's line in `scripts/architecture-debts.txt` with the import (the checker fails a stale entry); at closure delete G4 and the G5 import clause in `docs/architecture.md`.
+- [x] Remove the three `WORKAROUND(G4)` markers; update the three reference specs; delete the G5 import's line in `scripts/architecture-debts.txt` with the import (the checker fails a stale entry); at closure delete G4 and the G5 import clause in `docs/architecture.md`.
 - [x] Acceptance guard: shared finalization assertions through the founder, unchanged-child and mutated-child paths (inherited learning, per-life initialization, provisioning and cap); committed and rejected edits exercised against the mapping contract through the existing operator catalogs; a proptest that applying a composed mapping equals applying each mapping in turn.
 
 ## Verification
 
 - [x] Focused tests: `cargo test -p v3-core --test viability` -> pass (30/30), digests unchanged before and after; acceptance-guard tests (`cargo test -p v3-core --lib -- creature::birth`), whose catalog properties run committed and rejected events through the engine's gate (`apply_event`) and bound each event's fresh learnables -> pass (19/19).
 - [x] `cargo test --workspace` -> pass (3,107 tests, 0 failed), every pin in invariant 11 unchanged; `cargo check --workspace --all-targets`, `cargo clippy --workspace --all-targets` and `cargo fmt --all --check` -> clean.
-- [ ] `make rust-test-slow` -> pass, readings unchanged.
+- [x] `make rust-test-slow` -> pass (6 passed, 0 failed), readings unchanged; `make check` -> exit 0 at tested commit ac5b8a46f.
 - [x] Gate profile: `make bench PROFILE=gate FEATURE=t29-f01` -> outer exit 0, CLI exit 0, `severe=false`; summary at `docs/progress/features/t29-f01.json`, deterministic block identical to the epoch, raw hash and byte count checked, series entry points to the summary, no full report staged.
 
 ## Performance and Goal Impact
@@ -166,14 +166,18 @@ is not visible in the gate. As predeclared.
 
 ## Success Criteria
 
-- [ ] Seeding, delivery and the lab build every creature through `Zygote` and one finalization; no other code constructs a `CreatureState`.
-- [ ] No genome type holds a seed; seeds cross every edit by returned mappings, composed only for committed events.
-- [ ] Provisioning and its cap run inside finalization; no body or identity type draws randomness.
-- [ ] `NodeGenome`'s declarations and backend are private; mesh copy, removal and slice cloning are genome operations.
-- [ ] Every pin, draw stream and gate deterministic block is unchanged; `make check` passes.
+- [x] Seeding, delivery and the lab build every creature through `Zygote` and one finalization; no other code constructs a `CreatureState`.
+- [x] No genome type holds a seed; seeds cross every edit by returned mappings, composed only for committed events.
+- [x] Provisioning and its cap run inside finalization; no body or identity type draws randomness.
+- [x] `NodeGenome`'s declarations and backend are private; mesh copy, removal and slice cloning are genome operations.
+- [x] Every pin, draw stream and gate deterministic block is unchanged; `make check` passes.
 
 ## Notes for AI Agents
 
 - Decision: audit rows A1–A9 and A12 are in-feature refactors of this feature ([readings](../../progress/readings/t29-f01.md)).
 - Deferred: A10, the colour and kin-tag gate on `applied_events > 0`, moves with the body draws and is paid by T29.F02 (G5).
 - Deferred: unpaid accept, `CreatureGenome.nodes` (`genome/mod.rs:191`); payer proposed to the user at closure.
+- Decision: the final review's P1s (split_edge's stale compute occurrence, ungated catalog properties, the energy cap owned twice) were remediated in one pass; `cap_energy` is now a `CreatureState` method that finalization and simulation share.
+- Deferred: review P2 (vacuous key-set checks) was adopted; review P3, the test `Draft` in `container_tests.rs` shadowing fourteen edit methods beside `DerefMut`, is left as advisory test cruft.
+- Decision: the design lens's `architecture:` line was applied at closure as debt retirement: G4 deleted, G5's import clause dropped and its gate located at `mutation::body`, G6 located at `creature::birth`; the T30.F11 note drops the split borrow, retarget and split F01 paid.
+- Cost: `/usage` totals not collected (user command); implementer passes 5 (build, self-review, remediation, rebase fixture fix, viz re-pin) with advisor consults 3/2/2/0/0; spec-owner resumes after Plan 1; Codex challenge rounds 2, final `ready`; reviewers: correctness P1×2 P2×1, design P1×1, code health P3×1.
