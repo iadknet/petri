@@ -184,22 +184,19 @@ there blocks closure until the user accepts it or remediation removes it.
 The epochs re-pin at closure with commit 2's cause.
 
 **Measured verdict (2026-10-28, HEAD `da63b8e23`).** Both profiles: CLI exit
-0, `severe=false` against their references. Gate ran three times: runs 1 and 2
-(0.01249 and 0.01750 ms per creature-tick) were contaminated by another
-worktree's test binary at about 575 % CPU, which started after the
-`bench-wait` preflight; run 3 on a quiet host (0.00271) is the kept summary;
-`deterministic` is byte-identical across the three. Run 3 is 48 % below the
-gate epoch (0.00520, `t25-f11`), outside the predeclared +-10 % and 25 % flag
-band on the fast side; the tool reports no wall comparison, so this is a
-manual reading, not a pass. Counter flags: `plasticity_updates` +47.7 %
-(definition change, invariant 6) and `vm_steps` +49.1 % (not predeclared,
-under the 50 % severe line); goal flags `vm_steps` +34.6 %, `pass_cap_hits`
-+23.8 %. Goal hypotheses held in all three worlds: `scale_learning` 58 to 75 %
-and `member_default` 63 to 73 % of bundles at tick 2,000, `learned_scales`
-equal to the `scale_learning` bundles (3,570 to 8,439) with nonzero drift,
-`own` and `member_default` edge learners both present. Seed 22 fell to 27
-creatures at about tick 200 and recovered (final 2,784); no extinction. The
-epochs are not re-pinned yet. Details in the readings.
+0, outer `make` exit observed 0, `severe=false` against their references, no
+threshold crossed; both epochs re-pinned to this feature's summaries
+(predeclared, commit 2's draw-stream change).
+
+| Reading | Measured | Predeclared | Ruling |
+| --- | --- | --- | --- |
+| Gate wall per creature-tick | 0.002714 ms, -48 % vs epoch 0.005202 (`t25-f11`); run 3 of three, runs 1–2 (0.01249, 0.01750) excluded for host contention, `deterministic` byte-identical across all three | within 25 %, ±10 % hypothesis | hypothesis missed on the fast side; no regression; manual reading (the tool reports no wall comparison); no cause claimed |
+| Gate `plasticity_updates` | +47.7 % (flag) | definition change, no direction | as predeclared |
+| Gate `vm_steps` | +49.1 % (flag, under the 50 % severe line) | not named for the gate | trajectory reading: F12 changes no VM execution or VM mutation code and learning runs only in Graph backends, so no visit does more VM work; it moves with the draw stream as the goal paragraph predeclares for every per-seed counter; no acceptance needed |
+| Goal `vm_steps`, `pass_cap_hits` | +34.6 %, +23.8 % (flags); others ok | no direction | same trajectory reading |
+| Goal slots at tick 2,000 | `scale_learning` 58–75 %, `member_default` 63–73 % of bundles | near the 2/3 birth share | held; seed 22's 58 % follows its bottleneck |
+| Goal learners | `learned_scales` equal the `scale_learning` bundles (3,570–8,439), nonzero drift every sample; `own` and `member_default` edge learners present | as stated | held |
+| Persistence | no extinction; seed 22 fell to 27 at about tick 200 and recovered (final 2,784) | no direction | n/a |
 
 - Summaries of the declared profiles: [gate](../../progress/features/t25-f12.json),
   [goal](../../progress/features/t25-f12-goal.json).
