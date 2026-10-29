@@ -523,7 +523,7 @@ pub(crate) fn dispatch(
 /// Apply one mutation event through the gate: what it reports counts only
 /// when it commits, so a rolled-back event reports no bundle edits, broadcast
 /// or /// class (T25.F03, T25.F08).
-fn apply_event(
+pub(crate) fn apply_event(
     genome: &mut CreatureGenome,
     operator: MutationOperator,
     targets: &mut TargetSelector<'_>,

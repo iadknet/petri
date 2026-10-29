@@ -4,6 +4,9 @@
 //! inherited-value cases the deleted seed rows pinned, now against the
 //! mapping contract.
 
+use std::collections::BTreeSet;
+use std::ops::RangeInclusive;
+
 use proptest::prelude::*;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -20,9 +23,9 @@ use crate::genome::cgp::{
 };
 use crate::genome::learning::{GraphMapping, LearnableId, LearnableKey, NodeSeeds};
 use crate::genome::{BackendDef, HebbianRule, Learning, NodeGenome};
-use crate::mutation::engine::dispatch;
+use crate::mutation::engine::apply_event;
 use crate::mutation::reachability::TargetSets;
-use crate::mutation::MutationOperator;
+use crate::mutation::{MutationOperator, MutationSkipReason};
 use crate::runtime::state::GraphRuntimeState;
 
 fn body(capacity: f32) -> HeritableBody {
@@ -221,51 +224,153 @@ fn genomic(genome: &CreatureGenome) -> Seeds {
     seeds
 }
 
+/// How many of the child's learnables one committed event of `operator`
+/// may leave `Fresh`, by the seed rule (invariant 4): a weight or scale
+/// write and an added edge exactly one; a retarget, an added node (a split's
+/// identity edge), a raw-field step and a route that wires a new input at
+/// most one; every other operator keeps, copies, composes or drops, so none.
+/// `None`: the count follows the event (an added bundle or sensor wires
+/// fresh edges, a node removal rewires its consumers' sources, an added or
+/// swapped backend is fresh), and only the value check applies.
+fn fresh_bound(operator: MutationOperator) -> Option<RangeInclusive<usize>> {
+    use crate::mutation::graph::GraphOperator as G;
+    use crate::mutation::input_ref::InputRefOperator as I;
+    use crate::mutation::topology::TopologyOperator as T;
+    match operator {
+        MutationOperator::Graph(
+            G::AlterGraphEdgeWeight | G::AlterBundleScale | G::AddGraphEdge,
+        ) => Some(1..=1),
+        MutationOperator::Graph(
+            G::RetargetGraphEdge | G::AddInternalGraphNode | G::GraphRawFieldMutation,
+        )
+        | MutationOperator::Topology(T::AddRouteTarget | T::AddFeedbackRoute) => Some(0..=1),
+        MutationOperator::Graph(
+            G::AddBundleLive | G::AddBundleSilent | G::RemoveInternalGraphNode,
+        )
+        | MutationOperator::InputRef(I::AddSensorLive | I::AddSensorSilent)
+        | MutationOperator::Topology(T::AddNode | T::SwapNodeBackend) => None,
+        _ => Some(0..=0),
+    }
+}
+
+/// The learnables `seeds` carries a value for.
+fn keys(seeds: &Seeds) -> BTreeSet<LearnableId> {
+    seeds.iter().map(|(id, _)| id).collect()
+}
+
+/// Every value `carried` holds is `child`'s genomic own value at that
+/// learnable, bitwise; returns how many of the child's learnables it leaves
+/// without one.
+fn assert_carried(
+    child: &CreatureGenome,
+    carried: &Seeds,
+    what: impl std::fmt::Debug,
+) -> Result<usize, TestCaseError> {
+    let child_values = genomic(child);
+    for (id, value) in carried.iter() {
+        prop_assert_eq!(
+            child_values.get(id).map(f32::to_bits),
+            Some(value.to_bits()),
+            "{:?} at {:?}",
+            what,
+            id
+        );
+    }
+    Ok(keys(&child_values).len() - keys(carried).len())
+}
+
+/// A grown parent and the target sets over all its nodes.
+fn catalog_case(seed: u64, growth: u8) -> (CreatureGenome, Vec<usize>) {
+    let parent = grown(seed, growth);
+    let reachable = (0..parent.nodes.len()).collect();
+    (parent, reachable)
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(48))]
 
-    /// With the parent's values its genomic own values, every value an
-    /// event's mapping carries is the child's genomic own value at that
-    /// learnable, bitwise: a kept or copied learnable keeps its own value, a
-    /// detach composes to the member's new own weight, every write is
-    /// `Fresh`; every carried key names a learnable of the child. A rejected
-    /// event restores the genome.
+    /// Through the engine's gate, with the parent's values its genomic own
+    /// values: every value a committed event's mapping carries is the
+    /// child's genomic own value at that learnable, bitwise (a kept or
+    /// copied learnable keeps its own value, a detach composes to the
+    /// member's new own weight), and the learnables it leaves without a
+    /// value are exactly as many as the operator's writes and fresh edges
+    /// ([`fresh_bound`]). A rejected event restores the genome.
     #[test]
     fn every_carried_value_is_the_childs_genomic_value_through_every_catalog(
         seed in any::<u64>(),
         growth in 0u8..6,
     ) {
-        let parent = grown(seed, growth);
+        let (parent, reachable) = catalog_case(seed, growth);
         let parent_seeds = genomic(&parent);
         let config = MutationConfig::default();
         let context = crate::config::test_sensor_context(2);
-        let reachable: Vec<usize> = (0..parent.nodes.len()).collect();
         let sets = TargetSets::new(&reachable, &[]);
         for (index, &operator) in MutationOperator::ALL.iter().enumerate() {
             let mut child = parent.clone();
             let mut rng = SmallRng::seed_from_u64(seed ^ index as u64);
             let mut targets = sets.selector(0.5, 0.0);
-            let Ok((_, report)) =
-                dispatch(&mut child, operator, &mut targets, &mut rng, &config, &context)
-            else {
-                continue;
-            };
-            let carried = report.inheritance.apply(&parent_seeds);
-            let child_values = genomic(&child);
-            for (id, value) in carried.iter() {
-                prop_assert_eq!(
-                    child_values.get(id).map(f32::to_bits),
-                    Some(value.to_bits()),
-                    "{:?} at {:?}",
-                    operator,
-                    id
-                );
+            match apply_event(&mut child, operator, &mut targets, &mut rng, &config, &context) {
+                Ok((_, report)) => {
+                    let carried = report.inheritance.apply(&parent_seeds);
+                    let fresh = assert_carried(&child, &carried, operator)?;
+                    if let Some(bound) = fresh_bound(operator) {
+                        prop_assert!(bound.contains(&fresh), "{:?} left {} fresh", operator, fresh);
+                    }
+                }
+                Err(_) => prop_assert_eq!(&child, &parent, "{:?} rolled back", operator),
             }
         }
     }
 
+    /// A gate-rejected event of every operator restores the draft and
+    /// reports no mapping, and a whole birth of rejected events inherits
+    /// every value unchanged: the parent carries a node id three times, which
+    /// fails the parseability gate after any applied edit (one removal leaves
+    /// a duplicate).
+    #[test]
+    fn a_rejected_event_of_every_catalog_restores_the_draft_and_its_values(
+        seed in any::<u64>(),
+        growth in 0u8..6,
+    ) {
+        let (mut parent, _) = catalog_case(seed, growth);
+        let duplicate = parent.nodes[0].clone();
+        parent.nodes.extend([duplicate.clone(), duplicate]);
+        let reachable: Vec<usize> = (0..parent.nodes.len()).collect();
+        let parent_seeds = genomic(&parent);
+        let config = MutationConfig::default();
+        let context = crate::config::test_sensor_context(2);
+        let sets = TargetSets::new(&reachable, &[]);
+        let mut rejected = 0;
+        for (index, &operator) in MutationOperator::ALL.iter().enumerate() {
+            let mut child = parent.clone();
+            let mut rng = SmallRng::seed_from_u64(seed ^ index as u64);
+            let mut targets = sets.selector(0.5, 0.0);
+            let result = apply_event(&mut child, operator, &mut targets, &mut rng, &config, &context);
+            prop_assert!(result.is_err(), "{:?} committed on an unparseable draft", operator);
+            rejected += usize::from(result == Err(MutationSkipReason::ParseabilityViolation));
+            prop_assert_eq!(&child, &parent, "{:?} rolled back", operator);
+        }
+        prop_assert!(rejected > 0, "the gate rejected no applied event");
+        let mut child = parent.clone();
+        let birth = MutationConfig { per_unit_rate: 1.0, ..config };
+        let (summary, inheritance) = MutationEngine::apply_mutations_in(
+            &mut child,
+            &birth,
+            &reachable,
+            ParentExecuted::NONE,
+            &mut SmallRng::seed_from_u64(seed),
+            &context,
+        );
+        prop_assert_eq!(summary.applied_events, 0);
+        prop_assert_eq!(&child, &parent);
+        prop_assert_eq!(inheritance.apply(&parent_seeds), parent_seeds);
+    }
+
     /// Applying a composed mapping equals applying each mapping in turn,
-    /// over the committed events of whole births.
+    /// over the gated events of whole births; every composed value is the
+    /// child's genomic own value, and a birth whose committed events leave
+    /// nothing fresh ([`fresh_bound`]) carries every learnable of the child.
     #[test]
     fn a_composed_mapping_applies_as_its_events_in_turn(
         seed in any::<u64>(),
@@ -279,21 +384,26 @@ proptest! {
         let mut rng = SmallRng::seed_from_u64(seed);
         let mut composed = InheritanceMapping::Identity;
         let mut stepped = parent_seeds.clone();
+        let mut fresh_free = true;
         for event in 0..events {
             let operator = MutationOperator::ALL[(seed as usize + event * 7) % MutationOperator::ALL.len()];
             let reachable: Vec<usize> = (0..child.nodes.len()).collect();
             let sets = TargetSets::new(&reachable, &[]);
             let mut targets = sets.selector(0.5, 0.0);
-            let before = child.clone();
-            match dispatch(&mut child, operator, &mut targets, &mut rng, &config, &context) {
-                Ok((_, report)) => {
-                    stepped = report.inheritance.apply(&stepped);
-                    composed = report.inheritance.after(&composed);
-                }
-                Err(_) => child = before,
+            if let Ok((_, report)) =
+                apply_event(&mut child, operator, &mut targets, &mut rng, &config, &context)
+            {
+                stepped = report.inheritance.apply(&stepped);
+                composed = report.inheritance.after(&composed);
+                fresh_free &= fresh_bound(operator) == Some(0..=0);
             }
         }
-        prop_assert_eq!(composed.apply(&parent_seeds), stepped);
+        let carried = composed.apply(&parent_seeds);
+        prop_assert_eq!(&carried, &stepped);
+        let fresh = assert_carried(&child, &carried, "the birth")?;
+        if fresh_free {
+            prop_assert_eq!(fresh, 0);
+        }
     }
 }
 
