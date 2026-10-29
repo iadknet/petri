@@ -207,9 +207,11 @@ regression past its threshold would show it wrong.
       each comparator genome's canonical JSON on `768dde1fc`, taken before
       any edit, equals the one on the final code; both in readings.
 - [ ] `make rust-test-slow` -> exit 0.
-- [ ] Gate profile: summary stored at `docs/progress/features/t30-f12.json`,
+- [x] Gate profile: summary stored at `docs/progress/features/t30-f12.json`,
       deterministic block identical to the epoch, raw hash and byte count
       checked, series entry points to the summary, no full report staged.
+      Command `make bench PROFILE=gate FEATURE=t30-f12`, exit 0, severe=false,
+      verdict ok; readings in `docs/progress/readings/t30-f12.md`.
 
 ## Performance and Goal Impact
 
@@ -224,7 +226,12 @@ and a compute regression past the threshold goes to the spec owner, not to
 acceptance. No indicator can move; the goal profile is not run
 (Verification Plan).
 
-**Measured verdict.** Not yet measured.
+**Measured verdict.** `make bench PROFILE=gate FEATURE=t30-f12` -> make exit 0,
+CLI exit 0; `severe=false`; threshold verdict ok on every counter (deltas
+0.000000) against `t25-f12.json`; `deterministic` block identical to the
+epoch (SHA-256 `448cbef2...d21d7` both); wall clock +6.73% ms/creature-tick,
+level ok. Raw 159,914 bytes, SHA-256 `ade33cf956a8864943f9c6edf8f5da48027506702d06f1d67d221f2d4b45525f`,
+at `.bench-artifacts/t30-f12/gate.json` (ignored, unstaged); summary 36,763 bytes.
 
 - Summary: [gate](../../progress/features/t30-f12.json).
 - Full readings: [`docs/progress/readings/t30-f12.md`](../../progress/readings/t30-f12.md).
