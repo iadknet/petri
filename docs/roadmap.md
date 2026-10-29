@@ -1,7 +1,7 @@
 # Diverse Ecosystems and Complex Cognition
 
 **Status**: Active
-**Last updated**: 2026-10-27
+**Last updated**: 2026-10-28
 
 Program 2. Program 1 (2026-09-02 to 2026-10-12) is archived with what it
 closed, what made evolution start working and the findings it carried
@@ -19,7 +19,7 @@ attributed to the feature whose closure moved it.
 
 ## Track Roadmaps
 
-- [ ] **T25 — Edge Groups and Per-Edge Learning** — [Roadmap](roadmaps/t25-edge-groups-and-learning.md) — Depends on: None
+- [x] **T25 — Edge Groups and Per-Edge Learning** — [Roadmap](roadmaps/t25-edge-groups-and-learning.md) — Depends on: None
 - [x] **T26 — Body Traits** — [Roadmap](roadmaps/t26-body-traits.md) — Depends on: None
 - [ ] **T27 — Social Signals and Exchange** — [Roadmap](roadmaps/t27-social-signals-and-exchange.md) — Depends on: T26, T29, T30
 - [ ] **T28 — Niche Construction** — [Roadmap](roadmaps/t28-niche-construction.md) — Depends on: T26, T27, T29, T30

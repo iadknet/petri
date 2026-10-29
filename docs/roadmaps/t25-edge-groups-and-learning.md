@@ -1,7 +1,7 @@
 # T25 — Edge Groups and Per-Edge Learning
 
-**Status**: In Progress
-**Last updated**: 2026-10-27
+**Status**: Complete
+**Last updated**: 2026-10-28
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -21,7 +21,7 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
 - [x] One owner edits the graph, one captures a parent's learned state as a child's birth seeds, and one builds the running brain from them; no mutation operator keeps birth alignment by hand, and no struct literal builds an edge outside the constructors.
 - [x] No wired-sink unit remains and the founder anchor was re-pinned (F02); every edge outside a group costs one genome unit, and a group's cost follows F10's gene rule (the uniform one-unit-per-member rule was F02's outcome, superseded by F10 on 2026-10-20).
 - [x] Ring projections are edge groups: eight member edges with one shared scale, each member deletable, re-weightable and learnable on its own; every reader counts them as edges, reads membership from the genome, and no reader re-derives explicit membership (derived wiring analyses keep their own definitions over non-member edges).
-- [ ] A direction-pair group born silent on a creature, food, barrier or crowd offset is retained and its scale moves off zero in a 40,000-tick goal-long run on at least one standard goal world.
+- [x] A direction-pair group born silent on a creature, food, barrier or crowd offset is retained and its scale moves off zero in a 40,000-tick goal-long run on at least one standard goal world.
 - [x] The three creature families are one `NearbyCreature` family declared once in `contracts::inputs`.
 - [x] Learning mode, reward source, trace decay and the Lamarckian flag are per-edge heritable attributes on both surfaces; vote edges can learn; no cost knob or lazy initializer remains.
 - [x] (Superseded by T25.F12 for the representation: `Scope` and `inherit_scale` give way to bundle `Learning`, member overrides and `credits`; the behavior this criterion asked for is kept.) Scope and `inherit_scale` are heritable; a group-scope update is one pattern-weighted change to the shared scale, bounded once; every attribute mutation draws its scope.
@@ -193,6 +193,11 @@ reviews recorded in [the review readings](../progress/readings/t25-design-review
   re-pin gate and goal epochs." The final-code gate and goal summaries
   become both epochs in the closing commit; no threshold or stored
   baseline is edited.
+- Decided (user, 2026-10-28, "Accept T25.F04's 40,000-tick reading for criterion
+  4, check it, and close the T25 track"): criterion 4 rests on the T25.F04
+  goal-long reading ([readings](../progress/readings/t25-f04.md)), measured
+  before F10–F12 changed pair-bundle cost, creation and learning; no
+  goal-long run on the final T25 code exists.
 - Decided (user, 2026-10-22): F12 follows F11, after the user asked whether
   sensors, sinks, edges and bundles keep clean layers around learning. The
   [bundle learning note](../strategy/bundle-learning-ownership-2026-10-22.md)
