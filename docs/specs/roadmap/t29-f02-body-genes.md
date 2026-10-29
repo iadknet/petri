@@ -135,7 +135,7 @@ collapsed distribution in the goal-long run shows it wrong.
 - [x] Focused tests: brain operators are the catalog's leading run, carry the weights and are all `dispatch` takes, body operators outside them; founder supply 0.485 and size 85; body-supply draw pin; gene operations and the conception clamp against today's arithmetic; repeated scalar events at extreme normalized `share_min` and `log_step` stay finite and in range; an instrument's mutated genome equals conception's for the same draws; genome serde with the body and a rejected out-of-range active channel; body events recorded as applied `NotApplicable`; a zero-brain-event birth still draws body supply; the one-event screen draws no body event; size pressure leaves body events; `lineage_id` provenance; body census against brute-force pairs.
 - [x] Build: `cargo check --workspace --all-targets`, `cargo fmt --all --check`, `make rust-clippy`, `node scripts/architecture-check.mjs` -> exit 0; `cargo test -p v3-core` (2,256 unit tests and every integration target), `-p v3-cli -p v3-lab`, `-p v3-telemetry -p v3-server` -> all pass; frontend `npm test` -> 680 passed, `npm run lint` -> no new finding.
 - [ ] `make check` -> exit 0; `make rust-test-slow` -> exit 0.
-- [ ] Gate, goal and goal-long summaries stored at `docs/progress/features/t29-f02.json`, `t29-f02-goal.json`, `t29-f02-goal-long.json`; local raw hash, byte count and time checked; series entries point to them; no full report staged.
+- [x] Gate, goal and goal-long run once each (`make bench PROFILE=<p> FEATURE=t29-f02-body-genes`); summaries at `docs/progress/features/t29-f02-body-genes.json`, `-goal.json`, `-goal-long.json`; outer exits 0, 2, 2 and CLI exits 0, 3, 3 (3 is the severe exit); raw hashes, byte counts and times in the readings; series `closed` entries point to them; no full report staged. Goal and goal-long are `severe` (below).
 
 ## Performance and Goal Impact
 
@@ -168,11 +168,22 @@ closed in between; its epoch is not re-pinned.
 | Colour | `founder_colour_fraction` high and `distinct_colours` low at 2,000 ticks; no baseline exists | — |
 | Neighborhood and drift readings | move with the rate (brain supply 80/85 of before at founder size); no direction claimed | — |
 
-**Measured verdict.** Pending.
+**Measured verdict.** Final code `3dc216baf`. Gate: `severe=false`, CLI exit 0,
+deterministic block differs from the epoch as predeclared, wall -0.58 %. Goal:
+`severe=true` (CLI exit 3), `decided_passes` +86 % (0.0038 to 0.0070); all three
+worlds persist, with final, minimum and plateau population below the epoch's (Canyon
+final 1,624 against 2,784). Goal-long: `severe=true` (CLI exit 3),
+`plasticity_updates` +203 % and `decided_passes` +233 %, five more counters flagged;
+all three worlds persist; every body gene has 11,500 to 29,400 applied events per
+world, 0.0286 to 0.0289 body events per birth; capacity p10-p90 narrower in two worlds
+and wider in Confluence; within-clade kin bits 3.2 to 4.5. Several features closed
+between the epoch and this run, so the goal-long shift has more than one cause. The
+severe flags are unresolved and go to the orchestrator; the gate and goal epoch
+re-pins are not made.
 
-- Summaries: [gate](../../progress/features/t29-f02.json),
-  [goal](../../progress/features/t29-f02-goal.json),
-  [goal-long](../../progress/features/t29-f02-goal-long.json).
+- Summaries: [gate](../../progress/features/t29-f02-body-genes.json),
+  [goal](../../progress/features/t29-f02-body-genes-goal.json),
+  [goal-long](../../progress/features/t29-f02-body-genes-goal-long.json).
 - Full readings: [`docs/progress/readings/t29-f02.md`](../../progress/readings/t29-f02.md).
 
 ## Success Criteria

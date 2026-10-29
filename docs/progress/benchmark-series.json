@@ -101,7 +101,8 @@
       "docs/progress/features/t30-f16.json",
       "docs/progress/features/t29-f01.json",
       "docs/progress/features/t25-f12.json",
-      "docs/progress/features/t30-f12.json"
+      "docs/progress/features/t30-f12.json",
+      "docs/progress/features/t29-f02-body-genes.json"
     ]
   },
   "goal": {
@@ -341,7 +342,8 @@
       "docs/progress/features/t26-f02-evolvable-energy-reserves-goal.json",
       "docs/progress/features/t27-f03-giving-energy-goal.json",
       "docs/progress/features/t25-f11-goal.json",
-      "docs/progress/features/t25-f12-goal.json"
+      "docs/progress/features/t25-f12-goal.json",
+      "docs/progress/features/t29-f02-body-genes-goal.json"
     ]
   },
   "goal_worlds_long": {
@@ -350,7 +352,8 @@
     "closed": [
       "docs/progress/features/t25-f02-uniform-genome-size-goal-long.json",
       "docs/progress/features/t25-f04-direction-pair-groups-goal-long.json",
-      "docs/progress/features/t26-f02-evolvable-energy-reserves-goal-long.json"
+      "docs/progress/features/t26-f02-evolvable-energy-reserves-goal-long.json",
+      "docs/progress/features/t29-f02-body-genes-goal-long.json"
     ]
   }
 }
